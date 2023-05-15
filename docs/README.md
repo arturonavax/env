@@ -1,5 +1,7 @@
 # :scroll: Tutorials :scroll:
 
+[Screenshots](./screenshots/README.md)
+
 ## [Spanish :es:](./spanish)
 
 - **[¿Como uso Vim?](./spanish/vim_use.md)**
@@ -10,6 +12,6 @@
 
 - **[¿Como uso Delve?](./spanish/delve_use.md)**
 
-## English :en:
+## English :us:
 
 - **[MacOS](./mac_os)**

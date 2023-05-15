@@ -38,13 +38,8 @@ List of installation flags:
 ## Fonts installer
 
 ```sh
-bash <(curl -fsSL "https://env.arturonavax.dev/install_fonts.sh") help
+curl -fsSL "https://env.arturonavax.dev/install_fonts.sh" | bash
 ```
-
-List of installation flags:
-
-- `-i`: Install latest version available.
-- `-c`: Compiling from sources.
 
 ## OS config
 

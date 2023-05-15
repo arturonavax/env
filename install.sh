@@ -69,7 +69,7 @@ function install() {
 	fi
 
 	echo -e "${fgcolor_white_bold}[Installer]: Downloading the latest version of the repository...${fgcolor_reset}"
-	git pull origin master
+	git pull origin main
 	echo
 
 	echo -en "$fgcolor_yellow_bold"
