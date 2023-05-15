@@ -1,0 +1,78 @@
+window:
+  decorations: full
+
+  dimensions:
+    columns: 170
+    lines: 40
+
+  opacity: 0.99
+
+font:
+  size: 11
+
+  normal:
+    family: CaskaydiaCove Nerd Font Mono
+    style: Regular
+
+  italic:
+    family: CaskaydiaCove Nerd Font Mono
+    style: Italic
+
+  bold:
+    family: CaskaydiaCove Nerd Font Mono
+    style: Bold
+
+  bold_italic:
+    family: CaskaydiaCove Nerd Font Mono
+    style: Bold Italic
+
+tabspaces: 4
+
+env:
+  TERM: alacritty
+
+shell:
+  program: zsh
+  args:
+    - -l
+    - -c
+    - "tmux"
+
+key_bindings:
+  - { key: F11, mods: None, action: ToggleFullscreen }
+  - { key: F11, mods: Command, action: ToggleFullscreen }
+
+# TokyoNight Alacritty Colors
+colors:
+  transparent_background_colors: true
+
+  # Default colors
+  primary:
+    background: "0xEDEFF5"
+    foreground: "0x8b8b8c"
+
+  # Normal colors
+  normal:
+    black: "0x5D6584"
+    red: "0xBF4B4B"
+    green: "0x78A448"
+    yellow: "0xB87D28"
+    blue: "0x4A7AE1"
+    magenta: "0xA27BEA"
+    cyan: "0x4997C4"
+    white: "0xAFB8E3"
+
+  # Bright colors
+  bright:
+    black: "0x5D6584"
+    red: "0xf7768e"
+    green: "0x9ece6a"
+    yellow: "0xb87d28"
+    blue: "0x7aa2f7"
+    magenta: "0xbb9af7"
+    cyan: "0x7dcfff"
+    white: "0xc0caf5"
+
+  indexed_colors:
+    - { index: 16, color: "0x9C6515" }
+    - { index: 17, color: "0xdb4b4b" }

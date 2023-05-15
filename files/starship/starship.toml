@@ -1,0 +1,57 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+command_timeout = 1500
+add_newline = true
+
+format = """┌─ $directory\
+$git_branch\
+$git_commit\
+$git_state\
+$git_metrics\
+$git_status\
+$cmd_duration\
+$line_break\
+└─$sudo$character"""
+
+[character]
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+
+[sudo]
+disabled = false
+symbol = ' 🦊 '
+format = '[$symbol]($style)'
+
+[cmd_duration]
+min_time = 3_000
+show_milliseconds = true
+format = '[took](italic) [$duration]($style) '
+
+[directory]
+read_only = ' '
+truncation_length = 6
+truncation_symbol = '.../'
+repo_root_style = 'bold italic blue'
+
+repo_root_format = '[$read_only]($read_only_style)[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)[$path]($style) '
+format = '[$read_only]($read_only_style)[$path]($style) '
+
+[git_branch]
+symbol = ''
+
+[git_commit]
+format = 'on [\($hash$tag\)]($style) '
+tag_disabled = false
+
+[git_status]
+conflicted = '🏳'
+staged = '[+](bold green)'
+ahead = '[⇡](bold blue)'
+behind = '[⇣](bold cyan)'
+diverged = '[⇕](bold yellow)'
+untracked = '[?](bold yellow)'
+stashed = '[ﱾ](bold blue)'
+deleted = '[](bold red)'
+modified = '[!](bold red)'
+style = 'bold white'
+format = '([\[$stashed$conflicted$modified$renamed$staged$untracked$ahead_behind$deleted\]]($style) )'

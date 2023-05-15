@@ -1,0 +1,15 @@
+{
+	"name": "arturonavax-snippets",
+	"author": "arturonavax",
+	"engines": {
+		"vscode": "^1.11.0"
+	},
+	"contributes": {
+		"snippets": [
+			{
+				"language": "go",
+				"path": "./golang.json"
+			}
+		]
+	}
+}

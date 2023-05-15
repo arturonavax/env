@@ -1,0 +1,87 @@
+{
+	"root": true,
+
+	"env": {
+		"browser": true,
+		"es2022": true
+	},
+
+	"parserOptions": {
+		"ecmaVersion": "latest",
+		"sourceType": "module"
+	},
+
+	"overrides": [
+		{
+			"files": ["*.ts", "*.tsx"],
+
+			"extends": [
+				"plugin:react/recommended", "plugin:react/jsx-runtime",
+				"standard-with-typescript"
+			],
+
+			"plugins": ["react"],
+
+			"parserOptions": {
+				"project": ["./tsconfig.json"]
+			},
+
+			"rules": {
+				"no-tabs": "off",
+				"comma-dangle": "off",
+				"indent": ["error", "tab"],
+				"quotes": ["error", "double"],
+				"arrow-parens": ["error", "as-needed"],
+
+				"import/extensions": ["error", "never"],
+				"import/no-unresolved": "off",
+
+				"react/react-in-jsx-scope": "off",
+				"react/jsx-one-expression-per-line": "off",
+				"react/jsx-closing-bracket-location": "off",
+				"react/jsx-indent": ["error", "tab"],
+				"react/jsx-indent-props": ["error", "tab"],
+				"react/jsx-filename-extension": [
+					1,
+					{ "extensions": [".js", ".jsx", ".ts", ".tsx"] }
+				],
+
+				"@typescript-eslint/quotes": ["error", "double"],
+				"@typescript-eslint/indent": ["error", "tab"],
+				"@typescript-eslint/explicit-function-return-type": "warn",
+				"@typescript-eslint/space-before-function-paren": "off",
+				"@typescript-eslint/object-curly-spacing": "off"
+			}
+		},
+		{
+			"files": ["*.js", "*.jsx"],
+
+			"extends": [
+				"plugin:react/recommended", "plugin:react/jsx-runtime", "standard"
+			],
+
+			"plugins": ["react"],
+
+			"rules": {
+				"no-tabs": "off",
+				"comma-dangle": "off",
+				"indent": ["error", "tab"],
+				"quotes": ["error", "double"],
+				"arrow-parens": ["error", "as-needed"],
+
+				"import/extensions": ["error", "never"],
+				"import/no-unresolved": "off",
+
+				"react/react-in-jsx-scope": "off",
+				"react/jsx-one-expression-per-line": "off",
+				"react/jsx-closing-bracket-location": "off",
+				"react/jsx-indent": ["error", "tab"],
+				"react/jsx-indent-props": ["error", "tab"],
+				"react/jsx-filename-extension": [
+					1,
+					{ "extensions": [".js", ".jsx", ".ts", ".tsx"] }
+				]
+			}
+		}
+	]
+}

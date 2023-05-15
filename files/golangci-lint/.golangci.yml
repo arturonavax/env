@@ -1,0 +1,379 @@
+run:
+  timeout: 3m
+
+linters:
+  presets:
+    - unused
+    - bugs
+    - error
+    - style
+    - metalinter
+    - performance
+    - complexity
+    - format
+    - import
+    - module
+    - test
+    - sql
+    - module
+    - comment
+
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - depguard
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - execinquery
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - goerr113
+    - goheader
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    # - gosmopolitan
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - loggercheck
+    - logrlint
+    - maintidx
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - stylecheck
+    - tenv
+    - testableexamples
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl
+    # - zerologlint
+
+  disable:
+    # Deprecated
+    - varcheck
+    - structcheck
+    - deadcode
+    - nosnakecase
+    - exhaustivestruct
+    - golint
+    - ifshort
+    - interfacer
+    - maligned
+    - scopelint
+
+    # I do not use it
+    - gofmt
+    - gofumpt
+    - goimports
+    - lll
+    - gci
+    - nonamedreturns
+    - exhaustruct
+    - musttag
+    - tagliatelle
+    # - tagalign
+    - godox
+
+linters-settings:
+  revive:
+    rules:
+      - name: context-keys-type
+      - name: time-equal
+      - name: time-naming
+      - name: var-declaration
+      - name: unexported-return
+      - name: errorf
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: indent-error-flow
+      - name: empty-block
+      - name: superfluous-else
+      - name: confusing-naming
+      - name: get-return
+      - name: modifies-parameter
+      - name: confusing-results
+      - name: deep-exit
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: flag-parameter
+      - name: unnecessary-stmt
+      - name: struct-tag
+      - name: modifies-value-receiver
+      - name: constant-logical-expr
+      - name: bool-literal-in-expr
+      - name: redefines-builtin-id
+      - name: range-val-in-closure
+      - name: range-val-address
+      - name: waitgroup-by-value
+      - name: atomic
+      - name: empty-lines
+      - name: call-to-gc
+      - name: duplicated-imports
+      - name: import-shadowing
+      - name: bare-return
+      - name: unused-receiver
+      - name: string-of-int
+      - name: early-return
+      - name: unconditional-recursion
+      - name: identical-branches
+      - name: defer
+      - name: unexported-naming
+      - name: useless-break
+      - name: optimize-operands-order
+      - name: use-any
+      - name: datarace
+      - name: comment-spacings
+        arguments:
+          - nolint
+
+      - name: argument-limit
+        arguments: [4]
+
+      - name: function-result-limit
+        arguments: [4]
+
+      - name: imports-blacklist
+        arguments:
+          - "crypto/md5"
+          - "crypto/sha1"
+          - "io/ioutil"
+
+      - name: line-length-limit
+        arguments: [120]
+
+  govet:
+    check-shadowing: true
+    settings:
+      shadow:
+        strict: true
+    enable:
+      - asmdecl
+      - assign
+      - atomic
+      - atomicalign
+      - bools
+      - buildtag
+      - cgocall
+      - composites
+      - copylocks
+      - deepequalerrors
+      - errorsas
+      - fieldalignment
+      - findcall
+      - framepointer
+      - httpresponse
+      - ifaceassert
+      - loopclosure
+      - lostcancel
+      - nilfunc
+      - nilness
+      - printf
+      - reflectvaluecompare
+      - shadow
+      - shift
+      - sigchanyzer
+      - sortslice
+      - stdmethods
+      - stringintconv
+      - structtag
+      - testinggoroutine
+      - tests
+      - unmarshal
+      - unreachable
+      - unsafeptr
+      - unusedresult
+      - unusedwrite
+
+  funlen:
+    lines: 140
+    statements: 60
+
+  errcheck:
+    check-type-assertions: true
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+
+  nakedret:
+    max-func-lines: 4
+
+  tenv:
+    all: true
+
+  gosimple:
+    checks: ["all"]
+
+  staticcheck:
+    checks: ["all"]
+
+  stylecheck:
+    checks: ["all"]
+
+  gomnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+      - assign
+
+    ignored-numbers:
+      - "1"
+      - "1.0"
+      - "0"
+      - "0.0"
+
+  gomodguard:
+    blocked:
+      modules:
+        - github.com/golang/protobuf:
+            recommendations:
+              - google.golang.org/protobuf
+            reason: "see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules"
+
+        - github.com/satori/go.uuid:
+            recommendations:
+              - github.com/google/uuid
+            reason: "satori's package is not maintained"
+
+        - github.com/gofrs/uuid:
+            recommendations:
+              - github.com/google/uuid
+            reason: "see recommendation from dev-infra team: https://confluence.gtforge.com/x/gQI6Aw"
+
+  goconst:
+    match-constant: true
+    min-len: 2
+    min-occurrences: 3
+    min: 3
+    max: 3
+
+  dupl:
+    threshold: 100
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - opinionated
+
+    disabled-tags:
+      - experimental
+
+    settings:
+      hugeParam:
+        sizeThreshold: 80
+
+  gocognit:
+    min-complexity: 30
+
+  gocyclo:
+    min-complexity: 30
+
+  cyclop:
+    max-complexity: 19
+
+  decorder:
+    disable-dec-order-check: false
+    dec-order:
+      - const
+      - var
+      - type
+      - func
+
+  forbidigo:
+    forbid:
+      - "^print$(# Do not commit print statements, use the 'fmt' package instead)?"
+      - "^println$(# Do not commit print statements, use the 'fmt' package instead)?"
+
+  varnamelen:
+    min-name-length: 2
+    max-distance: 8
+    ignore-decls:
+      - c echo.Context
+      - c *gin.Context
+      - t *testing.T
+      - b *testing.B
+      - i int
+      - w http.ResponseWriter
+      - r *http.Request
+      - f *os.File
+
+  interfacebloat:
+    max: 10
+
+  reassign:
+    patterns:
+      - ".*"

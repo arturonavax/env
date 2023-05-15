@@ -1,0 +1,17 @@
+{
+	"iferr": {
+		"prefix": "iferr",
+		"description": "Handler error",
+
+		"body": ["if err != nil {", "\treturn ${1:err}", "}"]
+	},
+	"goboi": {
+		"prefix": "goboi",
+		"description": "Golang boilerplate",
+
+		"body": [
+			"package main", "", "import \"fmt\"", "", "func main() {",
+			"\tfmt.Println(\"${1:Hello world!}\")", "}"
+		]
+	}
+}
