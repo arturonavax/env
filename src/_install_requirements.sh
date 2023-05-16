@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs the tools and languages needed to run the installation script.
 # Automatically add to the PATH of the current session everything to be able to run the installation script in the same session.
-# This script should not be executed with the "source" command because it requires a modification of the PATH in the current SHELL session.
+# This script must be executed with the "source" command.
 #
 # Run: source ./src/_install_requirements.sh
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do

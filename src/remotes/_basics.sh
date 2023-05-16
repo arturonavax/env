@@ -1,5 +1,5 @@
 #!/bin/bash
-# This script should not be executed with the "source" command because it requires a modification of the PATH in the current SHELL session.
+# This script must be executed with the "source" command.
 #
 # Run: source <(curl -fsSL "https://env.arturonavax.dev/_basics.sh" | cat)
 mkdir -p "$HOME/.local/bin/"

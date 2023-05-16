@@ -1,4 +1,6 @@
 #!/bin/bash
+# This script must be executed with the "source" command.
+#
 # Run: source <(curl -fsSL "https://env.arturonavax.dev/_vars_colors.sh" | cat)
 
 # Reset Text Color

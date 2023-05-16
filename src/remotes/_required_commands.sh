@@ -1,4 +1,6 @@
 #!/bin/bash
+# This script must be executed with the "source" command.
+#
 # Run: source <(curl -fsSL "https://env.arturonavax.dev/_required_commands.sh" | cat)
 repo_remote_files="https://env.arturonavax.dev"
 

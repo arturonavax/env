@@ -1,4 +1,6 @@
 #!/bin/bash
+# This script must be executed with the "source" command.
+#
 # Run: source <(curl -fsSL "https://env.arturonavax.dev/_cd.sh" | cat)
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	if [[ "$PWD" == "/" ]]; then
