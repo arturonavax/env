@@ -87,6 +87,10 @@ requirements are installed:
 
 - `go` >= _v1.15.0_
 
+- `python3`
+
+  - `pip`
+
 - `node` >= _v12.0.0_
 
   - `npm`
