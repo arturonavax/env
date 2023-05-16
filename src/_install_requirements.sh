@@ -119,17 +119,6 @@ fi
 
 # ---
 
-if [[ "$(command -v deno)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing deno...${fgcolor_reset}"
-
-	## download deno
-	curl -fsSL https://deno.land/x/install/install.sh | sh
-
-	echo
-fi
-
-# ---
-
 if [[ "$(command -v go)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
 

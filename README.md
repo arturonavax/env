@@ -30,7 +30,7 @@ List of installation parameters:
 
   Install basic dependencies (depending on the operating system), and the
   following: `pyenv`, `python3`, `pipx`, `cargo`, `rustc`, `fnm`, `node`,
-  `npm`, `pnpm`, `deno` and `go`
+  `npm`, `pnpm` and `go`
 
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
