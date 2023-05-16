@@ -72,112 +72,130 @@ echo
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
+if [[ "$(command -v pyenv)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
 
-# downloads
-## download pyenv
-curl https://pyenv.run | bash || :
+	# download pyenv
+	curl https://pyenv.run | bash || :
 
-echo
-
-# ---
-
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing rust...${fgcolor_reset}"
-
-## download rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-
-echo
+	echo
+fi
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing fnm (node version manager)...${fgcolor_reset}"
+if [[ "$(command -v cargo)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing rust...${fgcolor_reset}"
 
-## download fnm
-curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+	# download rust
+	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 
-echo
-
-# ---
-
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pnpm (node package module)...${fgcolor_reset}"
-
-## download pnpm
-tmp_shell="$SHELL"
-export SHELL="bash" # To prevent the following installer, write to the ~/.zshrc file
-curl -fsSL https://get.pnpm.io/install.sh | sh -
-export SHELL="$tmp_shell"
-
-echo
+	echo
+fi
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing deno...${fgcolor_reset}"
+if [[ "$(command -v fnm)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing fnm (node version manager)...${fgcolor_reset}"
 
-## download deno
-curl -fsSL https://deno.land/x/install/install.sh | sh
+	## download fnm
+	curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
 
-echo
+	echo
+fi
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
+if [[ "$(command -v pnpm)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pnpm (node package module)...${fgcolor_reset}"
 
-## download go
-curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
+	## download pnpm
+	tmp_shell="$SHELL"
+	export SHELL="bash" # To prevent the following installer, write to the ~/.zshrc file
+	curl -fsSL https://get.pnpm.io/install.sh | sh -
+	export SHELL="$tmp_shell"
 
-echo
+	echo
+fi
+
+# ---
+
+if [[ "$(command -v deno)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing deno...${fgcolor_reset}"
+
+	## download deno
+	curl -fsSL https://deno.land/x/install/install.sh | sh
+
+	echo
+fi
+
+# ---
+
+if [[ "$(command -v go)" == "" ]]; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
+
+	## download go
+	curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
+
+	echo
+fi
 
 # ---
 
 echo -e "${fgcolor_white_bold}[Requirements Installer]: - Loading installations (source command)...${fgcolor_reset}"
 
-# loads
 function rehash() {
 	hash -r "$@"
 }
 
+# loads
 source ./files/zsh/.tools.sh || :
 
 echo
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing python 3...${fgcolor_reset}"
+# Install python if the current python is not from pyenv
+if ! command -v python3 | grep -q ".pyenv"; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing python 3...${fgcolor_reset}"
 
-# installs
-## install python
-pyenv install -s 3
-pyenv global 3
+	# install python
+	pyenv install -s 3
+	pyenv global 3
 
-eval "$(pyenv init -)"
+	eval "$(pyenv init -)"
 
-echo
-
-# ---
-
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
-
-## install pipx
-python3 -m pip install --upgrade pip
-python3 -m pip install --user pipx --force
-python3 -m pipx ensurepath
-
-echo
+	echo
+fi
 
 # ---
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing nodejs...${fgcolor_reset}"
+if ! python3 -m pipx --version &>/dev/null; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
 
-## install node
-fnm install --latest
+	# install pipx
+	python3 -m pip install --upgrade pip
+	python3 -m pip install --user pipx --force
+	python3 -m pipx ensurepath
 
-node_latest_label="$(fnm list | sort --version-sort | awk '{print $2}' | tail -n 1)"
+	echo
+fi
 
-fnm use "$node_latest_label"
-fnm default "$node_latest_label"
+# ---
 
-echo
+# Install nodejs if the current nodejs is not from fnm
+if ! command -v node | grep -q "fnm"; then
+	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing nodejs...${fgcolor_reset}"
+
+	# install node
+	fnm install --latest
+
+	node_latest_label="$(fnm list | sort --version-sort | awk '{print $2}' | tail -n 1)"
+
+	fnm use "$node_latest_label"
+	fnm default "$node_latest_label"
+
+	echo
+fi
 
 # ---
 
