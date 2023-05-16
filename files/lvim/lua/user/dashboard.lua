@@ -1,5 +1,5 @@
 lvim.builtin.alpha.dashboard.section.header.val = {
-	"                                            /\\   /\\   Hi! 🦊, " .. vim.fn.expand("$USER"),
+	"                                            /\\   /\\   Hi 🦊, " .. vim.fn.expand("$USER"),
 	"                                           //\\\\_//\\\\     ____",
 	"                                           \\_     _/    /   /",
 	"                                            / * * \\    /^^^]",

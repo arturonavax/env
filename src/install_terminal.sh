@@ -32,7 +32,39 @@ function install_terminal() {
 		alacritty_version_minor="$(alacritty --version | cut -d' ' -f2 | tr -d '\-dev' | cut -d. -f2)"
 	fi
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing Terminal and Tools...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: Starting install_terminal.sh script...${fgcolor_reset}"
+
+	# npm or pnpm
+	if [[ "$(command -v npm)" != "" ]]; then
+		function node_package_module() {
+			npm "$@"
+		}
+	fi
+
+	if [[ "$(command -v pnpm)" != "" ]]; then
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: - - pnpm is used instead of npm${fgcolor_reset}"
+
+		function node_package_module() {
+			pnpm "$@"
+		}
+	fi
+
+	# python3 -m pip or pipx
+	if python3 -m pip &>/dev/null; then
+		function python_binary_installer() {
+			python3 -m pip install --user --upgrade "$@"
+		}
+	fi
+
+	if [[ "$(command -v pipx)" != "" ]]; then
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: - - pipx is used instead of 'python3 -m pip'${fgcolor_reset}"
+
+		function python_binary_installer() {
+			pipx install "$@"
+		}
+	fi
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo apt update
@@ -119,49 +151,82 @@ function install_terminal() {
 
 		# clang is installed with xcode-select --install
 	fi
-	echo
-
-	# install speedtest
-	pipx install speedtest-cli
-
-	# install corepack and yarn
-	pnpm install -g corepack
-	pnpm install -g yarn
-	corepack prepare yarn@stable --activate || :
-
-	# install protobuf golang plugins
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-	# install serve and tldr
-	pnpm install -g serve tldr
-
-	# install fx (JSON Viewer)
-	go install github.com/antonmedv/fx@latest
 
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
-	# install pgcli and litecli
-	pipx install pgcli
-	pipx install litecli
-	echo
+	if [[ "$(command -v node_package_module)" != "" ]]; then
+		# install corepack and yarn
+		node_package_module install -g corepack
+		node_package_module install -g yarn
+		corepack prepare yarn@stable --activate || :
 
-	if [[ "$SHELL" != *"zsh" ]]; then
-		echo -e "${fgcolor_white_bold}[Terminal Installer]: ${fgcolor_yellow_bold}Configuring Zsh... enter your sudo or root password${fgcolor_reset}"
+		# install serve and tldr
+		node_package_module install -g serve tldr
 
-		if [[ "$(command -v zsh)" != "" ]]; then
-			chsh -s "$(command -v zsh)"
-		fi
-
-		touch ~/.zshrc
-
-		[[ "$(wc -l ~/.zshrc | awk '{print $1}')" == 0 ]] && cp ./files/zsh/.zshrc ~/.
+	else
+		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'node package module' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
+        \tcorepack, yarn, serve, tldr${fgcolor_reset}"
 	fi
+
+	if [[ "$(command -v go)" != "" ]]; then
+		# install fx (JSON Viewer)
+		go install github.com/antonmedv/fx@latest
+
+		# install protobuf golang plugins
+		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+		# install sec tools
+		go install github.com/sonatype-nexus-community/nancy@latest
+		go install golang.org/x/vuln/cmd/govulncheck@latest
+		curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh |
+			sh -s -- -b "$(go env GOPATH)"/bin
+
+		# install air
+		curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh |
+			sh -s -- -b "$(go env GOPATH)"/bin
+
+		# install golangci-lint
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
+			sh -s -- -b "$(go env GOPATH)"/bin
+
+		# install delve
+		go install github.com/go-delve/delve/cmd/dlv@latest
+
+		golangci-lint cache clean
+
+	else
+		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
+        \tfx, protoc-gen-go, protoc-gen-go-grpc, nancy, govulncheck, gosec, air, golangci-lint, delve${fgcolor_reset}"
+		echo
+	fi
+
+	if [[ "$(command -v python_binary_installer)" != "" ]]; then
+		python_binary_installer speedtest-cli
+		python_binary_installer pgcli
+		python_binary_installer litecli
+
+	else
+		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'python binary installer' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
+        \tspeedtest-cli, pgcli, litecli${fgcolor_reset}"
+		echo
+	fi
+
+	# install just
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin || :
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		brew install just
+	fi
+
 	echo
+
+	# ---
 
 	if ((alacritty_version_minor <= 11)); then
-		echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing Alacritty...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Alacritty...${fgcolor_reset}"
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
 			sudo add-apt-repository ppa:aslatter/ppa -y
@@ -189,35 +254,64 @@ function install_terminal() {
 		echo
 	fi
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading Tmux Plugin Manager...${fgcolor_reset}"
-	rm -rf ~/.tmux/plugins
-	git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-	echo
+	if [[ "$SHELL" != *"zsh" ]]; then
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: - ${fgcolor_yellow_bold}Configuring Zsh... enter your sudo or root password${fgcolor_reset}"
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing Starship...${fgcolor_reset}"
+		if [[ "$(command -v zsh)" != "" ]]; then
+			chsh -s "$(command -v zsh)"
+		fi
+
+		touch ~/.zshrc
+
+		[[ "$(wc -l ~/.zshrc | awk '{print $1}')" == 0 ]] && cp ./files/zsh/.zshrc ~/.
+
+		echo
+	fi
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Starship...${fgcolor_reset}"
 	curl -sS https://starship.rs/install.sh | sh -s -- --yes
+
 	echo
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing Zsh Plugins...${fgcolor_reset}"
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins...${fgcolor_reset}"
 	git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions || :
 	git clone https://github.com/zdharma-continuum/fast-syntax-highlighting ~/.zsh/fast-syntax-highlighting || :
 	git clone https://github.com/zsh-users/zsh-completions.git ~/.zsh/zsh-completions || :
 	git clone https://github.com/Aloxaf/fzf-tab ~/.zsh/fzf-tab || :
-	rm -f ~/.zcompdump || :
+	rm -f ~/.zcompdump
 	if [[ "$(command -v compinit)" != "" ]]; then
-		compinit
+		compinit || :
 	fi
+
 	echo
+
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Downloading Tmux Plugin Manager...${fgcolor_reset}"
+	rm -rf ~/.tmux/plugins
+	git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+
+	echo
+
+	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Synchronizing configuration...${fgcolor_reset}"
 	bash ./utils/sync_config.sh terminal
+
 	echo
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing Tmux Plugins...${fgcolor_reset}"
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Tmux Plugins...${fgcolor_reset}"
 	bash ~/.tmux/plugins/tpm/scripts/install_plugins.sh
+
 	echo
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: ZSH Shell sources...${fgcolor_reset}"
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Add ZSH Shell sources...${fgcolor_reset}"
 
 	[[ ! -f ~/.zshrc ]] && touch ~/.zshrc
 
@@ -227,43 +321,19 @@ function install_terminal() {
 
 	[[ "$(wc -l ~/.zshrc | awk '{print $1}')" == "$(wc -l ./files/zsh/.zshrc | awk '{print $1}')" ]] && cp ./files/zsh/.zshrc ~/.zshrc
 
+	# ---
+
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing fzf...${fgcolor_reset}"
 	rm -rf ~/.fzf
 	git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
 	~/.fzf/install --all --no-update-rc
+
 	echo
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing just and go tools...${fgcolor_reset}"
-
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin || :
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install just
-	fi
-	echo
-
-	go install github.com/sonatype-nexus-community/nancy@latest
-
-	go install golang.org/x/vuln/cmd/govulncheck@latest
-
-	curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh |
-		sh -s -- -b "$(go env GOPATH)"/bin
-	echo
-
-	curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh |
-		sh -s -- -b "$(go env GOPATH)"/bin
-	echo
-
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
-		sh -s -- -b "$(go env GOPATH)"/bin
-
-	golangci-lint cache clean
-	echo
+	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: ${fgcolor_green_bold}+ Terminal successfully installed!${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: (Restarting the computer to use Zsh for the first time)${fgcolor_reset}"
-	echo
 
 	echo -en "$fgcolor_reset"
 

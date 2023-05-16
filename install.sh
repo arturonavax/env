@@ -51,6 +51,11 @@ function install() {
 
 	# ---
 
+	echo -en "$fgcolor_yellow_bold"
+	sudo true
+	echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}Installation privileges obtained"
+	echo -en "$fgcolor_reset"
+
 	# installs requirements
 	if [[ "$install_requirements" == 1 ]]; then
 		source ./src/_install_requirements.sh
@@ -59,39 +64,32 @@ function install() {
 
 	source ./src/remotes/_required_commands.sh
 
-	required-commands git curl wget
-
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		required-sudo-commands snap apt
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		required-commands brew
-	fi
+	required-commands git
 
 	echo -e "${fgcolor_white_bold}[Installer]: Downloading the latest version of the repository...${fgcolor_reset}"
 	git pull origin main
 	echo
 
-	echo -en "$fgcolor_yellow_bold"
-	sudo true
-	echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}Installation privileges obtained"
-	echo -en "$fgcolor_reset"
-	echo
+	# check requireds install_fonts
+	if [[ "$install_fonts" == 1 ]]; then
+		required-commands curl
+		required-sudo-commands fc-cache
+	fi
 
-	# check requireds install-terminal
+	# check requireds install_terminal
 	if [[ "$install_terminal" == 1 ]]; then
 		./src/requirements/terminal.sh
 	fi
 
-	# check requireds install-editor
+	# check requireds install_editor
 	if [[ "$install_editor" == 1 ]]; then
 		./src/requirements/editor.sh
 	fi
 
+	# ---
+
 	# installs
 	if [[ "$install_fonts" == 1 ]]; then
-		required-sudo-commands fc-cache
-
 		./src/remotes/install_fonts.sh
 		echo
 	fi
@@ -103,10 +101,10 @@ function install() {
 
 	if [[ "$install_editor" == 1 ]]; then
 		./src/install_editor.sh
-		echo
 	fi
 
 	if [[ "$install_osconfig" == 1 ]]; then
+		echo
 		echo -e "${fgcolor_white_bold}[Installer]: Applying system settings...${fgcolor_reset}"
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
@@ -119,16 +117,15 @@ function install() {
 		fi
 
 		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}+ Applied configurations!${fgcolor_reset}"
-		echo
 	fi
 
 	if [[ "$(uname -s)" == "Darwin" ]]; then
+		echo
 		echo -e "${fgcolor_white_bold}[Installer]: Homebrew cleanup...${fgcolor_reset}"
 
 		brew cleanup
 
 		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}+ Homebrew cleaned!${fgcolor_reset}"
-		echo
 	fi
 }
 

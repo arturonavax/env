@@ -1,17 +1,6 @@
 # 🦊 env
 
-Development environment with terminal, with [Alacritty](https://alacritty.org/),
-[Tmux](https://github.com/tmux/tmux), [Zsh](https://github.com/zsh-users/zsh) and
-[Neovim](https://github.com/neovim/neovim). ([Screenshots](./docs/screenshots/README.md))
-
-**This environment uses [LunarVim](https://www.lunarvim.org/), so the
-editor command is: `lvim`**
-
-_Have `git`, `make`, `python3`, `pip`, `pipx`, `node`, `npm`, `pnpm` and `cargo`
-installed on your system. (MacOS requires Homebrew to be installed)_
-
-_[Resolve EACCES permissions when installing packages globally](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)
-to avoid error when installing packages with npm._
+Terminal-based development environment.
 
 _**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
 
@@ -24,10 +13,11 @@ _**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
 5. **[More keyboard speed :keyboard:](#more-keyboard-speed-keyboard)**
 6. **[Precaution and Backup :warning:](#precaution-and-backup-warning)**
 7. **[Reminders](#reminders)**
+8. **[Remote Scripts](#remote-scripts)**
 
 ## Installation :sparkles:
 
-This environment is prepared to be installed on Linux Ubuntu and MacOS,
+This environment is prepared to be installed on **GNU/Linux Ubuntu** and **MacOS**,
 read/adapt the installation scripts if you have another distribution/operating system.
 
 ```sh
@@ -37,6 +27,11 @@ bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") help
 List of installation parameters:
 
 - `requirements` / `r`: Install the necessary tools, languages and dependencies.
+
+  Install basic dependencies (depending on the operating system), and the
+  following: `pyenv`, `python3`, `pipx`, `cargo`, `rustc`, `fnm`, `node`,
+  `npm`, `pnpm`, `deno` and `go`
+
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
 - `editor` / `e`: Install the editor (`lvim`) and development tools.
@@ -53,22 +48,48 @@ Uninstall the main programs and delete the configuration and cache folders
 
 ## Requirements
 
+GNU/Linux requires `apt` and `snap` to be installed.
+
+MacOS requires Homebrew (`brew`) to be installed.
+
+If `pnpm` is installed, it will be used instead of `npm`.
+
+If `pipx` is installed, it will be used instead of `python3 -m pip` for some installations.
+
+_[Resolve EACCES permissions when installing packages globally](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)
+to avoid error when installing packages with npm._
+
+### For `terminal`
+
+- `git`
+
+### For `editor`
+
 - `git`
 - `make`
+- `cargo`
 - `python3`
 
   - `pip`
-  - `pipx`
 
-- `go` >= _v1.15.0_
 - `node` >= _v12.0.0_
 
   - `npm`
-  - `pnpm`
 
-- `rust`
+### For `fonts`
 
-  - `cargo`
+- `fc-cache` _(package `fontconfig`)_
+
+### To install the extra tools
+
+`terminal` and `editor` Install extra tools and utilities only if these
+requirements are installed:
+
+- `go` >= _v1.15.0_
+
+- `node` >= _v12.0.0_
+
+  - `npm`
 
 ## Precaution and Backup :warning:
 
@@ -85,7 +106,7 @@ _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
 - **True Color** :rainbow:
 
-- Nerd Font: [Caskaydia Cove](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/CascadiaCode)
+- Patched Mono Font: [Caskaydia Cove](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/CascadiaCode)
 
 ### Terminal :computer: ([`alacritty`](https://alacritty.org/))
 
@@ -125,9 +146,9 @@ _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
 - Word search :mag::abc: (`<Space>j`)
 
-- Linters :flashlight::straight_ruler:
+- Linters :flashlight:
 
-- Formatters 🛠️:straight_ruler:
+- Formatters 🛠️
 
 - Code Actions
 
@@ -205,3 +226,28 @@ can activate the different themes
 
 - The first save (`:w`) in a new project, or a first installation of this
   environment will be slow, because it is caching.
+
+## Remote Scripts
+
+There are utility scripts that can be executed remotely as they do not depend
+on other local files, these scripts are in the [src/remotes/](./src/remotes/) folder.
+
+Scripts starting with underscore (`_`) are made to be executed with the `source`
+command.
+
+The following subdomains redirect to [remote scripts folder](./src/remotes/):
+
+- `env.arturonavax.dev`
+- `env.arturonavax.com`
+- `environment.arturonavax.dev`
+- `environment.arturonavax.com`
+
+Examples:
+
+```sh
+bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh") -i
+```
+
+```sh
+source <(curl -fsSL "https://env.arturonavax.dev/_vars_colors.sh" | cat)
+```

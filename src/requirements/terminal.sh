@@ -16,4 +16,11 @@ done
 
 source ./src/remotes/_required_commands.sh
 
-required-commands tic git cargo rustup node pnpm pipx
+if [[ "$(uname -s)" == "Linux" ]]; then
+	required-sudo-commands apt snap
+
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+	required-commands brew
+fi
+
+required-commands git

@@ -43,7 +43,6 @@ function install_fonts() {
 	sudo fc-cache -f &>/dev/null || :
 
 	echo -e "${fgcolor_white_bold}[Fonts Installer]: ${fgcolor_green_bold}+ Successfully installed fonts!${fgcolor_reset}"
-	echo
 }
 
 # shellcheck disable=SC2154

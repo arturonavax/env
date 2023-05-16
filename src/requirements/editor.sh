@@ -18,35 +18,26 @@ source ./src/remotes/_vars_colors.sh
 source ./src/remotes/_required_commands.sh
 
 # check requireds
-required-commands go python3 pipx cargo node npm pnpm
+if [[ "$(uname -s)" == "Linux" ]]; then
+	required-sudo-commands apt
 
-go_version_major="$(go version | cut -d' ' -f3 | cut -d'.' -f1 | tr -d 'go')"
-go_version_minor="$(go version | cut -d' ' -f3 | cut -d'.' -f2)"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+	required-commands brew
+fi
+
+required-commands git make python3 pip cargo node npm
+
+if ! python3 -m pip &>/dev/null; then
+	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}python3 must have the 'pip' module.${fgcolor_reset}"
+
+	exit 1
+fi
+
 node_version_major="$(node --version | cut -d'.' -f1 | tr -d 'v')"
 
 ## check node version
 if ((node_version_major < 12)); then
 	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}NodeJs version must be equal to v12.0.0 or higher.${fgcolor_reset}"
-
-	exit 1
-fi
-
-## check go version
-if ((go_version_major < 1)) && ((go_version_minor < 15)); then
-	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}Go version must be equal to v15.0.0 or higher.${fgcolor_reset}"
-
-	exit 1
-fi
-
-## check go env
-if [[ "$(go env GOROOT)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}The GOROOT environment variable is not set.${fgcolor_reset}"
-
-	exit 1
-fi
-
-if [[ "$(go env GOPATH)" == "" ]]; then
-	echo "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}The GOPATH environment variable is not set.${fgcolor_reset}"
 
 	exit 1
 fi

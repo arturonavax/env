@@ -21,6 +21,11 @@ done
 repo_remote_files="https://env.arturonavax.dev"
 
 source ./src/remotes/_basics.sh
+source ./src/remotes/_vars_colors.sh
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: Starting _install_requirements.sh script...${fgcolor_reset}"
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing basic dependencies...${fgcolor_reset}"
 
 # dependencies
 if [[ "$(uname -s)" == "Linux" ]]; then
@@ -63,15 +68,39 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	brew install curl wget git make unzip fontconfig ncurses openssl readline sqlite3 xz zlib
 fi
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
+
 # downloads
 ## download pyenv
 curl https://pyenv.run | bash || :
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing rust...${fgcolor_reset}"
+
 ## download rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing fnm (node version manager)...${fgcolor_reset}"
+
 ## download fnm
 curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pnpm (node package module)...${fgcolor_reset}"
 
 ## download pnpm
 tmp_shell="$SHELL"
@@ -79,14 +108,42 @@ export SHELL="bash" # To prevent the following installer, write to the ~/.zshrc 
 curl -fsSL https://get.pnpm.io/install.sh | sh -
 export SHELL="$tmp_shell"
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing deno...${fgcolor_reset}"
+
 ## download deno
 curl -fsSL https://deno.land/x/install/install.sh | sh
+
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
 
 ## download go
 curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Loading installations (source command)...${fgcolor_reset}"
+
 # loads
+function rehash() {
+	hash -r "$@"
+}
+
 source ./files/zsh/.tools.sh || :
+
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing python 3...${fgcolor_reset}"
 
 # installs
 ## install python
@@ -95,10 +152,22 @@ pyenv global 3
 
 eval "$(pyenv init -)"
 
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
+
 ## install pipx
 python3 -m pip install --upgrade pip
 python3 -m pip install --user pipx --force
 python3 -m pipx ensurepath
+
+echo
+
+# ---
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing nodejs...${fgcolor_reset}"
 
 ## install node
 fnm install --latest
@@ -107,6 +176,8 @@ node_latest_label="$(fnm list | sort --version-sort | awk '{print $2}' | tail -n
 
 fnm use "$node_latest_label"
 fnm default "$node_latest_label"
+
+echo
 
 # ---
 
@@ -118,9 +189,13 @@ case "$SHELL" in
 *) shell_file=".bashrc" ;;
 esac
 
+echo -e "${fgcolor_white_bold}[Requirements Installer]: - Adding lines (~/$shell_file)...${fgcolor_reset}"
+
 cp ./files/zsh/.tools.sh ~/.
 
 touch ~/"$shell_file"
 
 # add 'source ~/.tools.sh' command to the end of the file
 ./src/remotes/add_lines.sh tools
+
+echo -e "${fgcolor_white_bold}[Requirements Installer]: ${fgcolor_green_bold}+ Requirements successfully installed!${fgcolor_reset}"
