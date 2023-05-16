@@ -6,7 +6,7 @@
 # Parameter to install OS config: osconfig
 # Parameter to install all: all
 # Parameter to help: help
-bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh" | cat) "$@" || exit 1
+bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
 
 [[ -z "$installation_folder" ]] && installation_folder="$HOME/arturonavax-env"
 
@@ -25,6 +25,6 @@ elif [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/u
 fi
 
 rm -rf "$installation_folder"
-git clone --depth 1 https://github.com/arturonavax/environment.git "$installation_folder"
+git clone --depth 1 https://github.com/arturonavax/env.git "$installation_folder"
 
-cd "$installation_folder" && bash install.sh "$@"
+cd "$installation_folder" && ./install.sh "$@"
