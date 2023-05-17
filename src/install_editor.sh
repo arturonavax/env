@@ -86,7 +86,7 @@ function install_editor() {
 			# GNU/Linux only dependencies
 			sudo apt install -y python3-neovim python3-pip python3-dev
 
-		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 			sudo dnf update
 
 			sudo dnf install -y curl git xclip xsel ripgrep

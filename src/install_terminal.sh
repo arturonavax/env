@@ -118,7 +118,7 @@ function install_terminal() {
 
 			sudo apt install -y clang
 
-		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 			sudo dnf update
 
 			sudo dnf install -y ncurses ncurses-term ncurses-devel
@@ -273,7 +273,7 @@ function install_terminal() {
 
 				sudo apt install alacritty
 
-			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 				cd ./downloads/
 				git clone --depth 1 https://github.com/alacritty/alacritty
 				cd ./alacritty/

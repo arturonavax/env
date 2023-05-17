@@ -49,7 +49,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		# tools
 		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
 
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 		sudo dnf update
 
 		sudo dnf group install -y "Development Tools"

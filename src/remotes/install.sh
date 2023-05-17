@@ -20,7 +20,7 @@ if [[ "$(uname -s)" == "Linux" && "$(command -v git)" == "" ]]; then
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 		sudo apt install -y git
 
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 		sudo dnf install -y git
 
 	else
