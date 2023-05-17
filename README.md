@@ -48,9 +48,13 @@ Uninstall the main programs and delete the configuration and cache folders
 
 ## Requirements
 
-GNU/Linux requires `apt` and `snap` to be installed.
+The installer of this environment is prepared for:
 
-MacOS requires Homebrew (`brew`) to be installed.
+- Debian/Ubuntu based systems using `apt` and `snap`.
+
+- Fedora/CentOS/RHEL based systems using `dnf`.
+
+- MacOS Systems.
 
 If `pnpm` is installed, it will be used instead of `npm`.
 

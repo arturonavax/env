@@ -61,7 +61,7 @@ latest_version="$(wget -qO- "$url_webscraping" | command grep -E -o "/go1(\.[0-9
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-if [[ "$(uname -p)" == "x86_64" ]]; then
+if [[ "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
 	arch="amd64"
 
 elif [[ "$(uname -p)" == "i386" ]]; then
