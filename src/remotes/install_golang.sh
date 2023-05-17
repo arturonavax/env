@@ -62,11 +62,20 @@ latest_version="$(wget -qO- "$url_webscraping" | command grep -E -o "/go1(\.[0-9
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 if [[ "$(uname -s)" == "Linux" ]]; then
-	arch=$(dpkg --print-architecture || uname -p)
+	if [[ "$(uname -p)" == "x86_64" ]]; then
+		arch="amd64"
+
+	elif [[ "$(uname -p)" == "i386" ]]; then
+		arch="386"
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
+	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
 	if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
 		arch="arm64"
+
 	else
 		arch="amd64"
 	fi
