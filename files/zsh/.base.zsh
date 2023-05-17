@@ -1,4 +1,6 @@
 #!/bin/zsh
+[[ "$0" != *"zsh"* ]] && return
+
 bindkey -e
 
 [[ "$(command -v lvim)" != "" ]] && export EDITOR=lvim
