@@ -14,6 +14,8 @@ echo "Installation folder: $installation_folder"
 echo
 
 if [[ "$(uname -s)" == "Linux" && "$(command -v git)" == "" ]]; then
+	source /etc/os-release
+
 	# install git
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 		sudo apt install -y git
