@@ -137,7 +137,7 @@ function install_terminal() {
 			sudo dnf install -y netcat openssh
 
 			sudo dnf install -y mtr tmux tree exa bat ripgrep xclip xsel tor \
-				shellcheck nmap arp-sca
+				shellcheck nmap arp-scan
 
 			sudo dnf install -y wireshark
 
