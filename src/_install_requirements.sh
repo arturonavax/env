@@ -52,7 +52,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
 		sudo dnf update
 
-		sudo dnf install -y zlib llvm xz ncurses ncurses-devel ncurses-term libffi tk readline sqlite
+		sudo dnf groupinstall -y "Development Tools"
+		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
+			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite
 
 		sudo dnf install -y curl wget git unzip make gcc fontconfig
 
