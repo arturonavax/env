@@ -139,7 +139,7 @@ function install_terminal() {
 			sudo dnf install -y mtr tmux tree exa bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan
 
-			sudo dnf install -y wireshark
+			sudo dnf install -y wireshark # includes tshark
 
 			sudo dnf install -y tidy protobuf
 
