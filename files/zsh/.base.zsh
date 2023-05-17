@@ -320,8 +320,7 @@ alias path='echo "${PATH//:/\n}" | sort'
 
 ## Fd
 if fd -q &>/dev/null; then
-    [[ "$(uname -s)" == "Darwin" ]] && alias fdfind='fd'
-
+    alias fdfind='fd'
     alias find='fdfind --hidden'
 fi
 
