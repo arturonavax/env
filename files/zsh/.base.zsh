@@ -154,15 +154,25 @@ EOF
 
     if [[ "$update_system" == 1 ]]; then
         if [[ "$(uname -s)" == "Linux" ]]; then
-            sudo apt -y update
-            sudo apt -y upgrade
-            sudo apt -y dist-upgrade
-            sudo apt -y full-upgrade
-            sudo apt autoremove
-            sudo apt autoclean
+            if [[ "$(command -v apt)" != "" ]]; then
+                sudo apt -y update
+                sudo apt -y upgrade
+                sudo apt -y dist-upgrade
+                sudo apt -y full-upgrade
+                sudo apt autoremove
+                sudo apt autoclean
+            fi
 
             if [[ "$(command -v snap)" != "" ]]; then
                 sudo snap refresh
+            fi
+
+            if [[ "$(command -v dnf)" != "" ]]; then
+                sudo dnf update -y
+                sudo dnf upgrade -y
+                sudo dnf distro-sync -y
+                sudo dnf autoremove
+                sudo dnf clean
             fi
 
         elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -207,8 +217,10 @@ EOF
 # Light theme mode
 function lighttheme() {
     if [[ "$(uname -s)" == "Linux" ]]; then
-        gsettings set org.gnome.desktop.interface color-scheme default
-        gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red"
+        if [[ "$(command -v gsettings)" != "" ]]; then
+            gsettings set org.gnome.desktop.interface color-scheme default
+            gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red"
+        fi
 
     elif [[ "$(uname -s)" == "Darwin" ]]; then
         osascript -e 'tell app "System Events" to tell appearance preferences to set dark mode to false' &>/dev/null
@@ -230,8 +242,10 @@ alias li=lighttheme
 # Dark mode
 function darktheme() {
     if [[ "$(uname -s)" == "Linux" ]]; then
-        gsettings set org.gnome.desktop.interface color-scheme prefer-dark
-        gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red-dark"
+        if [[ "$(command -v gsettings)" != "" ]]; then
+            gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+            gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red-dark"
+        fi
 
     elif [[ "$(uname -s)" == "Darwin" ]]; then
         osascript -e 'tell app "System Events" to tell appearance preferences to set dark mode to true' &>/dev/null
