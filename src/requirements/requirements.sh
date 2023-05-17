@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run: ./src/requirements/terminal.sh
+# Run: ./src/requirements/requirements.sh
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	if [[ "$PWD" == "/" ]]; then
 		echo "Repository root not found"
@@ -20,14 +20,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	source /etc/os-release
 
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		required-sudo-commands apt snap
+		required-sudo-commands apt
 
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
-		required-sudo-commands dnf
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+		required-sudo-commands yum
 	fi
-
-elif [[ "$(uname -s)" == "Darwin" ]]; then
-	required-commands brew
 fi
-
-required-commands git

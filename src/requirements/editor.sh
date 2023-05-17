@@ -19,7 +19,14 @@ source ./src/remotes/_required_commands.sh
 
 # check requireds
 if [[ "$(uname -s)" == "Linux" ]]; then
-	required-sudo-commands apt
+	source /etc/os-release
+
+	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+		required-sudo-commands apt
+
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+		required-sudo-commands dnf
+	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
 	required-commands brew

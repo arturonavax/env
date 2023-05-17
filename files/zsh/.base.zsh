@@ -34,7 +34,7 @@ export \
 [[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
 
 ## zsh plugins
-[[ "$(uname -s)" == "Linux" ]] && source /etc/zsh_command_not_found
+[[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
 [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh ]] && source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 [[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 [[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh

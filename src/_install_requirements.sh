@@ -29,17 +29,33 @@ echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing basic depen
 
 # dependencies
 if [[ "$(uname -s)" == "Linux" ]]; then
-	sudo apt update
+	source /etc/os-release
 
-	sudo apt install -y make build-essential libssl-dev zlib1g-dev \
-		libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-		libncursesw5-dev ncurses-term xz-utils tk-dev libffi-dev liblzma-dev
+	if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+		sudo dnf update
+		sudo dnf install -y epel-release
+	fi
 
-	# for Python GUIs
-	sudo apt install -y python3-dev python3-tk tk-dev
+	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+		sudo apt update
 
-	# tools
-	sudo apt install -y curl wget git make unzip fontconfig snapd
+		sudo apt install -y build-essential libssl-dev zlib1g-dev \
+			libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
+			libncursesw5-dev ncurses-term xz-utils tk-dev libffi-dev liblzma-dev
+
+		# for Python GUIs
+		sudo apt install -y python3-dev python3-tk tk-dev
+
+		# tools
+		sudo apt install -y curl wget git unzip make fontconfig snapd
+
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+		sudo dnf update
+
+		sudo dnf install -y zlib llvm xz ncurses ncurses-devel ncurses-term libffi tk readline sqlite
+
+		sudo dnf install -y curl wget git unzip make fontconfig
+	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
 	# CommandLineTools

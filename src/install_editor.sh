@@ -67,17 +67,38 @@ function install_editor() {
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt install -y curl git xclip xsel ripgrep clang-format
+		source /etc/os-release
 
-		# Dependencies with different names between APT and Homebrew
-		sudo apt install -y silversearcher-ag fd-find \
-			libncurses5-dev libncursesw5-dev libncurses5 ncurses-term # ncurses
+		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+			sudo dnf update
+			sudo dnf install -y epel-release
+		fi
 
-		# GNU/Linux only dependencies
-		sudo apt install -y python3-neovim python3-pip python3-dev
+		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+			sudo apt update
+
+			sudo apt install -y curl git xclip xsel ripgrep clang-format vim vim-nox
+
+			# Dependencies with different names between APT and Homebrew
+			sudo apt install -y silversearcher-ag fd-find \
+				libncurses5-dev libncursesw5-dev libncurses5 ncurses-term # ncurses
+
+			# GNU/Linux only dependencies
+			sudo apt install -y python3-neovim python3-pip python3-dev
+
+		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+			sudo dnf update
+
+			sudo dnf install -y curl git xclip xsel ripgrep
+
+			sudo dnf install -y the_silver_searcher \
+				ncurses ncurses-term ncurses-devel
+
+			sudo dnf install -y python3-pip python3-dev
+		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl git xclip xsel ripgrep
+		brew install curl git xclip xsel ripgrep vim lua
 
 		# Dependencies with different names between APT and Homebrew
 		brew install the_silver_searcher fd \
@@ -155,18 +176,11 @@ function install_editor() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Vim and NeoVim...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing NeoVim...${fgcolor_reset}"
 
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt install -y vim vim-nox
-
-		cd ./downloads/
-		bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install-neovim-from-release) || :
-		cd .. # exit downloads/
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install vim lua neovim
-	fi
+	cd ./downloads/
+	bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install-neovim-from-release) || :
+	cd .. # exit downloads/
 
 	echo
 

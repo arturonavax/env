@@ -58,6 +58,8 @@ function install() {
 
 	# installs requirements
 	if [[ "$install_requirements" == 1 ]]; then
+		./src/requirements/requirements.sh
+
 		source ./src/_install_requirements.sh
 		echo
 	fi

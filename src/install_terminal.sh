@@ -67,51 +67,84 @@ function install_terminal() {
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt update
+		source /etc/os-release
 
-		# en_US.UTF-8
-		sudo apt install -y language-pack-en
-		sudo locale-gen en_US.UTF-8
+		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+			sudo dnf update
+			sudo dnf install -y epel-release
+		fi
 
-		# GNU/Linux only dependencies
-		## CLI/TUI depedencies
-		sudo apt install -y libncurses5-dev libncursesw5-dev libncurses5 ncurses-term
+		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+			sudo apt update
 
-		## Async dependencies
-		sudo apt install -y libevent-dev
+			# en_US.UTF-8
+			sudo apt install -y language-pack-en
+			sudo locale-gen en_US.UTF-8
 
-		## GUI and Qt dependencies
-		sudo apt install -y libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 \
-			libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6 libxcb-xfixes0-dev
+			# GNU/Linux only dependencies
+			## CLI/TUI depedencies
+			sudo apt install -y libncurses5-dev libncursesw5-dev libncurses5 ncurses-term
 
-		## Fonts dependencies
-		sudo apt install -y libfreetype6-dev libfontconfig1-dev fontconfig
+			## Async dependencies
+			sudo apt install -y libevent-dev
 
-		## Keyboard dependencies
-		sudo apt install -y libxkbcommon-dev
+			## GUI and Qt dependencies
+			sudo apt install -y libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 \
+				libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6 libxcb-xfixes0-dev
 
-		# GNU/Linux base tools
-		sudo apt install -y ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
-			automake cmake python3 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
-			jq htop wdiff tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
+			## Fonts dependencies
+			sudo apt install -y pkg-config fontconfig libfreetype6-dev libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev
 
-		# GNU tools for GNU/Linux only
-		sudo apt install -y net-tools command-not-found strace
+			# GNU/Linux base tools
+			sudo apt install -y ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
+				automake cmake python3 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
+				jq htop wdiff tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
 
-		# GNU tools with different names between APT and Homebrew
-		sudo apt install -y netcat-traditional ssh
+			# GNU tools for GNU/Linux only
+			sudo apt install -y net-tools command-not-found strace
 
-		# Tools
-		sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
-			shellcheck nmap arp-scan aircrack-ng sqlmap
+			# GNU tools with different names between APT and Homebrew
+			sudo apt install -y netcat-traditional ssh
 
-		sudo apt install wireshark tshark
+			# Tools
+			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
+				shellcheck nmap arp-scan aircrack-ng sqlmap
 
-		# Tools with different names between APT and Homebrew
-		sudo apt install -y tidy protobuf-compiler john fd-find
-		sudo snap install ngrok
+			sudo apt install -y wireshark tshark
 
-		sudo apt -y install clang
+			# Tools with different names between APT and Homebrew
+			sudo apt install -y tidy protobuf-compiler john fd-find
+			sudo snap install ngrok
+
+			sudo apt install -y clang
+
+		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+			sudo dnf update
+
+			sudo dnf install -y ncurses ncurses-term ncurses-devel
+
+			sudo dnf install -y libevent
+
+			sudo dnf install -y fontconfig freetype-devel fontconfig-devel libxcb-devel libxkbcommon-devel
+			sudo dnf group install "Development Tools"
+
+			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
+				autoconf automake cmake python3 git mercurial curl wget m4 byacc swig bison flex llvm jq htop wdiff \
+				tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
+
+			sudo dnf install -y net-tools strace
+
+			sudo dnf install -y netcat openssh
+
+			sudo dnf install -y mtr tmux tree exa bat ripgrep xclip xsel tor \
+				shellcheck nmap arp-sca
+
+			sudo dnf install -y wireshark
+
+			sudo dnf install -y tidy protobuf-compiler
+
+			sudo dnf install -y install clang
+		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
 		brew tap homebrew/cask
@@ -229,9 +262,20 @@ function install_terminal() {
 		echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Alacritty...${fgcolor_reset}"
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
-			sudo add-apt-repository ppa:aslatter/ppa -y
+			if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* && "$(command -v add-apt-repository)" != "" ]]; then
+				sudo add-apt-repository ppa:aslatter/ppa -y
 
-			sudo apt install alacritty
+				sudo apt install alacritty
+
+			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+				cd ./downloads/
+				git clone --depth 1 https://github.com/alacritty/alacritty
+				cd ./alacritty/
+				cargo build --release
+				infocmp alacritty &>/dev/null || :
+				sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
+				cd ../.. # exit downloads/
+			fi
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
 			brew tap homebrew/cask
