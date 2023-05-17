@@ -129,8 +129,8 @@ function install_terminal() {
 			sudo dnf group install "Development Tools"
 
 			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
-				autoconf automake cmake python3 git mercurial curl wget m4 byacc swig bison flex llvm jq htop wdiff \
-				tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
+				autoconf automake cmake python3 git mercurial curl wget m4 byacc bison flex llvm jq htop wdiff \
+				tcpdump iftop rsync openssl openvpn gdb binutils coreutils diffutils findutils util-linux
 
 			sudo dnf install -y net-tools strace
 
