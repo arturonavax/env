@@ -141,7 +141,7 @@ function install_terminal() {
 
 			sudo dnf install -y wireshark
 
-			sudo dnf install -y tidy protobuf-compiler
+			sudo dnf install -y tidy protobuf
 
 			sudo dnf install -y install clang
 
