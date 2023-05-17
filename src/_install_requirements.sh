@@ -54,7 +54,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 
 		sudo dnf group install -y "Development Tools"
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
-			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite
+			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite qt5-qtbase-devel
 
 		sudo dnf install -y curl wget git unzip make gcc fontconfig
 
