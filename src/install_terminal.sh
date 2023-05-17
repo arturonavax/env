@@ -144,6 +144,9 @@ function install_terminal() {
 			sudo dnf install -y tidy protobuf-compiler
 
 			sudo dnf install -y install clang
+
+		else
+			echo "The operating system is not compatible with this installation." && exit 1
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -183,6 +186,9 @@ function install_terminal() {
 		brew install tidy-html5 protobuf john-jumbo fd ngrok/ngrok/ngrok
 
 		# clang is installed with xcode-select --install
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 	# install zoxide
@@ -267,7 +273,7 @@ function install_terminal() {
 
 				sudo apt install alacritty
 
-			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
+			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
 				cd ./downloads/
 				git clone --depth 1 https://github.com/alacritty/alacritty
 				cd ./alacritty/
@@ -275,6 +281,9 @@ function install_terminal() {
 				infocmp alacritty &>/dev/null || :
 				sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
 				cd ../.. # exit downloads/
+
+			else
+				echo "The operating system is not compatible with this installation." && exit 1
 			fi
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -293,6 +302,9 @@ function install_terminal() {
 			# infocmp alacritty &>/dev/null || :
 			# sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
 			# cd ../.. # exit downloads/
+
+		else
+			echo "The operating system is not compatible with this installation." && exit 1
 		fi
 
 		echo

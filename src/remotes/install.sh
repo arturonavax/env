@@ -15,13 +15,24 @@ echo
 
 if [[ "$(uname -s)" == "Linux" && "$(command -v git)" == "" ]]; then
 	# install git
-	sudo apt install git
+	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+		sudo apt install -y git
+
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
+		sudo dnf install -y git
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
+	fi
 
 elif [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
 	# install CommandLineTools (this contains GIT)
 	curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
 
 	[[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]] && echo "An error occurred with the CommandLineTools installation." && exit 1
+
+else
+	echo "The operating system is not compatible with this installation." && exit 1
 fi
 
 rm -rf "$installation_folder"

@@ -36,6 +36,9 @@ function install_fonts() {
 		sudo mkdir -p /Library/Fonts/patched-fonts
 
 		sudo cp ./* /Library/Fonts/patched-fonts/.
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 	cd -

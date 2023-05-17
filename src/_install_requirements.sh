@@ -55,6 +55,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo dnf install -y zlib llvm xz ncurses ncurses-devel ncurses-term libffi tk readline sqlite
 
 		sudo dnf install -y curl wget git unzip make fontconfig
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -82,6 +85,9 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 
 	# tools
 	brew install curl wget git make unzip fontconfig ncurses openssl readline sqlite3 xz zlib
+
+else
+	echo "The operating system is not compatible with this installation." && exit 1
 fi
 
 echo

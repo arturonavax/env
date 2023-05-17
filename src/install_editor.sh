@@ -95,6 +95,9 @@ function install_editor() {
 				ncurses ncurses-term ncurses-devel
 
 			sudo dnf install -y python3-pip python3-dev
+
+		else
+			echo "The operating system is not compatible with this installation." && exit 1
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -106,6 +109,9 @@ function install_editor() {
 
 		# MacOS only dependencies
 		brew install readline
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 	if [[ "$(uname -s)" == "Linux" && "$(command -v fdfind)" != "" ]]; then
@@ -170,6 +176,9 @@ function install_editor() {
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
 		brew install shellharden stylua
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 	echo
