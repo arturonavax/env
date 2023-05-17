@@ -174,7 +174,6 @@ EOF
                 sudo dnf upgrade -y
                 sudo dnf distro-sync -y
                 sudo dnf autoremove
-                sudo dnf clean
             fi
 
         elif [[ "$(uname -s)" == "Darwin" ]]; then
