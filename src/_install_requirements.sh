@@ -32,12 +32,12 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	source /etc/os-release
 
 	if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-		sudo dnf update
+		sudo dnf update -y
 		sudo dnf install -y epel-release
 	fi
 
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		sudo apt update
+		sudo apt update -y
 
 		sudo apt install -y build-essential libssl-dev zlib1g-dev \
 			libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
@@ -50,7 +50,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
 
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-		sudo dnf update
+		sudo dnf update -y
 
 		sudo dnf group install -y "Development Tools"
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \

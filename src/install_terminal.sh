@@ -70,12 +70,12 @@ function install_terminal() {
 		source /etc/os-release
 
 		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-			sudo dnf update
+			sudo dnf update -y
 			sudo dnf install -y epel-release
 		fi
 
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			sudo apt update
+			sudo apt update -y
 
 			# en_US.UTF-8
 			sudo apt install -y language-pack-en
@@ -119,7 +119,7 @@ function install_terminal() {
 			sudo apt install -y clang
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			sudo dnf update
+			sudo dnf update -y
 
 			sudo dnf install -y ncurses ncurses-term ncurses-devel
 

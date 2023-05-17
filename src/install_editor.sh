@@ -70,12 +70,12 @@ function install_editor() {
 		source /etc/os-release
 
 		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-			sudo dnf update
+			sudo dnf update -y
 			sudo dnf install -y epel-release
 		fi
 
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			sudo apt update
+			sudo apt update -y
 
 			sudo apt install -y curl git xclip xsel ripgrep clang-format vim vim-nox
 
@@ -87,14 +87,18 @@ function install_editor() {
 			sudo apt install -y python3-neovim python3-pip python3-dev
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			sudo dnf update
+			sudo dnf update -y
 
 			sudo dnf install -y curl git xclip xsel ripgrep
 
 			sudo dnf install -y the_silver_searcher \
 				ncurses ncurses-term ncurses-devel
 
-			sudo dnf install -y python3-pip qt5-qtbase-devel
+			sudo dnf install -y python3-pip
+
+			if [[ "$ID" == *"fedora"* ]]; then
+				sudo dnf install -y python3-neovim
+			fi
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
