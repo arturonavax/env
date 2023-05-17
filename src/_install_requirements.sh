@@ -47,14 +47,14 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo apt install -y python3-dev python3-tk tk-dev
 
 		# tools
-		sudo apt install -y curl wget git unzip make fontconfig snapd
+		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
 
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
 		sudo dnf update
 
 		sudo dnf install -y zlib llvm xz ncurses ncurses-devel ncurses-term libffi tk readline sqlite
 
-		sudo dnf install -y curl wget git unzip make fontconfig
+		sudo dnf install -y curl wget git unzip make gcc fontconfig
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
@@ -84,7 +84,7 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	brew install python-tk
 
 	# tools
-	brew install curl wget git make unzip fontconfig ncurses openssl readline sqlite3 xz zlib
+	brew install curl wget git make gcc unzip fontconfig ncurses openssl readline sqlite3 xz zlib
 
 else
 	echo "The operating system is not compatible with this installation." && exit 1
