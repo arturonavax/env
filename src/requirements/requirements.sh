@@ -22,7 +22,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 		required-sudo-commands apt
 
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-		required-sudo-commands yum
+	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
+		required-sudo-commands dnf
 	fi
 fi
