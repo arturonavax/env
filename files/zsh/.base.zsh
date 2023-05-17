@@ -338,7 +338,7 @@ fi
 
 ## Bat
 if [[ "$(command -v batcat)" != "" || "$(command -v bat)" != "" ]]; then
-    [[ "$(uname -s)" == "Darwin" ]] && alias batcat='bat'
+    [[ "$(command -v bat)" != "" ]] && alias batcat='bat'
     alias cat='batcat -P -p'
     alias less='batcat'
 fi
