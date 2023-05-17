@@ -177,6 +177,8 @@ if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null; then
 
 	eval "$(pyenv init -)"
 
+	python3 -m pip install --upgrade pip
+
 	echo
 fi
 
