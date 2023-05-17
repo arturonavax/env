@@ -126,7 +126,7 @@ function install_terminal() {
 			sudo dnf install -y libevent
 
 			sudo dnf install -y fontconfig freetype-devel fontconfig-devel libxcb-devel libxkbcommon-devel
-			sudo dnf group install "Development Tools"
+			sudo dnf group install -y "Development Tools"
 
 			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
 				autoconf automake cmake python3 git mercurial curl wget m4 byacc bison flex llvm jq htop wdiff \

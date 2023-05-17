@@ -52,7 +52,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* ]]; then
 		sudo dnf update
 
-		sudo dnf groupinstall -y "Development Tools"
+		sudo dnf group install -y "Development Tools"
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
 			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite
 
