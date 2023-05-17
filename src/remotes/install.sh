@@ -32,9 +32,6 @@ elif [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/u
 	curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
 
 	[[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]] && echo "An error occurred with the CommandLineTools installation." && exit 1
-
-else
-	echo "The operating system is not compatible with this installation." && exit 1
 fi
 
 rm -rf "$installation_folder"
