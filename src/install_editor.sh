@@ -94,7 +94,7 @@ function install_editor() {
 			sudo dnf install -y the_silver_searcher \
 				ncurses ncurses-term ncurses-devel
 
-			sudo dnf install -y python3-pip python3-dev
+			sudo dnf install -y python3-pip
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
