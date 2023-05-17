@@ -36,8 +36,4 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 [[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
-
-# deno
-export DENO_INSTALL="$HOME/.deno"
-[[ -d "$DENO_INSTALL/bin" ]] && export PATH="$DENO_INSTALL/bin:$PATH"
 :

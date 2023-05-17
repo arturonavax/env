@@ -197,14 +197,6 @@ EOF
             pipx upgrade-all
         fi
 
-        if [[ "$(command -v deno)" != "" ]]; then
-            deno upgrade
-        fi
-
-        if [[ "$(command -v bun)" != "" ]]; then
-            bun upgrade
-        fi
-
         update-go -i
     fi
 }
