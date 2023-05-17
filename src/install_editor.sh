@@ -94,7 +94,7 @@ function install_editor() {
 			sudo dnf install -y the_silver_searcher \
 				ncurses ncurses-term ncurses-devel
 
-			sudo dnf install -y python3-pip
+			sudo dnf install -y python3-pip qt5-qtbase-devel
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
@@ -197,7 +197,6 @@ function install_editor() {
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Providers for NeoVim...${fgcolor_reset}"
 	node_package_module install -g neovim
-	python3 -m pip install --user --upgrade pynvim
 	python3 -m pip install --user --upgrade pynvim
 	python3 -m pip install --user --upgrade msgpack-python
 	python3 -m pip install --user --upgrade msgpack

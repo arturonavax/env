@@ -168,7 +168,7 @@ echo
 # ---
 
 # Install python if the current python is not from pyenv
-if ! command -v python3 | grep -q ".pyenv"; then
+if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null; then
 	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing python 3...${fgcolor_reset}"
 
 	# install python
