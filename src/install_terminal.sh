@@ -129,7 +129,7 @@ function install_terminal() {
 			sudo dnf group install -y "Development Tools"
 
 			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
-				autoconf automake cmake python3 git mercurial curl wget m4 byacc bison flex llvm jq htop wdiff \
+				autoconf automake cmake python3 git mercurial curl wget m4 byacc swig bison flex llvm jq htop wdiff \
 				tcpdump iftop rsync openssl openvpn gdb binutils coreutils diffutils findutils util-linux
 
 			sudo dnf install -y net-tools strace
@@ -144,6 +144,10 @@ function install_terminal() {
 			sudo dnf install -y tidy protobuf
 
 			sudo dnf install -y clang
+
+			if [[ "$ID" == *"fedora"* ]]; then
+				sudo dnf install -y john protobuf-compiler aircrack-ng util-linux-user
+			fi
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
@@ -274,13 +278,18 @@ function install_terminal() {
 				sudo apt install alacritty
 
 			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-				cd ./downloads/
-				git clone --depth 1 https://github.com/alacritty/alacritty
-				cd ./alacritty/
-				cargo build --release
-				infocmp alacritty &>/dev/null || :
-				sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
-				cd ../.. # exit downloads/
+				if [[ "$ID" == *"fedora"* ]]; then
+					sudo dnf install -y alacritty
+
+				else
+					cd ./downloads/
+					git clone --depth 1 https://github.com/alacritty/alacritty
+					cd ./alacritty/
+					cargo build --release
+					infocmp alacritty &>/dev/null || :
+					sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
+					cd ../.. # exit downloads/
+				fi
 
 			else
 				echo "The operating system is not compatible with this installation." && exit 1
