@@ -143,7 +143,7 @@ function install_terminal() {
 
 			sudo dnf install -y tidy protobuf
 
-			sudo dnf install -y install clang
+			sudo dnf install -y clang
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
