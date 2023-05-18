@@ -157,10 +157,10 @@ EOF
     if [[ "$update_system" == 1 ]]; then
         if [[ "$(uname -s)" == "Linux" ]]; then
             if [[ "$(command -v apt)" != "" ]]; then
-                sudo apt -y update
-                sudo apt -y upgrade
-                sudo apt -y dist-upgrade
-                sudo apt -y full-upgrade
+                sudo apt update -y
+                sudo apt upgrade -y
+                sudo apt dist-upgrade -y
+                sudo apt full-upgrade -y
                 sudo apt autoremove
                 sudo apt autoclean
             fi

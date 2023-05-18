@@ -129,7 +129,7 @@ function install_terminal() {
 			sudo dnf group install -y "Development Tools"
 
 			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
-				autoconf automake cmake python3 git mercurial curl wget m4 byacc swig bison flex llvm jq htop wdiff \
+				autoconf automake cmake python3 git mercurial curl wget m4 byacc bison flex llvm jq htop wdiff \
 				tcpdump iftop rsync openssl openvpn gdb binutils coreutils diffutils findutils util-linux
 
 			sudo dnf install -y net-tools strace
@@ -146,7 +146,7 @@ function install_terminal() {
 			sudo dnf install -y clang
 
 			if [[ "$ID" == *"fedora"* ]]; then
-				sudo dnf install -y john protobuf-compiler aircrack-ng util-linux-user
+				sudo dnf install -y nasm swig john protobuf-compiler aircrack-ng util-linux-user
 			fi
 
 		else
