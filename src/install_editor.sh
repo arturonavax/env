@@ -140,6 +140,8 @@ function install_editor() {
 	node_package_module install eslint typescript postcss stylelint eslint-plugin-react eslint-config-standard-with-typescript \
 		@typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-import eslint-plugin-n eslint-plugin-promise \
 		stylelint-config-standard stylelint-config-standard-scss
+
+	node_package_module install eslint-plugin-n@15.0.0
 	cd -
 
 	if [[ "$(command -v go)" != "" ]]; then
