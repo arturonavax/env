@@ -17,9 +17,6 @@ _**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
 
 ## Installation :sparkles:
 
-This environment is prepared to be installed on **GNU/Linux Ubuntu** and **MacOS**,
-read/adapt the installation scripts if you have another distribution/operating system.
-
 ```sh
 bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") help
 ```
