@@ -61,23 +61,35 @@ latest_version="$(wget -qO- "$url_webscraping" | command grep -E -o "/go1(\.[0-9
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-if [[ "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
-	arch="amd64"
+if [[ "$(uname -s)" == "Linux" ]]; then
+	if [[ "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
+		arch="amd64"
 
-elif [[ "$(uname -p)" == "i386" ]]; then
-	arch="386"
+	elif [[ "$(uname -p)" == "i386" ]]; then
+		arch="386"
 
-elif [[ "$(uname -p)" == "arm64" ]]; then
-	arch="arm64"
+	elif [[ "$(uname -p)" == "arm64" ]]; then
+		arch="arm64"
 
-elif [[ "$(uname -p)" == "armv6l" ]]; then
-	arch="armv6l"
+	elif [[ "$(uname -p)" == "armv6l" ]]; then
+		arch="armv6l"
 
-elif [[ "$(uname -p)" == "ppc64le" ]]; then
-	arch="ppc64le"
+	elif [[ "$(uname -p)" == "ppc64le" ]]; then
+		arch="ppc64le"
 
-elif [[ "$(uname -p)" == "s390x" ]]; then
-	arch="s390x"
+	elif [[ "$(uname -p)" == "s390x" ]]; then
+		arch="s390x"
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
+	fi
+
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+	if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
+		arch="arm64"
+	else
+		arch="amd64"
+	fi
 
 else
 	echo "The operating system is not compatible with this installation." && exit 1
