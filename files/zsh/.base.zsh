@@ -314,7 +314,9 @@ function geoip() {
 
 # Create a new project in Go
 function gonew() {
-    mkdir "$1"
+    [[ "$1" == "" ]] && 1="sandbox"
+
+    mkdir "$1" || return 1
 
     cd "$1" || return
 
