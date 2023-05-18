@@ -6,6 +6,8 @@
 # Parameter to install OS config: osconfig
 # Parameter to install all: all
 # Parameter to help: help
+[[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
+
 bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
 
 [[ -z "$installation_folder" ]] && installation_folder="$HOME/arturonavax-env"
