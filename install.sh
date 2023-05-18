@@ -111,11 +111,9 @@ function install() {
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
 			./src/remotes/linux_osconfig.sh
-			echo
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
 			./src/remotes/macos_osconfig.sh
-			echo
 		fi
 
 		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}+ Applied configurations!${fgcolor_reset}"
