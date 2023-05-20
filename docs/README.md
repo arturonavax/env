@@ -14,4 +14,4 @@
 
 ## English :us:
 
-- **[MacOS](./mac_os)**
+- **[MacOS](./mac_os.md)**
