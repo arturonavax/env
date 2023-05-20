@@ -176,3 +176,6 @@ sudo hdiutil detach file.dmg
   - Systems: [Parallels](https://www.parallels.com/)
 
   - Applications and programs (High performance): [CrossOver](https://www.codeweavers.com/crossover/)
+
+    - Improve [CrossOver](https://www.codeweavers.com/crossover/)
+      compatibility: [CXPatcher](https://github.com/italomandara/CXPatcher)
