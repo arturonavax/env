@@ -195,6 +195,8 @@ function install_terminal() {
 		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
+	./src/remotes/add_lines.sh ngrok
+
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 

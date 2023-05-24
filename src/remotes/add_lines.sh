@@ -6,6 +6,7 @@ for arg in "$@"; do
 	base) add_base=1 ;;
 	tools) add_tools=1 ;;
 	basics) add_basics=1 ;;
+	ngrok) add_ngrok=1 ;;
 	esac
 done
 
@@ -57,5 +58,50 @@ if [[ "$add_basics" == 1 ]]; then
 		"$(command grep '^[^#]*export PATH\=\"\$PATH:\$HOME/.local/bin\"' ~/"$shell_file")" == "" ]]; then
 			echo '[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"' >>~/"$shell_file"
 		fi
+	fi
+fi
+
+# add 'console_ui_color: transparent' to the end of the file ngrok
+if [[ "$add_ngrok" == 1 ]]; then
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		ngrok_dirs=(
+			"$HOME/.config/ngrok"
+		)
+
+		if [[ -d "$HOME/snap/ngrok/" ]]; then
+			while read -r ngrok_dir; do
+				ngrok_dirs+=("$ngrok_dir/.config/ngrok")
+			done < <(command find ~/snap/ngrok -maxdepth 1 -type d -regex '.*/[0-9]+$')
+		fi
+
+		for ngrok_dir in "${ngrok_dirs[@]}"; do
+			mkdir -p "$ngrok_dir"
+
+			ngrok_file="$ngrok_dir/ngrok.yml"
+
+			touch "$ngrok_file"
+
+			if [[ "$(command grep '^[^#]*console_ui_color: transparent' "$ngrok_file")" == "" ]]; then
+				echo 'console_ui_color: transparent' >>"$ngrok_file"
+			fi
+		done
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		ngrok_dirs=(
+			"$HOME/.config/ngrok"
+			"$HOME/Library/Application Support/ngrok"
+		)
+
+		for ngrok_dir in "${ngrok_dirs[@]}"; do
+			mkdir -p "$ngrok_dir"
+
+			ngrok_file="$ngrok_dir/ngrok.yml"
+
+			touch "$ngrok_file"
+
+			if [[ "$(command grep '^[^#]*console_ui_color: transparent' "$ngrok_file")" == "" ]]; then
+				echo 'console_ui_color: transparent' >>"$ngrok_file"
+			fi
+		done
 	fi
 fi
