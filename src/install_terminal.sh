@@ -336,7 +336,7 @@ function install_terminal() {
 
 	sudo tic -xe alacritty,alacritty-direct alacritty.info
 
-	cd ../.. # exit downloads/
+	cd .. # exit downloads/
 
 	echo
 
