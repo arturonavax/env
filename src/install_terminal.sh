@@ -301,7 +301,7 @@ function install_terminal() {
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
 			brew tap homebrew/cask
 
-			brew install --cask alacritty
+			brew reinstall --cask alacritty
 
 			xattr -d com.apple.quarantine /Applications/Alacritty.app || :
 
