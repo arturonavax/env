@@ -196,6 +196,7 @@ function install_terminal() {
 	fi
 
 	./src/remotes/add_lines.sh ngrok
+	ngrok config upgrade
 
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
@@ -320,6 +321,26 @@ function install_terminal() {
 
 		echo
 	fi
+
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing alacritty color and tmux-256color info...${fgcolor_reset}"
+
+	cd ./downloads/
+
+	curl -LO https://invisible-island.net/datafiles/current/terminfo.src.gz && gunzip terminfo.src.gz
+
+	sudo tic -xe tmux-256color terminfo.src
+
+	curl -LO https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
+
+	sudo tic -xe alacritty,alacritty-direct alacritty.info
+
+	cd ../.. # exit downloads/
+
+	echo
+
+	# ---
 
 	if [[ "$SHELL" != *"zsh" ]]; then
 		echo -e "${fgcolor_white_bold}[Terminal Installer]: - ${fgcolor_yellow_bold}Configuring Zsh... enter your sudo or root password${fgcolor_reset}"
