@@ -30,6 +30,24 @@ lvim.builtin.indentlines.options.show_first_indent_level = false
 lvim.plugins = {
 	{ "tpope/vim-repeat" },
 	{
+		"anuvyklack/pretty-fold.nvim",
+		config = function()
+			require("pretty-fold").setup({
+				sections = {
+					left = {
+						"content",
+						"┣━━━━ ",
+						"number_of_folded_lines",
+						": ",
+						"percentage",
+					},
+					right = {},
+				},
+				fill_char = " ",
+			})
+		end,
+	},
+	{
 		"ntpeters/vim-better-whitespace",
 		config = function()
 			vim.g.better_whitespace_enabled = 1

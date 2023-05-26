@@ -24,6 +24,9 @@ function Dark_theme()
 	autocmd ColorScheme * highlight WinSeparator guifg=#1a1b26
 	autocmd ColorScheme * highlight WinSeparator guibg=NONE
 
+	" fold
+	autocmd ColorScheme * highlight Folded guibg=#292E42 gui=bold,italic
+
 	" dashboard
 	autocmd ColorScheme * highlight Label guifg=#BF4B4B gui=bold,italic
 
@@ -91,6 +94,9 @@ function Light_theme()
 	" WinSeparator color
 	autocmd ColorScheme * highlight WinSeparator guibg=#E1E2E7 guifg=#E1E2E7
 
+	" fold
+	autocmd ColorScheme * highlight Folded gui=bold,italic
+
 	" dashboard
 	autocmd ColorScheme * highlight Label guifg=#BF4B4B gui=bold,italic
 
@@ -103,7 +109,7 @@ function Light_theme()
 	autocmd ColorScheme * highlight IndentBlanklineContextChar guifg=#7094E1 gui=nocombine
 
 	" illuminate
-	autocmd ColorScheme * highlight IlluminatedWordText guibg=#aeaeb5 guisp=#7094E1 gui=underline
+	autocmd ColorScheme * highlight IlluminatedWordText guibg=#c4c4cc guisp=#7094E1 gui=underline
 
 	" nvim-tree
 	autocmd ColorScheme * highlight NvimTreeNormal guibg=NONE
