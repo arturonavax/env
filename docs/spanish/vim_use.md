@@ -63,15 +63,27 @@ y `<Ctrl>u` para subir 'media pagina'... si se necesita un scroll mas preciso
 utilizo `<Ctrl>e` para bajar suavemente el scroll y `<Ctrl>y` para subirlo,
 `zz` para centrar la pantalla con el cursor.
 
-Una vez visualizo lo que necesito editar, paso a observar el numero de linea
-relativo (si, la configuracion de este repositorio utiliza lineas relativas),
+Esta configuracion usa [leap.nvim](https://github.com/ggandor/leap.nvim) como
+plugin tipo EasyMotion, presiono `s` para delante del cursor o `S` para detras
+del cursor, y posteriormente 2 caracteres de donde quiero llegar, y luego la
+tecla final indicada por [leap.nvim](https://github.com/ggandor/leap.nvim) para llegar.
+
+### Before I used an EasyMotion
+
+Si no usara un plugin de tipo EasyMotion, la forma de movimiento era:
+
+Una vez visualizo lo que necesito editar, paso a observar el numero de linea relativo,
 pulso el numero y pulso `j` o `k` dependiendo en que direccion esta la linea. Ejemplo:
 
 _La linea objetivo esta 17 lineas debajo de donde estoy_ : `17j`
 
 _La linea objetivo esta 13 lineas debajo de donde estoy_ : `13k`
 
-_Nota mental: el punto es dejar de moverse por el archivo solo dejando presionado
+Al estar en la linea, uso `f` o `F` mas el caracter del lugar de la linea al que
+quiero ir, seguido de los `;` necesarios para repetir la busqueda y avanzar, por
+ejemplo: `fp;;` para ir a la tercera "p" de la linea.
+
+_Nota: El punto es dejar de moverse por el archivo solo dejando presionado
 `j` para bajar y `k` para subir, la idea es no hacer ningun movimiento innecesario,
 no necesitas pasar linea por linea para subir o bajar en un archivo, no necesitas
 esperar que el cursor llegue al borde de la pantalla para apenas entonces empezar
@@ -103,35 +115,6 @@ a hacer scroll._
 
 - Ir a una marca: `'{a-zA-Z}` (example: `'k`, va a la marca `k`, las marcas en
   mayuscula pueden ir a otros archivos)
-
-## Fast moving in the line
-
-Una vez que estoy en la linea en la que necesito moverme, utilizo `f` para buscar
-un caracter hacia delante o `F` para buscar un caracter hacia atras del cursor.
-Normalmente la primera busqueda por caracter no me lleva hasta donde necesito
-asi que solo repito la busqueda con `;` hasta ver el cursor en donde quiero
-llegar, por ejemplo :
-
-    Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-                                                 ^
-
-Si quisiera llegar a esa 'i' en esa linea pulgaria `fi;;;` rapidamente.
-
-    Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-                                                                 ^
-
-Si quisiera llegar a esa 'i' podria pulgar `fi;;;;` o `$Fi;` (ir al final de la
-linea y hace una busqueda hacia la izquierda).
-
-Si necesito repetir la busqueda pero en la direccion contraria puedo usar `,`...
-por ejemplo:
-
-    Lorem Ipsum is simply dummy text of the printing and typesetting industry.
-                    2                         1
-
-Podria pulgar `fi;;` para ir al punto 1 y luego `,` para ir al punto 2.
-
-De resto usar `w` para avanzar una palabra o `b` para retroceder una palabra.
 
 ## Actions in line
 
@@ -199,9 +182,9 @@ Utilizo `<Ctrl>g` para visualizar el nombre completo del archivo actual.
 
 Utilizo `:cc` para ir al primer error de la "quickfix list"
 
-Utilizo `:cn` para ir al siguiente error de la "quickfix list"
+Utilizo `g]` para ir al siguiente error de la "quickfix list"
 
-Utilizo `:cp` para ir al error anterior de la "quickfix list"
+Utilizo `g[` para ir al error anterior de la "quickfix list"
 
 Utilizo `o` para alternar la posicion del cursos en lo resaltado en modo `VISUAL`
 
@@ -546,6 +529,17 @@ editor es `lvim`.
 
 - Cambiar a modo LightTheme: `:LightTheme`
 - Cambiar a modo DarkTheme: `:DarkTheme`
+
+- Cerrar fold actual: `zc`
+- Abrir fold actual: `zo`
+- Toggle fold actual: `za`
+- Cerrar todos los folds actuales (recursivamente): `zC`
+- Abrir todos los folds actuales (recursivamente): `zO`
+- Ir al siguiente fold: `zj`
+- Ir al anterior fold: `zk`
+- Abrir todos los folds del nivel de indentacion actual: `zr`
+- Abrir todos los folds: `zR`
+- Cerrar todos los folds: `zM`
 
 ## vim-surround
 
