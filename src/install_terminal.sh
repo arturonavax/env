@@ -116,6 +116,9 @@ function install_terminal() {
 			sudo apt install -y tidy protobuf-compiler john fd-find
 			sudo snap install ngrok
 
+			./src/remotes/add_lines.sh ngrok
+			ngrok config upgrade
+
 			sudo apt install -y clang
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
@@ -189,14 +192,14 @@ function install_terminal() {
 		# Tools with different names between APT and Homebrew
 		brew install tidy-html5 protobuf john-jumbo fd ngrok/ngrok/ngrok
 
+		./src/remotes/add_lines.sh ngrok
+		ngrok config upgrade
+
 		# clang is installed with xcode-select --install
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
 	fi
-
-	./src/remotes/add_lines.sh ngrok
-	ngrok config upgrade
 
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
