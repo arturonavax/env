@@ -41,10 +41,11 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 
 		sudo apt install -y build-essential libssl-dev zlib1g-dev \
 			libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
-			libncursesw5-dev ncurses-term xz-utils tk-dev libffi-dev liblzma-dev
+			libncursesw5-dev ncurses-term xz-utils tk-dev libffi-dev \
+			liblzma-dev libxml2-dev libxslt1-dev
 
 		# for Python
-		sudo apt install -y libpq-dev python3-dev python3-venv python3-wheel python3-tk tk-dev
+		sudo apt install -y libpq-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk tk-dev
 
 		# tools
 		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
@@ -54,7 +55,8 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 
 		sudo dnf group install -y "Development Tools"
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
-			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite qt5-qtbase-devel libpq-dev python3-wheel
+			llvm xz ncurses ncurses-devel ncurses-term libffi tk sqlite qt5-qtbase-devel libxml2-devel
+		sudo dnf install -y libpq-dev python3-devel python3-wheel python3-setuptools
 
 		sudo dnf install -y curl wget git unzip make gcc fontconfig
 
