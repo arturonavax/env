@@ -130,7 +130,7 @@ if [[ "$install_flag" == 1 ]]; then
 			echo "!!! Homebrew installation error occurred." && exit 1
 		fi
 
-		brew install curl wget git make gcc ncurses sqlite3 readline python-tk
+		brew install curl wget git make gcc ncurses sqlite3 readline tcl-tk python-tk
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
