@@ -44,9 +44,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 			libncursesw5-dev ncurses-term xz-utils tk tk-dev libffi-dev \
 			liblzma-dev libxml2-dev libxslt1-dev
 
-		# for Python
-		sudo apt install -y libpq-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk tk-dev
-
 		# tools
 		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
 
@@ -56,7 +53,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo dnf group install -y "Development Tools"
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
 			llvm xz ncurses ncurses-devel ncurses-term libffi tk tk-devel sqlite qt5-qtbase-devel libxml2-devel
-		sudo dnf install -y libpq-devel python3-devel python3-wheel python3-setuptools
 
 		sudo dnf install -y curl wget git unzip make gcc fontconfig
 
@@ -84,9 +80,6 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 		echo "!!! Homebrew installation error occurred." && exit 1
 	fi
 
-	# for Python GUIs
-	brew install python-tk
-
 	# tools
 	brew install curl wget git make gcc unzip fontconfig ncurses openssl readline sqlite3 xz zlib
 
@@ -95,17 +88,6 @@ else
 fi
 
 echo
-
-# ---
-
-if [[ "$(command -v pyenv)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
-
-	# download pyenv
-	curl https://pyenv.run | bash || :
-
-	echo
-fi
 
 # ---
 
@@ -156,6 +138,11 @@ fi
 
 # ---
 
+# install python
+./src/remotes/install_python.sh -i
+
+# ---
+
 echo -e "${fgcolor_white_bold}[Requirements Installer]: - Loading installations (source command)...${fgcolor_reset}"
 
 function rehash() {
@@ -166,36 +153,6 @@ function rehash() {
 source ./files/zsh/.tools.sh || :
 
 echo
-
-# ---
-
-# Install python if the current python is not from pyenv
-if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing python 3...${fgcolor_reset}"
-
-	# install python
-	pyenv install -s 3
-	pyenv global 3
-
-	eval "$(pyenv init -)"
-
-	python3 -m pip install --upgrade pip
-
-	echo
-fi
-
-# ---
-
-if ! python3 -m pipx --version &>/dev/null; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
-
-	# install pipx
-	python3 -m pip install --upgrade pip
-	python3 -m pip install --user pipx --force
-	python3 -m pipx ensurepath
-
-	echo
-fi
 
 # ---
 
