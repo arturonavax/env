@@ -130,7 +130,7 @@ if [[ "$install_flag" == 1 ]]; then
 			echo "!!! Homebrew installation error occurred." && exit 1
 		fi
 
-		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib tcl-tk python-tk
+		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib tcl-tk python3 python-tk
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
@@ -139,8 +139,8 @@ if [[ "$install_flag" == 1 ]]; then
 	echo
 
 	# Install python if the current python is not from pyenv
+	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing Python $latest_version...${fgcolor_reset}"
 	if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null || [[ "$latest_version" != "$current_version" ]]; then
-		echo -e "${fgcolor_white_bold}[Python Installer]: - Installing Python $latest_version...${fgcolor_reset}"
 
 		# install python
 		pyenv install -s "$latest_version"
