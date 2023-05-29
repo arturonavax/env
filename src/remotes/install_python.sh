@@ -20,6 +20,8 @@ function exit-error-message() {
 	exit 1
 }
 
+[[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
+
 while getopts ':i' flag; do
 	case "$flag" in
 	i)
@@ -36,6 +38,11 @@ echo -e "${fgcolor_white_bold}[Python Installer]: Starting install_python.sh scr
 
 if [[ "$(command -v pyenv)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
+
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		# install CommandLineTools (this contains GIT)
+		curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
+	fi
 
 	# download pyenv
 	curl -fsSL https://pyenv.run | bash || :
