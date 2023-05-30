@@ -7,6 +7,8 @@ trap exit-error-message ERR SIGINT
 # Reset Text Color
 fgcolor_reset='\033[0m'
 
+fgcolor_cyan='\033[0;36m'
+
 # Bold Text Colors
 fgcolor_white_bold='\033[1;37m'
 fgcolor_yellow_bold='\033[1;33m'
@@ -94,7 +96,7 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo apt update -y
 
 			sudo apt install -y build-essential gcc make git wget curl libssl-dev zlib1g-dev \
-				libbz2-dev tk tk-dev libffi-dev liblzma-dev libxml2-dev libxslt1-dev \
+				libbz2-dev tk tk-dev libffi-dev liblzma-dev libxml libxml2-dev libxslt1-dev \
 				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
 				libpq-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk
 
@@ -102,9 +104,9 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo dnf update -y
 
 			sudo dnf group install -y "Development Tools"
-			sudo dnf install -y gcc make git wget curl libffi qt5-qtbase-devel \
+			sudo dnf install -y gcc make git wget curl libffi llibffi-devel qt5-qtbase-devel \
 				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel \
-				libxml2-devel libpq-devel python3-devel python3-wheel python3-setuptools tk tk-devel
+				libxml2 libxml2-devel libpq-devel python3-devel python3-wheel python3-setuptools tk tk-devel
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
@@ -149,8 +151,10 @@ if [[ "$install_flag" == 1 ]]; then
 		eval "$(pyenv init -)"
 
 		python3 -m pip install --upgrade pip
+		python3 -m pip install --upgrade tk
 
-		echo -e "${fgcolor_white_bold}[Python Installer]: Python $latest_version installation completed (add Pyenv to PATH)...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: Python $latest_version installation completed...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: Add Pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
 
 		echo
 	fi
@@ -160,10 +164,11 @@ if [[ "$install_flag" == 1 ]]; then
 
 		# install pipx
 		python3 -m pip install --upgrade pip
-		python3 -m pip install --user pipx --force
+		python3 -m pip install --force --upgrade --user pipx
 		python3 -m pipx ensurepath
 
 		echo -e "${fgcolor_white_bold}[Python Installer]: pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: Add ~/.local/bin to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.local/bin:\$PATH\"${fgcolor_reset}"
 
 		echo
 	fi
