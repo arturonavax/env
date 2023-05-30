@@ -145,7 +145,7 @@ if [[ "$install_flag" == 1 ]]; then
 	if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null || [[ "$latest_version" != "$current_version" ]]; then
 
 		# install python
-		if [[ "$(uname -s)" == "Linux" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
 			env \
 				PATH="$(brew --prefix tcl-tk)/bin:$PATH" \
 				LDFLAGS="-L$(brew --prefix tcl-tk)/lib" \
