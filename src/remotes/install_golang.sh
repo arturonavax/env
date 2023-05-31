@@ -55,7 +55,7 @@ while getopts ':ic' flag; do
 	esac
 done
 
-echo -e "${fgcolor_white_bold}Finding latest version of Golang ${fgcolor_cyan_bold}${fgcolor_white_bold}...${fgcolor_reset}"
+echo -e "${fgcolor_white_bold}[Golang Installer]: 󰍉 Finding latest version of Golang ${fgcolor_cyan_bold}${fgcolor_white_bold}...${fgcolor_reset}"
 
 latest_version="$(wget -qO- "$url_webscraping" | command grep -E -o "/go1(\.[0-9]+){0,2}" | sort --version-sort | tail -n 1 | cut -d "/" -f 2)"
 
@@ -81,7 +81,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		arch="s390x"
 
 	else
-		echo "The operating system is not compatible with this installation." && exit 1
+		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
 	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -92,7 +92,7 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	fi
 
 else
-	echo "The operating system is not compatible with this installation." && exit 1
+	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
 fi
 
 go_latest_filename="${latest_version}.${os}-${arch}.tar.gz"
@@ -116,19 +116,20 @@ function eval_installation() {
 
 line_installation=$(
 	cat <<EOF
-  ${fgcolor_yellow} Installation command (You still have to set up your PATH):${fgcolor_reset}
-    ${fgcolor_yellow}$ ${fgcolor_cyan}$(eval_installation "$installation_dirpath")${fgcolor_reset}
+ ${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} Installation command (You still have to set up your PATH):${fgcolor_reset}
+  ${fgcolor_yellow}$ ${fgcolor_cyan}$(eval_installation "$installation_dirpath")${fgcolor_reset}
 EOF
 )
 
 line_example=$(
 	cat <<EOF
-    ${fgcolor_yellow}# Example for adding "go" and "GOPATH/bin" to your PATH: $ ${fgcolor_cyan}echo 'export PATH="${installation_dirpath}go/bin:\$HOME/go/bin:\$PATH"' >> ~/${shell_file}${fgcolor_reset}
+ ${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}# Example for adding "go" and "GOPATH/bin" to your PATH:
+  ${fgcolor_yellow}$ ${fgcolor_cyan}echo 'export PATH="${installation_dirpath}go/bin:\$HOME/go/bin:\$PATH"' >> ~/${shell_file}${fgcolor_reset}
 EOF
 )
 
 function compiled_installation() {
-	echo -e "${fgcolor_white_bold}Getting bootstrap...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: Getting bootstrap...${fgcolor_reset}"
 	echo
 
 	sudo mkdir -p "$bootstrap_dirpath"
@@ -150,7 +151,7 @@ function compiled_installation() {
 	else
 		sudo rm -rf "${installation_dirpath}go/"
 
-		echo -e "${fgcolor_white_bold}Cloning Golang sources...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: Cloning Golang sources...${fgcolor_reset}"
 		echo
 
 		sudo git clone https://go.googlesource.com/go "${installation_dirpath}go"
@@ -168,12 +169,12 @@ function compiled_installation() {
 }
 
 if [[ "$(command -v go)" == "" ]]; then
-	echo -e "  ${fgcolor_red}✘ Golang is not installed on this system.${fgcolor_reset}"
-	echo -e "  ${fgcolor_yellow} The latest available version of Golang is: ${fgcolor_yellow_bold}${latest_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red}✘ Golang is not installed on this system.${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} The latest available version of Golang is: ${fgcolor_yellow_bold}${latest_version}${fgcolor_reset}"
 	echo
 
 	if [[ "$install_flag" == 1 ]]; then
-		echo -e "${fgcolor_cyan_bold} Running installation... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_cyan_bold} Running installation... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
 		echo
 
 		if [[ "$compile_flag" == 1 ]]; then
@@ -187,7 +188,7 @@ if [[ "$(command -v go)" == "" ]]; then
 			eval "$(eval_installation "$installation_dirpath")"
 		fi
 
-		echo -e "${fgcolor_green_bold} Installation completed.${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green_bold} Installation completed.${fgcolor_reset}"
 	else
 		echo -e "$line_installation"
 	fi
@@ -201,12 +202,12 @@ fi
 current_version="$(go version | cut -d " " -f 3)"
 
 if [[ "$latest_version" != "$current_version" ]]; then
-	echo -e "  ${fgcolor_yellow} There is a different version of Golang: ${current_version}"
-	echo -e "  ${fgcolor_yellow_bold} Latest new version available: ${latest_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} There is a different version of Golang: ${current_version}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow_bold} Latest new version available: ${latest_version}${fgcolor_reset}"
 	echo
 
 	if [[ "$install_flag" == 1 ]]; then
-		echo -e "${fgcolor_cyan_bold} Running updating... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_cyan_bold} Running updating... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
 		echo
 
 		if [[ "$compile_flag" == 1 ]]; then
@@ -220,10 +221,10 @@ if [[ "$latest_version" != "$current_version" ]]; then
 			eval "$(eval_installation "$installation_dirpath")"
 		fi
 
-		echo -e "${fgcolor_green_bold} Updating completed.${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green_bold} Updating completed.${fgcolor_reset}"
 	else
 		echo -e "$line_installation"
 	fi
 else
-	echo -e "  ${fgcolor_green} You have the latest version of Golang: ${current_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green} You have the latest version of Golang: ${current_version}${fgcolor_reset}"
 fi

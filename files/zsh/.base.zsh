@@ -118,6 +118,10 @@ function update-go() {
     curl -fsSL https://env.arturonavax.dev/install_golang.sh | bash -s -- $@
 }
 
+function update-python() {
+    curl -fsSL https://env.arturonavax.dev/install_python.sh | bash -s -- $@
+}
+
 # Update
 function update() {
     fcwb='\033[1;37m'
@@ -214,6 +218,7 @@ EOF
         fi
 
         update-go -i
+        update-python
     fi
 }
 
@@ -378,11 +383,4 @@ fi
 ## Basics
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
-
-## MacOS
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    brewbin="/usr/local/bin/brew"
-    [[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-    [[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
-fi
 :
