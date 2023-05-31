@@ -44,7 +44,7 @@ if [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/usr
 	curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
 fi
 
-echo -e "${fgcolor_white_bold}[Python Installer]: 󰍉 Finding latest version of Python ${fgcolor_cyan_bold}${fgcolor_white_bold}...${fgcolor_reset}"
+echo -e "${fgcolor_white_bold}[Python Installer]: 󰍉 Finding latest version of Python ${fgcolor_yellow_bold}${fgcolor_white_bold}...${fgcolor_reset}"
 
 if [[ "$(command -v pyenv)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
