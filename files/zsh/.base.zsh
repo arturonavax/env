@@ -3,6 +3,11 @@
 
 bindkey -e
 
+# PATH Basics
+[[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
+[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+
+# EDITOR
 [[ "$(command -v lvim)" != "" ]] && export EDITOR=lvim
 
 # load zsh-completions
@@ -378,9 +383,4 @@ fi
 if [[ "$(command -v ngrok)" != "" ]]; then
     alias ngrok='TERM=xterm-256color ngrok'
 fi
-
-# PATH
-## Basics
-[[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
-[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
 :

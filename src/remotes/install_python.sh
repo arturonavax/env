@@ -20,12 +20,16 @@ fgcolor_cyan_bold='\033[1;36m'
 
 function exit-error-message() {
 	echo
-	echo -e "${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
 
 	exit 1
 }
 
-[[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
+if [[ "$(command -v curl)" == "" ]]; then
+	echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The curl command is needed to execute this script.${fgcolor_reset}"
+
+	exit 1
+fi
 
 while getopts ':i' flag; do
 	case "$flag" in
@@ -33,7 +37,7 @@ while getopts ':i' flag; do
 		install_flag=1
 		;;
 	*)
-		echo -e "${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install."
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install."
 		exit 1
 		;;
 	esac
@@ -118,7 +122,9 @@ if [[ "$install_flag" == 1 ]]; then
 				libxml2 libxml2-devel libpq-devel python3-devel python3-wheel python3-setuptools tk tk-devel
 
 		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
+			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+
+			exit 1
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -138,13 +144,15 @@ if [[ "$install_flag" == 1 ]]; then
 		[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
 
 		if [[ "$(command -v brew)" == "" ]]; then
-			echo "!!! Homebrew installation error occurred." && exit 1
+			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}Homebrew installation error occurred." && exit 1
 		fi
 
 		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
 
 	else
-		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
+		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+
+		exit 1
 	fi
 
 	echo
@@ -168,7 +176,9 @@ if [[ "$install_flag" == 1 ]]; then
 				pyenv install -s "$latest_version"
 
 		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
+			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+
+			exit 1
 		fi
 
 		pyenv global "$latest_version"

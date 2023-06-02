@@ -8,10 +8,6 @@
 set -o errexit
 trap exit-error-message ERR SIGINT
 
-if [[ "$(command -v wget)" == "" ]]; then
-	echo "The wget command is needed to run this script" && exit 1
-fi
-
 url_webscraping="https://go.dev/dl/"
 
 installation_dirpath="/usr/local/"
@@ -35,10 +31,16 @@ fgcolor_green_bold='\033[1;32m'
 
 function exit-error-message() {
 	echo
-	echo -e "${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
 
 	exit 1
 }
+
+if [[ "$(command -v wget)" == "" ]]; then
+	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The wget command is needed to run this script.${fgcolor_reset}"
+
+	exit 1
+fi
 
 while getopts ':ic' flag; do
 	case "$flag" in
@@ -49,7 +51,7 @@ while getopts ':ic' flag; do
 		compile_flag=1
 		;;
 	*)
-		echo -e "${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install in case you don't have Golang installed on your system or find an update available, and ${fgcolor_green_bold}'-c'${fgcolor_reset} to perform the process by compiling from sources"
+		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install in case you don't have Golang installed on your system or find an update available, and ${fgcolor_green_bold}'-c'${fgcolor_reset} to perform the process by compiling from sources"
 		exit 1
 		;;
 	esac
@@ -81,7 +83,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		arch="s390x"
 
 	else
-		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
+		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+
+		exit 1
 	fi
 
 elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -92,7 +96,9 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	fi
 
 else
-	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation." && exit 1
+	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+
+	exit 1
 fi
 
 go_latest_filename="${latest_version}.${os}-${arch}.tar.gz"
@@ -170,7 +176,7 @@ function compiled_installation() {
 
 if [[ "$(command -v go)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red}✘ Golang is not installed on this system.${fgcolor_reset}"
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} The latest available version of Golang is: ${fgcolor_yellow_bold}${latest_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} The latest available version of Golang is: ${fgcolor_yellow_bold}${latest_version#go}${fgcolor_reset}"
 	echo
 
 	if [[ "$install_flag" == 1 ]]; then
@@ -203,7 +209,7 @@ current_version="$(go version | cut -d " " -f 3)"
 
 if [[ "$latest_version" != "$current_version" ]]; then
 	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow} There is a different version of Golang: ${current_version}"
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow_bold} Latest new version available: ${latest_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow_bold} Latest new version available: ${latest_version#go}${fgcolor_reset}"
 	echo
 
 	if [[ "$install_flag" == 1 ]]; then
@@ -226,5 +232,5 @@ if [[ "$latest_version" != "$current_version" ]]; then
 		echo -e "$line_installation"
 	fi
 else
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green} You have the latest version of Golang: ${current_version}${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green} You have the latest version of Golang: ${current_version#go}${fgcolor_reset}"
 fi
