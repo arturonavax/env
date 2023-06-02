@@ -84,7 +84,6 @@ else
 	if [[ "$latest_version" != "$current_version" ]]; then
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold} The version of Python installed is not the latest one.${fgcolor_reset}"
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold} The latest available version of Python is: $latest_version${fgcolor_reset}"
-		echo
 
 	else
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green} You have the latest version of Python: $latest_version${fgcolor_reset}"
