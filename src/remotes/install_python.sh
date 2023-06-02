@@ -50,22 +50,23 @@ fi
 
 echo -e "${fgcolor_white_bold}[Python Installer]: 󰍉 Finding latest version of Python ${fgcolor_yellow_bold}${fgcolor_white_bold}...${fgcolor_reset}"
 
-if [[ "$(command -v pyenv)" == "" ]]; then
+export PYENV_ROOT="$HOME/.pyenv"
+
+if [[ ":$PATH:" != *":$PYENV_ROOT/bin:"* ]]; then
+	export PATH="$PYENV_ROOT/bin:$PATH"
+fi
+
+if [[ ! -d ~/.pyenv/ ]]; then
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
 
 	# download pyenv
-	curl -fsSL https://pyenv.run | bash || :
-
-	export PYENV_ROOT="$HOME/.pyenv"
-	export PATH="$PYENV_ROOT/bin:$PATH"
-
-	if [[ -d ~/.pyenv ]]; then
-		eval "$(pyenv init -)"
-	fi
+	curl -fsSL https://pyenv.run | bash
 
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pyenv installation completed...${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
 fi
+
+eval "$(pyenv init -)"
 
 latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[0-9]+){1,2}$' |
 	sort --version-sort | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
