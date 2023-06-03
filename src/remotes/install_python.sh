@@ -129,18 +129,17 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo apt update -y
 
 			sudo apt install -y build-essential gcc llvm make git wget curl libssl-dev zlib1g-dev \
-				libbz2-dev tk tk-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
+				libbz2-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
 				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
-				libpq-dev xz-utils python3-dev python3-venv python3-wheel python3-setuptools python3-tk python3-openssl
+				libpq-dev xz-utils tk tk-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk python3-openssl
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 			sudo dnf update -y
 
 			sudo dnf group install -y "Development Tools"
-			sudo dnf install -y gcc make git wget curl libffi llibffi-devel qt5-qtbase-devel \
-				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel \
-				libxml2 libxml2-devel libpq-devel python3-devel python3-wheel python3-setuptools tk tk-devel
-
+			sudo dnf install -y gcc make git wget curl libffi llibffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
+				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
+				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-wheel python3-setuptools
 		else
 			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
 
