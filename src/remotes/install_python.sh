@@ -43,9 +43,24 @@ while getopts ':i' flag; do
 	esac
 done
 
-if [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
-	# install CommandLineTools (this contains GIT)
-	curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
+if [[ "$(uname -s)" == "Darwin" ]]; then
+	if [[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
+		# install CommandLineTools (this contains GIT)
+		curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
+	fi
+
+	# Homebrew
+	if [[ "$(command -v brew)" == "" ]]; then
+		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+	fi
+
+	brewbin="/usr/local/bin/brew"
+	[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
+	[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
+
+	if [[ "$(command -v brew)" == "" ]]; then
+		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}Homebrew installation error occurred." && exit 1
+	fi
 fi
 
 echo -e "${fgcolor_white_bold}[Python Installer]: 󰍉 Finding latest version of Python ${fgcolor_yellow_bold}${fgcolor_white_bold}...${fgcolor_reset}"
@@ -59,8 +74,13 @@ fi
 if [[ ! -d ~/.pyenv/ ]]; then
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
 
-	# download pyenv
-	curl -fsSL https://pyenv.run | bash
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		# download pyenv
+		curl -fsSL https://pyenv.run | bash
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		brew install pyenv
+	fi
 
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pyenv installation completed...${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
@@ -108,10 +128,10 @@ if [[ "$install_flag" == 1 ]]; then
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 			sudo apt update -y
 
-			sudo apt install -y build-essential gcc make git wget curl libssl-dev zlib1g-dev \
+			sudo apt install -y build-essential gcc llvm make git wget curl libssl-dev zlib1g-dev \
 				libbz2-dev tk tk-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
 				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
-				libpq-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk
+				libpq-dev xz-utils python3-dev python3-venv python3-wheel python3-setuptools python3-tk python3-openssl
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 			sudo dnf update -y
@@ -128,25 +148,6 @@ if [[ "$install_flag" == 1 ]]; then
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		# install CommandLineTools (this contains GIT)
-		curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
-
-		# rosetta2
-		softwareupdate --install-rosetta --agree-to-license || :
-
-		# Homebrew
-		if [[ "$(command -v brew)" == "" ]]; then
-			/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-		fi
-
-		brewbin="/usr/local/bin/brew"
-		[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-		[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
-
-		if [[ "$(command -v brew)" == "" ]]; then
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}Homebrew installation error occurred." && exit 1
-		fi
-
 		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
 
 	else
