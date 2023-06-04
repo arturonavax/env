@@ -128,7 +128,7 @@ if [[ "$install_flag" == 1 ]]; then
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 			sudo apt update -y
 
-			sudo apt install -y build-essential gcc llvm make git wget curl libssl-dev zlib1g-dev \
+			sudo apt install -y build-essential gcc llvm make git wget curl findutils libssl-dev zlib1g-dev \
 				libbz2-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
 				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
 				libpq-dev xz-utils tk tk-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk python3-openssl
@@ -147,7 +147,7 @@ if [[ "$install_flag" == 1 ]]; then
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
+		brew install curl wget git make gcc ncurses findutils sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
 
 	else
 		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
