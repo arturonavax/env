@@ -137,7 +137,7 @@ function install_editor() {
 
 	# install node tools plugins in $HOME
 	cd ~
-	node_package_module install eslint-plugin-n@15.0.0
+	node_package_module install eslint-plugin-n@^15.0.0
 
 	node_package_module install eslint typescript postcss stylelint eslint-plugin-react eslint-config-standard-with-typescript \
 		@typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-import eslint-plugin-n eslint-plugin-promise \
