@@ -137,7 +137,7 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo dnf update -y
 
 			sudo dnf group install -y "Development Tools"
-			sudo dnf install -y gcc make git wget curl libffi llibffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
+			sudo dnf install -y gcc make git wget curl libffi libffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
 				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
 				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-wheel python3-setuptools
 		else
