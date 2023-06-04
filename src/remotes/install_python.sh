@@ -160,7 +160,7 @@ if [[ "$install_flag" == 1 ]]; then
 	# Install python if the current python is not from pyenv
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing Python $latest_version...${fgcolor_reset}"
 
-	if ! command -v python3 | grep -q ".pyenv" || ! pyenv doctor &>/dev/null || [[ "$latest_version" != "$current_version" ]]; then
+	if ! command -v python3 | grep -q ".pyenv" || [[ "$latest_version" != "$current_version" ]]; then
 		# install python
 		if [[ "$(uname -s)" == "Linux" ]]; then
 			pyenv install -s "$latest_version"
