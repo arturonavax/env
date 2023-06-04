@@ -26,7 +26,7 @@ touch ~/"$shell_file"
 
 # add 'source ~/.base.zsh' command to the end of the file
 if [[ "$add_base" == 1 ]]; then
-	if [[ "$(command grep '^[^#]*\[\[ -f \~/\.base\.zsh \]\] && source \~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
+	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.base\.zsh \]\] && source ~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo >>~/"$shell_file"
 
 		echo '# load base configuration' >>~/"$shell_file"
@@ -36,7 +36,7 @@ fi
 
 # add 'source ~/.tools.sh' command to the end of the file
 if [[ "$add_tools" == 1 ]]; then
-	if [[ "$(command grep '^[^#]*\[\[ -f \~/\.tools\.sh \]\] && source \~/\.tools\.sh' ~/"$shell_file")" == "" ]]; then
+	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.tools\.sh \]\] && source ~/\.tools\.sh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo >>~/"$shell_file"
 
 		echo '# load tools' >>~/"$shell_file"
@@ -47,8 +47,8 @@ fi
 # add the basic PATH only if they are not already there, and if the previous files have not been loaded. (~/.base.zsh and ~/.tools.sh)
 if [[ "$add_basics" == 1 ]]; then
 	# shellcheck disable=SC2016
-	if [[ "$(command grep '^[^#]*\[\[ -f \~/\.tools\.sh \]\] && source \~/\.tools\.sh' ~/"$shell_file")" == "" &&
-	"$(command grep '^[^#]*\[\[ -f \~/\.base\.zsh \]\] && source \~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
+	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.tools\.sh \]\] && source ~/\.tools\.sh' ~/"$shell_file")" == "" &&
+	"$(command grep '^[^#]*\[\[ -f ~/\.base\.zsh \]\] && source ~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
 		if [[ "$(command grep '^[^#]*export PATH\=\"\$PATH:/usr/local/bin\"' ~/"$shell_file")" == "" &&
 		"$(command grep '^[^#]*export PATH\=\"/usr/local/bin:\$PATH\"' ~/"$shell_file")" == "" ]]; then
 			echo '[[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"' >>~/"$shell_file"
