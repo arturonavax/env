@@ -190,4 +190,4 @@ touch ~/"$shell_file"
 # add 'source ~/.tools.sh' command to the end of the file
 ./src/remotes/add_lines.sh tools
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: ${fgcolor_green_bold}+ Requirements successfully installed!${fgcolor_reset}"
+echo -e "${fgcolor_white_bold}[Requirements Installer]: ${fgcolor_green_bold}✔️ Requirements successfully installed!${fgcolor_reset}"

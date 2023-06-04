@@ -273,7 +273,7 @@ function install_editor() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: ${fgcolor_green_bold}+ Editor ($editor) successfully installed! +${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: ${fgcolor_green_bold}✔️ Editor ($editor) successfully installed!${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Editor Installer]: (Read ~/.config/lvim/config.lua)${fgcolor_reset}"
 
 	echo -en "$fgcolor_reset"

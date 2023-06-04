@@ -83,7 +83,7 @@ function uninstall() {
 	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
 
 	echo
-	echo -e "[Uninstaller]: ${fgcolor_green_bold}+ Uninstallation is complete${fgcolor_white_bold}"
+	echo -e "[Uninstaller]: ${fgcolor_green_bold}✔️ Uninstallation is complete${fgcolor_white_bold}"
 
 	echo -en "$fgcolor_reset"
 	echo

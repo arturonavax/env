@@ -116,7 +116,7 @@ function install() {
 			./src/remotes/macos_osconfig.sh
 		fi
 
-		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}+ Applied configurations!${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}✔️ Applied configurations!${fgcolor_reset}"
 	fi
 
 	if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -125,7 +125,7 @@ function install() {
 
 		brew cleanup
 
-		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}+ Homebrew cleaned!${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}✔️ Homebrew cleaned!${fgcolor_reset}"
 	fi
 }
 

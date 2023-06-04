@@ -423,7 +423,7 @@ function install_terminal() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: ${fgcolor_green_bold}+ Terminal successfully installed!${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: ${fgcolor_green_bold}✔️ Terminal successfully installed!${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: (Restarting the computer to use Zsh for the first time)${fgcolor_reset}"
 
 	echo -en "$fgcolor_reset"
