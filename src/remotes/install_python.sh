@@ -166,14 +166,14 @@ if [[ "$install_flag" == 1 ]]; then
 			pyenv install -s "$latest_version"
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
-			# env \
-			# 	PATH="$(brew --prefix tcl-tk)/bin:$PATH" \
-			# 	LDFLAGS="-L$(brew --prefix tcl-tk)/lib" \
-			# 	CPPFLAGS="-I$(brew --prefix tcl-tk)/include" \
-			# 	PKG_CONFIG_PATH="$(brew --prefix tcl-tk)/lib/pkgconfig" \
-			# 	CFLAGS="-I$(brew --prefix tcl-tk)/include" \
-			# 	PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcltk-includes='-I$(brew --prefix tcl-tk)/include' --with-tcltk-libs='-L$(brew --prefix tcl-tk)/lib -ltcl8.6 -ltk8.6' " \
-			pyenv install -s "$latest_version"
+			env \
+				PATH="$(brew --prefix tcl-tk)/bin:$PATH" \
+				LDFLAGS="-L$(brew --prefix tcl-tk)/lib" \
+				CPPFLAGS="-I$(brew --prefix tcl-tk)/include" \
+				PKG_CONFIG_PATH="$(brew --prefix tcl-tk)/lib/pkgconfig" \
+				CFLAGS="-I$(brew --prefix tcl-tk)/include" \
+				PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcltk-includes='-I$(brew --prefix tcl-tk)/include' --with-tcltk-libs='-L$(brew --prefix tcl-tk)/lib -ltcl8.6 -ltk8.6' " \
+				pyenv install -s "$latest_version"
 
 		else
 			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
