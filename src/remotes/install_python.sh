@@ -199,11 +199,16 @@ if [[ "$install_flag" == 1 ]]; then
 
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
 
-	# install pipx
-	python3 -m pip install --upgrade pip
-	python3 -m pip install --force --upgrade --user pipx
-	python3 -m pipx ensurepath
+	if ! python3 -m pipx --version &>/dev/null && command -v python3 | grep -q ".pyenv"; then
+		# install pipx
+		python3 -m pip install --upgrade pip
+		python3 -m pip install --force --upgrade --user pipx
+		python3 -m pipx ensurepath
 
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add ~/.local/bin to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.local/bin:\$PATH\"${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add ~/.local/bin to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.local/bin:\$PATH\"${fgcolor_reset}"
+
+	else
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pip is already installed...${fgcolor_reset}"
+	fi
 fi
