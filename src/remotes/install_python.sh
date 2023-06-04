@@ -63,7 +63,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 	fi
 fi
 
-echo -e "${fgcolor_white_bold}[Python Installer]: 󰍉 Finding latest version of Python ${fgcolor_yellow_bold}${fgcolor_white_bold}...${fgcolor_reset}"
+echo -e "${fgcolor_white_bold}[Python Installer]: 🔎 Finding latest version of Python ${fgcolor_yellow_bold}🐍${fgcolor_white_bold}...${fgcolor_reset}"
 
 export PYENV_ROOT="$HOME/.pyenv"
 
@@ -82,7 +82,7 @@ if [[ ! -d ~/.pyenv/ ]]; then
 		brew reinstall pyenv
 	fi
 
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pyenv installation completed...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pyenv installation completed...${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
 fi
 
@@ -92,27 +92,27 @@ latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[
 	sort --version-sort | tail -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
 if [[ "$(command -v python3)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}✘ Python is not installed on this system..${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}❌ Python is not installed on this system..${fgcolor_reset}"
 
 else
 	current_version="$(python3 --version | awk '{print $2}')"
 
 	if ! command -v python3 | grep -q ".pyenv"; then
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold} The installed Python was not installed with pyenv.${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}⚠️ The installed Python was not installed with pyenv.${fgcolor_reset}"
 	fi
 
 	if [[ "$latest_version" != "$current_version" ]]; then
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold} The version of Python installed is not the latest one.${fgcolor_reset}"
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold} The latest available version of Python is: $latest_version${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}⚠️ The version of Python installed is not the latest one.${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}ℹ️ The latest available version of Python is: $latest_version${fgcolor_reset}"
 
 	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green} You have the latest version of Python: $latest_version${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green}✔️ You have the latest version of Python: $latest_version${fgcolor_reset}"
 	fi
 fi
 
 if [[ "$install_flag" == 1 ]]; then
 	echo
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_cyan_bold} Running installation...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_cyan_bold}⚡ Running installation...${fgcolor_reset}"
 
 	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing dependencies...${fgcolor_reset}"
 
@@ -141,7 +141,7 @@ if [[ "$install_flag" == 1 ]]; then
 				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
 				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-wheel python3-setuptools
 		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
 
 			exit 1
 		fi
@@ -150,7 +150,7 @@ if [[ "$install_flag" == 1 ]]; then
 		brew install curl wget git make gcc ncurses sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
 
 	else
-		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
 
 		exit 1
 	fi
@@ -176,7 +176,7 @@ if [[ "$install_flag" == 1 ]]; then
 			pyenv install -s "$latest_version"
 
 		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The operating system is not compatible with this installation."
+			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
 
 			exit 1
 		fi
@@ -188,12 +188,12 @@ if [[ "$install_flag" == 1 ]]; then
 		python3 -m pip install --upgrade pip
 		python3 -m pip install --upgrade tk
 
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} Python $latest_version installation completed...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version installation completed...${fgcolor_reset}"
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
 		echo
 
 	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} Python $latest_version is already installed...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version is already installed...${fgcolor_reset}"
 		echo
 	fi
 
@@ -205,10 +205,10 @@ if [[ "$install_flag" == 1 ]]; then
 		python3 -m pip install --force --upgrade --user pipx
 		python3 -m pipx ensurepath
 
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add ~/.local/bin to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.local/bin:\$PATH\"${fgcolor_reset}"
 
 	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pip is already installed...${fgcolor_reset}"
+		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pip is already installed...${fgcolor_reset}"
 	fi
 fi
