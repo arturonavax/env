@@ -79,7 +79,7 @@ if [[ ! -d ~/.pyenv/ ]]; then
 		curl -fsSL https://pyenv.run | bash
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install pyenv
+		brew reinstall pyenv
 	fi
 
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold} pyenv installation completed...${fgcolor_reset}"
