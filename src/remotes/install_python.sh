@@ -139,7 +139,12 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo dnf group install -y "Development Tools"
 			sudo dnf install -y gcc make git wget curl libffi libffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
 				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
-				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-wheel python3-setuptools
+				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-setuptools
+
+			if [[ "$ID" == *"fedora"* ]]; then
+				sudo dnf install -y python3-wheel
+			fi
+
 		else
 			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
 
