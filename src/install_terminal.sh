@@ -291,9 +291,16 @@ function install_terminal() {
 					cd ./downloads/
 					git clone --depth 1 https://github.com/alacritty/alacritty
 					cd ./alacritty/
+
 					cargo build --release
 					infocmp alacritty &>/dev/null || :
 					sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
+
+					sudo cp target/release/alacritty /usr/local/bin
+					sudo cp extra/logo/alacritty-term.svg /usr/share/pixmaps/Alacritty.svg
+					sudo desktop-file-install extra/linux/Alacritty.desktop
+					sudo update-desktop-database
+
 					cd ../.. # exit downloads/
 				fi
 
