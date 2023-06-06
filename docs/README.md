@@ -15,3 +15,5 @@
 ## English :us:
 
 - **[MacOS](./mac_os.md)**
+
+- **[MacOS](./windows.md)**

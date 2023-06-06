@@ -18,12 +18,21 @@
 			"keys": "ctrl+shift+f"
 		},
 		{
+			"command": "unbound",
+			"keys": "ctrl+p"
+		},
+		{
 			"command": {
 				"action": "splitPane",
 				"split": "auto",
 				"splitMode": "duplicate"
 			},
 			"keys": "alt+shift+d"
+		},
+		{
+			"command": {
+				"action": "scrollUp"
+			}
 		}
 	],
 	"copyFormatting": "none",
@@ -31,16 +40,24 @@
 	"defaultProfile": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
 	"profiles": {
 		"defaults": {
+			"bellStyle": "none",
 			"colorScheme": "One Half Dark",
 			"experimental.retroTerminalEffect": false,
 			"font": {
-				"face": "CaskaydiaCove Nerd Font Mono"
+				"face": "CaskaydiaCove Nerd Font Mono",
+				"features": {
+					"calt": 0
+				}
 			},
-			"opacity": 99
+			"opacity": 91,
+			"useAcrylic": true
 		},
 		"list": [
 			{
 				"commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+				"font": {
+					"face": "CaskaydiaCove Nerd Font Mono"
+				},
 				"guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
 				"hidden": false,
 				"name": "Windows PowerShell"
@@ -68,6 +85,18 @@
 				"hidden": false,
 				"name": "Ubuntu",
 				"source": "CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc"
+			},
+			{
+				"guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+				"hidden": false,
+				"name": "PowerShell",
+				"source": "Windows.Terminal.PowershellCore"
+			},
+			{
+				"guid": "{a3a2e83a-884a-5379-baa8-16f193a13b21}",
+				"hidden": false,
+				"name": "PowerShell 7 Preview",
+				"source": "Windows.Terminal.PowershellCore"
 			}
 		]
 	},
@@ -303,5 +332,6 @@
 			"yellow": "#808000"
 		}
 	],
-	"themes": []
+	"themes": [],
+	"useAcrylicInTabRow": true
 }
