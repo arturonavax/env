@@ -1,23 +1,7 @@
 run:
-  timeout: 3m
+  timeout: 5m
 
 linters:
-  presets:
-    - unused
-    - bugs
-    - error
-    - style
-    - metalinter
-    - performance
-    - complexity
-    - format
-    - import
-    - module
-    - test
-    - sql
-    - module
-    - comment
-
   enable:
     - errcheck
     - gosimple
@@ -64,7 +48,7 @@ linters:
     - gomodguard
     - goprintffuncname
     - gosec
-    # - gosmopolitan
+    - gosmopolitan
     - grouper
     - importas
     - interfacebloat
@@ -73,6 +57,7 @@ linters:
     - logrlint
     - maintidx
     - makezero
+    - mirror
     - misspell
     - nakedret
     - nestif
@@ -104,7 +89,7 @@ linters:
     - whitespace
     - wrapcheck
     - wsl
-    # - zerologlint
+    - zerologlint
 
   disable:
     # Deprecated
@@ -129,7 +114,7 @@ linters:
     - exhaustruct
     - musttag
     - tagliatelle
-    # - tagalign
+    - tagalign
     - godox
 
 linters-settings:
@@ -377,3 +362,18 @@ linters-settings:
   reassign:
     patterns:
       - ".*"
+
+  wsl:
+    strict-append: true
+    allow-assign-and-call: false
+    allow-assign-and-anything: false
+    allow-multiline-assign: false
+    allow-trailing-comment: false
+    allow-separated-leading-comment: false
+    allow-cuddle-declarations: false
+    force-err-cuddling: true
+    force-short-decl-cuddling: false
+    force-case-trailing-whitespace: 1
+    error-variable-names: ["err", "err1", "err2", "err3"]
+    allow-cuddle-with-calls: ["Lock", "RLock"]
+    allow-cuddle-with-rhs: ["Unlock", "RUnlock"]
