@@ -16,13 +16,19 @@ winget install GitHub.cli
 winget install Yarn.Yarn
 winget install Microsoft.VisualStudioCode
 
-# Unlock execution scripts
-Start-Process powershell -ArgumentList '-Command "& {Set-ExecutionPolicy RemoteSigned}"' -Verb RunAs -Wait
+# Run as Administrator
+Start-Process powershell -Verb RunAs -Wait -ArgumentList '-Command "& {
+    # Install SSH
+    Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
 
-# Install more icons
-Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
-Start-Process powershell -ArgumentList '-Command "& {Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force}"' -Verb RunAs -Wait
-Start-Process powershell -ArgumentList '-Command "& {Install-Module -Name Terminal-Icons -Repository PSGallery}"' -Verb RunAs -Wait
+    # Unlock execution scripts
+    Set-ExecutionPolicy RemoteSigned
+
+    # Install more icons
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+    Install-Module -Name Terminal-Icons -Repository PSGallery
+}"'
 
 ## Add shell config for Terminal-Icons
 New-Item -ItemType File -Path $PROFILE -Force
@@ -36,7 +42,9 @@ New-Item -ItemType File -Path $PROFILE -Force
 Add-Content -Path $PROFILE -Value "Invoke-Expression (&starship init powershell)"
 
 # Install pyenv
-Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri `
+    "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" `
+    -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
 
 # Install fnm
 winget install Schniz.fnm
@@ -46,7 +54,8 @@ New-Item -ItemType File -Path $PROFILE -Force
 Add-Content -Path $PROFILE -Value "fnm env --use-on-cd | Out-String | Invoke-Expression"
 
 # Reload PATH
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" `
+    + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Install NodeJS
 fnm install --latest
@@ -73,6 +82,7 @@ winget install Rustlang.Rustup
 winget install zoxide
 
 ## Add shell config for zoxide
+New-Item -ItemType File -Path $PROFILE -Force
 Add-Content -Path $PROFILE -Value "Invoke-Expression (& { (zoxide init powershell | Out-String) })"
 
 # Install FZF

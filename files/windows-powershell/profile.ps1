@@ -9,12 +9,13 @@ fnm env --use-on-cd | Out-String | Invoke-Expression
 
 # Reload PATH
 function reloadenv {
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+	$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" `
+		+ [System.Environment]::GetEnvironmentVariable("Path","User")
 
-    . $PROFILE
+	. $PROFILE
 }
 
 function cpath {
-    $tmp_path = Get-Location
-    Set-Clipboard -Path $tmp_path
+	$tmp_path = Get-Location
+	Set-Clipboard -Path $tmp_path
 }

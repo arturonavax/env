@@ -16,4 +16,4 @@
 
 - **[MacOS](./mac_os.md)**
 
-- **[MacOS](./windows.md)**
+- **[Windows](./windows.md)**
