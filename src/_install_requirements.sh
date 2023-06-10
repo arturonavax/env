@@ -42,10 +42,10 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo apt install -y build-essential libssl-dev zlib1g-dev \
 			libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
 			libncursesw5-dev ncurses-term xz-utils tk tk-dev libffi-dev \
-			liblzma-dev libxml2-dev libxslt1-dev
+			liblzma-dev libxml2-dev libxslt1-dev libxcb-xinerama0 libxcb-cursor0
 
 		# tools
-		sudo apt install -y curl wget git unzip make gcc fontconfig snapd
+		sudo apt install -y curl wget git unzip zstd make gcc fontconfig snapd
 
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 		sudo dnf update -y
@@ -54,7 +54,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
 			llvm xz ncurses ncurses-devel ncurses-term libffi tk tk-devel sqlite qt5-qtbase-devel libxml2-devel
 
-		sudo dnf install -y curl wget git unzip make gcc fontconfig
+		sudo dnf install -y curl wget git unzip zstd make gcc fontconfig
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
