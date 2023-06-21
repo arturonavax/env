@@ -59,7 +59,7 @@ done
 
 echo -e "${fgcolor_white_bold}[Golang Installer]: 🔎 Finding latest version of Golang ${fgcolor_cyan_bold}🐹${fgcolor_white_bold}...${fgcolor_reset}"
 
-latest_version="$(wget -qO- "$url_webscraping" | command grep -E -o "/go1(\.[0-9]+){0,2}" | sort --version-sort | tail -n 1 | cut -d "/" -f 2)"
+latest_version="$(wget -qO- "$url_webscraping" | command grep -Po '/go1(\.[0-9]+){0,2}(?!.*rc)' | sort --version-sort | tail -n 1 | cut -d "/" -f 2)"
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
