@@ -3,7 +3,6 @@
 //    Tokyo Night
 //    vscode-icons
 //    Error Lens
-//    multi-command
 //    Activitus Bar
 //    Trailing Spaces
 //    Vim
@@ -35,6 +34,9 @@
 //    CSS Peek
 //    JSON to TS
 {
+	"workbench.colorTheme": "Tokyo Night",
+	"workbench.productIconTheme": "fluent-icons",
+
 	"vsicons.dontShowNewVersionMessage": true,
 	"window.zoomLevel": 1,
 	"explorer.confirmDragAndDrop": false,
@@ -45,7 +47,6 @@
 	"editor.minimap.enabled": false,
 	"editor.lineNumbers": "relative",
 	"workbench.startupEditor": "none",
-	"explorer.openEditors.visible": 0,
 	"timeline.pageSize": 0,
 	"editor.wordWrap": "on",
 	"editor.insertSpaces": false,
@@ -54,9 +55,18 @@
 	"files.trimTrailingWhitespace": true,
 	"explorer.autoReveal": true,
 	"terminal.integrated.defaultProfile.linux": "zsh",
+	"editor.inlayHints.enabled": "on",
 
-	"workbench.iconTheme": "vscode-icons",
-	"workbench.colorTheme": "Tokyo Night",
+	"editor.stickyScroll.enabled": true,
+	"update.showReleaseNotes": false,
+	"git.openRepositoryInParentFolders": "never",
+	"editor.fontLigatures": false,
+	"editor.linkedEditing": true,
+	"editor.guides.bracketPairs": true,
+	"breadcrumbs.enabled": false,
+	"editor.cursorSmoothCaretAnimation": "on",
+	"terminal.integrated.env.linux": {},
+
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
 	"editor.tabSize": 4,
@@ -186,7 +196,9 @@
 	"vim.neovimPath": "nvim",
 	"vim.easymotion": true,
 	"vim.surround": true,
+	"editor.cursorSurroundingLines": 8,
 	"vim.statusBarColorControl": false,
+	"vim.useSystemClipboard": true,
 	"vim.statusBarColors": {
 		"normal": "#BF4B4B",
 		"insert": "#9ECE6A",
@@ -208,16 +220,6 @@
 			"after": ["<Esc>"]
 		}
 	],
-	"vim.normalModeKeyBindings": [
-		{
-			"before": ["<S-l>"],
-			"commands": ["workbench.action.nextEditor"]
-		},
-		{
-			"before": ["<S-h>"],
-			"commands": ["workbench.action.previousEditor"]
-		}
-	],
 	"vim.normalModeKeyBindingsNonRecursive": [
 		{
 			"before": ["<C-c>"],
@@ -225,44 +227,36 @@
 			"when": "editorFocus"
 		},
 		{
-			"before": ["<leader>", "e"],
-			"commands": ["revealInExplorer"],
-			"when": "editorFocus"
+			"before": ["g", "p", "d"],
+			"commands": ["editor.action.peekDefinition"]
 		},
 		{
-			"before": ["<leader>", "n"],
-			"commands": ["workbench.action.toggleSidebarVisibility"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["<leader>", "w"],
-			"commands": ["workbench.action.splitEditor"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["<leader>", "r", "n"],
-			"commands": ["editor.action.rename"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["g", "r"],
-			"commands": ["editor.action.referenceSearch.trigger"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["g", "t"],
-			"commands": ["editor.action.goToTypeDefinition"],
-			"when": "editorFocus"
+			"before": ["g", "h"],
+			"commands": ["editor.action.showDefinitionPreviewHover"]
 		},
 		{
 			"before": ["g", "i"],
-			"commands": ["editor.action.goToImplementation"],
-			"when": "editorFocus"
+			"commands": ["editor.action.goToImplementation"]
 		},
 		{
-			"before": ["<leader>", "l"],
-			"commands": ["workbench.action.showErrorsWarnings"],
-			"when": "editorFocus"
+			"before": ["g", "p", "i"],
+			"commands": ["editor.action.peekImplementation"]
+		},
+		{
+			"before": ["g", "q"],
+			"commands": ["editor.action.quickFix"]
+		},
+		{
+			"before": ["g", "r"],
+			"commands": ["editor.action.referenceSearch.trigger"]
+		},
+		{
+			"before": ["g", "t"],
+			"commands": ["editor.action.goToTypeDefinition"]
+		},
+		{
+			"before": ["g", "p", "t"],
+			"commands": ["editor.action.peekTypeDefinition"]
 		},
 		{
 			"before": ["g", "["],
@@ -272,16 +266,6 @@
 		{
 			"before": ["g", "]"],
 			"commands": ["editor.action.marker.next"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["<leader>", "j"],
-			"commands": ["workbench.action.findInFiles"],
-			"when": "editorFocus"
-		},
-		{
-			"before": ["<leader>", "f"],
-			"commands": ["workbench.action.quickOpen"],
 			"when": "editorFocus"
 		}
 	],
@@ -293,14 +277,9 @@
 		{
 			"before": ["<"],
 			"after": ["<", "g", "v"]
-		},
-		{
-			"before": ["g", "b"],
-			"commands": ["editor.action.blockComment", "extension.vim_escape"]
 		}
 	],
-	"editor.stickyScroll.enabled": true,
-	"update.showReleaseNotes": false,
-	"git.openRepositoryInParentFolders": "never",
-	"editor.fontLigatures": false
+	"extensions.experimental.affinity": {
+		"vscodevim.vim": 1
+	}
 }

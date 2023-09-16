@@ -25,6 +25,7 @@ let myBlacklist = [
 	"- godox",
 ];
 
+
 document.querySelectorAll("table > tbody").forEach((tableBody) => {
 	tableBody.childNodes.forEach((tr) => {
 		let linterName = tr.querySelector("td").innerText;
