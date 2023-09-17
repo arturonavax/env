@@ -1,40 +1,9 @@
-// settings vscode
+// Settings VSCode
 {
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.productIconTheme": "fluent-icons",
-
-	"vsicons.dontShowNewVersionMessage": true,
-	"window.zoomLevel": 1,
-	"explorer.confirmDragAndDrop": false,
-	"editor.suggestSelection": "first",
-	"editor.scrollbar.horizontal": "hidden",
-	"editor.scrollbar.vertical": "hidden",
 	"workbench.editor.showTabs": true,
-	"editor.minimap.enabled": false,
-	"editor.lineNumbers": "relative",
 	"workbench.startupEditor": "none",
-	"timeline.pageSize": 0,
-	"editor.wordWrap": "on",
-	"editor.insertSpaces": false,
-	"files.trimTrailingWhitespace": true,
-	"explorer.autoReveal": true,
-	"terminal.integrated.defaultProfile.linux": "zsh",
-	"editor.inlayHints.enabled": "on",
-	"files.insertFinalNewline": false,
-	"files.trimFinalNewlines": true,
-
-	"editor.stickyScroll.enabled": true,
-	"update.showReleaseNotes": false,
-	"git.openRepositoryInParentFolders": "never",
-	"editor.fontLigatures": false,
-	"editor.linkedEditing": true,
-	"editor.guides.bracketPairs": true,
-	"breadcrumbs.enabled": false,
-	"editor.cursorSmoothCaretAnimation": "on",
-	"terminal.integrated.env.linux": {},
-
-	"gitlens.showWhatsNewAfterUpgrades": false,
-	"gitlens.currentLine.enabled": false,
 
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
@@ -42,6 +11,29 @@
 	"editor.tabCompletion": "on",
 	"editor.autoClosingBrackets": "always",
 	"editor.fontFamily": "CaskaydiaCove Nerd Font Mono",
+	"editor.stickyScroll.enabled": true,
+	"editor.fontLigatures": false,
+	"editor.linkedEditing": true,
+	"editor.guides.bracketPairs": true,
+	"editor.cursorSmoothCaretAnimation": "on",
+	"editor.formatOnSave": true,
+	"editor.formatOnPaste": false,
+	"editor.minimap.enabled": false,
+	"editor.suggestSelection": "first",
+	"editor.lineNumbers": "relative",
+	"editor.wordWrap": "on",
+	"editor.insertSpaces": false,
+	"editor.inlayHints.enabled": "on",
+	"breadcrumbs.enabled": false,
+
+	"window.zoomLevel": 1,
+	"timeline.pageSize": 0,
+	"files.trimFinalNewlines": true,
+	"files.trimTrailingWhitespace": true,
+	"explorer.autoReveal": true,
+
+	"terminal.integrated.defaultProfile.linux": "zsh",
+	"terminal.integrated.env.linux": {},
 	"terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"terminal.integrated.fontSize": 12,
 	"editor.tokenColorCustomizations": {
@@ -55,8 +47,17 @@
 		]
 	},
 
-	"editor.formatOnSave": true,
-	"editor.formatOnPaste": false,
+	"workbench.colorCustomizations": {
+		"[Tokyo Night]": {
+			"editorStickyScroll.background": "#212536"
+		},
+
+		"[Tokyo Night Light]": {
+			"editorStickyScroll.background": "#e4e4ea"
+		}
+	},
+
+	"gitlens.currentLine.enabled": false,
 
 	"prettier.enable": true,
 	"prettier.tabWidth": 2,
@@ -164,8 +165,7 @@
 	"vim.autoindent": true,
 	"vim.enableNeovim": true,
 	"vim.neovimPath": "nvim",
-	// "vim.easymotion": true,
-	"vim.sneak": true,
+	"vim.easymotion": true,
 	"vim.surround": true,
 	"editor.cursorSurroundingLines": 8,
 	"vim.statusBarColorControl": false,
@@ -191,6 +191,10 @@
 		}
 	],
 	"vim.normalModeKeyBindings": [
+		{
+			"before": ["s"],
+			"after": ["<leader>", "<leader>", "s"]
+		},
 		{
 			"before": ["g", "x"],
 			"commands": ["editor.action.openLink"]
@@ -262,9 +266,61 @@
 		{
 			"before": ["g", "b"],
 			"commands": ["editor.action.blockComment"]
+		},
+		{
+			"before": ["s"],
+			"after": ["<leader>", "<leader>", "s"]
 		}
 	],
 	"extensions.experimental.affinity": {
 		"vscodevim.vim": 1
-	}
+	},
+
+	"better-comments.tags": [
+		{
+			"tag": "!",
+			"color": "#FF2D00",
+			"strikethrough": false,
+			"underline": false,
+			"backgroundColor": "transparent",
+			"bold": false,
+			"italic": false
+		},
+		{
+			"tag": "?",
+			"color": "#3498DB",
+			"strikethrough": false,
+			"underline": false,
+			"backgroundColor": "transparent",
+			"bold": false,
+			"italic": false
+		},
+		{
+			"tag": "//",
+			"color": "#474747",
+			"strikethrough": false,
+			"underline": false,
+			"backgroundColor": "transparent",
+			"bold": false,
+			"italic": false
+		},
+		{
+			"tag": "todo",
+			"color": "#FF8C00",
+			"strikethrough": false,
+			"underline": false,
+			"backgroundColor": "transparent",
+			"bold": false,
+			"italic": false
+		},
+		{
+			"tag": "*",
+			"color": "#98C379",
+			"strikethrough": false,
+			"underline": false,
+			"backgroundColor": "transparent",
+			"bold": false,
+			"italic": false
+		}
+	]
 }

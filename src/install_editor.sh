@@ -257,17 +257,22 @@ function install_editor() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring tools GIT with lvim...${fgcolor_reset}"
-	git config --global core.editor lvim
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring tools GIT with vscode...${fgcolor_reset}"
+	# git config --global core.editor lvim
+	git config --global core.editor 'code --wait'
 
-	git config --global diff.tool lvim
+	# git config --global diff.tool lvim
+	# git config --global difftool.lvim.cmd 'lvim -d $LOCAL $REMOTE'
+	git config --global diff.tool vscode
 	# shellcheck disable=SC2016
-	git config --global difftool.lvim.cmd 'lvim -d $LOCAL $REMOTE'
+	git config --global difftool.vscode.cmd 'code --wait --diff $LOCAL $REMOTE'
 
-	git config --global merge.tool lvim
+	# git config --global merge.tool lvim
+	# git config --global mergetool.lvim.cmd 'lvim -d $LOCAL $REMOTE $MERGED'
+	# git config --global mergetool.lvim.trustExitCode true
+	git config --global merge.tool vscode
 	# shellcheck disable=SC2016
-	git config --global mergetool.lvim.cmd 'lvim -d $LOCAL $REMOTE $MERGED'
-	git config --global mergetool.lvim.trustExitCode true
+	git config --global mergetool.vscode.cmd 'code --wait $MERGED'
 
 	echo
 
