@@ -59,6 +59,11 @@
 		"when": "vim.active && referenceSearchVisible && !inputFocus"
 	},
 	{
+		"key": "q",
+		"command": "closeMarkersNavigation",
+		"when": "vim.active && !activeEditorGroupEmpty && (!inputFocus || editorFocus) && (vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
 		"key": "l",
 		"command": "workbench.action.navigateEditorGroups",
 		"when": "vim.active && filesExplorerFocus && !inputFocus"
@@ -502,10 +507,5 @@
 		"key": "z shift+O",
 		"command": "editor.foldRecursively",
 		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress') && editorTextFocus && foldingEnabled"
-	},
-	{
-		"key": "q",
-		"command": "closeMarkersNavigation",
-		"when": "vim.active && !activeEditorGroupEmpty && (!inputFocus || editorFocus) && (vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	}
 ]
