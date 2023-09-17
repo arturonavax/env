@@ -1,38 +1,4 @@
 // settings vscode
-//  plugins:
-//    Tokyo Night
-//    vscode-icons
-//    Error Lens
-//    Activitus Bar
-//    Trailing Spaces
-//    Vim
-//    Go
-//    Go Asm
-//    ES7+ React/Redux/React-Native snippets
-//    JavaScript (ES6) code snippets
-//    JavaScript and TypeScript Nightly
-//    Babel JavaScript
-//    Bun
-//    Import Cost
-//    IntelliSense for CSS class names in HTML
-//    Sass
-//    PostCSS Language Support
-//    Prettier - Code formatter
-//    ESLint
-//    Auto Rename Tag
-//    Auto Close Tag
-//    Path Intellisense
-//    Makefile Tools
-//    ShellCheck
-//    shell-format
-//    vscode-proto3
-//    Image preview
-//    Markdown Preview Enhanced
-//    Rest Client
-//    Thunder Client
-//    Buf
-//    CSS Peek
-//    JSON to TS
 {
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.productIconTheme": "fluent-icons",
@@ -50,12 +16,12 @@
 	"timeline.pageSize": 0,
 	"editor.wordWrap": "on",
 	"editor.insertSpaces": false,
-	"files.insertFinalNewline": false,
-	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
 	"explorer.autoReveal": true,
 	"terminal.integrated.defaultProfile.linux": "zsh",
 	"editor.inlayHints.enabled": "on",
+	"files.insertFinalNewline": false,
+	"files.trimFinalNewlines": true,
 
 	"editor.stickyScroll.enabled": true,
 	"update.showReleaseNotes": false,
@@ -66,6 +32,9 @@
 	"breadcrumbs.enabled": false,
 	"editor.cursorSmoothCaretAnimation": "on",
 	"terminal.integrated.env.linux": {},
+
+	"gitlens.showWhatsNewAfterUpgrades": false,
+	"gitlens.currentLine.enabled": false,
 
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
@@ -186,6 +155,7 @@
 	},
 
 	"vim.leader": "<space>",
+	// "vim.useSystemClipboard": true,
 	"vim.ignorecase": true,
 	"vim.smartcase": true,
 	"vim.incsearch": true,
@@ -194,11 +164,11 @@
 	"vim.autoindent": true,
 	"vim.enableNeovim": true,
 	"vim.neovimPath": "nvim",
-	"vim.easymotion": true,
+	// "vim.easymotion": true,
+	"vim.sneak": true,
 	"vim.surround": true,
 	"editor.cursorSurroundingLines": 8,
 	"vim.statusBarColorControl": false,
-	"vim.useSystemClipboard": true,
 	"vim.statusBarColors": {
 		"normal": "#BF4B4B",
 		"insert": "#9ECE6A",
@@ -220,11 +190,18 @@
 			"after": ["<Esc>"]
 		}
 	],
-	"vim.normalModeKeyBindingsNonRecursive": [
+	"vim.normalModeKeyBindings": [
 		{
-			"before": ["<C-c>"],
-			"commands": ["workbench.action.closeActiveEditor"],
-			"when": "editorFocus"
+			"before": ["g", "x"],
+			"commands": ["editor.action.openLink"]
+		},
+		{
+			"before": ["g", "c", "c"],
+			"commands": ["editor.action.commentLine"]
+		},
+		{
+			"before": ["g", "b", "c"],
+			"commands": ["editor.action.blockComment"]
 		},
 		{
 			"before": ["g", "p", "d"],
@@ -277,6 +254,14 @@
 		{
 			"before": ["<"],
 			"after": ["<", "g", "v"]
+		},
+		{
+			"before": ["g", "c"],
+			"commands": ["editor.action.commentLine"]
+		},
+		{
+			"before": ["g", "b"],
+			"commands": ["editor.action.blockComment"]
 		}
 	],
 	"extensions.experimental.affinity": {

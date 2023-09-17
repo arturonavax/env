@@ -70,7 +70,7 @@ tecla final indicada por [leap.nvim](https://github.com/ggandor/leap.nvim) para 
 
 ### Before I used an EasyMotion
 
-Si no usara un plugin de tipo EasyMotion, la forma de movimiento era:
+Si no usara un plugin del estilo de EasyMotion, la forma de movimiento era:
 
 Una vez visualizo lo que necesito editar, paso a observar el numero de linea relativo,
 pulso el numero y pulso `j` o `k` dependiendo en que direccion esta la linea. Ejemplo:
