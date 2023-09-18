@@ -29,6 +29,18 @@ lvim.builtin.indentlines.options.show_first_indent_level = false
 -- extra plugins
 lvim.plugins = {
 	{ "tpope/vim-repeat" },
+	{ "wakatime/vim-wakatime" },
+	{
+		"zbirenbaum/copilot-cmp",
+		event = "InsertEnter",
+		dependencies = { "zbirenbaum/copilot.lua" },
+		config = function()
+			vim.defer_fn(function()
+				require("copilot").setup() -- https://github.com/zbirenbaum/copilot.lua/blob/master/README.md#setup-and-configuration
+				require("copilot_cmp").setup() -- https://github.com/zbirenbaum/copilot-cmp/blob/master/README.md#configuration
+			end, 100)
+		end,
+	},
 	{
 		"kevinhwang91/nvim-ufo",
 		dependencies = "kevinhwang91/promise-async",

@@ -56,3 +56,5 @@ code --install-extension GitHub.copilot-chat                    # Github Copilot
 code --install-extension adpyke.codesnap                        # CodeSnap
 code --install-extension VisualStudioExptTeam.vscodeintellicode # IntelliCode
 code --install-extension AykutSarac.jsoncrack-vscode            # JSON Crack
+code --install-extension WakaTime.vscode-wakatime               # WakaTime
+code --install-extension alefragnani.project-manager            # Project Manager

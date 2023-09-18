@@ -91,6 +91,9 @@ function Light_theme()
 	})
 
 	vim.cmd([[
+	" CursorLine color
+	autocmd ColorScheme * highlight CursorLine guibg=#F2F2F5
+
 	" WinSeparator color
 	autocmd ColorScheme * highlight WinSeparator guibg=#E1E2E7 guifg=#E1E2E7
 
