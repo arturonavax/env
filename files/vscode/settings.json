@@ -15,7 +15,6 @@
 	"editor.fontLigatures": false,
 	"editor.linkedEditing": true,
 	"editor.guides.bracketPairs": true,
-	"editor.cursorSmoothCaretAnimation": "on",
 	"editor.formatOnSave": true,
 	"editor.formatOnPaste": false,
 	"editor.minimap.enabled": false,
@@ -24,8 +23,8 @@
 	"editor.wordWrap": "on",
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
+	"editor.cursorSmoothCaretAnimation": "on",
 	"breadcrumbs.enabled": false,
-
 	"window.zoomLevel": 1,
 	"timeline.pageSize": 0,
 	"files.trimFinalNewlines": true,

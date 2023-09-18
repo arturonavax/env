@@ -115,22 +115,22 @@
 	{
 		"key": "j",
 		"command": "editor.action.scrollDownHover",
-		"when": "editorHoverFocused"
+		"when": "vim.active && editorHoverFocused"
 	},
 	{
 		"key": "k",
 		"command": "editor.action.scrollUpHover",
-		"when": "editorHoverFocused"
+		"when": "vim.active && editorHoverFocused"
 	},
 	{
 		"key": "h",
 		"command": "editor.action.scrollLeftHover",
-		"when": "editorHoverFocused"
+		"when": "vim.active && editorHoverFocused"
 	},
 	{
 		"key": "l",
 		"command": "editor.action.scrollRightHover",
-		"when": "editorHoverFocused"
+		"when": "vim.active && editorHoverFocused"
 	},
 
 	// Move down
@@ -366,12 +366,12 @@
 	{
 		"key": "y",
 		"command": "filesExplorer.copy",
-		"when": "explorerViewletVisible && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
+		"when": "vim.active && explorerViewletVisible && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
 	},
 	{
 		"key": "/",
 		"command": "workbench.action.quickOpen",
-		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress')"
+		"when": "vim.active && explorerViewletVisible && filesExplorerFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress')"
 	},
 	{
 		"key": "ctrl+w",

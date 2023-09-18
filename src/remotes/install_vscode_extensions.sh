@@ -55,3 +55,4 @@ code --install-extension GitHub.copilot                         # Github Copilot
 code --install-extension GitHub.copilot-chat                    # Github Copilot Chat
 code --install-extension adpyke.codesnap                        # CodeSnap
 code --install-extension VisualStudioExptTeam.vscodeintellicode # IntelliCode
+code --install-extension AykutSarac.jsoncrack-vscode            # JSON Crack
