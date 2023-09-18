@@ -192,7 +192,11 @@
 	"vim.normalModeKeyBindings": [
 		{
 			"before": ["s"],
-			"after": ["<leader>", "<leader>", "s"]
+			"after": ["<leader>", "<leader>", "f"]
+		},
+		{
+			"before": ["S"],
+			"after": ["<leader>", "<leader>", "F"]
 		},
 		{
 			"before": ["g", "x"],
@@ -268,7 +272,11 @@
 		},
 		{
 			"before": ["s"],
-			"after": ["<leader>", "<leader>", "s"]
+			"after": ["<leader>", "<leader>", "f"]
+		},
+		{
+			"before": ["S"],
+			"after": ["<leader>", "<leader>", "F"]
 		}
 	],
 	"extensions.experimental.affinity": {
