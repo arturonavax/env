@@ -485,7 +485,7 @@ editor es `lvim`.
 - Abrir resultado de la quickfix list en una tab: `t`
 
 - Regresar un `jump`: `<Ctrl>o`
-- Avanzar al `jump`: `<Ctrl>o`
+- Avanzar al `jump`: `<Ctrl>i`
 
 - Agregar `tags` a una estructura: `<leader>gat`
 - Eliminar `tags` de una estructura: `<leader>grt`

@@ -329,5 +329,6 @@
 			"bold": false,
 			"italic": false
 		}
-	]
+	],
+	"security.workspace.trust.untrustedFiles": "open"
 }

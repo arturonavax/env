@@ -51,6 +51,21 @@
 		"command": "workbench.files.action.focusFilesExplorer",
 		"when": "vim.active && activeEditorGroupEmpty && !sideBarFocus && !editorFocus && !inputFocus"
 	},
+	{
+		"key": "p",
+		"command": "projectManager.listProjects",
+		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
+	},
+	{
+		"key": "u",
+		"command": "workbench.action.openRecent",
+		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
+	},
+	{
+		"key": "x",
+		"command": "revealFileInOS",
+		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
+	},
 
 	// General
 	{
