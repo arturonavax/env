@@ -58,3 +58,4 @@ code --install-extension VisualStudioExptTeam.vscodeintellicode # IntelliCode
 code --install-extension AykutSarac.jsoncrack-vscode            # JSON Crack
 code --install-extension WakaTime.vscode-wakatime               # WakaTime
 code --install-extension alefragnani.project-manager            # Project Manager
+code --install-extension mads-hartmann.bash-ide-vscode          # Bash IDE
