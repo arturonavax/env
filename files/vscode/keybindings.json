@@ -405,12 +405,12 @@
 	{
 		"key": "shift+h",
 		"command": "workbench.action.previousEditorInGroup",
-		"when": "vim.active && vim.mode !== 'Insert'"
+		"when": "vim.active && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "shift+l",
 		"command": "workbench.action.nextEditorInGroup",
-		"when": "vim.active && vim.mode !== 'Insert'"
+		"when": "vim.active && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+h",
