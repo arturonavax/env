@@ -541,6 +541,28 @@ editor es `lvim`.
 - Abrir todos los folds: `zR`
 - Cerrar todos los folds: `zM`
 
+### Debugger
+
+- Abrir debugger: `:GoDebug`
+- Detener debugger: `:GoDebug -s` | `:GoDbgStop`
+
+- Abrir configuración launch.json: `:GoDebugConfig`
+- Marcar o desmarcar breakpoint: `:GoBreakToggle`
+- Cargar todos los breakpoints de la configuración: `:GoBreakLoad`
+- Guardar todos los breakpoints a la configuración: `:GoBreakSave`
+- Definir breakpoint condicional: `:BreakCondition`
+
+- Continuar linea de ejecución: `n`
+- Continuar a siguiente breakpoint: `c`
+- Continuar a dentro de la función: `s`
+- Salir de dentro de la función: `o`
+- Imprimir valor hover: `p`
+- Marcar o desmarcar breakpoing: `b`
+
+- Editar valor en panel: `e`
+- Expandir valor en panel: `<Enter>`
+- Eliminar valor en panel: `d`
+
 ## vim-surround
 
 Esta configuracion incluye [vim-surround](https://github.com/tpope/vim-surround),
