@@ -22,6 +22,8 @@ editor="lvim"
 
 # install_editor install editor
 function install_editor() {
+	mv ~/.lunarvim.lua ~/.lunarvim.copy.lua || :
+
 	set -o errexit
 	trap exit-error-message ERR SIGINT
 
@@ -75,9 +77,16 @@ function install_editor() {
 		fi
 
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+			# Dependencies and keys for vscode
+			sudo apt-get -y install wget gpg
+			wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >packages.microsoft.gpg
+			sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+			sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+			rm -f packages.microsoft.gpg
+
 			sudo apt update -y
 
-			sudo apt install -y curl git xclip xsel ripgrep clang-format vim vim-nox
+			sudo apt install -y apt-transport-https curl git xclip xsel ripgrep clang-format vim vim-nox
 
 			# Dependencies with different names between APT and Homebrew
 			sudo apt install -y silversearcher-ag fd-find \
@@ -86,8 +95,16 @@ function install_editor() {
 			# GNU/Linux only dependencies
 			sudo apt install -y python3-neovim python3-pip python3-dev
 
+			# Install vscode
+			sudo apt install -y code
+
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
+			# Dependencies and keys for vscode
+			sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+			sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+
 			sudo dnf update -y
+			sudo dnf check-update
 
 			sudo dnf install -y curl git xclip xsel ripgrep
 
@@ -99,6 +116,9 @@ function install_editor() {
 			if [[ "$ID" == *"fedora"* ]]; then
 				sudo dnf install -y python3-neovim
 			fi
+
+			# Install vscode
+			sudo dnf install -y code
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
@@ -113,6 +133,10 @@ function install_editor() {
 
 		# MacOS only dependencies
 		brew install readline
+
+		# Install vscode
+		brew install --cask visual-studio-code
+		xattr -d com.apple.quarantine "/Applications/Visual Studio Code.app" || :
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
@@ -286,9 +310,13 @@ function install_editor() {
 	[[ -d ./downloads/ ]] && rm -rf ./downloads/
 
 	./src/remotes/fixer.sh
+
+	mv ~/.lunarvim.copy.lua ~/.lunarvim.lua || :
 }
 
 function exit-error-message() {
+	mv ~/.lunarvim.copy.lua ~/.lunarvim.lua || :
+
 	echo -e "$(
 		cat <<EOF
 
