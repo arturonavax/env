@@ -19,8 +19,8 @@ lvim.keys.normal_mode["gt"] = ":lua vim.lsp.buf.type_definition()<CR>"
 lvim.keys.normal_mode["gi"] = ":lua vim.lsp.buf.implementation()<CR>"
 lvim.keys.normal_mode["gr"] = ":lua vim.lsp.buf.references()<CR>"
 lvim.keys.normal_mode["K"] = ":lua vim.lsp.buf.hover()<CR>"
-
 lvim.keys.normal_mode["<leader>rn"] = ":lua vim.lsp.buf.rename()<CR>"
+
 -- lvim.keys.normal_mode["<leader>a"] = ":lua vim.lsp.buf.code_action()<CR>"
 -- lvim.keys.visual_mode["<leader>a"] = ":lua vim.lsp.buf.code_action()<CR>"
 -- lvim.keys.normal_mode["<leader>q"] = ":lua vim.lsp.codelens.run()<CR>"
@@ -35,6 +35,7 @@ lvim.keys.normal_mode["<leader>s"] = ":GoCodeLenAct<CR>"
 lvim.keys.normal_mode["<leader>f"] = ":lua require('telescope.builtin').find_files()<CR>"
 lvim.keys.normal_mode["<leader>j"] = ":lua require('telescope.builtin').live_grep()<CR>"
 lvim.keys.normal_mode["<leader>b"] = ":lua require('telescope.builtin').buffers()<CR>"
+lvim.keys.normal_mode["<leader>d"] = ":lua require('telescope.builtin').commands()<CR>"
 
 -- nvimtree
 lvim.keys.normal_mode["<leader>e"] = ":NvimTreeFindFileToggle<CR>"

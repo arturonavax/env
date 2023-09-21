@@ -522,5 +522,87 @@
 		"key": "z shift+O",
 		"command": "editor.foldRecursively",
 		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorTextFocus && foldingEnabled"
+	},
+
+	// Debugger
+	{
+		"key": "c",
+		"command": "workbench.action.debug.continue",
+		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "s",
+		"command": "workbench.action.debug.stepInto",
+		"when": "vim.active && debugState != 'inactive' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "o",
+		"command": "workbench.action.debug.stepOut",
+		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "n",
+		"command": "workbench.action.debug.stepOver",
+		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "p",
+		"command": "editor.debug.action.showDebugHover",
+		"when": "vim.active && editorTextFocus && inDebugMode && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "b",
+		"command": "editor.debug.action.toggleBreakpoint",
+		"when": "vim.active && debuggersAvailable && activeViewlet === 'workbench.view.debug' && editorTextFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "e",
+		"command": "debug.setVariable",
+		"when": "vim.active && variablesFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "e",
+		"command": "debug.renameWatchExpression",
+		"when": "vim.active && watchExpressionsFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "d",
+		"command": "debug.removeWatchExpression",
+		"when": "vim.active && watchExpressionsFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "i",
+		"command": "workbench.debug.viewlet.action.addWatchExpression",
+		"when": "vim.active && watchExpressionsFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "a",
+		"command": "workbench.debug.viewlet.action.addWatchExpression",
+		"when": "vim.active && watchExpressionsFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w w",
+		"command": "workbench.debug.action.focusWatchView",
+		"when": "vim.active && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w i",
+		"command": "workbench.debug.action.focusWatchView",
+		"when": "vim.active && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w v",
+		"command": "workbench.debug.action.focusVariablesView",
+		"when": "vim.active && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w b",
+		"command": "workbench.debug.action.focusBreakpointsView",
+		"when": "vim.active && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w l",
+		"command": "workbench.action.focusActiveEditorGroup",
+		"when": "vim.active && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	}
 ]
