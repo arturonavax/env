@@ -60,3 +60,4 @@ code --install-extension WakaTime.vscode-wakatime               # WakaTime
 code --install-extension alefragnani.project-manager            # Project Manager
 code --install-extension mads-hartmann.bash-ide-vscode          # Bash IDE
 code --install-extension tamasfe.even-better-toml               # Even Better TOML
+code --install-extension DavidAnson.vscode-markdownlint         # markdownlint
