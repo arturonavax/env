@@ -30,6 +30,7 @@
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
 	"explorer.autoReveal": true,
+	"security.workspace.trust.untrustedFiles": "open",
 
 	"terminal.integrated.defaultProfile.linux": "zsh",
 	"terminal.integrated.env.linux": {},
@@ -263,14 +264,6 @@
 			"after": ["<", "g", "v"]
 		},
 		{
-			"before": ["g", "c"],
-			"commands": ["editor.action.commentLine"]
-		},
-		{
-			"before": ["g", "b"],
-			"commands": ["editor.action.blockComment"]
-		},
-		{
 			"before": ["s"],
 			"after": ["<leader>", "<leader>", "f"]
 		},
@@ -330,5 +323,5 @@
 			"italic": false
 		}
 	],
-	"security.workspace.trust.untrustedFiles": "open"
+	"console-ninja.featureSet": "Community"
 }

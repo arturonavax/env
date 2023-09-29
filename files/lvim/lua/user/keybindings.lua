@@ -62,3 +62,7 @@ map("n", "<A-7>", ":BufferLineGoToBuffer 7<CR>", opts)
 map("n", "<A-8>", ":BufferLineGoToBuffer 8<CR>", opts)
 map("n", "<A-9>", ":BufferLineGoToBuffer 9<CR>", opts)
 map("n", "<A-0>", ":BufferLineGoToBuffer -1<CR>", opts)
+
+-- comment
+lvim.builtin.comment.toggler.block = "gCC"
+lvim.builtin.comment.opleader.block = "gC"

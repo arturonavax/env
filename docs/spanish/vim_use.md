@@ -457,9 +457,9 @@ editor es `lvim`.
 - Ir a un archivo del bufferline con su posicion: `<Alt>{number}` | example: `<Alt>2`
 
 - Comentar lineas toggle en modo `VISUAL`: `gc`
-- Comentar bloque toggle en modo `VISUAL`: `gb`
+- Comentar bloque toggle en modo `VISUAL`: `gC`
 - Comentar linea toggle en modo `NORMAL`: `gcc`
-- Comentar bloque toggle en modo `NORMAL`: `gbc`
+- Comentar bloque toggle en modo `NORMAL`: `gCC`
 
 - Abrir link/path: `gx`
 - Ir a definicion: `gd`
