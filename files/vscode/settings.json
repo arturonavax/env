@@ -1,6 +1,11 @@
 // Settings VSCode
 {
 	"workbench.colorTheme": "Tokyo Night",
+	"workbench.preferredDarkColorTheme": "Tokyo Night",
+	"workbench.preferredLightColorTheme": "Tokyo Night Light",
+	"workbench.tree.indent": 12,
+	"workbench.view.alwaysShowHeaderActions": true,
+	"breadcrumbs.enabled": false,
 	"workbench.productIconTheme": "fluent-icons",
 	"workbench.editor.showTabs": true,
 	"workbench.startupEditor": "none",
@@ -24,7 +29,6 @@
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
 	"editor.cursorSmoothCaretAnimation": "on",
-	"breadcrumbs.enabled": false,
 	"window.zoomLevel": 1,
 	"timeline.pageSize": 0,
 	"files.trimFinalNewlines": true,
@@ -32,7 +36,8 @@
 	"explorer.autoReveal": true,
 	"security.workspace.trust.untrustedFiles": "open",
 
-	"terminal.integrated.defaultProfile.linux": "zsh",
+	"terminal.integrated.defaultProfile.linux": "tmux",
+	"terminal.integrated.defaultProfile.osx": "tmux",
 	"terminal.integrated.env.linux": {},
 	"terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"terminal.integrated.fontSize": 12,
@@ -246,12 +251,22 @@
 		{
 			"before": ["g", "["],
 			"commands": ["editor.action.marker.prev"],
-			"when": "editorFocus"
+			"when": "editorFocus && !testing.isPeekVisible"
 		},
 		{
 			"before": ["g", "]"],
 			"commands": ["editor.action.marker.next"],
-			"when": "editorFocus"
+			"when": "editorFocus && !testing.isPeekVisible"
+		},
+		{
+			"before": ["g", "}"],
+			"commands": ["testing.goToNextMessage"],
+			"when": "editorFocus && testing.isPeekVisible"
+		},
+		{
+			"before": ["g", "{"],
+			"commands": ["testing.goToPreviousMessage"],
+			"when": "editorFocus && testing.isPeekVisible"
 		}
 	],
 	"vim.visualModeKeyBindings": [
