@@ -349,12 +349,12 @@ lvim.plugins = {
 			autocmd FileType go nmap <buffer> <leader>gat :GoAddTag<CR>
 			autocmd FileType go nmap <buffer> <leader>grt :GoRmTag<CR>
 
-			autocmd FileType go nmap <buffer> <leader>gt :GoTest<CR>
+			autocmd FileType go nmap <buffer> <leader>T :GoTest<CR>
 			autocmd FileType go nmap <buffer> <leader>gtt :GoAddAllTest<CR>
-			autocmd FileType go nmap <buffer> <leader>gav :GoAltV<CR>
+			autocmd FileType go nmap <buffer> <leader>t :GoAltV<CR>
 			autocmd FileType go nmap <buffer> <leader>gac :GoCmt<CR>
 			autocmd FileType go nmap <buffer> <leader>gtc :GoCoverage<CR>
-			autocmd FileType go nmap <buffer> <leader>go :GoCoverage -t<CR>
+			autocmd FileType go nmap <buffer> <leader>c :GoCoverage -t<CR>
 			autocmd FileType go nmap <buffer> <leader>gfs :GoFillStruct<CR>
 			autocmd FileType go nmap <buffer> <leader>gfw :GoFillSwitch<CR>
 			]])
