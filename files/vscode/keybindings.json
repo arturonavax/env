@@ -163,6 +163,21 @@
 		"command": "widgetNavigation.focusPrevious",
 		"when": "vim.active && !editorFocus && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
+	{
+		"key": "ctrl+w shift+=",
+		"command": "workbench.action.increaseViewHeight",
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w -",
+		"command": "workbench.action.decreaseViewHeight",
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+w =",
+		"command": "workbench.action.evenEditorWidths",
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
 
 	//// Remaps
 	{
@@ -183,7 +198,7 @@
 	{
 		"key": "shift+k",
 		"command": "editor.action.showHover",
-		"when": "vim.active && editorTextFocus && (vim.mode === 'Normal' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress')"
+		"when": "vim.active && editorTextFocus && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "j",
