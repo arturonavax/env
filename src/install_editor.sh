@@ -22,7 +22,7 @@ editor="lvim"
 
 # install_editor install editor
 function install_editor() {
-	mv ~/.lunarvim.lua ~/.lunarvim.copy.lua || :
+	[[ -f ~/.lunarvim.lua ]] && mv ~/.lunarvim.lua ~/.lunarvim.copy.lua
 
 	set -o errexit
 	trap exit-error-message ERR SIGINT
@@ -311,11 +311,11 @@ function install_editor() {
 
 	./src/remotes/fixer.sh
 
-	mv ~/.lunarvim.copy.lua ~/.lunarvim.lua || :
+	[[ -f ~/.lunarvim.copy.lua ]] && mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
 }
 
 function exit-error-message() {
-	mv ~/.lunarvim.copy.lua ~/.lunarvim.lua || :
+	[[ -f ~/.lunarvim.copy.lua ]] && mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
 
 	echo -e "$(
 		cat <<EOF
