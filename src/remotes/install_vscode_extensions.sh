@@ -7,7 +7,7 @@ if [[ "$(command -v code)" == "" ]]; then
 fi
 
 code --install-extension enkia.tokyo-night                      # Tokyo Night
-code --install-extension miguelsolorio.fluent-icons             # Fluent Icons
+code --install-extension PKief.material-icon-theme              # Material Icon Theme
 code --install-extension usernamehw.errorlens                   # Error Lens
 code --install-extension shardulm94.trailing-spaces             # Trailing Spaces
 code --install-extension vscodevim.vim                          # Vim
