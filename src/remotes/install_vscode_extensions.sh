@@ -12,7 +12,6 @@ code --install-extension usernamehw.errorlens                         # Error Le
 code --install-extension shardulm94.trailing-spaces                   # Trailing Spaces
 code --install-extension vscodevim.vim                                # Vim
 code --install-extension golang.go                                    # Go
-code --install-extension quillaja.goasm                               # Go Asm
 code --install-extension ms-python.python                             # Python
 code --install-extension ms-python.vscode-pylance                     # Pylance
 code --install-extension rust-lang.rust-analyzer                      # rust-analyzer
