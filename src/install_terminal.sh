@@ -279,7 +279,7 @@ function install_terminal() {
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
 			if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* && "$(command -v add-apt-repository)" != "" ]]; then
-				sudo add-apt-repository ppa:aslatter/ppa -y
+				# sudo add-apt-repository ppa:aslatter/ppa -y
 
 				sudo apt install alacritty
 
