@@ -90,7 +90,7 @@ function install_editor() {
 
 			# Dependencies with different names between APT and Homebrew
 			sudo apt install -y silversearcher-ag fd-find \
-				libncurses5-dev libncursesw5-dev libncurses5 ncurses-term # ncurses
+				libncurses5-dev libncursesw5-dev libncurses-dev ncurses-term # ncurses
 
 			# GNU/Linux only dependencies
 			sudo apt install -y python3-neovim python3-pip python3-dev

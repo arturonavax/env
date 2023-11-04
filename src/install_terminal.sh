@@ -83,7 +83,7 @@ function install_terminal() {
 
 			# GNU/Linux only dependencies
 			## CLI/TUI depedencies
-			sudo apt install -y libncurses5-dev libncursesw5-dev libncurses5 ncurses-term
+			sudo apt install -y libncurses5-dev libncursesw5-dev libncurses-dev ncurses-term
 
 			## Async dependencies
 			sudo apt install -y libevent-dev
