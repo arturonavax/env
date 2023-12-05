@@ -3,7 +3,7 @@
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.preferredDarkColorTheme": "Tokyo Night",
 	"workbench.preferredLightColorTheme": "Tokyo Night Light",
-	"workbench.iconTheme": "material-icon-theme",
+	"workbench.iconTheme": "vscode-icons",
 	"workbench.tree.indent": 12,
 	"workbench.view.alwaysShowHeaderActions": true,
 	"breadcrumbs.enabled": false,
@@ -36,11 +36,31 @@
 	"explorer.autoReveal": true,
 	"security.workspace.trust.untrustedFiles": "open",
 
-	"terminal.integrated.defaultProfile.linux": "tmux",
-	"terminal.integrated.defaultProfile.osx": "tmux",
-	"terminal.integrated.env.linux": {},
 	"terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"terminal.integrated.fontSize": 12,
+	"terminal.integrated.defaultProfile.linux": "tmux",
+	"terminal.integrated.defaultProfile.osx": "tmux",
+	"terminal.integrated.defaultProfile.windows": "PowerShell",
+	"terminal.integrated.profiles.windows": {
+		"PowerShell": {
+			"source": "PowerShell",
+			"icon": "terminal-powershell"
+		},
+		"Command Prompt": {
+			"path": [
+				"${env:windir}\\Sysnative\\cmd.exe",
+				"${env:windir}\\System32\\cmd.exe"
+			],
+			"args": [],
+			"icon": "terminal-cmd"
+		},
+		"Git Bash": {
+			"source": "Git Bash"
+		},
+		"Windows PowerShell": {
+			"path": "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+		}
+	},
 	"editor.tokenColorCustomizations": {
 		"textMateRules": [
 			{
