@@ -65,13 +65,11 @@
 				"source": "Windows.Terminal.PowershellCore"
 			},
 			{
-				"commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-				"font": {
-					"face": "CaskaydiaCove Nerd Font Mono"
-				},
-				"guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+				"commandline": "C:\\Program Files\\Git\\bin\\bash.exe",
+				"guid": "{e32c6f14-197f-489f-925d-6c88a0f25c53}",
 				"hidden": false,
-				"name": "Windows PowerShell"
+				"icon": "C:\\Program Files\\Git\\mingw64\\share\\git\\git-for-windows.ico",
+				"name": "Git Bash"
 			},
 			{
 				"commandline": "%SystemRoot%\\System32\\cmd.exe",
@@ -84,6 +82,15 @@
 				"hidden": false,
 				"name": "Azure Cloud Shell",
 				"source": "Windows.Terminal.Azure"
+			},
+			{
+				"commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+				"font": {
+					"face": "CaskaydiaCove Nerd Font Mono"
+				},
+				"guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+				"hidden": false,
+				"name": "Windows PowerShell"
 			}
 		]
 	},
