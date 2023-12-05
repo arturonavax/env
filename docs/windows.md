@@ -1,6 +1,30 @@
 # Windows
 
 ```sh
+## Download WinGet in https://aka.ms/getwinget
+## Set Add-AppxPackage: Import-Module Appx -UseWindowsPowerShell
+## Install WinGet: Add-AppxPackage -Path <file>
+
+function InstallWinGet() {
+    Import-Module Appx -UseWindowsPowerShell
+
+    $hasPackageManager = Get-AppPackage -name "Microsoft.DesktopAppInstaller"
+
+    if(!$hasPackageManager) {
+        Add-AppxPackage -Path "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx"
+
+        $releases_url = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
+
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $releases = Invoke-RestMethod -uri "$($releases_url)"
+        $latestRelease = $releases.assets | Where { $_.browser_download_url.EndsWith("msixbundle") } | Select -First 1
+
+        Add-AppxPackage -Path $latestRelease.browser_download_url
+    }
+}
+
+InstallWinGet
+
 # Update all
 winget upgrade -h --all
 
