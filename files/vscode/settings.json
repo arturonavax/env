@@ -7,7 +7,7 @@
 	"workbench.tree.indent": 12,
 	"workbench.view.alwaysShowHeaderActions": true,
 	"breadcrumbs.enabled": false,
-	"workbench.editor.showTabs": true,
+	"workbench.editor.showTabs": "multiple",
 	"workbench.startupEditor": "none",
 
 	"editor.fontSize": 12,
