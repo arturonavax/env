@@ -46,6 +46,7 @@ winget install GitHub.cli
 
 winget install Yarn.Yarn
 winget install Microsoft.VisualStudioCode
+$ENV:EDITOR = "'$HOME'/AppData/Local/Programs/Microsoft\ VS\ Code/Code.exe"
 
 # Run as Administrator
 Start-Process powershell -Verb RunAs -Wait -ArgumentList '-Command "& {
@@ -71,6 +72,7 @@ winget install --id Starship.Starship
 ## Add shell config for starship
 New-Item -ItemType File -Path $PROFILE -Force
 Add-Content -Path $PROFILE -Value "Invoke-Expression (&starship init powershell)"
+New-Item -ItemType Directory -Force ~/.config;New-Item -ItemType file ~/.config/starship.toml;
 
 # Install pyenv
 Invoke-WebRequest -UseBasicParsing -Uri `

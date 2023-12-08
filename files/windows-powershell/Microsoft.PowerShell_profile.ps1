@@ -1,4 +1,6 @@
 # File at $PROFILE
+$ENV:EDITOR = "'$HOME'/AppData/Local/Programs/Microsoft\ VS\ Code/Code.exe"
+
 Import-Module -Name Terminal-Icons
 
 Invoke-Expression (&starship init powershell)
