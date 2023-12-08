@@ -151,8 +151,8 @@ function install_editor() {
 
 	# install corepack and yarn
 	node_package_module install -g corepack
+	corepack disable
 	node_package_module install -g yarn
-	corepack prepare yarn@stable --activate || :
 
 	# install eslint and typescript
 	node_package_module install -g eslint typescript

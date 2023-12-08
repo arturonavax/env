@@ -207,8 +207,8 @@ function install_terminal() {
 	if [[ "$(command -v node_package_module)" != "" ]]; then
 		# install corepack and yarn
 		node_package_module install -g corepack
+		corepack disable
 		node_package_module install -g yarn
-		corepack prepare yarn@stable --activate || :
 
 		# install serve and tldr
 		node_package_module install -g serve tldr
