@@ -437,7 +437,7 @@ function install_terminal() {
 
 	[[ -d ./downloads/ ]] && rm -rf ./downloads/
 
-	./src/remotes/fixer.sh
+	./src/remotes/fixer.sh || :
 }
 
 function exit-error-message() {

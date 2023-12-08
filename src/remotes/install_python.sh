@@ -88,9 +88,9 @@ fi
 
 eval "$(pyenv init -)"
 
-# remove version 3.12.*
+# TODO: remove version >3.11, because they do not have 'distutils'
 latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[0-9]+){1,2}$' |
-	sort --version-sort | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | command grep -v '^3\.12' | tail -n 1)"
+	sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | awk -F. '$1 < 3 || ($1 == 3 && $2 <= 11)' | sort --version-sort | tail -n 1)"
 
 if [[ "$(command -v python3)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}❌ Python is not installed on this system..${fgcolor_reset}"

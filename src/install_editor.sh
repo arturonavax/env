@@ -309,7 +309,7 @@ function install_editor() {
 
 	[[ -d ./downloads/ ]] && rm -rf ./downloads/
 
-	./src/remotes/fixer.sh
+	./src/remotes/fixer.sh || :
 
 	[[ -f ~/.lunarvim.copy.lua ]] && mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
 }
