@@ -23,6 +23,13 @@ function InstallWinGet() {
     }
 }
 
+function reloadenv {
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" `
+        + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+    . $PROFILE
+}
+
 InstallWinGet
 
 # Update all
@@ -78,8 +85,7 @@ New-Item -ItemType File -Path $PROFILE -Force
 Add-Content -Path $PROFILE -Value "fnm env --use-on-cd | Out-String | Invoke-Expression"
 
 # Reload PATH
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" `
-    + [System.Environment]::GetEnvironmentVariable("Path","User")
+reloadenv
 
 # Install NodeJS
 fnm install --latest
@@ -92,10 +98,26 @@ pyenv update
 pyenv install 3.12.1
 pyenv global 3.12.1
 
+# Reload PATH
+reloadenv
+
+python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade tk
+python3 -m pip install --upgrade setuptools
+python3 -m pip install --upgrade wheel
+
 ## Install pipx
 python3 -m pip install --upgrade pip
 python3 -m pip install --force --upgrade --user pipx
 python3 -m pipx ensurepath
+
+## Install python tools
+pipx install black
+pipx install pylint
+pipx install beautysh
+pipx install cmakelang
+pipx install speedtest-cli
+pipx install litecli
 
 # Install Golang
 winget install Golang.Go
