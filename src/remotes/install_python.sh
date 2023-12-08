@@ -88,7 +88,9 @@ fi
 
 eval "$(pyenv init -)"
 
-pyenv update
+if [[ "$(uname -s)" != "Darwin" ]]; then
+	pyenv update
+fi
 
 latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[0-9]+){1,2}$' |
 	sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort --version-sort | tail -n 1)"
