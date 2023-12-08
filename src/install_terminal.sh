@@ -89,7 +89,7 @@ function install_terminal() {
 			sudo apt install -y libevent-dev
 
 			## GUI and Qt dependencies
-			sudo apt install -y libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 \
+			sudo apt install -y libxrandr2 libxrandr2 libxss1 \
 				libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6 libxcb-xfixes0-dev
 
 			## Fonts dependencies
