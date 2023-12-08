@@ -39,6 +39,7 @@
 	"terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"terminal.integrated.fontSize": 12,
 	"terminal.integrated.defaultProfile.linux": "tmux",
+	"terminal.integrated.env.linux": {},
 	"terminal.integrated.defaultProfile.osx": "tmux",
 	"terminal.integrated.defaultProfile.windows": "PowerShell",
 	"terminal.integrated.profiles.windows": {
@@ -358,6 +359,5 @@
 			"italic": false
 		}
 	],
-	"console-ninja.featureSet": "Community",
-	"terminal.integrated.env.linux": {}
+	"console-ninja.featureSet": "Community"
 }
