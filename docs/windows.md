@@ -88,8 +88,9 @@ fnm install --latest
 winget install pnpm
 
 # Install Python
-pyenv install 3.11.3
-pyenv global 3.11.3
+pyenv update
+pyenv install 3.12.1
+pyenv global 3.12.1
 
 ## Install pipx
 python3 -m pip install --upgrade pip

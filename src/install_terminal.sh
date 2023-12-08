@@ -251,12 +251,12 @@ function install_terminal() {
 
 	if [[ "$(command -v python_binary_installer)" != "" ]]; then
 		python_binary_installer speedtest-cli
-		python_binary_installer pgcli
+		# python_binary_installer pgcli
 		python_binary_installer litecli
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'python binary installer' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tspeedtest-cli, pgcli, litecli${fgcolor_reset}"
+        \tspeedtest-cli, litecli${fgcolor_reset}"
 		echo
 	fi
 
