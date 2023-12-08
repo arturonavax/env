@@ -358,5 +358,6 @@
 			"italic": false
 		}
 	],
-	"console-ninja.featureSet": "Community"
+	"console-ninja.featureSet": "Community",
+	"terminal.integrated.env.linux": {}
 }

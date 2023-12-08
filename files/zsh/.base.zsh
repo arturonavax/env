@@ -108,7 +108,8 @@ function cleanup() {
         sudo swapon -a
 
     elif [[ "$(uname -s)" == "Darwin" ]]; then
-        echo "!!! Under construction for MacOS"
+        # Swap memory and caches in MacOS does not work exactly the same way as in Linux, you do not have to worry about clearing it manually.
+        sudo purge
     fi
 }
 
