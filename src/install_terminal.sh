@@ -435,9 +435,11 @@ function install_terminal() {
 
 	echo -en "$fgcolor_reset"
 
-	[[ -d ./downloads/ ]] && rm -rf ./downloads/
+	if [[ -d ./downloads/ ]]; then
+		rm -rf ./downloads/
+	fi
 
-	./src/remotes/fixer.sh || :
+	./src/remotes/fixer.sh
 }
 
 function exit-error-message() {

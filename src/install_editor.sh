@@ -22,7 +22,9 @@ editor="lvim"
 
 # install_editor install editor
 function install_editor() {
-	[[ -f ~/.lunarvim.lua ]] && mv ~/.lunarvim.lua ~/.lunarvim.copy.lua
+	if [[ -f ~/.lunarvim.lua ]]; then
+		mv ~/.lunarvim.lua ~/.lunarvim.copy.lua
+	fi
 
 	set -o errexit
 	trap exit-error-message ERR SIGINT
@@ -307,15 +309,21 @@ function install_editor() {
 
 	echo -en "$fgcolor_reset"
 
-	[[ -d ./downloads/ ]] && rm -rf ./downloads/
+	if [[ -d ./downloads/ ]]; then
+		rm -rf ./downloads/
+	fi
 
-	./src/remotes/fixer.sh || :
+	./src/remotes/fixer.sh
 
-	[[ -f ~/.lunarvim.copy.lua ]] && mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
+	if [[ -f ~/.lunarvim.copy.lua ]]; then
+		mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
+	fi
 }
 
 function exit-error-message() {
-	[[ -f ~/.lunarvim.copy.lua ]] && mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
+	if [[ -f ~/.lunarvim.copy.lua ]]; then
+		mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
+	fi
 
 	echo -e "$(
 		cat <<EOF
