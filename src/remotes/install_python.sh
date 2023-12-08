@@ -88,8 +88,8 @@ fi
 
 eval "$(pyenv init -)"
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
-	pyenv update
+if [[ "$(uname -s)" == "Linux" ]]; then
+	pyenv update &>/dev/null
 fi
 
 latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[0-9]+){1,2}$' |
