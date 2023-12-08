@@ -149,9 +149,7 @@ function install_editor() {
 		sudo ln -s "$(command -v fdfind)" /usr/bin/fd
 	fi
 
-	# install corepack and yarn
-	node_package_module install -g corepack
-	corepack disable
+	# install yarn
 	node_package_module install -g yarn
 
 	# install eslint and typescript

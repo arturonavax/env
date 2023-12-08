@@ -205,9 +205,7 @@ function install_terminal() {
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
 	if [[ "$(command -v node_package_module)" != "" ]]; then
-		# install corepack and yarn
-		node_package_module install -g corepack
-		corepack disable
+		# install yarn
 		node_package_module install -g yarn
 
 		# install serve and tldr
@@ -215,7 +213,7 @@ function install_terminal() {
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'node package module' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tcorepack, yarn, serve, tldr${fgcolor_reset}"
+        \tyarn, serve, tldr${fgcolor_reset}"
 	fi
 
 	if [[ "$(command -v go)" != "" ]]; then
