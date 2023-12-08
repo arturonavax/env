@@ -132,7 +132,7 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo apt install -y build-essential gcc llvm make git wget curl findutils libssl-dev zlib1g-dev \
 				libbz2-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
 				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
-				libpq-dev xz-utils tk tk-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tk python3-openssl
+				libpq-dev xz-utils tk tk-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tabulate python3-tk python3-openssl
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 			sudo dnf update -y
@@ -140,7 +140,7 @@ if [[ "$install_flag" == 1 ]]; then
 			sudo dnf group install -y "Development Tools"
 			sudo dnf install -y gcc make git wget curl libffi libffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
 				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
-				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-setuptools
+				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-setuptools python3-tabulate
 
 			if [[ "$ID" == *"fedora"* ]]; then
 				sudo dnf install -y python3-wheel
@@ -153,7 +153,7 @@ if [[ "$install_flag" == 1 ]]; then
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl wget git make gcc ncurses findutils sqlite3 openssl readline zlib xz tcl-tk python3 python-tk
+		brew install curl wget git make gcc ncurses findutils sqlite3 openssl readline zlib xz tcl-tk python3 python-tk python-setuptools python-tabulate
 
 	else
 		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
@@ -193,6 +193,8 @@ if [[ "$install_flag" == 1 ]]; then
 
 		python3 -m pip install --upgrade pip
 		python3 -m pip install --upgrade tk
+		python3 -m pip install --upgrade setuptools
+		python3 -m pip install --upgrade wheel
 
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version installation completed...${fgcolor_reset}"
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
