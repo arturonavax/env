@@ -7,6 +7,7 @@
 	"workbench.tree.indent": 12,
 	"workbench.view.alwaysShowHeaderActions": true,
 	"breadcrumbs.enabled": false,
+	"window.zoomLevel": 1,
 	"workbench.editor.showTabs": "multiple",
 	"workbench.startupEditor": "none",
 
@@ -17,6 +18,7 @@
 	"editor.autoClosingBrackets": "always",
 	"editor.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"editor.stickyScroll.enabled": true,
+	"workbench.tree.enableStickyScroll": true,
 	"editor.fontLigatures": false,
 	"editor.linkedEditing": true,
 	"editor.guides.bracketPairs": true,
@@ -29,7 +31,6 @@
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
 	"editor.cursorSmoothCaretAnimation": "on",
-	"window.zoomLevel": 1,
 	"timeline.pageSize": 0,
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
