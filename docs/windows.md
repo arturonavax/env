@@ -92,7 +92,7 @@ reloadenv
 # Install NodeJS
 fnm install --latest
 
-# Insatll pnpm
+# Install pnpm
 winget install pnpm
 
 # Install Python

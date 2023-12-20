@@ -53,8 +53,8 @@ defaults write com.apple.finder FXPreferredGroupBy kind
 defaults write com.apple.dock orientation -string left
 defaults write com.apple.dock autohide -bool true
 defaults write com.apple.dock magnification -int 1
-defaults write com.apple.dock largesize -int 60
-defaults write com.apple.dock tilesize -int 45
+defaults write com.apple.dock largesize -int 65
+defaults write com.apple.dock tilesize -int 55
 defaults write com.apple.dock "show-recents" -int 0
 defaults write com.apple.dock expose-animation-duration -float 0.05
 
