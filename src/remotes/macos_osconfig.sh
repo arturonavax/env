@@ -11,8 +11,8 @@ chflags nohidden ~/Library
 # show extensions of all files
 defaults write -g AppleShowAllExtensions -bool true
 
-# disable mouse natural scroll
-defaults write -g com.apple.swipescrolldirection -bool false && killall cfprefsd
+# enable mouse natural scroll
+defaults write -g com.apple.swipescrolldirection -bool true && killall cfprefsd
 
 # disable .DS_Store files
 defaults write com.apple.desktopservices DSDontWriteNetworkStores true
