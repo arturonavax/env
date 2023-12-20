@@ -30,7 +30,7 @@ function install_fonts() {
 		sudo cp ./* /usr/local/share/fonts/patched-fonts/.
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		# brew tap homebrew/cask-fonts
+		# brew tap --force homebrew/cask-fonts
 		# brew install --cask font-caskaydia-cove-nerd-font
 
 		sudo mkdir -p /Library/Fonts/patched-fonts

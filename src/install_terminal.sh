@@ -157,7 +157,7 @@ function install_terminal() {
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew tap homebrew/cask
+		brew tap --force homebrew/cask
 		brew update
 
 		# MacOS only dependencies
@@ -307,7 +307,7 @@ function install_terminal() {
 			fi
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
-			brew tap homebrew/cask
+			brew tap --force homebrew/cask
 
 			brew reinstall --cask alacritty
 
