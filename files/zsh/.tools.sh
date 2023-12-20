@@ -3,13 +3,6 @@
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
 
-# MacOS - Homebrew
-if [[ "$(uname -s)" == "Darwin" ]]; then
-	brewbin="/usr/local/bin/brew"
-	[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-	[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
-fi
-
 # go
 [[ -d /usr/local/go/bin/ ]] && export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
