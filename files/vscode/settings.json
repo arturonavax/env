@@ -42,6 +42,7 @@
 	"terminal.integrated.defaultProfile.linux": "tmux",
 	"terminal.integrated.env.linux": {},
 	"terminal.integrated.defaultProfile.osx": "tmux",
+	"terminal.integrated.env.osx": {},
 	"terminal.integrated.defaultProfile.windows": "PowerShell",
 	"terminal.integrated.profiles.windows": {
 		"PowerShell": {

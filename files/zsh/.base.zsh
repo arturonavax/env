@@ -371,8 +371,8 @@ if [[ "$(command -v exa)" != "" ]]; then
     alias llt='exa --icons --classify --tree'
 
 else
-    alias ls='ls --color --classify'
-    alias ll='ls --color --classify -l'
+    alias ls='ls --color'
+    alias ll='ls --color -l'
 fi
 
 ## Bat
