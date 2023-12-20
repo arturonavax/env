@@ -186,8 +186,8 @@ function install_terminal() {
 		brew install clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
 			shellcheck nmap arp-scan aircrack-ng sqlmap
 
-		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh
-		sudo ln -s /opt/homebrew/bin/tmux /usr/local/bin/tmux
+		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh || :
+		sudo ln -s /opt/homebrew/bin/tmux /usr/local/bin/tmux || :
 
 		brew install --cask wireshark # includes tshark
 
