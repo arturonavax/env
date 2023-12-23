@@ -4,15 +4,31 @@
 
 - App launcher: `Command-Space`
 
-- Switch input source: `Ctrl-Space`
+- Show apps (Mission Control): `Ctrl-UpArrow` or Swipe up using three fingers (or four fingers)
 
 - Switch apps: `Command-Tab`
+
+- Close app: `Command-Q` or `Option-Commnad-Esc` (Force)
+
+- Refresh page (F5): `Command-R`
+
+- Switch input source: `Ctrl-Space` or `Fn`
 
 - Full screen window: `Ctrl-Command-F`
 
 - New window: `Command-N`
 
 - Minimize window: `Command-H`
+
+
+- Screenshots:
+  - Area (Clipboard): `Shift-Ctrl-Command-4`
+  - Complete (Clipboard): `Shift-Ctrl-Command-3`
+  - Area (File): `Shift-Command-4`
+  - Complete (File): `Shift-Command-3`
+  - Options: `Shift-Command-5`
+
+- Grave accent (\`) or Tilde (\~): Key to the right of the Shift
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
