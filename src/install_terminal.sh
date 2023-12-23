@@ -108,7 +108,7 @@ function install_terminal() {
 
 			# Tools
 			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
-				shellcheck nmap arp-scan aircrack-ng sqlmap
+				shellcheck nmap arp-scan aircrack-ng sqlmap direnv
 
 			sudo apt install -y wireshark tshark
 
@@ -184,7 +184,7 @@ function install_terminal() {
 
 		# Tools
 		brew install clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
-			shellcheck nmap arp-scan aircrack-ng sqlmap
+			shellcheck nmap arp-scan aircrack-ng sqlmap direnv
 
 		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh || :
 		sudo ln -s /opt/homebrew/bin/tmux /usr/local/bin/tmux || :
