@@ -47,7 +47,7 @@
 	},
 	{
 		"key": "q",
-		"command": "workbench.action.quit",
+		"command": "workbench.action.closeWindow",
 		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
 	},
 	{
