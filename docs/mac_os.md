@@ -4,6 +4,8 @@
 
 - App launcher: `Command-Space`
 
+- Lock: `Ctrl-Command-Q`
+
 - Show apps (Mission Control): `Ctrl-UpArrow` or Swipe up using three fingers (or four fingers)
 
 - Switch apps: `Command-Tab`
@@ -19,7 +21,6 @@
 - New window: `Command-N`
 
 - Minimize window: `Command-H`
-
 
 - Screenshots:
   - Area (Clipboard): `Shift-Ctrl-Command-4`
