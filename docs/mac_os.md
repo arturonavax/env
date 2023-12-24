@@ -31,6 +31,8 @@
 
 - Grave accent (\`) or Tilde (\~): Key to the right of the Shift
 
+- Emojis: `Fn-E`
+
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
 ## Devs

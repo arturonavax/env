@@ -15,6 +15,12 @@ while true; do
 	kill -0 "$$" || exit
 done 2>/dev/null &
 
+# Set computer name (as done via System Preferences → Sharing)
+# sudo scutil --set ComputerName "MacBook Arturo"
+# sudo scutil --set HostName "MacBook Arturo"
+# sudo scutil --set LocalHostName "MacBook Arturo"
+# sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "MacBook Arturo"
+
 # Disable the sound effects on boot
 sudo nvram SystemAudioVolume=" "
 sudo nvram StartupMute=%01
@@ -59,17 +65,33 @@ defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
 # in the login window
 sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
 
+# Show list of users in the login window instead of having to enter their names
+sudo defaults write /Library/Preferences/com.apple.loginwindow SHOWFULLNAME -int 0
+
+# Show language menu in the top right corner of the boot screen
+sudo defaults write /Library/Preferences/com.apple.loginwindow showInputMenu -bool true
+
+# Disable screen saver
+defaults -currentHost write com.apple.screensaver idleTime -int 0
+
+# Show clock in screen saver
+defaults -currentHost write com.apple.screensaver showClock -int 1
+
 # creates symbolic link for "airport" command
 [[ "$(command -v airport)" == "" ]] && sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/bin/airport
 
 # show hidden folders
 chflags nohidden ~/
 chflags nohidden ~/Library && xattr -d com.apple.FinderInfo ~/Library
+
 # Show the /Volumes folder
 sudo chflags nohidden /Volumes
 
 # show extensions of all files
 defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+
+# Trackpad: three finger drag
+defaults write com.apple.AppleMultitouchTrackpad "TrackpadThreeFingerDrag" -bool "true"
 
 # disable mouse natural scroll
 defaults write NSGlobalDomain com.apple.swipescrolldirection -bool false
@@ -79,13 +101,23 @@ defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool
 defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 
+# Show battery percentage
+defaults write com.apple.menuextra.battery ShowPercent -string "YES"
+defaults -currentHost write com.apple.controlcenter.plist BatteryShowPercentage -bool true
+
 # disable .DS_Store files
 # Avoid creating .DS_Store files on network or USB volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
 
+# Finder: allow quitting via ⌘ + Q; doing so will also hide desktop icons
+defaults write com.apple.finder QuitMenuItem -bool true
+
 # finder: show hidden files
 defaults write com.apple.finder AppleShowAllFiles -bool true
+
+# show scroll bars always
+defaults write NSGlobalDomain "AppleShowScrollBars" -string "Always"
 
 # finder: show path bar
 defaults write com.apple.finder ShowPathbar -bool true
@@ -123,9 +155,9 @@ defaults write NSGlobalDomain com.apple.springing.delay -float 0
 /usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:arrangeBy grid" ~/Library/Preferences/com.apple.finder.plist
 
 # Increase grid spacing for icons on the desktop and in other icon views
-/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:gridSpacing 50" ~/Library/Preferences/com.apple.finder.plist
-/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:gridSpacing 50" ~/Library/Preferences/com.apple.finder.plist
-/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:gridSpacing 50" ~/Library/Preferences/com.apple.finder.plist
+/usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:gridSpacing 65" ~/Library/Preferences/com.apple.finder.plist
+/usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:gridSpacing 65" ~/Library/Preferences/com.apple.finder.plist
+/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:gridSpacing 65" ~/Library/Preferences/com.apple.finder.plist
 
 # Increase the size of icons on the desktop and in other icon views
 /usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:iconSize 80" ~/Library/Preferences/com.apple.finder.plist
@@ -166,10 +198,11 @@ defaults write com.apple.finder FXInfoPanesExpanded -dict \
 # dock
 defaults write com.apple.dock orientation -string left
 defaults write com.apple.dock autohide -bool true
+defaults write com.apple.dock autohide-delay -int 0
+defaults write com.apple.dock autohide-time-modifier -float 0.8
 defaults write com.apple.dock magnification -int 1
 defaults write com.apple.dock largesize -int 65
 defaults write com.apple.dock tilesize -int 55
-defaults write com.apple.dock "show-recents" -int 0
 defaults write com.apple.dock expose-animation-duration -float 0.05
 defaults write com.apple.dock show-recents -bool false
 
@@ -205,6 +238,9 @@ defaults write com.apple.screensaver askForPasswordDelay -int 0
 # Reference: https://github.com/kevinSuttle/macOS-Defaults/issues/17#issuecomment-266633501
 defaults write NSGlobalDomain AppleFontSmoothing -int 1
 
+# Enable HiDPI display modes (requires restart)
+sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
+
 # disable saving of window status on power off
 sudo defaults write com.apple.loginwindow TALLogoutSavesState -bool false
 defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
@@ -226,12 +262,25 @@ defaults write com.apple.screencapture location ~/Pictures/Screenshots
 sudo ln -sf "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app" "/Applications/Simulator.app"
 sudo ln -sf "/Applications/Xcode.app/Contents/Developer/Applications/Simulator (Watch).app" "/Applications/Simulator (Watch).app"
 
+# Hot corners
+# Possible values:
+#  0: no-op
+#  2: Mission Control
+#  3: Show application windows
+#  4: Desktop
+#  5: Start screen saver
+#  6: Disable screen saver
+#  7: Dashboard
+# 10: Put display to sleep
+# 11: Launchpad
+# 12: Notification Center
+# 13: Lock Screen
 # Top left screen corner → Mission Control
 defaults write com.apple.dock wvous-tl-corner -int 2
 defaults write com.apple.dock wvous-tl-modifier -int 0
 
-# Bottom left screen corner → Start screen saver
-defaults write com.apple.dock wvous-bl-corner -int 5
+# Bottom left screen corner → Lock Screen
+defaults write com.apple.dock wvous-bl-corner -int 13
 defaults write com.apple.dock wvous-bl-modifier -int 0
 
 # Bottom right screen corner → Desktop
@@ -362,6 +411,59 @@ defaults write org.m0k.transmission BlocklistAutoUpdate -bool true
 
 # Randomize port on launch
 defaults write org.m0k.transmission RandomPort -bool true
+
+###############################################################################
+# Mail                                                                        #
+###############################################################################
+
+# Disable send and reply animations in Mail.app
+defaults write com.apple.mail DisableReplyAnimations -bool true
+defaults write com.apple.mail DisableSendAnimations -bool true
+
+# Copy email addresses as `foo@example.com` instead of `Foo Bar <foo@example.com>` in Mail.app
+defaults write com.apple.mail AddressesIncludeNameOnPasteboard -bool false
+
+# Add the keyboard shortcut ⌘ + Enter to send an email in Mail.app
+defaults write com.apple.mail NSUserKeyEquivalents -dict-add "Send" "@\U21a9"
+
+# Display emails in threaded mode, sorted by date (oldest at the top)
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "DisplayInThreadedMode" -string "yes"
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "SortedDescending" -string "yes"
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "SortOrder" -string "received-date"
+
+# Disable inline attachments (just show the icons)
+defaults write com.apple.mail DisableInlineAttachmentViewing -bool true
+
+# Disable automatic spell checking
+defaults write com.apple.mail SpellCheckingBehavior -string "NoSpellCheckingEnabled"
+
+###############################################################################
+# Energy saving                                                               #
+###############################################################################
+
+# Enable lid wakeup
+sudo pmset -a lidwake 1
+
+# Sleep the display after 15 minutes
+sudo pmset -a displaysleep 30
+
+# Disable machine sleep while charging
+sudo pmset -c sleep 0
+
+# Set machine sleep to 5 minutes on battery
+sudo pmset -b sleep 0
+
+# Set standby delay to 24 hours (default is 1 hour)
+sudo pmset -a standbydelay 86400
+
+# Never go into computer sleep mode
+sudo systemsetup -setcomputersleep Off >/dev/null
+
+# Hibernation mode
+# 0: Disable hibernation (speeds up entering sleep mode)
+# 3: Copy RAM to disk so the system state can still be restored in case of a
+#    power failure.
+sudo pmset -a hibernatemode 0
 
 ###############################################################################
 # Kill affected applications                                                  #
