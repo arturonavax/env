@@ -1,16 +1,26 @@
 # MacOS
 
+Enable FileVault (or Firmware Password if it is an Intel processor) to lock
+Recovery Mode and encrypt the disk.
+
+---
+
+1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
+2. **[Other applications for MacOS](#other-applications-for-macos)**
+3. **[Devs](#devs)**
+
 ## Default keyboard shortcuts
 
 - App launcher: `Command-Space`
 
 - Lock: `Ctrl-Command-Q`
 
-- Show apps (Mission Control): `Ctrl-UpArrow` or Swipe up using three fingers (or four fingers)
+- Show apps (Mission Control): `Ctrl-UpArrow` or Swipe up using three fingers
+(or four fingers)
 
 - Switch apps: `Command-Tab`
 
-- Close app: `Command-Q` or `Option-Commnad-Esc` (Force)
+- Close app (Quit): `Command-Q` or `Option-Commnad-Esc` (Force)
 
 - Refresh page (F5): `Command-R`
 
@@ -33,7 +43,96 @@
 
 - Emojis: `Fn-E`
 
+- Switch desktop: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
+three fingers (or four fingers)
+
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
+
+## Other applications for MacOS
+
+- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
+
+  - _Pricing:_
+    - _Free._
+    - _Pro: $96 USD/annual._
+
+- App Switching: [AltTab](https://alt-tab-macos.netlify.app/)
+
+  - _Pricing: Free._
+
+- Video player: [VLC](https://www.videolan.org/)
+
+  - _Pricing: Free._
+
+- Window Manager: [Rectangle](https://rectangleapp.com/)
+
+  - _Pricing:_
+    - _Free._
+    - _Pro: $9.99 USD._
+
+- Monitor Manager: [Monitor Control](https://monitorcontrol.app)
+
+  - _Pricing: Free._
+
+- Calendar in the interface: [Dato](https://sindresorhus.com/dato)
+
+  - _Pricing: $15 USD aprox._
+
+- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/)
+
+  - _Pricing: $16 USD._
+
+- Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
+
+  - _Pricing: $4.99 USD._
+
+- Cleaner and Antivirus: [CleanMyMac X](https://macpaw.com/cleanmymac)
+
+  - _Pricing: $89.95 USD._
+
+- Emails: [Spark](https://sparkmailapp.com/)
+
+  - _Pricing: $59.99 USD/annual._
+
+- Battery Care: [AlDente Pro](https://apphousekitchen.com/)
+
+  - _Pricing: $26.42 USD._
+
+- Screenshots: [CleanShot X](https://cleanshot.com/)
+
+  - _Pricing: $29 USD._
+
+- Calculator: [Numi](https://numi.app/)
+
+  - _Pricing: $29.74 USD._
+
+- Keyboard Shortcut Manager _(Consider Raycast)_:
+
+  - [Karabiner](https://karabiner-elements.pqrs.org/)
+
+    - _Pricing: Free._
+
+  - [Keyboard Maestro](https://www.keyboardmaestro.com/main/)
+    - _Pricing: $42.84 USD._
+
+- Virtualization:
+
+  - Systems: [Parallels](https://www.parallels.com/)
+
+    - _Pricing:_
+      - _Standard Edition: $129.99 USD._
+      - _Pro Edition: $119.99 USD/annual._
+
+  - Applications and programs (High performance): [CrossOver](https://www.codeweavers.com/crossover/)
+
+    - _Pricing:_
+
+      - _CrossOver +: $64 USD/annual._
+      - _CrossOver Life: $494 USD._
+
+    - Improve [CrossOver](https://www.codeweavers.com/crossover/)
+      compatibility: [CXPatcher](https://github.com/italomandara/CXPatcher)
+      - _Pricing: Free._
 
 ## Devs
 
@@ -155,89 +254,3 @@ hdiutil attach file.dmg
 # after installation
 sudo hdiutil detach file.dmg
 ```
-
-## Other applications for MacOS
-
-- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
-
-  - _Pricing:_
-    - _Free._
-    - _Pro: $96 USD/annual._
-
-- App Switching: [AltTab](https://alt-tab-macos.netlify.app/)
-
-  - _Pricing: Free._
-
-- Calendar in the interface: [Dato](https://sindresorhus.com/dato)
-
-  - _Pricing: Free._
-
-- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/)
-
-  - _Pricing: $16 USD._
-
-- Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
-
-  - _Pricing: $4.99 USD._
-
-- Cleaner and Antivirus: [CleanMyMac X](https://macpaw.com/cleanmymac)
-
-  - _Pricing: $89.95 USD._
-
-- Emails: [Spark](https://sparkmailapp.com/)
-
-  - _Pricing: $59.99 USD/annual._
-
-- Video player: [VLC](https://www.videolan.org/)
-
-  - _Pricing: Free._
-
-- Battery Care: [AlDente Pro](https://apphousekitchen.com/)
-
-  - _Pricing: $26.42 USD._
-
-- Screenshots: [CleanShot X](https://cleanshot.com/)
-
-  - _Pricing: $29 USD._
-
-- Calculator: [Numi](https://numi.app/)
-
-  - _Pricing: $29.74 USD._
-
-- Monitor Manager: [Monitor Control](https://monitorcontrol.app)
-
-  - _Pricing: Free._
-
-- Window Manager _(Consider Raycast)_: [Rectangle](https://rectangleapp.com/)
-
-  - _Pricing:_
-    - _Free._
-    - _Pro: $9.99 USD._
-
-- Keyboard Shortcut Manager _(Consider Raycast)_:
-
-  - [Karabiner](https://karabiner-elements.pqrs.org/)
-
-    - _Pricing: Free._
-
-  - [Keyboard Maestro](https://www.keyboardmaestro.com/main/)
-    - _Pricing: $42.84 USD._
-
-- Virtualization:
-
-  - Systems: [Parallels](https://www.parallels.com/)
-
-    - _Pricing:_
-      - _Standard Edition: $129.99 USD._
-      - _Pro Edition: $119.99 USD/annual._
-
-  - Applications and programs (High performance): [CrossOver](https://www.codeweavers.com/crossover/)
-
-    - _Pricing:_
-
-      - _CrossOver +: $64 USD/annual._
-      - _CrossOver Life: $494 USD._
-
-    - Improve [CrossOver](https://www.codeweavers.com/crossover/)
-      compatibility: [CXPatcher](https://github.com/italomandara/CXPatcher)
-      - _Pricing: Free._

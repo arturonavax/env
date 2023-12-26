@@ -1,6 +1,8 @@
 #!/bin/bash
 # Run: curl -fsSL "https://env.arturonavax.dev/macos_osconfig.sh" | bash
 
+# Inspiration: https://github.com/mathiasbynens/dotfiles/blob/master/.macos
+
 # Close any open System Preferences panes, to prevent them from overriding
 # settings we’re about to change
 osascript -e 'tell application "System Preferences" to quit'
@@ -15,6 +17,10 @@ while true; do
 	kill -0 "$$" || exit
 done 2>/dev/null &
 
+###############################################################################
+# General UI/UX                                                               #
+###############################################################################
+
 # Set computer name (as done via System Preferences → Sharing)
 # sudo scutil --set ComputerName "MacBook Arturo"
 # sudo scutil --set HostName "MacBook Arturo"
@@ -27,6 +33,15 @@ sudo nvram StartupMute=%01
 
 # Set sidebar icon size to medium
 defaults write NSGlobalDomain NSTableViewDefaultSizeMode -int 2
+
+# Show scroll bars always
+defaults write NSGlobalDomain "AppleShowScrollBars" -string "Always"
+
+# Disable the over-the-top focus ring animation
+defaults write NSGlobalDomain NSUseAnimatedFocusRing -bool false
+
+# Enable smooth scrolling
+defaults write NSGlobalDomain NSScrollAnimationEnabled -bool true
 
 # Increase window resize speed for Cocoa applications
 defaults write NSGlobalDomain NSWindowResizeTime -float 0.001
@@ -61,6 +76,9 @@ defaults write com.apple.systempreferences NSQuitAlwaysKeepsWindows -bool false
 # Disable automatic termination of inactive apps
 defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
 
+# Set Help Viewer windows to non-floating mode
+defaults write com.apple.helpviewer DevMode -bool tru
+
 # Reveal IP address, hostname, OS version, etc. when clicking the clock
 # in the login window
 sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
@@ -68,8 +86,36 @@ sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo Hos
 # Show list of users in the login window instead of having to enter their names
 sudo defaults write /Library/Preferences/com.apple.loginwindow SHOWFULLNAME -int 0
 
-# Show language menu in the top right corner of the boot screen
-sudo defaults write /Library/Preferences/com.apple.loginwindow showInputMenu -bool true
+# Disable automatic capitalization as it’s annoying when typing code
+defaults write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
+
+# Disable smart dashes as they’re annoying when typing code
+defaults write NSGlobalDomain NSAutomaticDashSubstitutionEnabled -bool false
+
+# Disable automatic period substitution as it’s annoying when typing code
+defaults write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled -bool false
+
+# Disable smart quotes as they’re annoying when typing code
+defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
+
+# Disable auto-correct
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# Show battery percentage
+defaults write com.apple.menuextra.battery ShowPercent -string "YES"
+defaults -currentHost write com.apple.controlcenter.plist BatteryShowPercentage -bool true
+
+# Disable save state of Alacritty
+mkdir -p "$HOME/Library/Saved Application State/org.alacritty.savedState/"
+rm -rf "$HOME/Library/Saved Application State/org.alacritty.savedState/*"
+chmod -R a-w "$HOME/Library/Saved Application State/org.alacritty.savedState/"
+
+# Creates symbolic link for "airport" command
+[[ "$(command -v airport)" == "" ]] && sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/bin/airport
+
+###############################################################################
+# Screen                                                                      #
+###############################################################################
 
 # Disable screen saver
 defaults -currentHost write com.apple.screensaver idleTime -int 0
@@ -77,52 +123,99 @@ defaults -currentHost write com.apple.screensaver idleTime -int 0
 # Show clock in screen saver
 defaults -currentHost write com.apple.screensaver showClock -int 1
 
-# creates symbolic link for "airport" command
-[[ "$(command -v airport)" == "" ]] && sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/bin/airport
+# Require password immediately after sleep or screen saver begins
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
 
-# show hidden folders
-chflags nohidden ~/
-chflags nohidden ~/Library && xattr -d com.apple.FinderInfo ~/Library
+# Screenshots in PNG format
+defaults write com.apple.screencapture type -string "png"
 
-# Show the /Volumes folder
-sudo chflags nohidden /Volumes
+# Screenshots location
+mkdir -p ~/Pictures/Screenshots
+defaults write com.apple.screencapture location ~/Pictures/Screenshots
 
-# show extensions of all files
-defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+# Enable subpixel font rendering on non-Apple LCDs
+# Reference: https://github.com/kevinSuttle/macOS-Defaults/issues/17#issuecomment-266633501
+defaults write NSGlobalDomain AppleFontSmoothing -int 1
 
-# Trackpad: three finger drag
+# Enable HiDPI display modes (requires restart)
+sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
+
+# Disable saving of window status on power off
+sudo defaults write com.apple.loginwindow TALLogoutSavesState -bool false
+defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
+defaults write NSGlobalDomain ApplePersistence -bool no
+
+###############################################################################
+# Trackpad, mouse, keyboard, Bluetooth accessories, and input                 #
+###############################################################################
+
+# Trackpad: Three finger drag
 defaults write com.apple.AppleMultitouchTrackpad "TrackpadThreeFingerDrag" -bool "true"
 
-# disable mouse natural scroll
-defaults write NSGlobalDomain com.apple.swipescrolldirection -bool false
-
-# Trackpad: disable tap to click for this user and for the login screen
+# Trackpad: Disable tap to click for this user and for the login screen
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool false
 defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 
-# Show battery percentage
-defaults write com.apple.menuextra.battery ShowPercent -string "YES"
-defaults -currentHost write com.apple.controlcenter.plist BatteryShowPercentage -bool true
+# Disable mouse natural scroll
+defaults write NSGlobalDomain com.apple.swipescrolldirection -bool false
 
-# disable .DS_Store files
+# Set a blazingly fast keyboard repeat rate
+defaults write NSGlobalDomain KeyRepeat -int 2
+defaults write NSGlobalDomain InitialKeyRepeat -int 15
+
+# Disable press-and-hold for keys in favor of key repeat
+defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+
+# Enable full keyboard access for all controls
+# (e.g. enable Tab in modal dialogs)
+defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
+
+# Use scroll gesture with the Ctrl (^) modifier key to zoom
+defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+defaults write com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
+# Follow the keyboard focus while zoomed in
+defaults write com.apple.universalaccess closeViewZoomFollowsFocus -bool true
+
+# Set language and text formats
+# Note: if you’re in the US, replace `EUR` with `USD`, `Centimeters` with
+# `Inches`, `en_GB` with `en_US`, and `true` with `false`.
+defaults write NSGlobalDomain AppleLanguages -array "en" "nl"
+defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+defaults write NSGlobalDomain AppleMeasurementUnits -string "Centimeters"
+defaults write NSGlobalDomain AppleMetricUnits -bool true
+
+# Show language menu in the top right corner of the boot screen
+sudo defaults write /Library/Preferences/com.apple.loginwindow showInputMenu -bool true
+
+###############################################################################
+# Finder                                                                      #
+###############################################################################
+
+# Show extensions of all files
+defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+
+# Show hidden folders
+sudo chflags nohidden /Volumes
+chflags nohidden / && xattr -d com.apple.FinderInfo /
+chflags nohidden ~/ && xattr -d com.apple.FinderInfo ~/
+chflags nohidden ~/Library && xattr -d com.apple.FinderInfo ~/Library
+
 # Avoid creating .DS_Store files on network or USB volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
 
-# Finder: allow quitting via ⌘ + Q; doing so will also hide desktop icons
+# Allow quitting via ⌘ + Q; doing so will also hide desktop icons
 defaults write com.apple.finder QuitMenuItem -bool true
 
-# finder: show hidden files
+# Show hidden files
 defaults write com.apple.finder AppleShowAllFiles -bool true
 
-# show scroll bars always
-defaults write NSGlobalDomain "AppleShowScrollBars" -string "Always"
-
-# finder: show path bar
+# Show path bar
 defaults write com.apple.finder ShowPathbar -bool true
 
-# finder: show status bar
+# Show status bar
 defaults write com.apple.finder ShowStatusBar -bool true
 
 # When performing a search, search the current folder by default
@@ -140,7 +233,6 @@ defaults write NSGlobalDomain com.apple.springing.enabled -bool true
 # Remove the spring loading delay for directories
 defaults write NSGlobalDomain com.apple.springing.delay -float 0
 
-# finder: show item info
 # Show item info near icons on the desktop and in other icon views
 /usr/libexec/PlistBuddy -c "Set :DesktopViewSettings:IconViewSettings:showItemInfo true" ~/Library/Preferences/com.apple.finder.plist
 /usr/libexec/PlistBuddy -c "Set :FK_StandardViewSettings:IconViewSettings:showItemInfo true" ~/Library/Preferences/com.apple.finder.plist
@@ -168,7 +260,7 @@ defaults write NSGlobalDomain com.apple.springing.delay -float 0
 # Four-letter codes for the other view modes: `icnv`, `clmv`, `glyv`
 defaults write com.apple.finder FXPreferredViewStyle -string "Nlsv"
 
-# finder: order by kind
+# Order by kind
 defaults write com.apple.finder FXPreferredGroupBy kind
 /usr/libexec/PlistBuddy -c 'set :StandardViewSettings:IconViewSettings:arrangeBy kind' ~/Library/Preferences/com.apple.finder.plist
 /usr/libexec/PlistBuddy -c 'set :StandardViewSettings:ExtendedListViewSettingsV2:sortColumn dateLastOpened' ~/Library/Preferences/com.apple.finder.plist
@@ -181,8 +273,8 @@ defaults write com.apple.finder ShowHardDrivesOnDesktop -bool true
 defaults write com.apple.finder ShowMountedServersOnDesktop -bool true
 defaults write com.apple.finder ShowRemovableMediaOnDesktop -bool true
 
-# finder: show the path in the title in POSIX style
-#defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
+# Show the path in the title in POSIX style
+# defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
 
 # Set $HOME as the default location for new Finder windows
 defaults write com.apple.finder NewWindowTarget -string "PfLo"
@@ -195,72 +287,74 @@ defaults write com.apple.finder FXInfoPanesExpanded -dict \
 	OpenWith -bool true \
 	Privileges -bool true
 
-# dock
+###############################################################################
+# Dock, Dashboard, and hot corners                                            #
+###############################################################################
+
+# Orientation
 defaults write com.apple.dock orientation -string left
-defaults write com.apple.dock autohide -bool true
-defaults write com.apple.dock autohide-delay -int 0
-defaults write com.apple.dock autohide-time-modifier -float 0.8
+
+# Set the icon size of Dock items to 55 pixels
+defaults write com.apple.dock tilesize -int 55
+
+# Magnification icons
 defaults write com.apple.dock magnification -int 1
 defaults write com.apple.dock largesize -int 65
-defaults write com.apple.dock tilesize -int 55
+
+# Enable highlight hover effect for the grid view of a stack (Dock)
+defaults write com.apple.dock mouse-over-hilite-stack -bool true
+
+# Automatically hide and show the Dock
+defaults write com.apple.dock autohide -bool true
+
+# Remove the auto-hiding Dock delay
+defaults write com.apple.dock autohide-delay -int 0
+
+# Remove the animation when hiding/showing the Dock
+defaults write com.apple.dock autohide-time-modifier -float 0.8
+
+# Speed up Mission Control animations
 defaults write com.apple.dock expose-animation-duration -float 0.05
+
+# Don’t show recent applications in Dock
 defaults write com.apple.dock show-recents -bool false
 
-# default terminal exit
-/usr/libexec/PlistBuddy -c 'add :"Window Settings":Basic:shellExitAction integer 0' ~/Library/Preferences/com.apple.Terminal.plist
-/usr/libexec/PlistBuddy -c 'set :"Window Settings":Basic:shellExitAction 0' ~/Library/Preferences/com.apple.Terminal.plist
+# Minimize windows into their application’s icon
+defaults write com.apple.dock minimize-to-application -bool true
 
-# Disable automatic capitalization as it’s annoying when typing code
-defaults write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
+# Change minimize/maximize window effect
+defaults write com.apple.dock mineffect -string "genie"
 
-# Disable smart dashes as they’re annoying when typing code
-defaults write NSGlobalDomain NSAutomaticDashSubstitutionEnabled -bool false
+# Show indicator lights for open applications in the Dock
+defaults write com.apple.dock show-process-indicators -bool true
 
-# Disable automatic period substitution as it’s annoying when typing code
-defaults write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled -bool false
+# Enable spring loading for all Dock items
+defaults write com.apple.dock enable-spring-load-actions-on-all-items -bool true
 
-# Disable smart quotes as they’re annoying when typing code
-defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
+# Group windows by application in Mission Control
+defaults write com.apple.dock expose-group-by-app -bool true
 
-# Disable auto-correct
-defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+# Disable Dashboard
+defaults write com.apple.dashboard mcx-disabled -bool true
 
-# speed keyboard
-defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
-defaults write NSGlobalDomain KeyRepeat -int 2
-defaults write NSGlobalDomain InitialKeyRepeat -int 15
+# Don’t show Dashboard as a Space
+defaults write com.apple.dock dashboard-in-overlay -bool true
 
-# Require password immediately after sleep or screen saver begins
-defaults write com.apple.screensaver askForPassword -int 1
-defaults write com.apple.screensaver askForPasswordDelay -int 0
+# Don’t automatically rearrange Spaces based on most recent use
+defaults write com.apple.dock mru-spaces -bool false
 
-# Enable subpixel font rendering on non-Apple LCDs
-# Reference: https://github.com/kevinSuttle/macOS-Defaults/issues/17#issuecomment-266633501
-defaults write NSGlobalDomain AppleFontSmoothing -int 1
+# Don’t show only open applications in the Dock
+defaults write com.apple.dock static-only -bool false
 
-# Enable HiDPI display modes (requires restart)
-sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
-
-# disable saving of window status on power off
-sudo defaults write com.apple.loginwindow TALLogoutSavesState -bool false
-defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
-defaults write NSGlobalDomain ApplePersistence -bool no
-
-# disable save state of Alacritty
-mkdir -p "$HOME/Library/Saved Application State/org.alacritty.savedState/"
-rm -rf "$HOME/Library/Saved Application State/org.alacritty.savedState/*"
-chmod -R a-w "$HOME/Library/Saved Application State/org.alacritty.savedState/"
-
-# screenshots in PNG format
-defaults write com.apple.screencapture type -string "png"
-
-# screenshots location
-mkdir -p ~/Pictures/Screenshots
-defaults write com.apple.screencapture location ~/Pictures/Screenshots
+# Make Dock icons of hidden applications translucent
+defaults write com.apple.dock showhidden -bool true
 
 # Add iOS & Watch Simulator to Launchpad
 sudo ln -sf "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app" "/Applications/Simulator.app"
 sudo ln -sf "/Applications/Xcode.app/Contents/Developer/Applications/Simulator (Watch).app" "/Applications/Simulator (Watch).app"
+
+# Reset Launchpad, but keep the desktop wallpaper intact
+find "${HOME}/Library/Application Support/Dock" -name "*-*.db" -maxdepth 1 -delete
 
 # Hot corners
 # Possible values:
@@ -287,12 +381,20 @@ defaults write com.apple.dock wvous-bl-modifier -int 0
 defaults write com.apple.dock wvous-br-corner -int 4
 defaults write com.apple.dock wvous-br-modifier -int 0
 
+###############################################################################
+# Terminal & iTerm 2                                                          #
+###############################################################################
+
 # Only use UTF-8 in Terminal.app
 defaults write com.apple.terminal StringEncodings -array 4
 
 # Enable Secure Keyboard Entry in Terminal.app
 # See: https://security.stackexchange.com/a/47786/8918
 defaults write com.apple.terminal SecureKeyboardEntry -bool true
+
+# default terminal exit
+/usr/libexec/PlistBuddy -c 'add :"Window Settings":Basic:shellExitAction integer 0' ~/Library/Preferences/com.apple.Terminal.plist
+/usr/libexec/PlistBuddy -c 'set :"Window Settings":Basic:shellExitAction 0' ~/Library/Preferences/com.apple.Terminal.plist
 
 ###############################################################################
 # Activity Monitor                                                            #
@@ -341,6 +443,32 @@ defaults write com.apple.commerce AutoUpdate -bool true
 
 # Allow the App Store to reboot machine on macOS updates
 defaults write com.apple.commerce AutoUpdateRestartRequired -bool true
+
+###############################################################################
+# Address Book, Dashboard, iCal, TextEdit, and Disk Utility                   #
+###############################################################################
+
+# Enable the debug menu in Address Book
+defaults write com.apple.addressbook ABShowDebugMenu -bool true
+
+# Enable Dashboard dev mode (allows keeping widgets on the desktop)
+defaults write com.apple.dashboard devmode -bool true
+
+# Enable the debug menu in iCal (pre-10.8)
+defaults write com.apple.iCal IncludeDebugMenu -bool true
+
+# Use plain text mode for new TextEdit documents
+defaults write com.apple.TextEdit RichText -int 0
+# Open and save files as UTF-8 in TextEdit
+defaults write com.apple.TextEdit PlainTextEncoding -int 4
+defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
+
+# Enable the debug menu in Disk Utility
+defaults write com.apple.DiskUtility DUDebugMenuEnabled -bool true
+defaults write com.apple.DiskUtility advanced-image-options -bool true
+
+# Auto-play videos when opened with QuickTime Player
+defaults write com.apple.QuickTimePlayerX MGPlayMovieOnOpen -bool true
 
 ###############################################################################
 # Photos                                                                      #
@@ -464,6 +592,22 @@ sudo systemsetup -setcomputersleep Off >/dev/null
 # 3: Copy RAM to disk so the system state can still be restored in case of a
 #    power failure.
 sudo pmset -a hibernatemode 0
+
+###############################################################################
+# Safari & WebKit                                                             #
+###############################################################################
+
+echo 'curl -fsSL "https://env.arturonavax.dev/macos_safari.sh" | bash'
+
+curl -fsSL "https://env.arturonavax.dev/macos_safari.sh" | bash
+
+echo "If there was an error with the Safari configuration, run after giving Full Disk Access to the current terminal: System Settings > Privacy & Security > Full Disk Access."
+
+###############################################################################
+# Sudo Touch ID                                                               #
+###############################################################################
+
+curl -fsSL "https://env.arturonavax.dev/macos_sudo_touchid.sh" | bash
 
 ###############################################################################
 # Kill affected applications                                                  #
