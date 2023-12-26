@@ -110,10 +110,10 @@ function install() {
 		echo -e "${fgcolor_white_bold}[Installer]: Applying system settings...${fgcolor_reset}"
 
 		if [[ "$(uname -s)" == "Linux" ]]; then
-			./src/remotes/linux_osconfig.sh
+			bash ./src/remotes/linux_osconfig.sh 2>/dev/null
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
-			./src/remotes/macos_osconfig.sh
+			bash ./src/remotes/macos_osconfig.sh 2>/dev/null
 		fi
 
 		echo -e "${fgcolor_white_bold}[Installer]: ${fgcolor_green_bold}✔️ Applied configurations!${fgcolor_reset}"
