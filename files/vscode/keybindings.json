@@ -10,13 +10,7 @@
 	},
 	{
 		"key": "ctrl+shift+y",
-		"command": "runCommands",
-		"args": {
-			"commands": [
-				"workbench.view.extension.project-manager",
-				"workbench.action.focusActiveEditorGroup"
-			]
-		}
+		"command": "projectManager.listProjects"
 	},
 
 	// Editor Empty (Dashboard)

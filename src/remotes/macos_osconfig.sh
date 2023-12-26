@@ -198,9 +198,12 @@ defaults write NSGlobalDomain AppleShowAllExtensions -bool true
 
 # Show hidden folders
 sudo chflags nohidden /Volumes
-chflags nohidden / && xattr -d com.apple.FinderInfo /
-chflags nohidden ~/ && xattr -d com.apple.FinderInfo ~/
-chflags nohidden ~/Library && xattr -d com.apple.FinderInfo ~/Library
+
+chflags nohidden ~/
+xattr -d com.apple.FinderInfo ~/
+
+chflags nohidden ~/Library
+xattr -d com.apple.FinderInfo ~/Library
 
 # Avoid creating .DS_Store files on network or USB volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
