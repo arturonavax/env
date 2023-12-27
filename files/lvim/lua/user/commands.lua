@@ -17,7 +17,7 @@ function OpenBuffersInVSCode()
 	end
 
 	local cwd = vim.fn.getcwd()
-	vim.cmd("!code -g " .. cwd .. " " .. table.concat(fileNames, " "))
+	vim.cmd("!code -n -g " .. cwd .. " " .. table.concat(fileNames, " "))
 end
 
 vim.cmd([[
