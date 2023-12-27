@@ -12,6 +12,10 @@
 		"key": "ctrl+shift+y",
 		"command": "projectManager.listProjects"
 	},
+	{
+		"key": "ctrl+shift+cmd+y",
+		"command": "projectManager.listProjectsNewWindow"
+	},
 
 	// Editor Empty (Dashboard)
 	{
