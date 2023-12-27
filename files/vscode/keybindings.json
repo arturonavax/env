@@ -470,7 +470,7 @@
 	{
 		"key": "/",
 		"command": "workbench.action.quickOpen",
-		"when": "vim.active && filesExplorerFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "filesExplorerFocus && (!inputFocus) && (vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w l",

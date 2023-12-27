@@ -31,6 +31,7 @@
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
 	"editor.cursorSmoothCaretAnimation": "on",
+	"editor.accessibilitySupport": "off",
 	"timeline.pageSize": 0,
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
