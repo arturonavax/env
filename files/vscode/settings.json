@@ -3,7 +3,7 @@
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.preferredDarkColorTheme": "Tokyo Night",
 	"workbench.preferredLightColorTheme": "Tokyo Night Light",
-	"workbench.iconTheme": "vscode-icons",
+	"workbench.iconTheme": "material-icon-theme",
 	"workbench.tree.indent": 12,
 	"workbench.view.alwaysShowHeaderActions": true,
 	"breadcrumbs.enabled": false,
