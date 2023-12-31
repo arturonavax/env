@@ -6,7 +6,7 @@ Recovery Mode and encrypt the disk.
 ---
 
 1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
-2. **[Other applications for MacOS](#other-applications-for-macos)**
+2. **[Best applications for MacOS](#best-applications-for-macos)**
 3. **[Devs](#devs)**
 
 ## Default keyboard shortcuts
@@ -43,14 +43,14 @@ Recovery Mode and encrypt the disk.
 
 - Emojis: `Fn-E`
 
+- Show hidden files when selecting a file in Finder: `Shift-Command-.`
+
 - Switch desktop: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
 three fingers (or four fingers).
 
 - Switch desktop quickly: `Ctrl-1` or `Ctrl-2`... Configuring it in System Settings
 -> Keyboard -> Keyboard Shortcuts -> Mission Control -> Mission Control -> Switch
 to Desktop X (While the Desktops are active).
-
-- Show hidden files when selecting a file in Finder: `Shift-Command-.`
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
