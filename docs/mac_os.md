@@ -39,48 +39,119 @@ Recovery Mode and encrypt the disk.
   - Complete (File): `Shift-Command-3`
   - Options: `Shift-Command-5`
 
-- Grave accent (\`) or Tilde (\~): Key to the right of the Shift
+- Grave accent (\`) or Tilde (\~): Key to the right of the Shift (ABC input source).
 
 - Emojis: `Fn-E`
 
 - Switch desktop: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
-three fingers (or four fingers)
+three fingers (or four fingers).
+
+- Switch desktop quickly: `Ctrl-1` or `Ctrl-2`... Configuring it in System Settings
+-> Keyboard -> Keyboard Shortcuts -> Mission Control -> Mission Control -> Switch
+to Desktop X (While the Desktops are active).
+
+- Show hidden files when selecting a file in Finder: `Shift-Command-.`
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
 ## Other applications for MacOS
 
-- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
+- Git GUI: [SourceTree](https://www.sourcetreeapp.com)
 
-  - _Pricing:_
+  - _Pricing: Free._
+
+- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
+or [Alfred](https://www.alfredapp.com)
+
+  - _Pricing Raycast:_
     - _Free._
     - _Pro: $96 USD/annual._
+
+  - _Pricing Alfred:_
+    - _Free._
+    - _Powerpack: $34 USD._
 
 - App Switching: [AltTab](https://alt-tab-macos.netlify.app/)
 
   - _Pricing: Free._
 
-- Video player: [VLC](https://www.videolan.org/)
+- Video player: [IINA](https://iina.io)
 
   - _Pricing: Free._
 
-- Window Manager: [Rectangle](https://rectangleapp.com/)
+- Time awareness: [Pandan](https://sindresorhus.com/pandan)
 
-  - _Pricing:_
+  - _Pricing: Free._
+
+- Window Manager: [Amethyst](https://ianyh.com/amethyst/) or [Rectangle](https://rectangleapp.com/)
+
+  - _Pricing Rectangle:_
     - _Free._
     - _Pro: $9.99 USD._
+
+  - _Pricing Amethyst: Free._
+
+- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
+
+  - _Pricing Bartender: $16 USD._
+
+  - _Pricing iBar: Free._
 
 - Monitor Manager: [Monitor Control](https://monitorcontrol.app)
 
   - _Pricing: Free._
 
-- Calendar in the interface: [Dato](https://sindresorhus.com/dato)
+- Relax sounds: [Nozio](https://noiz.io)
 
-  - _Pricing: $15 USD aprox._
+  - _Pricing:_
+    - _Pro: $19.99 USD._
+    - _Lite: Free._
 
-- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/)
+- App updater: [Latest](https://max.codes/latest/) or [MacUpdater](https://www.corecode.io/macupdater/)
 
-  - _Pricing: $16 USD._
+  - _Pricing Latest: Free._
+
+  - _Pricing MacUpdater:_
+    - _Standard Edition: $11.61 USD._
+    - _Scanning Only: Free._
+
+- App cleaner: [AppCleaner](https://freemacsoft.net/appcleaner/)
+
+  - _Pricing: Free._
+
+- Text recognition (OCR): [TextSniper](https://textsniper.app) or [Shottr](https://shottr.cc)
+
+  - _Pricing TextSniper: $7.99 USD._
+  - _Pricing Shottr: Free._
+
+- Screenshots: [CleanShot X](https://cleanshot.com/) or [Shottr](https://shottr.cc)
+
+  - _Pricing CleanShot X: $29 USD_
+  - _Pricing Shottr: Free._
+
+- System monitor: [iStat Menus](https://bjango.com/mac/istatmenus/) or [Stats](https://github.com/exelban/stats)
+
+  - _Pricing iStat Menus: $14.27 USD._
+  - _Pricing Stats: Free._
+
+- Information on other Apple devices: [AirBuddy](airbuddy.app)
+
+  - _Pricing: $15.46 USD._
+
+- Video downloader: [Downie](https://software.charliemonroe.net/downie/) or [VDown](https://en.vdownapp.com)
+
+  - _Pricing Downnie: $19.99 USD._
+  - _Pricing VDown: Free._
+
+- Command Palette in any applicattions: [Paletro](https://appmakes.io/paletro)
+or `Shift-Command-?`
+
+  - _Pricing Paletro: $6.99 USD._
+
+- Calendar in the interface: [Dato](https://sindresorhus.com/dato) or [Itsycal](https://www.mowglii.com/itsycal/)
+
+  - _Pricing Dato: $15 USD aprox._
+  - _Pricing Itsycal: Free._
 
 - Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
 
@@ -90,23 +161,18 @@ three fingers (or four fingers)
 
   - _Pricing: $89.95 USD._
 
-- Emails: [Spark](https://sparkmailapp.com/)
+- Battery Care: [AlDente](https://apphousekitchen.com/)
 
-  - _Pricing: $59.99 USD/annual._
+  - _Pricing:_
+    - _Pro: $26.89 USD._
+    - _Normal: Free._
 
-- Battery Care: [AlDente Pro](https://apphousekitchen.com/)
+- Calculator: [Numi](https://numi.app/) or [Evaluator](https://evaluator.link/)
 
-  - _Pricing: $26.42 USD._
+  - _Pricing Numi: $29.74 USD._
+  - _Pricing Evaluator: Free._
 
-- Screenshots: [CleanShot X](https://cleanshot.com/)
-
-  - _Pricing: $29 USD._
-
-- Calculator: [Numi](https://numi.app/)
-
-  - _Pricing: $29.74 USD._
-
-- Keyboard Shortcut Manager _(Consider Raycast)_:
+- Keyboard Shortcut Manager _(Consider Raycast or Alfred)_:
 
   - [Karabiner](https://karabiner-elements.pqrs.org/)
 
@@ -114,6 +180,11 @@ three fingers (or four fingers)
 
   - [Keyboard Maestro](https://www.keyboardmaestro.com/main/)
     - _Pricing: $42.84 USD._
+
+- Emails: [Spark](https://sparkmailapp.com/) or Apple Mail
+
+  - _Pricing Spark: $59.99 USD/annual._
+  - _Pricing Apple Mail: Free._
 
 - Virtualization:
 
@@ -126,7 +197,6 @@ three fingers (or four fingers)
   - Applications and programs (High performance): [CrossOver](https://www.codeweavers.com/crossover/)
 
     - _Pricing:_
-
       - _CrossOver +: $64 USD/annual._
       - _CrossOver Life: $494 USD._
 
