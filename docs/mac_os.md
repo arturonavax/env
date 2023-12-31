@@ -54,7 +54,7 @@ to Desktop X (While the Desktops are active).
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
-## Other applications for MacOS
+## Best applications for MacOS
 
 - Git GUI: [SourceTree](https://www.sourcetreeapp.com)
 
@@ -85,16 +85,15 @@ or [Alfred](https://www.alfredapp.com)
 
 - Window Manager: [Amethyst](https://ianyh.com/amethyst/) or [Rectangle](https://rectangleapp.com/)
 
+  - _Pricing Amethyst: Free._
+
   - _Pricing Rectangle:_
     - _Free._
     - _Pro: $9.99 USD._
 
-  - _Pricing Amethyst: Free._
-
 - Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
 
   - _Pricing Bartender: $16 USD._
-
   - _Pricing iBar: Free._
 
 - Monitor Manager: [Monitor Control](https://monitorcontrol.app)
@@ -134,24 +133,29 @@ or [Alfred](https://www.alfredapp.com)
   - _Pricing iStat Menus: $14.27 USD._
   - _Pricing Stats: Free._
 
-- Information on other Apple devices: [AirBuddy](airbuddy.app)
-
-  - _Pricing: $15.46 USD._
-
 - Video downloader: [Downie](https://software.charliemonroe.net/downie/) or [VDown](https://en.vdownapp.com)
 
   - _Pricing Downnie: $19.99 USD._
   - _Pricing VDown: Free._
 
-- Command Palette in any applicattions: [Paletro](https://appmakes.io/paletro)
-or `Shift-Command-?`
-
-  - _Pricing Paletro: $6.99 USD._
-
 - Calendar in the interface: [Dato](https://sindresorhus.com/dato) or [Itsycal](https://www.mowglii.com/itsycal/)
 
   - _Pricing Dato: $15 USD aprox._
   - _Pricing Itsycal: Free._
+
+- Battery Care: [AlDente](https://apphousekitchen.com/)
+
+  - _Pricing:_
+    - _Pro: $26.89 USD._
+    - _Normal: Free._
+
+- Copy with formatting: [Pure Paste](https://sindresorhus.com/pure-paste)
+
+  - _Pricing: Free._
+
+- Night Shift: [f.lux](https://justgetflux.com)
+
+  - _Pricing: Free._
 
 - Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
 
@@ -161,11 +165,14 @@ or `Shift-Command-?`
 
   - _Pricing: $89.95 USD._
 
-- Battery Care: [AlDente](https://apphousekitchen.com/)
+- Information on other Apple devices: [AirBuddy](airbuddy.app)
 
-  - _Pricing:_
-    - _Pro: $26.89 USD._
-    - _Normal: Free._
+  - _Pricing: $15.46 USD._
+
+- Command Palette in any applicattions: [Paletro](https://appmakes.io/paletro)
+or `Shift-Command-?`
+
+  - _Pricing Paletro: $6.99 USD._
 
 - Calculator _(Consider Raycast or Alfred)_: [Numi](https://numi.app/)
 

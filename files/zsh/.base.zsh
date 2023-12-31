@@ -9,9 +9,9 @@ bindkey -e
 
 # MacOS - Homebrew
 if [[ "$(uname -s)" == "Darwin" ]]; then
-	brewbin="/usr/local/bin/brew"
-	[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-	[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
+    brewbin="/usr/local/bin/brew"
+    [[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
+    [[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
 fi
 
 # EDITOR
@@ -258,7 +258,7 @@ function lighttheme() {
     [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
     [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
 
-    [[ -f ~/.config/alacritty/light_theme.yml ]] && cp ~/.config/alacritty/light_theme.yml ~/.config/alacritty/alacritty.yml
+    [[ -f ~/.config/alacritty/light_theme.toml ]] && cp ~/.config/alacritty/light_theme.toml ~/.config/alacritty/alacritty.toml
 }
 
 alias li=lighttheme
@@ -282,7 +282,7 @@ function darktheme() {
     [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
     [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
 
-    [[ -f ~/.config/alacritty/dark_theme.yml ]] && cp ~/.config/alacritty/dark_theme.yml ~/.config/alacritty/alacritty.yml
+    [[ -f ~/.config/alacritty/dark_theme.toml ]] && cp ~/.config/alacritty/dark_theme.toml ~/.config/alacritty/alacritty.toml
 }
 
 alias da=darktheme

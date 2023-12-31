@@ -12,7 +12,7 @@ mkdir -p "$backup_folder/lsp-settings/" || exit 1
 mkdir -p "$backup_folder/vscode/" || exit 1
 mkdir -p "$backup_folder/lua/user" || exit 1
 
-cp ~/.config/alacritty/alacritty.yml "$backup_folder/."
+cp ~/.config/alacritty/alacritty.toml "$backup_folder/."
 
 cp ~/.tmux.conf "$backup_folder/."
 

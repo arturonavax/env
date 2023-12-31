@@ -298,11 +298,11 @@ defaults write com.apple.finder FXInfoPanesExpanded -dict \
 defaults write com.apple.dock orientation -string left
 
 # Set the icon size of Dock items to 55 pixels
-defaults write com.apple.dock tilesize -int 55
+defaults write com.apple.dock tilesize -int 45
 
 # Magnification icons
 defaults write com.apple.dock magnification -int 1
-defaults write com.apple.dock largesize -int 65
+defaults write com.apple.dock largesize -int 55
 
 # Enable highlight hover effect for the grid view of a stack (Dock)
 defaults write com.apple.dock mouse-over-hilite-stack -bool true
@@ -376,13 +376,17 @@ find "${HOME}/Library/Application Support/Dock" -name "*-*.db" -maxdepth 1 -dele
 defaults write com.apple.dock wvous-tl-corner -int 2
 defaults write com.apple.dock wvous-tl-modifier -int 0
 
-# Bottom left screen corner → Lock Screen
-defaults write com.apple.dock wvous-bl-corner -int 13
-defaults write com.apple.dock wvous-bl-modifier -int 0
-
-# Bottom right screen corner → Desktop
-defaults write com.apple.dock wvous-br-corner -int 4
+# Bottom right screen corner → Lock Screen
+defaults write com.apple.dock wvous-br-corner -int 13
 defaults write com.apple.dock wvous-br-modifier -int 0
+
+# Top right screen corner → Desktop
+defaults write com.apple.dock wvous-tr-corner -int 4
+defaults write com.apple.dock wvous-tr-modifier -int 0
+
+# Bottom left screen corner → No-op
+defaults write com.apple.dock wvous-bl-corner -int 0
+defaults write com.apple.dock wvous-bl-modifier -int 0
 
 ###############################################################################
 # Terminal & iTerm 2                                                          #
@@ -638,6 +642,6 @@ for app in "Activity Monitor" \
 	"Tweetbot" \
 	"Twitter" \
 	"iCal"; do
-	killall "${app}" &>/dev/null
+	killall "$app" &>/dev/null
 done
 echo "Done. Note that some of these changes require a logout/restart to take effect."

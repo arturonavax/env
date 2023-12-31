@@ -76,9 +76,9 @@ fi
 if [[ "$sync_terminal" == 1 ]]; then
 	mkdir -p ~/.config/alacritty/
 
-	cp ./files/alacritty/alacritty.yml ~/.config/alacritty/.
-	cp ./files/alacritty/dark_theme.yml ~/.config/alacritty/.
-	cp ./files/alacritty/light_theme.yml ~/.config/alacritty/.
+	cp ./files/alacritty/alacritty.toml ~/.config/alacritty/.
+	cp ./files/alacritty/dark_theme.toml ~/.config/alacritty/.
+	cp ./files/alacritty/light_theme.toml ~/.config/alacritty/.
 
 	cp ./files/tmux/.tmux.conf ~/.
 

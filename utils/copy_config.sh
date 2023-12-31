@@ -18,9 +18,9 @@ while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 done
 
 # Copy files
-cp ~/.config/alacritty/alacritty.yml ./files/alacritty/.
-cp ~/.config/alacritty/dark_theme.yml ./files/alacritty/.
-cp ~/.config/alacritty/light_theme.yml ./files/alacritty/.
+cp ~/.config/alacritty/alacritty.toml ./files/alacritty/.
+cp ~/.config/alacritty/dark_theme.toml ./files/alacritty/.
+cp ~/.config/alacritty/light_theme.toml ./files/alacritty/.
 
 cp ~/.tmux.conf ./files/tmux/.
 

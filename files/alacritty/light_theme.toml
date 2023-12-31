@@ -1,0 +1,78 @@
+[colors]
+transparent_background_colors = true
+
+[[colors.indexed_colors]]
+color = "0x9C6515"
+index = 16
+
+[[colors.indexed_colors]]
+color = "0xdb4b4b"
+index = 17
+
+[colors.bright]
+black = "0x5D6584"
+blue = "0x7aa2f7"
+cyan = "0x7dcfff"
+green = "0x9ece6a"
+magenta = "0xbb9af7"
+red = "0xf7768e"
+white = "0xc0caf5"
+yellow = "0xb87d28"
+
+[colors.normal]
+black = "0x5D6584"
+blue = "0x4A7AE1"
+cyan = "0x4997C4"
+green = "0x78A448"
+magenta = "0xA27BEA"
+red = "0xBF4B4B"
+white = "0xAFB8E3"
+yellow = "0xB87D28"
+
+[colors.primary]
+background = "0xEDEFF5"
+foreground = "0x8b8b8c"
+
+[env]
+TERM = "alacritty"
+
+[font]
+size = 14
+
+[font.bold]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Bold"
+
+[font.bold_italic]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Bold Italic"
+
+[font.italic]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Italic"
+
+[font.normal]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Regular"
+
+[[keyboard.bindings]]
+action = "ToggleFullscreen"
+key = "F11"
+mods = "None"
+
+[[keyboard.bindings]]
+action = "ToggleFullscreen"
+key = "F11"
+mods = "Command"
+
+[shell]
+args = ["-l", "-c", "tmux"]
+program = "zsh"
+
+[window]
+decorations = "full"
+opacity = 0.99
+
+[window.dimensions]
+columns = 170
+lines = 40
