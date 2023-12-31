@@ -43,6 +43,8 @@ cp ~/.prettierrc.json "$backup_folder/."
 cp ~/.stylelintrc.json "$backup_folder/."
 cp ~/.sql-formatter.json "$backup_folder/."
 
+cp ~/.amethyst.yml "$backup_folder/."
+
 # Delete the oldest backup in case the container weight is more than 50MB.
 while [ "$backup_storage_current_size" -gt "$backup_storage_max_size" ]; do
 	oldest_backup=$(find "$backup_storage_folder" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' |

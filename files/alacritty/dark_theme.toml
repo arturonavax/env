@@ -1,3 +1,47 @@
+[window]
+decorations = "full"
+opacity = 0.99
+
+[window.dimensions]
+columns = 170
+lines = 40
+
+[env]
+TERM = "alacritty"
+
+[shell]
+program = "zsh"
+args = ["-l", "-c", "tmux"]
+
+[font]
+size = 14
+
+[font.bold]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Bold"
+
+[font.bold_italic]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Bold Italic"
+
+[font.italic]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Italic"
+
+[font.normal]
+family = "CaskaydiaCove Nerd Font Mono"
+style = "Regular"
+
+[[keyboard.bindings]]
+action = "ToggleFullscreen"
+key = "F11"
+mods = "None"
+
+[[keyboard.bindings]]
+action = "ToggleFullscreen"
+key = "F11"
+mods = "Command"
+
 [colors]
 transparent_background_colors = true
 
@@ -32,47 +76,3 @@ yellow = "0xB87D28"
 [colors.primary]
 background = "0x191A21"
 foreground = "0xc0caf5"
-
-[env]
-TERM = "alacritty"
-
-[font]
-size = 14
-
-[font.bold]
-family = "CaskaydiaCove Nerd Font Mono"
-style = "Bold"
-
-[font.bold_italic]
-family = "CaskaydiaCove Nerd Font Mono"
-style = "Bold Italic"
-
-[font.italic]
-family = "CaskaydiaCove Nerd Font Mono"
-style = "Italic"
-
-[font.normal]
-family = "CaskaydiaCove Nerd Font Mono"
-style = "Regular"
-
-[[keyboard.bindings]]
-action = "ToggleFullscreen"
-key = "F11"
-mods = "None"
-
-[[keyboard.bindings]]
-action = "ToggleFullscreen"
-key = "F11"
-mods = "Command"
-
-[shell]
-args = ["-l", "-c", "tmux"]
-program = "zsh"
-
-[window]
-decorations = "full"
-opacity = 0.99
-
-[window.dimensions]
-columns = 170
-lines = 40

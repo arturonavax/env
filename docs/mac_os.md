@@ -91,6 +91,9 @@ or [Alfred](https://www.alfredapp.com)
     - _Free._
     - _Pro: $9.99 USD._
 
+  - Note: In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
+    mode do not work well in Amethyst.
+
 - Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
 
   - _Pricing Bartender: $16 USD._

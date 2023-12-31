@@ -163,5 +163,7 @@ if [[ "$sync_osconfig" == 1 ]]; then
 		./src/remotes/macos_osconfig.sh
 	fi
 
+	cp ./files/amethyst/.amethyst.yml ~/.
+
 	echo -e "${fcgreenb}Synchronized OS config!${fcr}"
 fi

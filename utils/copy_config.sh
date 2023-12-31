@@ -50,3 +50,5 @@ cp ~/.eslintrc.json ./files/eslint/.
 cp ~/.prettierrc.json ./files/prettier/.
 cp ~/.stylelintrc.json ./files/stylelint/.
 cp ~/.sql-formatter.json ./files/sql-formatter/.
+
+cp ~/.amethyst.yml ./files/amethyst/.

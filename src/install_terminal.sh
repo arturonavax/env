@@ -323,6 +323,7 @@ function install_terminal() {
 			# cd ./alacritty/
 			# make app
 			# cp -r target/release/osx/Alacritty.app /Applications/
+			# sudo ln -s target/release/alacritty /usr/local/bin/alacritty || :
 			# infocmp alacritty &>/dev/null || :
 			# sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
 			# cd ../.. # exit downloads/
