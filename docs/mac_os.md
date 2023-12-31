@@ -152,10 +152,11 @@ or [Alfred](https://www.alfredapp.com)
     - _Pro: $26.89 USD._
     - _Normal: Free._
 
-  - Note: Set the battery charge limit to 75%, do not let the battery discharge
-    more than 25%, and do a full cycle (from 100% to 0%) every 1 or 2 weeks, if
-    you notice a battery decalibration use the calibration mode. Sailing mode activated
-    with 5% difference, and heat protection activated with 45°C temperature limit.
+  - Note: Set the battery charge limit to 80%, do not let the battery discharge
+    more than 20%, and do a full cycle (from 100% to 0%) every 1 or 2 weeks,
+    if you notice a battery decalibration use the calibration mode. Sailing mode
+    activated with 5% difference, and heat protection activated with 45°C temperature
+    limit.
 
 - Copy with formatting: [Pure Paste](https://sindresorhus.com/pure-paste)
 

@@ -41,6 +41,12 @@ List of installation flags:
 curl -fsSL "https://env.arturonavax.dev/install_fonts.sh" | bash
 ```
 
+## Visual Studio Code extensions installer
+
+```sh
+curl -fsSL "https://env.arturonavax.dev/install_vscode_extensions.sh" | bash
+```
+
 ## OS config
 
 ### GNU/Linux
@@ -59,10 +65,4 @@ curl -fsSL "https://env.arturonavax.dev/macos_osconfig.sh" | bash
 
 ```sh
 curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash
-```
-
-## Visual Studio Code extensions installer
-
-```sh
-curl -fsSL "https://env.arturonavax.dev/install_vscode_extensions.sh" | bash
 ```

@@ -1,6 +1,8 @@
 #!/bin/bash
+# Execute after granting "Full Disk Access" to the terminal to be used: System Settings > Privacy & Security > Full Disk Access.
+#
 # Run: curl -fsSL "https://env.arturonavax.dev/macos_osconfig.sh" | bash
-
+#
 # Inspiration: https://github.com/mathiasbynens/dotfiles/blob/master/.macos
 
 # Close any open System Preferences panes, to prevent them from overriding
@@ -34,8 +36,11 @@ sudo nvram StartupMute=%01
 # Set sidebar icon size to medium
 defaults write NSGlobalDomain NSTableViewDefaultSizeMode -int 2
 
+# Auto saving is enabled, you are not prompted to save changes
+defaults write NSGlobalDomain NSCloseAlwaysConfirmsChanges -bool true
+
 # Show scroll bars always
-defaults write NSGlobalDomain "AppleShowScrollBars" -string "Always"
+defaults write NSGlobalDomain AppleShowScrollBars -string "Always"
 
 # Disable the over-the-top focus ring animation
 defaults write NSGlobalDomain NSUseAnimatedFocusRing -bool false
@@ -59,6 +64,9 @@ defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
 
 # Automatically quit printer app once the print jobs complete
 defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
+
+# By default, pressing a function key will perform the special feature printed on that key
+defaults write NSGlobalDomain com.apple.keyboard.fnState -bool false
 
 # Disable the “Are you sure you want to open this application?” dialog
 defaults write com.apple.LaunchServices LSQuarantine -bool false
@@ -104,6 +112,32 @@ defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
 # Show battery percentage
 defaults write com.apple.menuextra.battery ShowPercent -string "YES"
 defaults -currentHost write com.apple.controlcenter.plist BatteryShowPercentage -bool true
+defaults -currentHost write com.apple.controlcenter.plist "NSStatusItem Visible Battery" -bool true
+
+# Show WiFi
+defaults -currentHost write com.apple.controlcenter.plist "NSStatusItem Visible WiFi" -bool true
+
+# Don't show Siri
+defaults -currentHost write com.apple.systemuiserver.plist "NSStatusItem Visible Siri" -bool false
+defaults -currentHost write com.apple.Siri.plist StatusMenuVisible -bool false
+
+# When a new disk is connected, system prompts to ask if you want to use it as a backup volume
+defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool false
+
+# Notifications will be displayed
+defaults write com.apple.Music userWantsPlaybackNotifications -bool true
+
+# Config clock
+defaults write com.apple.menuextra.clock IsAnalog -bool false
+defaults write com.apple.menuextra.clock Show24Hour -bool false
+defaults write com.apple.menuextra.clock ShowDayOfMonth -bool false
+defaults write com.apple.menuextra.clock ShowDayOfWeek -bool false
+defaults write com.apple.menuextra.clock FlashDateSeparators -bool false
+defaults write com.apple.menuextra.clock ShowSeconds -bool true
+defaults write com.apple.menuextra.clock DateFormat -string "\"h:mm:ss\""
+
+# Feedback Assistant gathers large files when submitting a report
+defaults write com.apple.appleseed.FeedbackAssistant Autogather -bool true
 
 # Disable save state of Alacritty
 mkdir -p "$HOME/Library/Saved Application State/org.alacritty.savedState/"
@@ -132,7 +166,9 @@ defaults write com.apple.screencapture type -string "png"
 
 # Screenshots location
 mkdir -p ~/Pictures/Screenshots
+mkdir -p "$HOME/Pictures/Simulator Screenshots"
 defaults write com.apple.screencapture location ~/Pictures/Screenshots
+defaults write com.apple.iphonesimulator ScreenShotSaveLocation -string "$HOME/Pictures/Simulator Screenshots"
 
 # Enable subpixel font rendering on non-Apple LCDs
 # Reference: https://github.com/kevinSuttle/macOS-Defaults/issues/17#issuecomment-266633501
@@ -151,7 +187,12 @@ defaults write NSGlobalDomain ApplePersistence -bool no
 ###############################################################################
 
 # Trackpad: Three finger drag
-defaults write com.apple.AppleMultitouchTrackpad "TrackpadThreeFingerDrag" -bool "true"
+defaults write com.apple.AppleMultitouchTrackpad Dragging -bool false
+defaults write com.apple.AppleMultitouchTrackpad DragLock -bool false
+defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool true
+
+# Trackpad: Click weight (threshold)
+defaults write com.apple.AppleMultitouchTrackpad FirstClickThreshold -int 1
 
 # Trackpad: Disable tap to click for this user and for the login screen
 defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool false
@@ -196,6 +237,15 @@ sudo defaults write /Library/Preferences/com.apple.loginwindow showInputMenu -bo
 # Show extensions of all files
 defaults write NSGlobalDomain AppleShowAllExtensions -bool true
 
+# Show icon in the title bar (Requires to grant full disk access)
+defaults write com.apple.universalaccess showWindowTitlebarIcons -bool true
+
+# Remove the delay when hovering the toolbar title
+defaults write NSGlobalDomain NSToolbarTitleViewRolloverDelay -float 0
+
+# Show all icons
+defaults write com.apple.finder CreateDesktop -bool true
+
 # Show hidden folders
 sudo chflags nohidden /Volumes
 
@@ -209,8 +259,11 @@ xattr -d com.apple.FinderInfo ~/Library
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
 
-# Allow quitting via ⌘ + Q; doing so will also hide desktop icons
-defaults write com.apple.finder QuitMenuItem -bool true
+# Empty bin items after 30 days
+defaults write com.apple.finder "FXRemoveOldTrashItems" -bool false
+
+# Allow quitting via ⌘ + Q; doing so will also hide desktop icons (Not recommend)
+# defaults write com.apple.finder QuitMenuItem -bool false
 
 # Show hidden files
 defaults write com.apple.finder AppleShowAllFiles -bool true
@@ -226,6 +279,7 @@ defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
 
 # Keep folders on top when sorting by name
 defaults write com.apple.finder _FXSortFoldersFirst -bool true
+defaults write com.apple.finder _FXSortFoldersFirstOnDesktop -bool true
 
 # Disable the warning when changing a file extension
 defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
@@ -334,8 +388,8 @@ defaults write com.apple.dock show-process-indicators -bool true
 # Enable spring loading for all Dock items
 defaults write com.apple.dock enable-spring-load-actions-on-all-items -bool true
 
-# Group windows by application in Mission Control
-defaults write com.apple.dock expose-group-by-app -bool true
+# Don’t group windows by application in Mission Control
+defaults write com.apple.dock expose-group-by-app -bool false
 
 # Disable Dashboard
 defaults write com.apple.dashboard mcx-disabled -bool true
@@ -346,11 +400,19 @@ defaults write com.apple.dock dashboard-in-overlay -bool true
 # Don’t automatically rearrange Spaces based on most recent use
 defaults write com.apple.dock mru-spaces -bool false
 
+# Displays have separate Spaces
+defaults write com.apple.spaces spans-displays -bool false
+
 # Don’t show only open applications in the Dock
 defaults write com.apple.dock static-only -bool false
 
 # Make Dock icons of hidden applications translucent
 defaults write com.apple.dock showhidden -bool true
+
+# Xcode
+defaults write com.apple.dt.Xcode IDEAdditionalCounterpartSuffixes -array-add "ViewModel" "View"
+defaults write com.apple.dt.Xcode IDEAdditionalCounterpartSuffixes -array-add "Router" "Interactor" "Builder"
+defaults write com.apple.dt.Xcode ShowBuildOperationDuration -bool true
 
 # Add iOS & Watch Simulator to Launchpad
 sudo ln -sf "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app" "/Applications/Simulator.app"
@@ -388,6 +450,9 @@ defaults write com.apple.dock wvous-tr-modifier -int 0
 defaults write com.apple.dock wvous-bl-corner -int 0
 defaults write com.apple.dock wvous-bl-modifier -int 0
 
+# Switch to a Space with open windows for the application
+defaults write NSGlobalDomain AppleSpacesSwitchOnActivate -bool true
+
 ###############################################################################
 # Terminal & iTerm 2                                                          #
 ###############################################################################
@@ -399,7 +464,10 @@ defaults write com.apple.terminal StringEncodings -array 4
 # See: https://security.stackexchange.com/a/47786/8918
 defaults write com.apple.terminal SecureKeyboardEntry -bool true
 
-# default terminal exit
+# Focus Follows Mouse
+defaults write com.apple.terminal FocusFollowsMouse -bool false
+
+# Default terminal exit
 /usr/libexec/PlistBuddy -c 'add :"Window Settings":Basic:shellExitAction integer 0' ~/Library/Preferences/com.apple.Terminal.plist
 /usr/libexec/PlistBuddy -c 'set :"Window Settings":Basic:shellExitAction 0' ~/Library/Preferences/com.apple.Terminal.plist
 
@@ -419,6 +487,9 @@ defaults write com.apple.ActivityMonitor ShowCategory -int 0
 # Sort Activity Monitor results by CPU usage
 defaults write com.apple.ActivityMonitor SortColumn -string "CPUUsage"
 defaults write com.apple.ActivityMonitor SortDirection -int 0
+
+# Update frequency
+defaults write com.apple.ActivityMonitor UpdatePeriod -int 5
 
 ###############################################################################
 # Mac App Store                                                               #
@@ -466,9 +537,13 @@ defaults write com.apple.iCal IncludeDebugMenu -bool true
 
 # Use plain text mode for new TextEdit documents
 defaults write com.apple.TextEdit RichText -int 0
+
 # Open and save files as UTF-8 in TextEdit
 defaults write com.apple.TextEdit PlainTextEncoding -int 4
 defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
+
+# Quotes will remain in the form they are typed.
+defaults write com.apple.TextEdit SmartQuotes -bool false
 
 # Enable the debug menu in Disk Utility
 defaults write com.apple.DiskUtility DUDebugMenuEnabled -bool true
@@ -620,7 +695,7 @@ curl -fsSL "https://env.arturonavax.dev/macos_sudo_touchid.sh" | bash
 # Create Desktops                                                             #
 ###############################################################################
 
-curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh" | bash
+bash <(curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh") 5
 
 ###############################################################################
 # Kill affected applications                                                  #
@@ -637,6 +712,7 @@ for app in "Activity Monitor" \
 	"Google Chrome" \
 	"Mail" \
 	"Messages" \
+	"Music" \
 	"Opera" \
 	"Photos" \
 	"Safari" \
@@ -647,7 +723,9 @@ for app in "Activity Monitor" \
 	"Transmission" \
 	"Tweetbot" \
 	"Twitter" \
+	"Xcode" \
 	"iCal"; do
 	killall "$app" &>/dev/null
 done
-echo "Done. Note that some of these changes require a logout/restart to take effect."
+
+echo "✅ Done. Note that some of these changes require a logout/restart to take effect."

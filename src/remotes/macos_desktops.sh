@@ -1,7 +1,12 @@
 #!/bin/bash
-# Run: curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh" | bash
+# Run: bash <(curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh")
 
 desirable_desktops=5
+
+if [[ "$#" != 0 ]]; then
+	desirable_desktops=$1
+fi
+
 count_desktops=$(defaults read com.apple.spaces SpacesDisplayConfiguration | command grep "uuid" | command grep -v 'uuid = "";' | wc -l)
 
 if ((desirable_desktops - count_desktops >= 1)); then
