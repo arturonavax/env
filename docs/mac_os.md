@@ -167,10 +167,9 @@ or `Shift-Command-?`
     - _Pro: $26.89 USD._
     - _Normal: Free._
 
-- Calculator: [Numi](https://numi.app/) or [Evaluator](https://evaluator.link/)
+- Calculator _(Consider Raycast or Alfred)_: [Numi](https://numi.app/)
 
   - _Pricing Numi: $29.74 USD._
-  - _Pricing Evaluator: Free._
 
 - Keyboard Shortcut Manager _(Consider Raycast or Alfred)_:
 
