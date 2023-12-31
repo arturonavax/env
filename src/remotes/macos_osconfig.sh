@@ -617,6 +617,12 @@ echo "If there was an error with the Safari configuration, run after giving Full
 curl -fsSL "https://env.arturonavax.dev/macos_sudo_touchid.sh" | bash
 
 ###############################################################################
+# Create Desktops                                                             #
+###############################################################################
+
+curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh" | bash
+
+###############################################################################
 # Kill affected applications                                                  #
 ###############################################################################
 
