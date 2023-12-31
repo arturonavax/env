@@ -156,7 +156,7 @@ function install_editor() {
 	node_package_module install -g eslint typescript
 
 	# install global node tools
-	node_package_module install --global tree-sitter-cli prettier rome eslint typescript emmet-ls bash-language-server \
+	node_package_module install --global tree-sitter-cli prettier eslint typescript emmet-ls bash-language-server \
 		markdownlint-cli @bufbuild/buf nginxbeautifier sql-formatter stylelint
 
 	# install node tools plugins in $HOME

@@ -36,10 +36,6 @@ require("lvim.lsp.null-ls.formatters").setup({
 	},
 	-- others
 	{
-		command = "rome",
-		filetypes = { "javascript", "typescript", "javascriptreact", "typescriptreact", "json" },
-	},
-	{
 		command = "prettier",
 		filetypes = {
 			"vue",
@@ -47,19 +43,24 @@ require("lvim.lsp.null-ls.formatters").setup({
 			"scss",
 			"less",
 			"html",
+			"json",
 			"jsonc",
+			"javascript",
+			"typescript",
+			"javascriptreact",
+			"typescriptreact",
 			"yaml",
 			"markdown",
 			"markdown.mdx",
 			"graphql",
 			"handlebars",
 		},
-		-- args config default rome
+		-- args config default
 		args = {
 			"--config-precedence",
 			"file-override",
 			"--tab-width",
-			"2",
+			"4",
 			"--use-tabs",
 			"--print-width",
 			"80",

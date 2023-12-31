@@ -51,7 +51,6 @@ code --install-extension oven.bun-vscode # Bun
 
 ## Formatters
 code --install-extension esbenp.prettier-vscode # Prettier - Code formatter
-code --install-extension rome.rome              # Rome - Fast code formatter
 
 ## Linter
 code --install-extension dbaeumer.vscode-eslint # ESLint
