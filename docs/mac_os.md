@@ -60,6 +60,11 @@ to Desktop X (While the Desktops are active).
 
   - _Pricing: Free._
 
+- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
+
+  - _Pricing Bartender: $16 USD._
+  - _Pricing iBar: Free._
+
 - Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
 or [Alfred](https://www.alfredapp.com)
 
@@ -94,16 +99,11 @@ or [Alfred](https://www.alfredapp.com)
   - Note: In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
     mode do not work well in Amethyst.
 
-- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
-
-  - _Pricing Bartender: $16 USD._
-  - _Pricing iBar: Free._
-
 - Monitor Manager: [Monitor Control](https://monitorcontrol.app)
 
   - _Pricing: Free._
 
-- Relax sounds: [Nozio](https://noiz.io)
+- Relax sounds: [Noizio](https://noiz.io)
 
   - _Pricing:_
     - _Pro: $19.99 USD._
@@ -151,6 +151,11 @@ or [Alfred](https://www.alfredapp.com)
   - _Pricing:_
     - _Pro: $26.89 USD._
     - _Normal: Free._
+
+  - Note: Set the battery charge limit to 75%, do not let the battery discharge
+    more than 25%, and do a full cycle (from 100% to 0%) every 1 or 2 weeks, if
+    you notice a battery decalibration use the calibration mode. Sailing mode activated
+    with 5% difference, and heat protection activated with 45°C temperature limit.
 
 - Copy with formatting: [Pure Paste](https://sindresorhus.com/pure-paste)
 
