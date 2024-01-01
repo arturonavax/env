@@ -409,6 +409,9 @@ defaults write com.apple.dock static-only -bool false
 # Make Dock icons of hidden applications translucent
 defaults write com.apple.dock showhidden -bool true
 
+# Switch to a Space with open windows for the application
+defaults write NSGlobalDomain AppleSpacesSwitchOnActivate -bool true
+
 # Xcode
 defaults write com.apple.dt.Xcode IDEAdditionalCounterpartSuffixes -array-add "ViewModel" "View"
 defaults write com.apple.dt.Xcode IDEAdditionalCounterpartSuffixes -array-add "Router" "Interactor" "Builder"
@@ -434,24 +437,22 @@ find "${HOME}/Library/Application Support/Dock" -name "*-*.db" -maxdepth 1 -dele
 # 11: Launchpad
 # 12: Notification Center
 # 13: Lock Screen
+
 # Top left screen corner → Mission Control
 defaults write com.apple.dock wvous-tl-corner -int 2
 defaults write com.apple.dock wvous-tl-modifier -int 0
 
-# Bottom right screen corner → Lock Screen
-defaults write com.apple.dock wvous-br-corner -int 13
-defaults write com.apple.dock wvous-br-modifier -int 0
-
-# Top right screen corner → Desktop
-defaults write com.apple.dock wvous-tr-corner -int 4
+# Top right screen corner → Notification Center
+defaults write com.apple.dock wvous-tr-corner -int 12
 defaults write com.apple.dock wvous-tr-modifier -int 0
 
 # Bottom left screen corner → No-op
 defaults write com.apple.dock wvous-bl-corner -int 0
 defaults write com.apple.dock wvous-bl-modifier -int 0
 
-# Switch to a Space with open windows for the application
-defaults write NSGlobalDomain AppleSpacesSwitchOnActivate -bool true
+# Bottom right screen corner → Lock Screen
+defaults write com.apple.dock wvous-br-corner -int 13
+defaults write com.apple.dock wvous-br-modifier -int 0
 
 ###############################################################################
 # Terminal & iTerm 2                                                          #
