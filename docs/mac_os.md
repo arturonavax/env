@@ -54,7 +54,11 @@ to Desktop X (While the Desktops are active).
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
-## Best applications for MacOS
+## Personal list of applications for MacOS
+
+Almost all of these applications are available in [Setapp subscriptions](https://setapp.com)
+($107.88 USD/annual). Cost of all these apps excluding Raycast, Spark, Parallels
+and CrossOver: $404.65 USD.
 
 - Git GUI: [SourceTree](https://www.sourcetreeapp.com)
 
