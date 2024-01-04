@@ -84,6 +84,7 @@ code --install-extension mhutchie.git-graph # Git Graph
 
 ## Markdown
 code --install-extension yzhang.markdown-all-in-one     # Markdown All in One
+code --install-extension jebbs.markdown-extended        # Markdown Extended
 code --install-extension DavidAnson.vscode-markdownlint # markdownlint
 
 ## Docker

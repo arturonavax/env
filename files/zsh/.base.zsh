@@ -303,9 +303,9 @@ function flushdns() {
         sudo systemd-resolve --flush-caches
 
     elif [[ "$(uname -s)" == "Darwin" ]]; then
+        sudo dscacheutil -flushcache
         sudo killall -HUP mDNSResponder
         sudo killall mDNSResponderHelper
-        sudo dscacheutil -flushcache
     fi
 }
 

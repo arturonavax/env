@@ -96,8 +96,11 @@ or [Alfred](https://www.alfredapp.com)
     - _Free._
     - _Pro: $9.99 USD._
 
-  - Note: In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
-    mode do not work well in Amethyst.
+  - Notes:
+    - In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
+      mode do not work well in Amethyst.
+    - If I use Amethyst, I use Raycast or Alfred to set up window keyboard shortcuts
+      such as Rectangle.
 
 - Monitor Manager: [Monitor Control](https://monitorcontrol.app)
 
@@ -152,19 +155,39 @@ or [Alfred](https://www.alfredapp.com)
     - _Pro: $26.89 USD._
     - _Normal: Free._
 
-  - Note: Set the battery charge limit to 80%, do not let the battery discharge
-    more than 20%, and do a full cycle (from 100% to 0%) every 1 or 2 weeks,
-    if you notice a battery decalibration use the calibration mode. Sailing mode
-    activated with 5% difference, and heat protection activated with 45°C temperature
-    limit.
+  - Notes:
+    - Set the battery charge limit to 80%, do not let the battery discharge more
+      than 20%.
+    - Hardware Battery Percentage, activated.
+    - Automatic Discharge, activated.
+    - Disable Sleep until Charge Limit, activated.
+    - Sailing Mode, activated with a difference of 10%.
+    - Heat Protection, activated with a temperature limit of 30-35°C.
+    - Stop charging when powered off/app closed, activated.
+    - Use the Calibration Mode every 1 or 2 weeks.
 
 - Copy with formatting: [Pure Paste](https://sindresorhus.com/pure-paste)
 
   - _Pricing: Free._
 
-- Night Shift: [f.lux](https://justgetflux.com)
+- Night shift: [f.lux](https://justgetflux.com)
 
   - _Pricing: Free._
+
+- Cliboard manager _(Consider Raycast or Alfred)_: [Maccy](https://maccy.app)
+
+  - _Pricing: Free._
+
+  - Note: Add password and sensitive data management applications to the blacklist
+    of the clipboard manager.
+
+- Developer tools: [DevToysMac](https://github.com/ObuchiYuki/DevToysMac)
+
+  - _Pricing: Free._
+
+- Snippet manager _(Consider Raycast or Alfred)_: [Rocket Typist](https://www.witt-software.com/rockettypist/)
+
+  - _Pricing: $9.95 USD._
 
 - Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
 
@@ -338,4 +361,39 @@ hdiutil attach file.dmg
 
 # after installation
 sudo hdiutil detach file.dmg
+```
+
+### Config DNS
+
+#### List Network Services
+
+```bash
+networksetup -listallnetworkservices
+```
+
+#### Show current DNS
+
+```bash
+networksetup -getdnsservers <NetworkService>
+```
+
+#### Set DNS
+
+```bash
+# Cloudflare
+networksetup -setdnsservers <NetworkService> 1.1.1.1 1.0.0.1 2606:4700:4700::1111 2606:4700:4700::1001
+```
+
+#### Remove DNS
+
+```bash
+networksetup -setdnsservers <NetworkService> empty
+```
+
+#### Flush DNS
+
+```bash
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+sudo killall mDNSResponderHelper
 ```
