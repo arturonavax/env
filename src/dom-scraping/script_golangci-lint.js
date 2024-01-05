@@ -23,8 +23,9 @@ let myBlacklist = [
 	"- tagliatelle",
 	"- taglign",
 	"- godox",
+	"- inamedparam",
+	"- gochecksumtype",
 ];
-
 
 document.querySelectorAll("table > tbody").forEach((tableBody) => {
 	tableBody.childNodes.forEach((tr) => {

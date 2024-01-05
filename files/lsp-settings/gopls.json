@@ -21,13 +21,14 @@
 			"composites": true,
 			"copylocks": true,
 			"deepequalerrors": true,
+			"defers": true,
+			"deprecated": true,
 			"directive": true,
 			"embed": true,
 			"errorsas": true,
 			"fieldalignment": true,
 			"httpresponse": true,
 			"ifaceassert": true,
-			"infertypeargs": true,
 			"loopclosure": true,
 			"lostcancel": true,
 			"nilfunc": true,
@@ -38,6 +39,7 @@
 			"simplifycompositelit": true,
 			"simplifyrange": true,
 			"simplifyslice": true,
+			"slog": true,
 			"sortslice": true,
 			"stdmethods": true,
 			"stringintconv": true,
@@ -58,6 +60,7 @@
 			"undeclaredname": true,
 			"unusedvariable": true,
 			"fillstruct": true,
+			"infertypeargs": true,
 			"stubmethods": true
 		}
 	}

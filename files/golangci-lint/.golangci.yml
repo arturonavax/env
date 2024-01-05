@@ -1,3 +1,7 @@
+# Last golangci-lint revised version: v1.55.2
+# Last revive revised version: v1.3.5
+# Date last revised: 04/01/2024
+
 run:
   timeout: 5m
 
@@ -68,16 +72,20 @@ linters:
     - nolintlint
     - nosprintfhostport
     - paralleltest
+    - perfsprint
     - prealloc
     - predeclared
     - promlinter
+    - protogetter
     - reassign
     - revive
     - rowserrcheck
+    - sloglint
     - sqlclosecheck
     - stylecheck
     - tenv
     - testableexamples
+    - testifylint
     - testpackage
     - thelper
     - tparallel
@@ -116,6 +124,8 @@ linters:
     - tagliatelle
     - tagalign
     - godox
+    - inamedparam
+    - gochecksumtype
 
 linters-settings:
   revive:
@@ -123,6 +133,7 @@ linters-settings:
       - name: context-keys-type
       - name: time-equal
       - name: time-naming
+      - name: unchecked-type-assertion
       - name: var-declaration
       - name: unexported-return
       - name: errorf
@@ -175,6 +186,8 @@ linters-settings:
       - name: optimize-operands-order
       - name: use-any
       - name: datarace
+      - name: redundant-import-alias
+      - name: import-alias-naming
       - name: comment-spacings
         arguments:
           - nolint
@@ -377,3 +390,14 @@ linters-settings:
     error-variable-names: ["err", "err1", "err2", "err3"]
     allow-cuddle-with-calls: ["Lock", "RLock"]
     allow-cuddle-with-rhs: ["Unlock", "RUnlock"]
+
+  perfsprint:
+    int-conversion: true
+    err-error: true
+    errorf: true
+    sprintf1: true
+
+  testifylint:
+    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+    # Default: false
+    enable-all: true
