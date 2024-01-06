@@ -6,8 +6,8 @@ Recovery Mode and encrypt the disk.
 ---
 
 1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
-2. **[Best applications for MacOS](#best-applications-for-macos)**
-3. **[Devs](#devs)**
+2. **[Devs](#devs)**
+3. **[Personal list of applications for MacOS](#personal-list-of-applications-for-macos)**
 
 ## Default keyboard shortcuts
 
@@ -20,7 +20,7 @@ Recovery Mode and encrypt the disk.
 
 - Switch apps: `Command-Tab`
 
-- Close app (Quit): `Command-Q` or `Option-Commnad-Esc` (Force)
+- Close app (Quit): `Command-Q` or `Option-Command-Esc` (Force)
 
 - Refresh page (F5): `Command-R`
 
@@ -53,198 +53,6 @@ three fingers (or four fingers).
 to Desktop X (While the Desktops are active).
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
-
-## Personal list of applications for MacOS
-
-Almost all of these applications are available in [Setapp subscriptions](https://setapp.com)
-($107.88 USD/annual). Cost of all these apps excluding Raycast, Spark, Parallels
-and CrossOver: $404.65 USD.
-
-- Git GUI: [SourceTree](https://www.sourcetreeapp.com)
-
-  - _Pricing: Free._
-
-- Hiding icons in menu bar: [Bartender](https://www.macbartender.com/) or [iBar](https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12)
-
-  - _Pricing Bartender: $16 USD._
-  - _Pricing iBar: Free._
-
-- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast](https://www.raycast.com/)
-or [Alfred](https://www.alfredapp.com)
-
-  - _Pricing Raycast:_
-    - _Free._
-    - _Pro: $96 USD/annual._
-
-  - _Pricing Alfred:_
-    - _Free._
-    - _Powerpack: $34 USD._
-
-- App Switching: [AltTab](https://alt-tab-macos.netlify.app/)
-
-  - _Pricing: Free._
-
-- Video player: [IINA](https://iina.io)
-
-  - _Pricing: Free._
-
-- Time awareness: [Pandan](https://sindresorhus.com/pandan)
-
-  - _Pricing: Free._
-
-- Window Manager: [Amethyst](https://ianyh.com/amethyst/) or [Rectangle](https://rectangleapp.com/)
-
-  - _Pricing Amethyst: Free._
-
-  - _Pricing Rectangle:_
-    - _Free._
-    - _Pro: $9.99 USD._
-
-  - Notes:
-    - In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
-      mode do not work well in Amethyst.
-    - If I use Amethyst, I use Raycast or Alfred to set up window keyboard shortcuts
-      such as Rectangle.
-
-- Monitor Manager: [Monitor Control](https://monitorcontrol.app)
-
-  - _Pricing: Free._
-
-- Relax sounds: [Noizio](https://noiz.io)
-
-  - _Pricing:_
-    - _Pro: $19.99 USD._
-    - _Lite: Free._
-
-- App updater: [Latest](https://max.codes/latest/) or [MacUpdater](https://www.corecode.io/macupdater/)
-
-  - _Pricing Latest: Free._
-
-  - _Pricing MacUpdater:_
-    - _Standard Edition: $11.61 USD._
-    - _Scanning Only: Free._
-
-- App cleaner: [AppCleaner](https://freemacsoft.net/appcleaner/)
-
-  - _Pricing: Free._
-
-- Text recognition (OCR): [TextSniper](https://textsniper.app) or [Shottr](https://shottr.cc)
-
-  - _Pricing TextSniper: $7.99 USD._
-  - _Pricing Shottr: Free._
-
-- Screenshots: [CleanShot X](https://cleanshot.com/) or [Shottr](https://shottr.cc)
-
-  - _Pricing CleanShot X: $29 USD_
-  - _Pricing Shottr: Free._
-
-- System monitor: [iStat Menus](https://bjango.com/mac/istatmenus/) or [Stats](https://github.com/exelban/stats)
-
-  - _Pricing iStat Menus: $14.27 USD._
-  - _Pricing Stats: Free._
-
-- Video downloader: [Downie](https://software.charliemonroe.net/downie/) or [VDown](https://en.vdownapp.com)
-
-  - _Pricing Downnie: $19.99 USD._
-  - _Pricing VDown: Free._
-
-- Calendar in the interface: [Dato](https://sindresorhus.com/dato) or [Itsycal](https://www.mowglii.com/itsycal/)
-
-  - _Pricing Dato: $15 USD aprox._
-  - _Pricing Itsycal: Free._
-
-- Battery Care: [AlDente](https://apphousekitchen.com/)
-
-  - _Pricing:_
-    - _Pro: $26.89 USD._
-    - _Normal: Free._
-
-  - Notes:
-    - Set the battery charge limit to 80%, do not let the battery discharge more
-      than 20%.
-    - Hardware Battery Percentage, activated.
-    - Automatic Discharge, activated.
-    - Disable Sleep until Charge Limit, activated.
-    - Sailing Mode, activated with a difference of 10%.
-    - Heat Protection, activated with a temperature limit of 30-35°C.
-    - Stop charging when powered off/app closed, activated.
-    - Use the Calibration Mode every 1 or 2 weeks.
-
-- Copy with formatting: [Pure Paste](https://sindresorhus.com/pure-paste)
-
-  - _Pricing: Free._
-
-- Night shift: [f.lux](https://justgetflux.com)
-
-  - _Pricing: Free._
-
-- Cliboard manager _(Consider Raycast or Alfred)_: [Maccy](https://maccy.app)
-
-  - _Pricing: Free._
-
-  - Note: Add password and sensitive data management applications to the blacklist
-    of the clipboard manager.
-
-- Developer tools: [DevToysMac](https://github.com/ObuchiYuki/DevToysMac)
-
-  - _Pricing: Free._
-
-- Snippet manager _(Consider Raycast or Alfred)_: [Rocket Typist](https://www.witt-software.com/rockettypist/)
-
-  - _Pricing: $9.95 USD._
-
-- Replacement option switcher: [One Switch](https://fireball.studio/oneswitch/)
-
-  - _Pricing: $4.99 USD._
-
-- Cleaner and Antivirus: [CleanMyMac X](https://macpaw.com/cleanmymac)
-
-  - _Pricing: $89.95 USD._
-
-- Information on other Apple devices: [AirBuddy](airbuddy.app)
-
-  - _Pricing: $15.46 USD._
-
-- Command Palette in any applicattions: [Paletro](https://appmakes.io/paletro)
-or `Shift-Command-?`
-
-  - _Pricing Paletro: $6.99 USD._
-
-- Calculator _(Consider Raycast or Alfred)_: [Numi](https://numi.app/)
-
-  - _Pricing Numi: $29.74 USD._
-
-- Keyboard Shortcut Manager _(Consider Raycast or Alfred)_:
-
-  - [Karabiner](https://karabiner-elements.pqrs.org/)
-
-    - _Pricing: Free._
-
-  - [Keyboard Maestro](https://www.keyboardmaestro.com/main/)
-    - _Pricing: $42.84 USD._
-
-- Emails: [Spark](https://sparkmailapp.com/) or Apple Mail
-
-  - _Pricing Spark: $59.99 USD/annual._
-  - _Pricing Apple Mail: Free._
-
-- Virtualization:
-
-  - Systems: [Parallels](https://www.parallels.com/)
-
-    - _Pricing:_
-      - _Standard Edition: $129.99 USD._
-      - _Pro Edition: $119.99 USD/annual._
-
-  - Applications and programs (High performance): [CrossOver](https://www.codeweavers.com/crossover/)
-
-    - _Pricing:_
-      - _CrossOver +: $64 USD/annual._
-      - _CrossOver Life: $494 USD._
-
-    - Improve [CrossOver](https://www.codeweavers.com/crossover/)
-      compatibility: [CXPatcher](https://github.com/italomandara/CXPatcher)
-      - _Pricing: Free._
 
 ## Devs
 
@@ -401,3 +209,339 @@ sudo dscacheutil -flushcache
 sudo killall -HUP mDNSResponder
 sudo killall mDNSResponderHelper
 ```
+
+## Personal list of applications for MacOS
+
+### Costs
+
+Some of these applications are available in [Setapp subscriptions][setapp]
+($107.88 USD/annual).
+
+Total applications: 41 (excluding Parallels and CrossOver).
+
+- Free applications: 20.
+- Paid applications: 21.
+
+  - One-time payment: 19 apps (choosing Alfred over Raycast). ($437.1 USD)
+    - Some applications require a payment to upgrade to new versions.
+    - Dato: Only one year of updates.
+    - iStats Menu: Only 6 months of weather data.
+
+  - Subscription: 2 apps. ($179.99 USD/annual)
+
+- Total applications in Setapp: 23.
+
+  - Without Setapp: $377.25 USD + $179.99 USD/annual.
+    - Some applications require a payment to upgrade to new versions.
+    - Dato: Only one year of updates.
+    - iStats Menu: Only 6 months of weather data.
+
+  - With Setapp: $107.88 USD/annual
+    - Updates and upgrades included.
+
+All applications available on Setapp and paying for those that are not:
+_$107.88 USD/annual (23 Setapp apps) + $79.84 USD (3 One-time payment apps)_
+
+### List
+
+- Git GUI: [SourceTree][sourcetree]
+
+  - _Pricing: Free._
+
+- Hiding icons in menu bar: [Bartender][bartender] or [iBar][ibar]
+
+  - _Pricing Bartender: $16 USD._ (🔶 Available on Setapp)
+  - _Pricing iBar: Free._
+
+- Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast][raycast]
+or [Alfred][alfred]
+
+  - _Pricing Alfred:_
+    - _Powerpack: $34 USD._
+    - _Normal: Free._
+
+  - _Pricing Raycast:_
+    - _Normal: Free._
+    - _Pro: $96 USD/annual._
+
+- App Switching: [AltTab][alttab]
+
+  - _Pricing: Free._
+
+- Video player: [IINA][iina]
+
+  - _Pricing: Free._
+
+- Time awareness: [Pandan][pandan]
+
+  - _Pricing: Free._
+
+- Window Manager: [Amethyst][amethyst] and [Rectangle][rectangle]
+
+  - _Pricing Amethyst: Free._
+
+  - _Pricing Rectangle:_
+    - _Normal: Free._
+    - _Pro: $9.99 USD._
+
+  - Notes:
+    - I use Amethyst only for development and workflow, with the option
+      "Automatically float applications except those listed".
+    - I use Rectangle for everything that is not part of the Amethyst layout.
+    - In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
+      mode do not work well in Amethyst.
+
+- Monitor Manager: [Monitor Control][monitorcontrol]
+
+  - _Pricing: Free._
+
+- Relax sounds: [Noizio][noizio] or MacOS Background Sounds (System Settings
+-> Accessibility -> Audio -> Background Sounds)
+
+  - _Pricing Noizio:_
+    - _Lite: Free._
+    - _Pro: $19.99 USD._ (🔶 Available on Setapp)
+
+  - _Pricing MacOS Background sounds: Free._
+
+- App updater: [Latest][latest] or [MacUpdater][macupdater]
+
+  - _Pricing Latest: Free._
+
+  - _Pricing MacUpdater:_
+    - _Standard Edition: $11.61 USD._
+    - _Scanning Only: Free._
+
+- App cleaner: [AppCleaner][appcleaner]
+
+  - _Pricing: Free._
+
+- Organization and documentation: [Notion][notion]
+
+  - _Pricing: Free._
+
+- Time Tracker: [Timing][timing] or [Toggl Track][toggltrack]
+
+  - _Pricing Timing: $120 USD/annual._ (🔶 Available on Setapp)
+
+  - _Pricing Toggle Track: Free._
+
+- Habit Tracker: [Habitify][habitify]
+
+  - _Pricing:_
+    - _Normal: Free._
+    - _Pro: $30 USD._
+
+- Text recognition (OCR): [TextSniper][textsniper] or [Shottr][shottr]
+
+  - _Pricing TextSniper: $7.99 USD._ (🔶 Available on Setapp)
+  - _Pricing Shottr: Free._
+
+- Screenshots: [CleanShot X][cleanshotx] or [Shottr][shottr]
+
+  - _Pricing CleanShot X: $29 USD_ (Only one year of updates) (🔶 Available on Setapp)
+  - _Pricing Shottr: Free._
+
+- System monitor: [iStat Menus][istatmenu] or [Stats][stats]
+
+  - _Pricing iStat Menus: $14.27 USD._ (Only 6 months of weather data)
+    (🔶 Available on Setapp)
+  - _Pricing Stats: Free._
+
+- Video downloader: [Downie][downie] or [VDown][vdown]
+
+  - _Pricing Downnie: $19.99 USD._ (🔶 Available on Setapp)
+  - _Pricing VDown: Free._
+
+- Calendar in the interface: [Dato][dato] or [Itsycal][itsycal]
+
+  - _Pricing Dato: $15 USD aprox._ (🔶 Available on Setapp)
+  - _Pricing Itsycal: Free._
+
+- Battery Care: [AlDente][aldente]
+
+  - _Pricing:_
+    - _Pro: $26.89 USD._ (🔶 Available on Setapp)
+    - _Normal: Free._
+
+  - Notes:
+    - Set the battery charge limit to 80%, do not let the battery discharge more
+      than 20%.
+    - Hardware Battery Percentage, activated.
+    - Automatic Discharge, activated.
+    - Disable Sleep until Charge Limit, activated.
+    - Sailing Mode, activated with a difference of 10%.
+    - Heat Protection, activated with a temperature limit of 30-35°C.
+    - Stop charging when powered off/app closed, activated.
+    - Use the Calibration Mode every 1 or 2 weeks.
+
+- Copy with formatting: [Pure Paste][purepaste]
+
+  - _Pricing: Free._
+
+- Night shift: [f.lux][flux]
+
+  - _Pricing: Free._
+
+- Cliboard manager _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Maccy][maccy]
+
+  - _Pricing: Free._
+
+  - Note: Add password and sensitive data management applications to the blacklist
+    of the clipboard manager.
+
+- Developer tools: [DevToysMac][devtoysmac]
+
+  - _Pricing: Free._
+
+- Cheat Sheet shortcuts: [CheatSheet][cheatsheet]
+
+  - _Pricing: Free._
+
+- Drag and drop bar: [Dropzone][dropzone]
+
+  - _Pricing:_
+    - _Pro: $35 USD._ (🔶 Available on Setapp)
+    - _Normal: Free._
+
+- Option switch manager: [One Switch][oneswitch] or [SwitchManager][switchmanager]
+
+  - _Pricing One Switch: $4.99 USD._ (🔶 Available on Setapp)
+  - _Pricing SwitchManager: Free._
+
+- Snippet manager _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Rocket Typist][rockettypist]
+
+  - _Pricing:_
+    - _Pro: $19.99 USD._ (🔶 Available on Setapp)
+    - _Normal: Free._
+
+- Webcam preview: [Hand Mirror][handmirror] or Apple Photo Booth
+
+  - _Pricing Hand Mirror:_
+    - _Pro: $9 USD aprox._ (🔶 Available on Setapp)
+    - _Normal: Free._
+
+  - _Pricing Apple Photo Booth: Free._
+
+- Hidden desktop icons _(Consider [One Switch][oneswitch] or
+[SwitchManager][switchmanager])_: [HiddenMe][hiddenme]
+
+  - _Pricing HiddenMe: $3 USD aprox._
+
+- Cleaner and Antivirus: [CleanMyMac X][cleanmymacx]
+
+  - _Pricing: $89.95 USD._ (🔶 Available on Setapp)
+
+- Information on other Apple devices: [AirBuddy][airbuddy]
+
+  - _Pricing: $15.46 USD._ (🔶 Available on Setapp)
+
+- Command Palette in any applicattions: [Paletro][paletro]
+or `Shift-Command-?`
+
+  - _Pricing Paletro: $6.99 USD._ (🔶 Available on Setapp)
+
+- Calculator _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Numi][numi]
+
+  - _Pricing: $29.74 USD._ (🔶 Available on Setapp)
+
+- Check security settings: [Pareto Security][paretosecurity]
+
+  - _Pricing: $17 USD._ (🔶 Available on Setapp)
+
+- Emails: [Spark][spark] or Apple Mail
+
+  - _Pricing Spark: $59.99 USD/annual._ (🔶 Available on Setapp)
+  - _Pricing Apple Mail: Free._
+
+- Logitech devices manager: [Logi Options][logioptions]
+
+  - _Pricing: Free._
+
+- Smooth scrolling: [Mos][mos]
+
+  - _Pricing: Free._
+
+- Keyboard Shortcut Manager _(Consider [Raycast][raycast] or [Alfred][alfred])_:
+
+  - [Karabiner][karabiner]
+
+    - _Pricing: Free._
+
+  - [Keyboard Maestro][keyboardmaestro]
+
+    - _Pricing: $42.84 USD._
+
+- Virtualization:
+
+  - Systems: [Parallels][parallels]
+
+    - _Pricing:_
+      - _Standard Edition: $129.99 USD._
+      - _Pro Edition: $119.99 USD/annual._
+
+  - Applications and programs (High performance): [CrossOver][crossover]
+
+    - _Pricing:_
+      - _CrossOver +: $64 USD/annual._
+      - _CrossOver Life: $494 USD._
+
+    - Improve [CrossOver][crossover]
+      compatibility: [CXPatcher][cxpatcher]
+
+      - _Pricing: Free._
+
+[sourcetree]: https://www.sourcetreeapp.com
+[bartender]: https://www.macbartender.com/
+[ibar]: https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12
+[raycast]: https://www.raycast.com/
+[alfred]: https://www.alfredapp.com
+[alttab]: https://alt-tab-macos.netlify.app/
+[iina]: https://iina.io
+[pandan]: https://sindresorhus.com/pandan
+[amethyst]: https://ianyh.com/amethyst/
+[rectangle]: https://rectangleapp.com/
+[monitorcontrol]: https://monitorcontrol.app
+[noizio]: https://noiz.io
+[latest]: https://max.codes/latest/
+[macupdater]: https://www.corecode.io/macupdater/
+[appcleaner]: https://freemacsoft.net/appcleaner/
+[notion]: https://www.notion.so
+[timing]: https://timingapp.com
+[toggltrack]: https://toggl.com/track/time-tracking-mac/
+[habitify]: https://www.habitify.me
+[textsniper]: https://textsniper.app
+[shottr]: https://shottr.cc
+[cleanshotx]: https://cleanshot.com/
+[istatmenu]: https://bjango.com/mac/istatmenus/
+[stats]: https://github.com/exelban/stats
+[downie]: https://software.charliemonroe.net/downie/
+[vdown]: https://en.vdownapp.com
+[dato]: https://sindresorhus.com/dato
+[itsycal]: https://www.mowglii.com/itsycal/
+[aldente]: https://apphousekitchen.com/
+[purepaste]: https://sindresorhus.com/pure-paste
+[flux]: https://justgetflux.com
+[maccy]: https://github.com/p0deje/Maccy
+[devtoysmac]: https://github.com/ObuchiYuki/DevToysMac
+[cheatsheet]: https://cheatsheet-mac.en.softonic.com/mac
+[dropzone]: https://aptonic.com
+[oneswitch]: https://fireball.studio/oneswitch/
+[switchmanager]: https://www.doyourdata.com/mac-manager/switch-manager.html
+[rockettypist]: https://www.witt-software.com/rockettypist/
+[handmirror]: https://handmirror.app
+[hiddenme]: https://apps.apple.com/us/app/hiddenme/id467040476
+[cleanmymacx]: https://macpaw.com/cleanmymac
+[airbuddy]: https://airbuddy.app
+[paletro]: https://appmakes.io/paletro
+[numi]: https://numi.app/
+[paretosecurity]: https://paretosecurity.com
+[spark]: https://sparkmailapp.com/
+[logioptions]: https://www.logitech.com/en-us/software/options.html
+[mos]: https://mos.caldis.me
+[karabiner]: https://karabiner-elements.pqrs.org/
+[keyboardmaestro]: https://www.keyboardmaestro.com/main/
+[parallels]: https://www.parallels.com/
+[crossover]: https://www.codeweavers.com/crossover/
+[cxpatcher]: https://github.com/italomandara/CXPatcher
+[setapp]: https://setapp.com
