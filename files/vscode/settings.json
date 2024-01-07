@@ -198,9 +198,13 @@
 	"vim.autoindent": true,
 	// "vim.enableNeovim": true,
 	// "vim.neovimPath": "nvim",
-	// "vim.easymotion": true,
-	"vim.sneak": true,
+
+	"vim.easymotion": true,
 	"vim.surround": true,
+	"vim.highlightedyank.enable": true,
+	"vim.highlightedyank.color": "#a9dc7660",
+	"vim.highlightedyank.duration": 200,
+
 	"editor.cursorSurroundingLines": 8,
 	"vim.statusBarColorControl": false,
 	"vim.statusBarColors": {
@@ -227,11 +231,11 @@
 	"vim.normalModeKeyBindings": [
 		{
 			"before": ["s"],
-			"after": ["<leader>", "<leader>", "f"]
+			"after": ["<leader>", "<leader>", "2", "f"]
 		},
 		{
 			"before": ["S"],
-			"after": ["<leader>", "<leader>", "F"]
+			"after": ["<leader>", "<leader>", "2", "F"]
 		},
 		{
 			"before": ["g", "x"],
@@ -309,11 +313,11 @@
 		},
 		{
 			"before": ["s"],
-			"after": ["<leader>", "<leader>", "f"]
+			"after": ["<leader>", "<leader>", "2", "f"]
 		},
 		{
 			"before": ["S"],
-			"after": ["<leader>", "<leader>", "F"]
+			"after": ["<leader>", "<leader>", "2", "F"]
 		}
 	],
 	// Vim: fix v$ behavior
