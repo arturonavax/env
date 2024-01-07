@@ -365,15 +365,18 @@ or [Alfred][alfred]
     - _Normal: Free._
 
   - Notes:
-    - Set the battery charge limit to 80%, do not let the battery discharge more
-      than 20%.
-    - Hardware Battery Percentage, activated.
-    - Automatic Discharge, activated.
-    - Disable Sleep until Charge Limit, activated.
-    - Sailing Mode, activated with a difference of 10%.
-    - Heat Protection, activated with a temperature limit of 30-35°C.
-    - Stop charging when powered off/app closed, activated.
-    - Use the Calibration Mode every 1 or 2 weeks.
+    - Set the battery [charge limit to 80%][aldente-chargelimit], do not let the
+      battery discharge more than 20%.
+    - [Hardware Battery Percentage][aldente-hardwarebattery], activated.
+    - [Automatic Discharge][aldente-automaticdischarge], activated.
+    - [Disable Sleep until Charge Limit][aldente-disablesleep], activated.
+    - [Sailing Mode][aldente-sailingmode], activated with a difference of 10%.
+    - [Heat Protection][aldente-heatprotection], activated with a temperature limit
+      of 30-35°C.
+    - [Stop charging when powered off/app closed][aldente-stopcharging-poweroff],
+      activated.
+    - [Stop charging when sleeping][aldente-stopcharging-sleeping], activated.
+    - Use the [Calibration Mode][aldente-calibrationmode] every 1 or 2 weeks.
 
 - Copy with formatting: [Pure Paste][purepaste]
 
@@ -491,6 +494,7 @@ or `Shift-Command-?`
 
       - _Pricing: Free._
 
+[setapp]: https://setapp.com
 [sourcetree]: https://www.sourcetreeapp.com
 [bartender]: https://www.macbartender.com/
 [ibar]: https://apps.apple.com/us/app/ibar-menubar-icon-control-tool/id6443843900?mt=12
@@ -544,4 +548,13 @@ or `Shift-Command-?`
 [parallels]: https://www.parallels.com/
 [crossover]: https://www.codeweavers.com/crossover/
 [cxpatcher]: https://github.com/italomandara/CXPatcher
-[setapp]: https://setapp.com
+
+[aldente-sailingmode]: https://apphousekitchen.com/feature-explanation-sailing-mode/
+[aldente-automaticdischarge]: https://apphousekitchen.com/feature-explanation-automatic-discharge/
+[aldente-hardwarebattery]: https://apphousekitchen.com/feature-explanation-hardware-battery-percentage/
+[aldente-disablesleep]: https://apphousekitchen.com/feature-explanation-disable-sleep-until-charge-limit/
+[aldente-heatprotection]: https://apphousekitchen.com/feature-explanation-heat-protection/
+[aldente-calibrationmode]: https://apphousekitchen.com/feature-explanation-calibration-mode-2/
+[aldente-chargelimit]: https://apphousekitchen.com/feature-explanation-charge-limiter/
+[aldente-stopcharging-poweroff]: https://apphousekitchen.com/feature-explanation-stop-charging-when-powered-off-app-closed/
+[aldente-stopcharging-sleeping]: https://apphousekitchen.com/feature-explanation-stop-charging-when-sleeping/

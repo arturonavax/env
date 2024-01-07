@@ -6,6 +6,7 @@ if [[ "$(command -v code)" == "" ]]; then
 	exit 1
 fi
 
+code --install-extension nemesv.copy-file-name                  # Copy file name
 code --install-extension enkia.tokyo-night                      # Tokyo Night
 code --install-extension PKief.material-icon-theme              # Material Icon Theme
 code --install-extension usernamehw.errorlens                   # Error Lens

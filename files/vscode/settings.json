@@ -191,13 +191,15 @@
 	// "vim.useSystemClipboard": true,
 	"vim.ignorecase": true,
 	"vim.smartcase": true,
+	"vim.smartRelativeLine": true,
 	"vim.incsearch": true,
 	"vim.useCtrlKeys": true,
 	"vim.hlsearch": true,
 	"vim.autoindent": true,
-	"vim.enableNeovim": true,
-	"vim.neovimPath": "nvim",
-	"vim.easymotion": true,
+	// "vim.enableNeovim": true,
+	// "vim.neovimPath": "nvim",
+	// "vim.easymotion": true,
+	"vim.sneak": true,
 	"vim.surround": true,
 	"editor.cursorSurroundingLines": 8,
 	"vim.statusBarColorControl": false,
@@ -313,6 +315,17 @@
 			"before": ["S"],
 			"after": ["<leader>", "<leader>", "F"]
 		}
+	],
+	// Vim: fix v$ behavior
+	"vim.visualModeKeyBindingsNonRecursive": [
+		{
+			"before": ["$"],
+			"after": ["g", "_"]
+		}
+		// {
+		// 	"before": ["g", "_"],
+		// 	"after": ["$"]
+		// }
 	],
 	"extensions.experimental.affinity": {
 		"vscodevim.vim": 1

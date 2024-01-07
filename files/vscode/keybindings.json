@@ -223,6 +223,31 @@
 		"command": "editor.action.scrollRightHover",
 		"when": "vim.active && editorHoverFocused"
 	},
+	{
+		"key": "g g",
+		"command": "editor.action.goToTopHover",
+		"when": "vim.active && editorHoverFocused"
+	},
+	{
+		"key": "shift+g",
+		"command": "editor.action.goToBottomHover",
+		"when": "vim.active && editorHoverFocused"
+	},
+	{
+		"key": "ctrl+d",
+		"command": "editor.action.pageDownHover",
+		"when": "vim.active && editorHoverFocused"
+	},
+	{
+		"key": "ctrl+u",
+		"command": "editor.action.pageUpHover",
+		"when": "vim.active && editorHoverFocused"
+	},
+	{
+		"key": "q",
+		"command": "workbench.action.focusLastEditorGroup",
+		"when": "vim.active && editorHoverFocused"
+	},
 
 	// Panels
 	{
@@ -468,7 +493,22 @@
 	},
 	{
 		"key": "y",
+		"command": "copy-file-name.copyFileNameWithExtension",
+		"when": "vim.active && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
+	},
+	{
+		"key": "shift+y",
+		"command": "copyRelativeFilePath",
+		"when": "vim.active && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
+	},
+	{
+		"key": "c",
 		"command": "filesExplorer.copy",
+		"when": "vim.active && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
+	},
+	{
+		"key": "p",
+		"command": "filesExplorer.paste",
 		"when": "vim.active && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
 	},
 	{
