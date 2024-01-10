@@ -173,6 +173,7 @@ if [[ "$install_flag" == 1 ]]; then
 	if ! command -v python3 | grep -q ".pyenv" || [[ "$latest_version" != "$current_version" ]]; then
 		# install python
 		if [[ "$(uname -s)" == "Linux" ]]; then
+			# env PYTHON_CONFIGURE_OPTS="--enable-shared" \
 			pyenv install -s "$latest_version"
 
 		elif [[ "$(uname -s)" == "Darwin" ]]; then
@@ -183,6 +184,11 @@ if [[ "$install_flag" == 1 ]]; then
 			# 	PKG_CONFIG_PATH="$(brew --prefix tcl-tk)/lib/pkgconfig" \
 			# 	CFLAGS="-I$(brew --prefix tcl-tk)/include" \
 			# 	PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcltk-includes='-I$(brew --prefix tcl-tk)/include' --with-tcltk-libs='-L$(brew --prefix tcl-tk)/lib -ltcl8.6 -ltk8.6' " \
+
+			# env \
+			# 	LDFLAGS="-L$(brew --prefix openssl@1.1)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix sqlite3)/lib -L$(brew --prefix xz)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix tcl-tk)/lib" \
+			# 	CPPFLAGS="-I$(brew --prefix openssl@1.1)/include -I$(brew --prefix readline)/include -I$(brew --prefix sqlite3)/include -I$(brew --prefix xz)/include -I$(brew --prefix zlib)/include -I$(brew --prefix tcl-tk)/include" \
+			# 	PKG_CONFIG_PATH="$(brew --prefix openssl@1.1)/lib/pkgconfig:$(brew --prefix readline)/lib/pkgconfig:$(brew --prefix sqlite3)/lib/pkgconfig:$(brew --prefix xz)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix tcl-tk)/lib/pkgconfig" \
 			pyenv install -s "$latest_version"
 
 		else
@@ -199,6 +205,12 @@ if [[ "$install_flag" == 1 ]]; then
 		python3 -m pip install --upgrade tk
 		python3 -m pip install --upgrade setuptools
 		python3 -m pip install --upgrade wheel
+		python3 -m pip install --upgrade numpy
+		python3 -m pip install --upgrade pandas
+		python3 -m pip install --upgrade packaging
+		python3 -m pip install --upgrade requests
+		python3 -m pip install --upgrade opt_einsum
+		python3 -m pip install --upgrade keras_preprocessing --no-deps
 
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version installation completed...${fgcolor_reset}"
 		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"

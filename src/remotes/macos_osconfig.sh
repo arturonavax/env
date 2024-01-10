@@ -671,10 +671,18 @@ sudo pmset -a standbydelay 86400
 sudo systemsetup -setcomputersleep Off >/dev/null
 
 # Hibernation mode
-# 0: Disable hibernation (speeds up entering sleep mode)
-# 3: Copy RAM to disk so the system state can still be restored in case of a
-#    power failure.
-sudo pmset -a hibernatemode 0
+# 0: Disable hibernation (speeds up entering sleep mode); Old style sleep mode,
+#    with RAM powered on while sleeping, safe sleep disabled, and super-fast wake.
+# 3: Copy RAM to disk so the system state can still be restored in case of a power failure;
+#    RAM is powered on while sleeping, but RAM contents are also written to disk before sleeping.
+#    In the event of total power loss, the system enters hibernation mode automatically.
+# 7: This is the same as mode 3, but it’s for those using secure virtual memory.
+# 25: The system will store a copy of memory to persistent storage (the disk), and will remove power
+#     to memory. The system will restore from disk image.
+#
+# Sleep command: pmset sleepnow
+# Get sleep mode: pmset -g | grep hibernatemode
+sudo pmset -a hibernatemode 3
 
 ###############################################################################
 # Visual Studio Code                                                          #
@@ -704,10 +712,10 @@ echo "If there was an error with the Safari configuration, run after giving Full
 curl -fsSL "https://env.arturonavax.dev/macos_sudo_touchid.sh" | bash
 
 ###############################################################################
-# Create Desktops                                                             #
+# Create Spaces                                                               #
 ###############################################################################
 
-bash <(curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh") 5
+bash <(curl -fsSL "https://env.arturonavax.dev/macos_spaces.sh") 2
 
 ###############################################################################
 # Kill affected applications                                                  #

@@ -164,6 +164,7 @@ if [[ "$sync_osconfig" == 1 ]]; then
 	fi
 
 	cp ./files/amethyst/.amethyst.yml ~/.
+	cp ./files/karabiner/karabiner.json ~/.config/karabiner/.
 
 	echo -e "${fcgreenb}Synchronized OS config!${fcr}"
 fi

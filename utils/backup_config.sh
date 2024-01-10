@@ -44,6 +44,7 @@ cp ~/.stylelintrc.json "$backup_folder/."
 cp ~/.sql-formatter.json "$backup_folder/."
 
 cp ~/.amethyst.yml "$backup_folder/."
+cp ~/.config/karabiner/karabiner.json "$backup_folder/."
 
 # Delete the oldest backup in case the container weight is more than 50MB.
 while [ "$backup_storage_current_size" -gt "$backup_storage_max_size" ]; do

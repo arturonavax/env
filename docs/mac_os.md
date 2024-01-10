@@ -30,7 +30,7 @@ Recovery Mode and encrypt the disk.
 
 - New window: `Command-N`
 
-- Minimize window: `Command-H`
+- Minimize window: `Command-M`
 
 - Screenshots:
   - Area (Clipboard): `Shift-Ctrl-Command-4`
@@ -41,16 +41,29 @@ Recovery Mode and encrypt the disk.
 
 - Grave accent (\`) or Tilde (\~): Key to the right of the Shift (ABC input source).
 
+- Supr: `Fn-Delete`
+
 - Emojis: `Fn-E`
 
 - Show hidden files when selecting a file in Finder: `Shift-Command-.`
 
-- Switch desktop: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
-three fingers (or four fingers).
+- Spaces:
+  - With "Desktop & Dock -> Mission Control -> Display have separate Spaces" activated,
+    on each external monitor I create at least 2 spaces and do not use the first
+    one, so that when disconnecting the monitor, the windows are not merged with
+    the first space of the main monitor.
 
-- Switch desktop quickly: `Ctrl-1` or `Ctrl-2`... Configuring it in System Settings
--> Keyboard -> Keyboard Shortcuts -> Mission Control -> Mission Control -> Switch
-to Desktop X (While the Desktops are active).
+  - The most frequent windows are assigned to "All desktops", in the Dock ->
+    Right-click on the app -> Options -> Assign To -> All Desktops.
+
+  - Switch spaces: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
+  three fingers (or four fingers).
+
+  - Switch spaces quickly: `Ctrl-1` or `Ctrl-2` or etc etc... Configuring it in
+    System Settings -> Keyboard -> Keyboard Shortcuts -> Mission Control ->
+    Mission Control -> Switch to Desktop X (While the Desktops are active).
+
+- When the "Enter to send message" does not work: `Fn-Enter`
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
@@ -219,10 +232,10 @@ Some of these applications are available in [Setapp subscriptions][setapp]
 
 Total applications: 41 (excluding Parallels and CrossOver).
 
-- Free applications: 20.
-- Paid applications: 21.
+- Free applications: 18.
+- Paid applications: 23.
 
-  - One-time payment: 19 apps (choosing Alfred over Raycast). ($437.1 USD)
+  - One-time payment: 21 apps (choosing Alfred over Raycast). ($471.61 USD)
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
@@ -240,13 +253,11 @@ Total applications: 41 (excluding Parallels and CrossOver).
     - Updates and upgrades included.
 
 All applications available on Setapp and paying for those that are not:
-_$107.88 USD/annual (23 Setapp apps) + $79.84 USD (3 One-time payment apps)_
+_$107.88 USD/annual (23 Setapp apps) + $114.35 USD (5 One-time payment apps)_
 
 ### List
 
-- Git GUI: [SourceTree][sourcetree]
-
-  - _Pricing: Free._
+#### Essentials
 
 - Hiding icons in menu bar: [Bartender][bartender] or [iBar][ibar]
 
@@ -264,19 +275,15 @@ or [Alfred][alfred]
     - _Normal: Free._
     - _Pro: $96 USD/annual._
 
-- App Switching: [AltTab][alttab]
+- App switching: [AltTab][alttab] and [rcmd](https://lowtechguys.com/rcmd/)
 
-  - _Pricing: Free._
+  - _Pricing AltTab: Free._
 
-- Video player: [IINA][iina]
+  - _Pricing rcmd: $12.99 USD._
 
-  - _Pricing: Free._
+    - Note: The same behavior can be achieved with [Karabiner-Elements][karabiner]
 
-- Time awareness: [Pandan][pandan]
-
-  - _Pricing: Free._
-
-- Window Manager: [Amethyst][amethyst] and [Rectangle][rectangle]
+- Window manager: [Amethyst][amethyst] and [Rectangle][rectangle]
 
   - _Pricing Amethyst: Free._
 
@@ -287,22 +294,17 @@ or [Alfred][alfred]
   - Notes:
     - I use Amethyst only for development and workflow, with the option
       "Automatically float applications except those listed".
+
     - I use Rectangle for everything that is not part of the Amethyst layout.
+
     - In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
       mode do not work well in Amethyst.
 
-- Monitor Manager: [Monitor Control][monitorcontrol]
+- App cleaner: [AppCleaner][appcleaner]
 
   - _Pricing: Free._
 
-- Relax sounds: [Noizio][noizio] or MacOS Background Sounds (System Settings
--> Accessibility -> Audio -> Background Sounds)
-
-  - _Pricing Noizio:_
-    - _Lite: Free._
-    - _Pro: $19.99 USD._ (🔶 Available on Setapp)
-
-  - _Pricing MacOS Background sounds: Free._
+  - Note: SmartDelete, activated.
 
 - App updater: [Latest][latest] or [MacUpdater][macupdater]
 
@@ -311,10 +313,6 @@ or [Alfred][alfred]
   - _Pricing MacUpdater:_
     - _Standard Edition: $11.61 USD._
     - _Scanning Only: Free._
-
-- App cleaner: [AppCleaner][appcleaner]
-
-  - _Pricing: Free._
 
 - Organization and documentation: [Notion][notion]
 
@@ -342,17 +340,6 @@ or [Alfred][alfred]
   - _Pricing CleanShot X: $29 USD_ (Only one year of updates) (🔶 Available on Setapp)
   - _Pricing Shottr: Free._
 
-- System monitor: [iStat Menus][istatmenu] or [Stats][stats]
-
-  - _Pricing iStat Menus: $14.27 USD._ (Only 6 months of weather data)
-    (🔶 Available on Setapp)
-  - _Pricing Stats: Free._
-
-- Video downloader: [Downie][downie] or [VDown][vdown]
-
-  - _Pricing Downnie: $19.99 USD._ (🔶 Available on Setapp)
-  - _Pricing VDown: Free._
-
 - Calendar in the interface: [Dato][dato] or [Itsycal][itsycal]
 
   - _Pricing Dato: $15 USD aprox._ (🔶 Available on Setapp)
@@ -378,14 +365,6 @@ or [Alfred][alfred]
     - [Stop charging when sleeping][aldente-stopcharging-sleeping], activated.
     - Use the [Calibration Mode][aldente-calibrationmode] every 1 or 2 weeks.
 
-- Copy with formatting: [Pure Paste][purepaste]
-
-  - _Pricing: Free._
-
-- Night shift: [f.lux][flux]
-
-  - _Pricing: Free._
-
 - Cliboard manager _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Maccy][maccy]
 
   - _Pricing: Free._
@@ -393,11 +372,44 @@ or [Alfred][alfred]
   - Note: Add password and sensitive data management applications to the blacklist
     of the clipboard manager.
 
-- Developer tools: [DevToysMac][devtoysmac]
+- Cheat Sheet shortcuts: [CheatSheet][cheatsheet]
 
   - _Pricing: Free._
 
-- Cheat Sheet shortcuts: [CheatSheet][cheatsheet]
+- Calculator _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Numi][numi]
+
+  - _Pricing: $29.74 USD._ (🔶 Available on Setapp)
+
+- Emails: [Spark][spark] or Apple Mail
+
+  - _Pricing Spark: $59.99 USD/annual._ (🔶 Available on Setapp)
+  - _Pricing Apple Mail: Free._
+
+- Git GUI: [SourceTree][sourcetree]
+
+  - _Pricing: Free._
+
+#### Optional
+
+- System monitor: [iStat Menus][istatmenu] or [Stats][stats]
+
+  - _Pricing iStat Menus: $14.27 USD._ (Only 6 months of weather data)
+    (🔶 Available on Setapp)
+  - _Pricing Stats: Free._
+
+- Webcam preview: [Hand Mirror][handmirror] or Apple Photo Booth
+
+  - _Pricing Hand Mirror:_
+    - _Pro: $9 USD aprox._ (🔶 Available on Setapp)
+    - _Normal: Free._
+
+  - _Pricing Apple Photo Booth: Free._
+
+- Time awareness: [Pandan][pandan]
+
+  - _Pricing: Free._
+
+- Video player: [IINA][iina]
 
   - _Pricing: Free._
 
@@ -406,6 +418,42 @@ or [Alfred][alfred]
   - _Pricing:_
     - _Pro: $35 USD._ (🔶 Available on Setapp)
     - _Normal: Free._
+
+- Monitor manager: [BetterDisplay][betterdisplay] or [Monitor Control][monitorcontrol]
+
+  - _Pricing BetterDisplay:_
+    - _Normal: Free._
+    - _Pro: $21.42 USD._
+
+    - Notes for external monitors:
+      - "High Resolution (HiDPI)", activated.
+      - "Edit the system configuration of this display model", activated.
+        - "Enable smooth scaling", activated.
+          - "Add near-native HiDPI resolution with smooth scaling", activated.
+
+  - _Pricing Monitor Control: Free._
+
+- Relax sounds: [Noizio][noizio] or MacOS Background Sounds (System Settings
+-> Accessibility -> Audio -> Background Sounds)
+
+  - _Pricing Noizio:_
+    - _Lite: Free._
+    - _Pro: $19.99 USD._ (🔶 Available on Setapp)
+
+  - _Pricing MacOS Background sounds: Free._
+
+- Video downloader: [Downie][downie] or [VDown][vdown]
+
+  - _Pricing Downnie: $19.99 USD._ (🔶 Available on Setapp)
+  - _Pricing VDown: Free._
+
+- Copy with formatting: [Pure Paste][purepaste]
+
+  - _Pricing: Free._
+
+- Developer tools: [DevToysMac][devtoysmac]
+
+  - _Pricing: Free._
 
 - Option switch manager: [One Switch][oneswitch] or [SwitchManager][switchmanager]
 
@@ -417,14 +465,6 @@ or [Alfred][alfred]
   - _Pricing:_
     - _Pro: $19.99 USD._ (🔶 Available on Setapp)
     - _Normal: Free._
-
-- Webcam preview: [Hand Mirror][handmirror] or Apple Photo Booth
-
-  - _Pricing Hand Mirror:_
-    - _Pro: $9 USD aprox._ (🔶 Available on Setapp)
-    - _Normal: Free._
-
-  - _Pricing Apple Photo Booth: Free._
 
 - Hidden desktop icons _(Consider [One Switch][oneswitch] or
 [SwitchManager][switchmanager])_: [HiddenMe][hiddenme]
@@ -444,20 +484,11 @@ or `Shift-Command-?`
 
   - _Pricing Paletro: $6.99 USD._ (🔶 Available on Setapp)
 
-- Calculator _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Numi][numi]
-
-  - _Pricing: $29.74 USD._ (🔶 Available on Setapp)
-
 - Check security settings: [Pareto Security][paretosecurity]
 
   - _Pricing: $17 USD._ (🔶 Available on Setapp)
 
-- Emails: [Spark][spark] or Apple Mail
-
-  - _Pricing Spark: $59.99 USD/annual._ (🔶 Available on Setapp)
-  - _Pricing Apple Mail: Free._
-
-- Logitech devices manager: [Logi Options][logioptions]
+- Logitech devices manager: [Logi Options+][logioptionsplus]
 
   - _Pricing: Free._
 
@@ -465,9 +496,9 @@ or `Shift-Command-?`
 
   - _Pricing: Free._
 
-- Keyboard Shortcut Manager _(Consider [Raycast][raycast] or [Alfred][alfred])_:
+- Keyboard shortcut manager _(Consider [Raycast][raycast] or [Alfred][alfred])_:
 
-  - [Karabiner][karabiner]
+  - [Karabiner-Elements][karabiner]
 
     - _Pricing: Free._
 
@@ -541,7 +572,7 @@ or `Shift-Command-?`
 [numi]: https://numi.app/
 [paretosecurity]: https://paretosecurity.com
 [spark]: https://sparkmailapp.com/
-[logioptions]: https://www.logitech.com/en-us/software/options.html
+[logioptionsplus]: https://www.logitech.com/en-us/software/logi-options-plus.html
 [mos]: https://mos.caldis.me
 [karabiner]: https://karabiner-elements.pqrs.org/
 [keyboardmaestro]: https://www.keyboardmaestro.com/main/
@@ -558,3 +589,4 @@ or `Shift-Command-?`
 [aldente-chargelimit]: https://apphousekitchen.com/feature-explanation-charge-limiter/
 [aldente-stopcharging-poweroff]: https://apphousekitchen.com/feature-explanation-stop-charging-when-powered-off-app-closed/
 [aldente-stopcharging-sleeping]: https://apphousekitchen.com/feature-explanation-stop-charging-when-sleeping/
+[betterdisplay]: https://github.com/waydabber/BetterDisplay

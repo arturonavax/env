@@ -1,20 +1,20 @@
 #!/bin/bash
-# Run: bash <(curl -fsSL "https://env.arturonavax.dev/macos_desktops.sh")
+# Run: bash <(curl -fsSL "https://env.arturonavax.dev/macos_spaces.sh")
 
-desirable_desktops=5
+desirable_spaces=2
 
 if [[ "$#" != 0 ]]; then
-	desirable_desktops=$1
+	desirable_spaces=$1
 fi
 
-count_desktops=$(defaults read com.apple.spaces SpacesDisplayConfiguration | command grep "uuid" | command grep -v 'uuid = "";' | wc -l)
+count_spaces=$(defaults read com.apple.spaces SpacesDisplayConfiguration | command grep "uuid" | command grep -v 'uuid = "";' | wc -l)
 
-if ((desirable_desktops - count_desktops >= 1)); then
+if ((desirable_spaces - count_spaces >= 1)); then
 	osascript <<EOF
 do shell script "open -b com.apple.exposelauncher"
 delay 0.5
 tell application id "com.apple.systemevents"
-	repeat (($desirable_desktops - $count_desktops)) times
+	repeat (($desirable_spaces - $count_spaces)) times
 		tell (every application process ¬
 			whose bundle identifier = "com.apple.dock") to ¬
 			click (button 1 of group 2 of group 1 of group 1)

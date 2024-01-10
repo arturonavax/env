@@ -1,22 +1,42 @@
 # layouts - Ordered list of layouts to use by layout key (default tall, wide, fullscreen, and column).
 layouts:
   - tall
-  - fullscreen
-  # - tall-right
+  - tall-right
   - wide
-  # - two-pane
-  # - middle-wide
-  # - 3column-left
-  # - 3column-middle
-  # - 3column-right
-  # - 4column-left
-  # - 4column-right
+  - two-pane
+  - middle-wide
+  - 3column-left
+  - 3column-middle
+  - 3column-right
+  - 4column-left
+  - 4column-right
   - column
-  # - row
-  # - floating
-  # - widescreen-tall
-  # - widescreen-tall-right
-  # - bsp
+  - row
+  - widescreen-tall
+  - widescreen-tall-right
+  - bsp
+  - fullscreen
+  - floating
+
+# layouts - Ordered list of layouts to use by layout key (default tall, wide, fullscreen, and column).
+# layouts:
+#   - tall
+#   - fullscreen
+#   # - tall-right
+#   - wide
+#   # - two-pane
+#   # - middle-wide
+#   # - 3column-left
+#   # - 3column-middle
+#   # - 3column-right
+#   # - 4column-left
+#   # - 4column-right
+#   - column
+#   # - row
+#   # - floating
+#   # - widescreen-tall
+#   # - widescreen-tall-right
+#   # - bsp
 
 # First mod (default option + shift).
 mod1:
@@ -243,27 +263,10 @@ window-minimum-height: 0
 window-minimum-width: 0
 
 # List of bundle identifiers for applications to either be automatically floating or automatically tiled based on floating-is-blacklist (default []).
-floating:
-  [
-    "com.apple.systempreferences",
-    "com.lwouis.alt-tab-macos",
-    "net.freemacsoft.AppCleaner",
-    "com.amethyst.Amethyst",
-    "org.herf.Flux",
-    "cn.better365.iBar",
-    "com.mowglii.ItsycalApp",
-    "me.guillaumeb.MonitorControl",
-    "com.kryolokovlin.NoizioLite",
-    "com.nordsec.nordpass",
-    "com.sindresorhus.Pandan",
-    "com.sindresorhus.Pure-Paste",
-    "com.raycast.macos",
-    "cc.ffitch.shottr",
-    "eu.exelban.Stats",
-  ]
+floating: ["org.alacritty", "com.microsoft.VSCode"]
 
 # Boolean flag determining behavior of the floating list. true if the applications should be floating and all others tiled. false if the applications should be tiled and all others floating (default true).
-floating-is-blacklist: true
+floating-is-blacklist: false
 
 # true if screen frames should exclude the status bar. false if the screen frames should include the status bar (default false).
 ignore-menu-bar: false

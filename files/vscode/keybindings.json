@@ -196,6 +196,11 @@
 		"command": "-markdown.showPreview",
 		"when": "!notebookEditorFocused && editorLangId == 'markdown'"
 	},
+	{
+		"key": "cmd+m",
+		"command": "-markdown.extension.editing.toggleMath",
+		"when": "editorTextFocus && !editorReadonly && editorLangId =~ /^markdown$|^rmd$|^quarto$/"
+	},
 
 	// Hover
 	{

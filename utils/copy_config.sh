@@ -52,3 +52,4 @@ cp ~/.stylelintrc.json ./files/stylelint/.
 cp ~/.sql-formatter.json ./files/sql-formatter/.
 
 cp ~/.amethyst.yml ./files/amethyst/.
+cp ~/.config/karabiner/karabiner.json ./files/karabiner/.
