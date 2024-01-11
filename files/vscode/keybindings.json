@@ -622,7 +622,8 @@
 	},
 	{
 		"key": "space a",
-		"command": "editor.action.codeAction",
+		// "command": "editor.action.codeAction",
+		"command": "editor.action.quickFix",
 		"when": "vim.active && editorHasCodeActionsProvider && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{

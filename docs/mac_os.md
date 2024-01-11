@@ -556,7 +556,6 @@ or `Shift-Command-?`
 [itsycal]: https://www.mowglii.com/itsycal/
 [aldente]: https://apphousekitchen.com/
 [purepaste]: https://sindresorhus.com/pure-paste
-[flux]: https://justgetflux.com
 [maccy]: https://github.com/p0deje/Maccy
 [devtoysmac]: https://github.com/ObuchiYuki/DevToysMac
 [cheatsheet]: https://cheatsheet-mac.en.softonic.com/mac

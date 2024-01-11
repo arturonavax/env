@@ -228,6 +228,25 @@
 			"after": ["<Esc>"]
 		}
 	],
+	// change vim to vscode undo/redo
+	"vim.normalModeKeyBindingsNonRecursive": [
+		{
+			"before": ["u"],
+			"commands": [
+				{
+					"command": "undo"
+				}
+			]
+		},
+		{
+			"before": ["<C-r>"],
+			"commands": [
+				{
+					"command": "redo"
+				}
+			]
+		}
+	],
 	"vim.normalModeKeyBindings": [
 		{
 			"before": ["s"],
