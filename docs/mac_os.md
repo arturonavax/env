@@ -235,16 +235,16 @@ Total applications: 41 (excluding Parallels and CrossOver).
 - Free applications: 18.
 - Paid applications: 23.
 
-  - One-time payment: 21 apps (choosing Alfred over Raycast). ($471.61 USD)
+  - One-time payment: 21 apps (choosing Alfred over Raycast). ($471.61 USD approx)
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
 
-  - Subscription: 2 apps. ($179.99 USD/annual)
+  - Subscription: 2 apps. ($179.99 USD/annual approx)
 
 - Total applications in Setapp: 23.
 
-  - Without Setapp: $377.25 USD + $179.99 USD/annual.
+  - Without Setapp: $377.25 USD + $179.99 USD/annual. (approx)
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
@@ -253,7 +253,7 @@ Total applications: 41 (excluding Parallels and CrossOver).
     - Updates and upgrades included.
 
 All applications available on Setapp and paying for those that are not:
-_$107.88 USD/annual (23 Setapp apps) + $114.35 USD (5 One-time payment apps)_
+_$107.88 USD/annual (23 Setapp apps) + $114.35 USD approx (5 One-time payment apps)_
 
 ### List
 
@@ -342,7 +342,7 @@ or [Alfred][alfred]
 
 - Calendar in the interface: [Dato][dato] or [Itsycal][itsycal]
 
-  - _Pricing Dato: $15 USD aprox._ (🔶 Available on Setapp)
+  - _Pricing Dato: $15 USD approx._ (🔶 Available on Setapp)
   - _Pricing Itsycal: Free._
 
 - Battery Care: [AlDente][aldente]
@@ -400,7 +400,7 @@ or [Alfred][alfred]
 - Webcam preview: [Hand Mirror][handmirror] or Apple Photo Booth
 
   - _Pricing Hand Mirror:_
-    - _Pro: $9 USD aprox._ (🔶 Available on Setapp)
+    - _Pro: $9 USD approx._ (🔶 Available on Setapp)
     - _Normal: Free._
 
   - _Pricing Apple Photo Booth: Free._
@@ -469,7 +469,7 @@ or [Alfred][alfred]
 - Hidden desktop icons _(Consider [One Switch][oneswitch] or
 [SwitchManager][switchmanager])_: [HiddenMe][hiddenme]
 
-  - _Pricing HiddenMe: $3 USD aprox._
+  - _Pricing HiddenMe: $3 USD approx._
 
 - Cleaner and Antivirus: [CleanMyMac X][cleanmymacx]
 
