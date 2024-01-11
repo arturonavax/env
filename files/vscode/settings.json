@@ -1,5 +1,8 @@
 // Settings VSCode
 {
+	"editor.lineNumbers": "relative", // disable for streaming
+	"vim.smartRelativeLine": true, // disable for streaming
+
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.preferredDarkColorTheme": "Tokyo Night",
 	"workbench.preferredLightColorTheme": "Tokyo Night Light",
@@ -26,7 +29,6 @@
 	"editor.formatOnPaste": false,
 	"editor.minimap.enabled": false,
 	"editor.suggestSelection": "first",
-	"editor.lineNumbers": "relative",
 	"editor.wordWrap": "on",
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
@@ -191,7 +193,6 @@
 	// "vim.useSystemClipboard": true,
 	"vim.ignorecase": true,
 	"vim.smartcase": true,
-	"vim.smartRelativeLine": true,
 	"vim.incsearch": true,
 	"vim.useCtrlKeys": true,
 	"vim.hlsearch": true,
