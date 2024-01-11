@@ -715,7 +715,7 @@ curl -fsSL "https://env.arturonavax.dev/macos_sudo_touchid.sh" | bash
 # Create Spaces                                                               #
 ###############################################################################
 
-bash <(curl -fsSL "https://env.arturonavax.dev/macos_spaces.sh") 2
+# bash <(curl -fsSL "https://env.arturonavax.dev/macos_spaces.sh") 2
 
 ###############################################################################
 # Kill affected applications                                                  #
