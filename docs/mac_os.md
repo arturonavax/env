@@ -3,6 +3,9 @@
 Enable FileVault (or Firmware Password if it is an Intel processor) to lock
 Recovery Mode and encrypt the disk.
 
+With the brightness increase key (F2), you can get more brightness than the
+maximum brightness with the bar in the options.
+
 ---
 
 1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
@@ -13,9 +16,9 @@ Recovery Mode and encrypt the disk.
 
 - App launcher: `Command-Space`
 
-- Lock: `Ctrl-Command-Q`
+- Lock: `Control-Command-Q`
 
-- Show apps (Mission Control): `Ctrl-UpArrow` or Swipe up using three fingers
+- Show apps (Mission Control): `Control-UpArrow` or Swipe up using three fingers
 (or four fingers)
 
 - Switch apps: `Command-Tab`
@@ -24,17 +27,18 @@ Recovery Mode and encrypt the disk.
 
 - Refresh page (F5): `Command-R`
 
-- Switch input source: `Ctrl-Space` or `Fn`
+- Switch input source: `Control-Space` or `Fn`
 
-- Full screen window: `Ctrl-Command-F`
+- Full screen window: `Control-Command-F`
 
 - New window: `Command-N`
 
 - Minimize window: `Command-M`
 
 - Screenshots:
-  - Area (Clipboard): `Shift-Ctrl-Command-4`
-  - Complete (Clipboard): `Shift-Ctrl-Command-3`
+
+  - Area (Clipboard): `Shift-Control-Command-4`
+  - Complete (Clipboard): `Shift-Control-Command-3`
   - Area (File): `Shift-Command-4`
   - Complete (File): `Shift-Command-3`
   - Options: `Shift-Command-5`
@@ -48,6 +52,7 @@ Recovery Mode and encrypt the disk.
 - Show hidden files when selecting a file in Finder: `Shift-Command-.`
 
 - Spaces:
+
   - With "Desktop & Dock -> Mission Control -> Display have separate Spaces" activated,
     on each external monitor I create at least 2 spaces and do not use the first
     one, so that when disconnecting the monitor, the windows are not merged with
@@ -56,11 +61,11 @@ Recovery Mode and encrypt the disk.
   - The most frequent windows are assigned to "All desktops", in the Dock ->
     Right-click on the app -> Options -> Assign To -> All Desktops.
 
-  - Switch spaces: `Ctrl-LeftArrow` or `Ctrl-RightArrow` or Swipe left/right using
-  three fingers (or four fingers).
+  - Switch spaces: `Control-LeftArrow` or `Control-RightArrow` or Swipe left/right
+    using three fingers (or four fingers).
 
-  - Switch spaces quickly: `Ctrl-1` or `Ctrl-2` or etc etc... Configuring it in
-    System Settings -> Keyboard -> Keyboard Shortcuts -> Mission Control ->
+  - Switch spaces quickly: `Control-1` or `Control-2` or etc etc... Configuring
+    it in System Settings -> Keyboard -> Keyboard Shortcuts -> Mission Control ->
     Mission Control -> Switch to Desktop X (While the Desktops are active).
 
 - When the "Enter to send message" does not work: `Fn-Enter`
@@ -262,17 +267,22 @@ _$107.88 USD/annual (23 Setapp apps) + $114.35 USD approx (5 One-time payment ap
 - Hiding icons in menu bar: [Bartender][bartender] or [iBar][ibar]
 
   - _Pricing Bartender: $16 USD._ (🔶 Available on Setapp)
+
   - _Pricing iBar: Free._
 
 - Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast][raycast]
 or [Alfred][alfred]
 
   - _Pricing Alfred:_
+
     - _Powerpack: $34 USD._
+
     - _Normal: Free._
 
   - _Pricing Raycast:_
+
     - _Normal: Free._
+
     - _Pro: $96 USD/annual._
 
 - App switching: [AltTab][alttab] and [rcmd](https://lowtechguys.com/rcmd/)
@@ -288,10 +298,13 @@ or [Alfred][alfred]
   - _Pricing Amethyst: Free._
 
   - _Pricing Rectangle:_
+
     - _Normal: Free._
+
     - _Pro: $9.99 USD._
 
   - Notes:
+
     - I use Amethyst only for development and workflow, with the option
       "Automatically float applications except those listed".
 
@@ -308,11 +321,13 @@ or [Alfred][alfred]
 
 - App updater: [Latest][latest] or [MacUpdater][macupdater]
 
-  - _Pricing Latest: Free._
-
   - _Pricing MacUpdater:_
+
     - _Standard Edition: $11.61 USD._
+
     - _Scanning Only: Free._
+
+  - _Pricing Latest: Free._
 
 - Organization and documentation: [Notion][notion]
 
@@ -327,31 +342,50 @@ or [Alfred][alfred]
 - Habit Tracker: [Habitify][habitify]
 
   - _Pricing:_
+
     - _Normal: Free._
+
     - _Pro: $30 USD._
 
 - Text recognition (OCR): [TextSniper][textsniper] or [Shottr][shottr]
 
   - _Pricing TextSniper: $7.99 USD._ (🔶 Available on Setapp)
+
   - _Pricing Shottr: Free._
+
+  - Note: Set shortcut to `Control-Option-Command-0` (Like [CleanShot X][cleanshotx])
 
 - Screenshots: [CleanShot X][cleanshotx] or [Shottr][shottr]
 
   - _Pricing CleanShot X: $29 USD_ (Only one year of updates) (🔶 Available on Setapp)
+
   - _Pricing Shottr: Free._
+
+    - Note: Set shortcut to (Like [CleanShot X][cleanshotx]):
+
+      - Area screenshot: `Control-Option-Command-1`
+      - Repeat area screenshot: `Control-Option-Command-2`
+      - Any window screenshot: `Control-Option-Command-3`
+      - Fullscreen screenshot: `Control-Option-Command-4`
+      - Active window screenshot: `Control-Option-Command-5`
+      - Scrolling screenshot: `Control-Option-Command-6`
 
 - Calendar in the interface: [Dato][dato] or [Itsycal][itsycal]
 
   - _Pricing Dato: $15 USD approx._ (🔶 Available on Setapp)
+
   - _Pricing Itsycal: Free._
 
 - Battery Care: [AlDente][aldente]
 
   - _Pricing:_
+
     - _Pro: $26.89 USD._ (🔶 Available on Setapp)
+
     - _Normal: Free._
 
   - Notes:
+
     - Set the battery [charge limit to 80%][aldente-chargelimit], do not let the
       battery discharge more than 20%.
     - [Hardware Battery Percentage][aldente-hardwarebattery], activated.
@@ -383,6 +417,7 @@ or [Alfred][alfred]
 - Emails: [Spark][spark] or Apple Mail
 
   - _Pricing Spark: $59.99 USD/annual._ (🔶 Available on Setapp)
+
   - _Pricing Apple Mail: Free._
 
 - Git GUI: [SourceTree][sourcetree]
@@ -395,12 +430,15 @@ or [Alfred][alfred]
 
   - _Pricing iStat Menus: $14.27 USD._ (Only 6 months of weather data)
     (🔶 Available on Setapp)
+
   - _Pricing Stats: Free._
 
 - Webcam preview: [Hand Mirror][handmirror] or Apple Photo Booth
 
   - _Pricing Hand Mirror:_
+
     - _Pro: $9 USD approx._ (🔶 Available on Setapp)
+
     - _Normal: Free._
 
   - _Pricing Apple Photo Booth: Free._
@@ -416,16 +454,21 @@ or [Alfred][alfred]
 - Drag and drop bar: [Dropzone][dropzone]
 
   - _Pricing:_
+
     - _Pro: $35 USD._ (🔶 Available on Setapp)
+
     - _Normal: Free._
 
 - Monitor manager: [BetterDisplay][betterdisplay] or [Monitor Control][monitorcontrol]
 
   - _Pricing BetterDisplay:_
+
     - _Normal: Free._
+
     - _Pro: $21.42 USD._
 
     - Notes for external monitors:
+
       - "High Resolution (HiDPI)", activated.
       - "Edit the system configuration of this display model", activated.
         - "Enable smooth scaling", activated.
@@ -437,7 +480,9 @@ or [Alfred][alfred]
 -> Accessibility -> Audio -> Background Sounds)
 
   - _Pricing Noizio:_
+
     - _Lite: Free._
+
     - _Pro: $19.99 USD._ (🔶 Available on Setapp)
 
   - _Pricing MacOS Background sounds: Free._
@@ -445,6 +490,7 @@ or [Alfred][alfred]
 - Video downloader: [Downie][downie] or [VDown][vdown]
 
   - _Pricing Downnie: $19.99 USD._ (🔶 Available on Setapp)
+
   - _Pricing VDown: Free._
 
 - Copy with formatting: [Pure Paste][purepaste]
@@ -458,12 +504,15 @@ or [Alfred][alfred]
 - Option switch manager: [One Switch][oneswitch] or [SwitchManager][switchmanager]
 
   - _Pricing One Switch: $4.99 USD._ (🔶 Available on Setapp)
+
   - _Pricing SwitchManager: Free._
 
 - Snippet manager _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Rocket Typist][rockettypist]
 
   - _Pricing:_
+
     - _Pro: $19.99 USD._ (🔶 Available on Setapp)
+
     - _Normal: Free._
 
 - Hidden desktop icons _(Consider [One Switch][oneswitch] or
@@ -511,17 +560,20 @@ or `Shift-Command-?`
   - Systems: [Parallels][parallels]
 
     - _Pricing:_
+
       - _Standard Edition: $129.99 USD._
+
       - _Pro Edition: $119.99 USD/annual._
 
   - Applications and programs (High performance): [CrossOver][crossover]
 
     - _Pricing:_
+
       - _CrossOver +: $64 USD/annual._
+
       - _CrossOver Life: $494 USD._
 
-    - Improve [CrossOver][crossover]
-      compatibility: [CXPatcher][cxpatcher]
+    - Improve [CrossOver][crossover] compatibility: [CXPatcher][cxpatcher]
 
       - _Pricing: Free._
 
