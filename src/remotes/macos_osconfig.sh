@@ -24,10 +24,10 @@ done 2>/dev/null &
 ###############################################################################
 
 # Set computer name (as done via System Preferences → Sharing)
-# sudo scutil --set ComputerName "MacBook Arturo"
-# sudo scutil --set HostName "MacBook Arturo"
-# sudo scutil --set LocalHostName "MacBook Arturo"
-# sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "MacBook Arturo"
+# sudo scutil --set ComputerName "MacBook Pro Arturo"
+# sudo scutil --set HostName "MacBook Pro Arturo"
+# sudo scutil --set LocalHostName "MacBook Pro Arturo"
+# sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "MacBook Pro Arturo"
 
 # Disable the sound effects on boot
 sudo nvram SystemAudioVolume=" "
@@ -35,6 +35,9 @@ sudo nvram StartupMute=%01
 
 # Set sidebar icon size to medium
 defaults write NSGlobalDomain NSTableViewDefaultSizeMode -int 2
+
+# When switching to an app, switch to a space with open windows for this app
+defaults write NSGlobalDomain AppleSpacesSwitchOnActivate -bool true
 
 # Auto saving is enabled, you are not prompted to save changes
 defaults write NSGlobalDomain NSCloseAlwaysConfirmsChanges -bool true

@@ -31,7 +31,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a WhatsApp"
+										"shell_command": "open -a 'WhatsApp' && osascript -e 'tell application \"WhatsApp\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -47,7 +47,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a Notion"
+										"shell_command": "open -a 'Notion' && osascript -e 'tell application \"Notion\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -63,7 +63,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a Safari"
+										"shell_command": "open -a 'Safari' && osascript -e 'tell application \"Safari\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -79,7 +79,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a Spotify"
+										"shell_command": "open -a 'Spotify' && osascript -e 'tell application \"Spotify\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -95,7 +95,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a 'Visual Studio Code'"
+										"shell_command": "open -a 'Visual Studio Code' && osascript -e 'tell application \"Visual Studio Code\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -111,7 +111,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a 'Microsoft Teams (work or school)'"
+										"shell_command": "open -a 'Microsoft Teams (work or school)' && osascript -e 'tell application \"Microsoft Teams (work or school)\" to activate'"
 									}
 								],
 								"type": "basic"
@@ -127,7 +127,7 @@
 								"to": [
 									{
 										"modifiers": ["left_command"],
-										"shell_command": "open -a Alacritty"
+										"shell_command": "open -a 'Alacritty' && osascript -e 'tell application \"Alacritty\" to activate'"
 									}
 								],
 								"type": "basic"
