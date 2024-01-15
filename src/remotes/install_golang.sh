@@ -205,7 +205,7 @@ if [[ "$(command -v go)" == "" ]]; then
 	exit 0
 fi
 
-current_version="$(go version | cut -d " " -f 3)"
+current_version="$("$installation_dirpath/go/bin/go" version | cut -d " " -f 3)"
 
 if [[ "$latest_version" != "$current_version" ]]; then
 	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}⚠️ There is a different version of Golang: ${current_version}"
