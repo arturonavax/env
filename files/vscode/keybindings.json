@@ -271,6 +271,11 @@
 		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
+		"key": "ctrl+w h",
+		"command": "workbench.files.action.focusFilesExplorer",
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
 		"key": "space p",
 		"command": "workbench.action.togglePanel",
 		"when": "vim.active && !terminal && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"

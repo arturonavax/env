@@ -1,10 +1,15 @@
 # MacOS
 
-Enable FileVault (or Firmware Password if it is an Intel processor) to lock
+- Enable FileVault (or Firmware Password if it is an Intel processor) to lock
 Recovery Mode and encrypt the disk.
 
-With the brightness increase key (F2), you can get more brightness than the
+- With the brightness increase key (F2), you can get more brightness than the
 maximum brightness with the bar in the options.
+
+  - By using the `Shift-Option` key you can shift up and down by quarter on the `F`
+    keys such as brightness and volume.
+
+- With the "Screen Sharing" app you can control other Macs.
 
 ---
 
@@ -25,7 +30,7 @@ maximum brightness with the bar in the options.
 
 - Close app (Quit): `Command-Q` or `Option-Command-Esc` (Force)
 
-- Refresh page (F5): `Command-R`
+- Refresh page (F5 in Windows): `Command-R`
 
 - Switch input source: `Control-Space` or `Fn`
 
@@ -35,19 +40,25 @@ maximum brightness with the bar in the options.
 
 - Minimize window: `Command-M`
 
-- Screenshots:
+- Screenshots (I reconfigure it as follows):
 
-  - Area (Clipboard): `Shift-Control-Command-4`
-  - Complete (Clipboard): `Shift-Control-Command-3`
   - Area (File): `Shift-Command-4`
+  - Area (Clipboard): `Shift-Control-Command-4`
+
+    - Move selected area: Move while holding the `Space` key down.
+    - Enlarge corners of the selected area: Move while holding the `Option`
+      key down.
+    - Select window: `Space`
+
   - Complete (File): `Shift-Command-3`
+  - Complete (Clipboard): `Shift-Control-Command-3`
   - Options: `Shift-Command-5`
 
 - Grave accent (\`) or Tilde (\~): Key to the right of the Shift (ABC input source).
 
 - Supr: `Fn-Delete`
 
-- Emojis: `Fn-E`
+- Emojis: `Fn-E` or `Control-Command-Space`
 
 - Show hidden files when selecting a file in Finder: `Shift-Command-.`
 
@@ -68,7 +79,20 @@ maximum brightness with the bar in the options.
     it in System Settings -> Keyboard -> Keyboard Shortcuts -> Mission Control ->
     Mission Control -> Switch to Desktop X (While the Desktops are active).
 
+  - Close is spaces more quickly: While in the Spaces bar, press `Option` to see
+    all the close space buttons more quickly.
+
 - When the "Enter to send message" does not work: `Fn-Enter`
+
+- Zoom somewhere on the screen: Scroll while pressing the `Control` key.
+
+  - Accesibility -> Zoom -> Use scroll gesture with modifier keys to zoom.
+
+- Open video in Picture in Picture or other options: Double right click
+  (two-finger click).
+
+  - Move the Picture in Picture window more precisely: Move while pressing
+    the `Command` key.
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
@@ -235,12 +259,12 @@ sudo killall mDNSResponderHelper
 Some of these applications are available in [Setapp subscriptions][setapp]
 ($107.88 USD/annual).
 
-Total applications: 41 (excluding Parallels and CrossOver).
+Total applications: 42 (excluding Parallels and CrossOver).
 
 - Free applications: 18.
-- Paid applications: 23.
+- Paid applications: 24.
 
-  - One-time payment: 21 apps (choosing Alfred over Raycast). ($471.61 USD approx)
+  - One-time payment: 22 apps (choosing Alfred over Raycast). ($476.6 USD approx)
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
@@ -258,7 +282,7 @@ Total applications: 41 (excluding Parallels and CrossOver).
     - Updates and upgrades included.
 
 All applications available on Setapp and paying for those that are not:
-_$107.88 USD/annual (23 Setapp apps) + $114.35 USD approx (5 One-time payment apps)_
+_$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment apps)_
 
 ### List
 
@@ -361,14 +385,20 @@ or [Alfred][alfred]
 
   - _Pricing Shottr: Free._
 
-    - Note: Set shortcut to (Like [CleanShot X][cleanshotx]):
+  - Note: Set shortcut to (Like [CleanShot X][cleanshotx]):
 
-      - Area screenshot: `Control-Option-Command-1`
-      - Repeat area screenshot: `Control-Option-Command-2`
-      - Any window screenshot: `Control-Option-Command-3`
-      - Fullscreen screenshot: `Control-Option-Command-4`
-      - Active window screenshot: `Control-Option-Command-5`
-      - Scrolling screenshot: `Control-Option-Command-6`
+    - Area screenshot: `Control-Option-Command-1`
+
+      - Move selected area: Move while holding the `Space` key down.
+      - Enlarge corners of the selected area: Move while holding the `Option`
+        key down.
+      - Select window: `Space`
+
+    - Repeat area screenshot: `Control-Option-Command-2`
+    - Any window screenshot: `Control-Option-Command-3`
+    - Fullscreen screenshot: `Control-Option-Command-4`
+    - Active window screenshot: `Control-Option-Command-5`
+    - Scrolling screenshot: `Control-Option-Command-6`
 
 - Calendar in the interface: [Dato][dato] or [Itsycal][itsycal]
 
@@ -446,6 +476,18 @@ or [Alfred][alfred]
 - Time awareness: [Pandan][pandan]
 
   - _Pricing: Free._
+
+- Dark mode in the browser: [Noir][noir] or [Dark Reader][darkreader]
+
+  - _Pricing Noir:_
+
+    - _For Safari: $4.99 USD approx._
+
+  - _Pricing Dark Reader:_
+
+    - _For Safari: $4.99 USD approx._
+
+    - _For everything else: Free._
 
 - Video player: [IINA][iina]
 
@@ -641,3 +683,5 @@ or `Shift-Command-?`
 [aldente-stopcharging-poweroff]: https://apphousekitchen.com/feature-explanation-stop-charging-when-powered-off-app-closed/
 [aldente-stopcharging-sleeping]: https://apphousekitchen.com/feature-explanation-stop-charging-when-sleeping/
 [betterdisplay]: https://github.com/waydabber/BetterDisplay
+[noir]: https://apps.apple.com/es/app/noir-dark-mode-for-safari/id1592917505
+[darkreader]: https://darkreader.org
