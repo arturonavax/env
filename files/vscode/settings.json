@@ -1,7 +1,7 @@
 // Settings VSCode
 {
-	"editor.lineNumbers": "relative", // disable for streaming
-	"vim.smartRelativeLine": true, // disable for streaming
+	// "editor.lineNumbers": "relative", // disable for streaming
+	// "vim.smartRelativeLine": true, // disable for streaming
 
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.preferredDarkColorTheme": "Tokyo Night",
@@ -112,7 +112,7 @@
 	"[javascriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
 	"[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
 	"[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-	"[proto3]": { "editor.defaultFormatter": "bufbuild.vscode-buf" },
+	"[proto3]": { "editor.defaultFormatter": null },
 
 	"emmet.includeLanguages": {
 		"postcss": "css",

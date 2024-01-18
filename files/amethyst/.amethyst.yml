@@ -263,7 +263,10 @@ window-minimum-height: 0
 window-minimum-width: 0
 
 # List of bundle identifiers for applications to either be automatically floating or automatically tiled based on floating-is-blacklist (default []).
-floating: ["org.alacritty", "com.microsoft.VSCode"]
+floating: [
+    # "org.alacritty", # I don't integrate the terminal into Amethyst because using tmux I don't need to manage many terminal windows, so it is not part of the necessary flow of managed windows.
+    "com.microsoft.VSCode",
+  ]
 
 # Boolean flag determining behavior of the floating list. true if the applications should be floating and all others tiled. false if the applications should be tiled and all others floating (default true).
 floating-is-blacklist: false
