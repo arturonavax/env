@@ -66,11 +66,17 @@ maximum brightness with the bar in the options.
 
 - Close window: `Shift-Command-W`
 
+  - Close all windows: `Option-Command-W`
+
+  - Close tab: `Command-W`
+
 - Close app (Quit): `Command-Q` or `Option-Command-Esc` (Force)
 
-- New window: `Command-N`
+- New window: `Command-N` or `Shift-Command-N`
 
 - Minimize window: `Command-M`
+
+  - Minimize all windows: `Option-Command-M`
 
 - Full screen window: `Control-Command-F`
 
@@ -94,7 +100,7 @@ maximum brightness with the bar in the options.
 
 - Grave accent (\`) or Tilde (\~): Key to the right of the Shift (ABC input source).
 
-- Supr: `Fn-Delete`
+- Supr: `Fn-Delete` or `Control-D`
 
 - Emojis: `Fn-E` or `Control-Command-Space`
 
@@ -131,6 +137,53 @@ maximum brightness with the bar in the options.
 
   - Move the Picture in Picture window more precisely: Move while pressing
     the `Command` key.
+
+- Open preferences: `Command-,`
+
+### Global
+
+- Copy: `Command-C`
+
+- Paste: `Command-V`
+
+  - Paste Without Formatting: `Shift-Command-V`
+
+- Cut: `Command-X`
+
+- Move to the beginning of the line: `Control-A`
+
+- Move to the end of a line: `Control-E`
+
+- Delete the character on the left: `Control-H`
+
+- Delete the character on the right: `Control-D`
+
+- Select all: `Command-A`
+
+- Undo: `Command-Z`
+
+- Save: `Command-S`
+
+  - Save As: `Shift-Command-S`
+
+- Find: `Command-F`
+
+  - Next: `Command-G`
+
+  - Previous: `Shift-Command-G`
+
+  - Find and Replace: `Option-Command-F`
+
+### Finder
+
+- Open file preview with Quick Look (allows to resize smaller): `Space` after
+  selecting the file in Finder.
+
+- Move files to folder: `Control-Command-N`
+
+- Get file information: `Command-I`
+
+- Delete file: `Command-Delete`
 
 ### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
 
