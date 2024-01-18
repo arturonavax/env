@@ -1,5 +1,46 @@
 # MacOS
 
+1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
+2. **[Devs](#devs)**
+3. **[Personal list of applications for MacOS](#personal-list-of-applications-for-macos)**
+
+---
+
+## Key concepts of MacOS
+
+- Processes and Windows: In MacOS a process may not have graphical windows, only
+  the name of the application process appears in the upper left corner. By clicking
+  on the "File" button in the context menu at the top, you can create a new graphical
+  window of the application (or by pressing or `Command-N`).
+
+  - Close and Quit:
+
+    - Close (Red/x button on the left in a window, `Shift-Command-W`): refers to
+      close a graphical application window, not a process.
+
+    - Quit: refers to close the process of an application (Close completely)
+      (Secondary click on the application in the Dock and "Quit" button, or on the
+      name of the application in the top left and the "Quit" button, `Command-Q`).
+
+  - Context menu: Context menu: In MacOS the context menu is used much more than
+    in other operating systems, it is the top left bar where is the name of the
+    active process, the "File" button, "Edit", "Selection", etc, etc.
+
+- App switcher `Command-Tab`: The MacOS "App switcher" shows the open applications/processes,
+  these processes do not necessarily have a graphical window open so it can be confusing.
+  It is also important to note that "Finder" never closes completely (Quit), this
+  can be changed but it is not recommended. To have a more traditional
+  "Switcher app" like in Windows or Linux-Gnome, there are alternatives like [AltTab][alttab].
+
+- Mission Control: The Mission Control is the way you can see all open (not minimized)
+  graphic windows, from there you can also manage "Spaces", it is very similar to
+  Gnome in Linux distributions. (`Control-UpArrow` or Swipe up using three fingers
+  (or four fingers))
+
+- App launcher `Command-Space`: The default application launcher is Spotlight, from
+  it you can open any application, configuration, search for files and internet,and
+  much more. The default MacOS app launcher can be changed for more powerful ones.
+
 - Enable FileVault (or Firmware Password if it is an Intel processor) to lock
 Recovery Mode and encrypt the disk.
 
@@ -11,13 +52,7 @@ maximum brightness with the bar in the options.
 
 - With the "Screen Sharing" app you can control other Macs.
 
----
-
-1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
-2. **[Devs](#devs)**
-3. **[Personal list of applications for MacOS](#personal-list-of-applications-for-macos)**
-
-## Default keyboard shortcuts
+## Keyboard shortcuts
 
 - App launcher: `Command-Space`
 
@@ -26,19 +61,23 @@ maximum brightness with the bar in the options.
 - Show apps (Mission Control): `Control-UpArrow` or Swipe up using three fingers
 (or four fingers)
 
-- Switch apps: `Command-Tab`
+- Switch apps: `Command-Tab` and `Shift-Command-Tab`
+
+  - Switch active windows: `` Command-` `` and `` Shift-Command-` ``
+
+- Close window: `Shift-Command-W`
 
 - Close app (Quit): `Command-Q` or `Option-Command-Esc` (Force)
-
-- Refresh page (F5 in Windows): `Command-R`
-
-- Switch input source: `Control-Space` or `Fn`
-
-- Full screen window: `Control-Command-F`
 
 - New window: `Command-N`
 
 - Minimize window: `Command-M`
+
+- Full screen window: `Control-Command-F`
+
+- Refresh page (F5 in Windows): `Command-R`
+
+- Switch input source: `Control-Space` or `Fn`
 
 - Screenshots (I reconfigure it as follows):
 
@@ -88,7 +127,7 @@ maximum brightness with the bar in the options.
 
   - Accesibility -> Zoom -> Use scroll gesture with modifier keys to zoom.
 
-- Open video in Picture in Picture or other options: Double right click
+- Open video in Picture in Picture or other options: Secondary double click
   (two-finger click).
 
   - Move the Picture in Picture window more precisely: Move while pressing
@@ -309,7 +348,8 @@ or [Alfred][alfred]
 
     - _Pro: $96 USD/annual._
 
-- App switching: [AltTab][alttab] and [rcmd](https://lowtechguys.com/rcmd/)
+- App switcher: [AltTab][alttab] _(Consider adapting to the MacOS app switcher)_
+  and [rcmd](https://lowtechguys.com/rcmd/)
 
   - _Pricing AltTab: Free._
 

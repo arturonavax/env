@@ -16,6 +16,14 @@
 		"key": "ctrl+shift+cmd+y",
 		"command": "projectManager.listProjectsNewWindow"
 	},
+	{
+		"key": "ctrl+w",
+		"command": "-workbench.action.switchWindow"
+	},
+	{
+		"key": "alt+w",
+		"command": "workbench.action.switchWindow"
+	},
 
 	// Editor Empty (Dashboard)
 	{
