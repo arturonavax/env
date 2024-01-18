@@ -1,10 +1,9 @@
 # MacOS
 
-1. **[Default keyboard shortcuts](#default-keyboard-shortcuts)**
-2. **[Devs](#devs)**
-3. **[Personal list of applications for MacOS](#personal-list-of-applications-for-macos)**
-
----
+1. **[Key concepts of MacOS](#key-concepts-of-macos)**
+2. **[Keyboard shortcuts](#keyboard-shortcuts)**
+3. **[Devs](#devs)**
+4. **[Personal list of applications for MacOS](#personal-list-of-applications-for-macos)**
 
 ## Key concepts of MacOS
 
@@ -103,7 +102,7 @@ maximum brightness with the bar in the options.
 
 - Spaces:
 
-  - With "Desktop & Dock -> Mission Control -> Display have separate Spaces" activated,
+  - With "Desktop & Dock -> Mission Control -> Display have separate Spaces" enabled,
     on each external monitor I create at least 2 spaces and do not use the first
     one, so that when disconnecting the monitor, the windows are not merged with
     the first space of the main monitor.
@@ -323,7 +322,7 @@ Total applications: 42 (excluding Parallels and CrossOver).
 All applications available on Setapp and paying for those that are not:
 _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment apps)_
 
-### List
+### App list
 
 #### Essentials
 
@@ -381,7 +380,7 @@ or [Alfred][alfred]
 
   - _Pricing: Free._
 
-  - Note: SmartDelete, activated.
+  - Note: SmartDelete, enabled.
 
 - App updater: [Latest][latest] or [MacUpdater][macupdater]
 
@@ -458,15 +457,15 @@ or [Alfred][alfred]
 
     - Set the battery [charge limit to 80%][aldente-chargelimit], do not let the
       battery discharge more than 20%.
-    - [Hardware Battery Percentage][aldente-hardwarebattery], activated.
-    - [Automatic Discharge][aldente-automaticdischarge], activated.
-    - [Disable Sleep until Charge Limit][aldente-disablesleep], activated.
-    - [Sailing Mode][aldente-sailingmode], activated with a difference of 10%.
-    - [Heat Protection][aldente-heatprotection], activated with a temperature limit
+    - [Hardware Battery Percentage][aldente-hardwarebattery], enabled.
+    - [Automatic Discharge][aldente-automaticdischarge], enabled.
+    - [Disable Sleep until Charge Limit][aldente-disablesleep], enabled.
+    - [Sailing Mode][aldente-sailingmode], enabled with a difference of 10%.
+    - [Heat Protection][aldente-heatprotection], enabled with a temperature limit
       of 30-35°C.
     - [Stop charging when powered off/app closed][aldente-stopcharging-poweroff],
-      activated.
-    - [Stop charging when sleeping][aldente-stopcharging-sleeping], activated.
+      enabled.
+    - [Stop charging when sleeping][aldente-stopcharging-sleeping], enabled.
     - Use the [Calibration Mode][aldente-calibrationmode] every 1 or 2 weeks.
 
 - Cliboard manager _(Consider [Raycast][raycast] or [Alfred][alfred])_: [Maccy][maccy]
@@ -551,10 +550,10 @@ or [Alfred][alfred]
 
     - Notes for external monitors:
 
-      - "High Resolution (HiDPI)", activated.
-      - "Edit the system configuration of this display model", activated.
-        - "Enable smooth scaling", activated.
-          - "Add near-native HiDPI resolution with smooth scaling", activated.
+      - "High Resolution (HiDPI)", enabled.
+      - "Edit the system configuration of this display model", enabled.
+        - "Enable smooth scaling", enabled.
+          - "Add near-native HiDPI resolution with smooth scaling", enabled.
 
   - _Pricing Monitor Control: Free._
 
