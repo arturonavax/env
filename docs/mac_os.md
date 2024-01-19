@@ -40,6 +40,35 @@
   it you can open any application, configuration, search for files and internet,and
   much more. The default MacOS app launcher can be changed for more powerful ones.
 
+- Sleep mode: It is the "suspend" in MacOS, in Sleep mode your computer still does
+  many things (also uses internet connection) (at least set the `hibernatemode`
+  to `25`, you can query the current value with the command `pmset -g | grep hibernatemode`),
+  and when you put the computer in Sleep mode it just looks like the screen is
+  turned off. With the `pmset -g log` command you can see everything the system
+  did while it was asleep.
+
+  - The problem: The problem: The computer is probably not processing a task/program/download
+    that you are interested in by going into Sleep mode, Sleep mode does a lot while
+    asleep, but mainly system tasks.
+
+  - There are two situations where your computer goes into Sleep mode automatically:
+
+    1. When the screen turns off, but this can be avoided if the power adapter
+       is connected and the following option is activated: System Settings ->
+       Battery -> Options -> Prevent automatic sleeping on power adapter when
+       display is off.
+
+    2. When you close the screen/lid of your Macbook, and this behavior cannot be
+       changed from the traditional settings
+
+    3. When you lock it and the screen turns off (you can quickly turn off the
+       screen while it is locked by pressing `ESC`).
+
+    All situations of automatic sleep mode can be avoided by using applications
+    like "Amphetamine", Or by simply running the command
+    `caffeinate -d` in the terminal, the `-d` also prevents the screen from
+    turning off.
+
 - Enable FileVault (or Firmware Password if it is an Intel processor) to lock
 Recovery Mode and encrypt the disk.
 
@@ -350,9 +379,9 @@ sudo killall mDNSResponderHelper
 Some of these applications are available in [Setapp subscriptions][setapp]
 ($107.88 USD/annual).
 
-Total applications: 42 (excluding Parallels and CrossOver).
+Total applications: 43 (excluding Parallels and CrossOver).
 
-- Free applications: 18.
+- Free applications: 19.
 - Paid applications: 24.
 
   - One-time payment: 22 apps (choosing Alfred over Raycast). ($476.6 USD approx)
@@ -545,6 +574,8 @@ or [Alfred][alfred]
 - Git GUI: [SourceTree][sourcetree]
 
   - _Pricing: Free._
+
+- Prevent sleep mode: [Amphetamine][amphetamine] or command `caffeinate -d`
 
 #### Optional
 
@@ -777,3 +808,4 @@ or `Shift-Command-?`
 [betterdisplay]: https://github.com/waydabber/BetterDisplay
 [noir]: https://apps.apple.com/es/app/noir-dark-mode-for-safari/id1592917505
 [darkreader]: https://darkreader.org
+[amphetamine]: https://apps.apple.com/es/app/amphetamine/id937984704
