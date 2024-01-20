@@ -111,7 +111,7 @@ maximum brightness with the bar in the options.
 
 - Refresh page (F5 in Windows): `Command-R`
 
-- Switch input source: `Control-Space` or `Fn`
+- Switch input source: `Control-Space` (Without delay) or `GlobeKey` (With delay)
 
 - Screenshots (I reconfigure it as follows):
 
