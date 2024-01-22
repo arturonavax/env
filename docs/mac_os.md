@@ -25,7 +25,7 @@
     in other operating systems, it is the top left bar where is the name of the
     active process, the "File" button, "Edit", "Selection", etc, etc.
 
-- App switcher `Command-Tab`: The MacOS "App switcher" shows the open applications/processes,
+- App switcher (`Command-Tab`): The MacOS "App switcher" shows the open applications/processes,
   these processes do not necessarily have a graphical window open so it can be confusing.
   It is also important to note that "Finder" never closes completely (Quit), this
   can be changed but it is not recommended. To have a more traditional
@@ -36,9 +36,15 @@
   Gnome in Linux distributions. (`Control-UpArrow` or Swipe up using three fingers
   (or four fingers))
 
-- App launcher `Command-Space`: The default application launcher is Spotlight, from
-  it you can open any application, configuration, search for files and internet,and
-  much more. The default MacOS app launcher can be changed for more powerful ones.
+- App launcher (`Command-Space`): The default application launcher is Spotlight,
+  from it you can open any application, configuration, search for files and
+  internet, and much more. The default MacOS app launcher can be changed for
+  more powerful ones.
+
+- Apple Shortcuts: It is an application of the system that allows you to create
+  interactive shortcuts with dynamic actions, mainly useful for shortcuts that
+  change some configuration of the system or to carry out some task with some
+  application of the own system. I usually call the shortcuts from the App launcher.
 
 - Sleep mode: It is the "suspend" in MacOS, in Sleep mode your computer still does
   many things (also uses internet connection) (at least set the `hibernatemode`

@@ -24,6 +24,10 @@
 		"key": "alt+w",
 		"command": "workbench.action.switchWindow"
 	},
+	{
+		"key": "shift+cmd+o",
+		"command": "workbench.action.files.openFolder"
+	},
 
 	// Editor Empty (Dashboard)
 	{
@@ -74,6 +78,11 @@
 	{
 		"key": "u",
 		"command": "workbench.action.openRecent",
+		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
+	},
+	{
+		"key": "o",
+		"command": "workbench.action.files.openFolder",
 		"when": "vim.active && activeEditorGroupEmpty && !editorFocus && !inputFocus"
 	},
 	{
@@ -551,32 +560,32 @@
 	{
 		"key": "shift+h",
 		"command": "workbench.action.previousEditorInGroup",
-		"when": "vim.active && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && editorFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "shift+l",
 		"command": "workbench.action.nextEditorInGroup",
-		"when": "vim.active && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && editorFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+h",
 		"command": "workbench.action.moveEditorLeftInGroup",
-		"when": "vim.active && editorFocus"
+		"when": "vim.active && editorFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+l",
 		"command": "workbench.action.moveEditorRightInGroup",
-		"when": "vim.active && editorFocus"
+		"when": "vim.active && editorFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+p",
 		"command": "workbench.action.pinEditor",
-		"when": "vim.active && !activeEditorIsPinned && vim.mode === 'Normal' && !suggestWidgetVisible && !suggestWidgetMultipleSuggestions && !codeActionMenuVisible && !listFocus && !problemFocus && !problemsFilterFocus && !inFilesPicker && !inQuickOpen && !hasSearchResult && !inSearchEditor"
+		"when": "vim.active && editorFocus && !activeEditorIsPinned && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && !suggestWidgetVisible && !suggestWidgetMultipleSuggestions && !codeActionMenuVisible && !listFocus && !problemFocus && !problemsFilterFocus && !inFilesPicker && !inQuickOpen && !hasSearchResult && !inSearchEditor"
 	},
 	{
 		"key": "ctrl+p",
 		"command": "workbench.action.unpinEditor",
-		"when": "vim.active && activeEditorIsPinned && vim.mode === 'Normal' && !suggestWidgetVisible && !suggestWidgetMultipleSuggestions && !codeActionMenuVisible && !listFocus && !problemFocus && !problemsFilterFocus && !inFilesPicker && !inQuickOpen && !hasSearchResult && !inSearchEditor"
+		"when": "vim.active && editorFocus && activeEditorIsPinned && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && !suggestWidgetVisible && !suggestWidgetMultipleSuggestions && !codeActionMenuVisible && !listFocus && !problemFocus && !problemsFilterFocus && !inFilesPicker && !inQuickOpen && !hasSearchResult && !inSearchEditor"
 	},
 
 	// Clear exits
