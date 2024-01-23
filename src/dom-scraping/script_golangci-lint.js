@@ -25,6 +25,7 @@ let myBlacklist = [
 	"- godox",
 	"- inamedparam",
 	"- gochecksumtype",
+	"- depguard",
 ];
 
 document.querySelectorAll("table > tbody").forEach((tableBody) => {
