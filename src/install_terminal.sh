@@ -220,6 +220,16 @@ function install_terminal() {
         \tyarn, serve, tldr${fgcolor_reset}"
 	fi
 
+	# check exists goenv
+	export GOENV_ROOT="$HOME/.goenv"
+
+	if [[ -d "$GOENV_ROOT" ]]; then
+		export PATH="$GOENV_ROOT/bin:$PATH"
+		eval "$(goenv init -)"
+		export PATH="$GOROOT/bin:$PATH"
+		export PATH="$PATH:$GOPATH/bin"
+	fi
+
 	if [[ "$(command -v go)" != "" ]]; then
 		# install fx (JSON Viewer)
 		go install github.com/antonmedv/fx@latest

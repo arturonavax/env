@@ -168,6 +168,16 @@ function install_editor() {
 		stylelint-config-standard
 	cd -
 
+	# check exists goenv
+	export GOENV_ROOT="$HOME/.goenv"
+
+	if [[ -d "$GOENV_ROOT" ]]; then
+		export PATH="$GOENV_ROOT/bin:$PATH"
+		eval "$(goenv init -)"
+		export PATH="$GOROOT/bin:$PATH"
+		export PATH="$PATH:$GOPATH/bin"
+	fi
+
 	if [[ "$(command -v go)" != "" ]]; then
 		go install github.com/jesseduffield/lazygit@latest
 
