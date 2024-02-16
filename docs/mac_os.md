@@ -84,10 +84,10 @@
     turning off.
 
 - Enable FileVault (or Firmware Password if it is an Intel processor) to lock
-Recovery Mode and encrypt the disk.
+  Recovery Mode and encrypt the disk.
 
 - With the brightness increase key (F2), you can get more brightness than the
-maximum brightness with the bar in the options.
+  maximum brightness with the bar in the options.
 
   - By using the `Shift-Option` key you can shift up and down by quarter on the `F`
     keys such as brightness and volume.
@@ -101,7 +101,7 @@ maximum brightness with the bar in the options.
 - Lock: `Control-Command-Q`
 
 - Show apps (Mission Control): `Control-UpArrow` or Swipe up using three fingers
-(or four fingers)
+  (or four fingers)
 
 - Switch apps: `Command-Tab` and `Shift-Command-Tab`
 
@@ -276,7 +276,7 @@ installed with the prefix "g", for example: `ggrep`.
 # GNU/Linux base tools
 brew install ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
     automake cmake python3 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
-    jq htop wdiff tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
+    jq htop wdiff tcpdump iftop rsync openssl@3 openvpn gdb nasm binutils coreutils diffutils findutils util-linux
 
 # GNU tools for MacOS only
 brew install gnu-indent gnu-sed gnu-tar gnu-which gnutls gnu-getopt gawk gpatch lsusb
@@ -401,6 +401,7 @@ Total applications: 43 (excluding Parallels and CrossOver).
 - Paid applications: 24.
 
   - One-time payment: 22 apps (choosing Alfred over Raycast). ($476.6 USD approx)
+
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
@@ -410,6 +411,7 @@ Total applications: 43 (excluding Parallels and CrossOver).
 - Total applications in Setapp: 23.
 
   - Without Setapp: $377.25 USD + $179.99 USD/annual. (approx)
+
     - Some applications require a payment to upgrade to new versions.
     - Dato: Only one year of updates.
     - iStats Menu: Only 6 months of weather data.
@@ -431,7 +433,7 @@ _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment ap
   - _Pricing iBar: Free._
 
 - Spotlight replacement, and Window Manager, and Keyboard shortcut manager: [Raycast][raycast]
-or [Alfred][alfred]
+  or [Alfred][alfred]
 
   - _Pricing Alfred:_
 
@@ -658,7 +660,7 @@ or [Alfred][alfred]
   - _Pricing Monitor Control: Free._
 
 - Relax sounds: [Noizio][noizio] or MacOS Background Sounds (System Settings
--> Accessibility -> Audio -> Background Sounds)
+  -> Accessibility -> Audio -> Background Sounds)
 
   - _Pricing Noizio:_
 
@@ -697,7 +699,7 @@ or [Alfred][alfred]
     - _Normal: Free._
 
 - Hidden desktop icons _(Consider [One Switch][oneswitch] or
-[SwitchManager][switchmanager])_: [HiddenMe][hiddenme]
+  [SwitchManager][switchmanager])_: [HiddenMe][hiddenme]
 
   - _Pricing HiddenMe: $3 USD approx._
 
@@ -710,7 +712,7 @@ or [Alfred][alfred]
   - _Pricing: $15.46 USD._ (🔶 Available on Setapp)
 
 - Command Palette in any applicattions: [Paletro][paletro]
-or `Shift-Command-?`
+  or `Shift-Command-?`
 
   - _Pricing Paletro: $6.99 USD._ (🔶 Available on Setapp)
 
@@ -813,7 +815,6 @@ or `Shift-Command-?`
 [parallels]: https://www.parallels.com/
 [crossover]: https://www.codeweavers.com/crossover/
 [cxpatcher]: https://github.com/italomandara/CXPatcher
-
 [aldente-sailingmode]: https://apphousekitchen.com/feature-explanation-sailing-mode/
 [aldente-automaticdischarge]: https://apphousekitchen.com/feature-explanation-automatic-discharge/
 [aldente-hardwarebattery]: https://apphousekitchen.com/feature-explanation-hardware-battery-percentage/

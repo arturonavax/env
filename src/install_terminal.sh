@@ -173,8 +173,8 @@ function install_terminal() {
 		# GNU/Linux base tools
 		brew install ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
 			automake cmake python3 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
-			jq htop wdiff tcpdump iftop rsync openssl openvpn nasm binutils coreutils diffutils findutils util-linux
-		# jq htop wdiff tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
+			jq htop wdiff tcpdump iftop rsync openssl@3 openvpn nasm binutils coreutils diffutils findutils util-linux
+		# jq htop wdiff tcpdump iftop rsync openssl@3 openvpn gdb nasm binutils coreutils diffutils findutils util-linux
 
 		# GNU tools for MacOS only
 		brew install gnu-indent gnu-sed gnu-tar gnu-which gnutls gnu-getopt gawk gpatch lsusb

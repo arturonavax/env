@@ -81,7 +81,7 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	fi
 
 	# tools
-	brew install curl wget git make gcc unzip fontconfig ncurses openssl readline sqlite xz zlib
+	brew install curl wget git make gcc unzip fontconfig ncurses openssl@3 readline sqlite xz zlib
 
 else
 	echo "The operating system is not compatible with this installation." && exit 1
