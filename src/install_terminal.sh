@@ -172,7 +172,7 @@ function install_terminal() {
 
 		# GNU/Linux base tools
 		brew install ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
-			automake cmake python@3 python@3.12 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
+			automake cmake python@3.12 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
 			jq htop wdiff tcpdump iftop rsync openssl@3 openvpn nasm binutils coreutils diffutils findutils util-linux
 		# jq htop wdiff tcpdump iftop rsync openssl@3 openvpn gdb nasm binutils coreutils diffutils findutils util-linux
 
