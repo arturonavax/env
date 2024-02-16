@@ -157,7 +157,7 @@ if [[ "$install_flag" == 1 ]]; then
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl wget git make gcc ncurses findutils sqlite openssl@3 readline zlib xz tcl-tk python@3.12 python-tk python-setuptools python-tabulate
+		brew install curl wget git make gcc ncurses findutils sqlite openssl@3 readline zlib xz tcl-tk python@3.12 python-tk@3.12 python-setuptools python-tabulate
 
 	else
 		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
