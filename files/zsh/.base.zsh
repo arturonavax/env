@@ -153,8 +153,8 @@ EOF
 
     for arg in "$@"; do
         case "$arg" in
-            system | s) update_system=1 ;;
             tools | t) update_tools=1 ;;
+            system | s) update_system=1 ;;
             all | a) update_all=1 ;;
             h | help)
                 usage_update
@@ -172,8 +172,34 @@ EOF
     [[ "$#" == 0 ]] && update_system=1
 
     if [[ "$update_all" == 1 ]]; then
-        update_system=1
         update_tools=1
+        update_system=1
+    fi
+
+	sudo true
+
+    if [[ "$update_tools" == 1 ]]; then
+        if [[ "$(command -v rustup)" != "" ]]; then
+            rustup update stable
+            rustup check
+        fi
+
+        if [[ "$(command -v pnpm)" != "" ]]; then
+            pnpm add -g @pnpm/exe
+            pnpm --global update
+            cd "$HOME"
+            pnpm update
+            cd -
+        fi
+
+        if [[ "$(command -v python3)" != "" ]]; then
+            python3 -m pip install --upgrade pip
+            python3 -m pip install --user --upgrade pipx
+            pipx upgrade-all
+        fi
+
+        update-go -i
+        update-python
     fi
 
     if [[ "$update_system" == 1 ]]; then
@@ -207,31 +233,6 @@ EOF
                 brew cleanup
             fi
         fi
-
-    fi
-
-    if [[ "$update_tools" == 1 ]]; then
-        if [[ "$(command -v rustup)" != "" ]]; then
-            rustup update stable
-            rustup check
-        fi
-
-        if [[ "$(command -v pnpm)" != "" ]]; then
-            pnpm add -g @pnpm/exe
-            pnpm --global update
-            cd "$HOME"
-            pnpm update
-            cd -
-        fi
-
-        if [[ "$(command -v python3)" != "" ]]; then
-            python3 -m pip install --upgrade pip
-            python3 -m pip install --user --upgrade pipx
-            pipx upgrade-all
-        fi
-
-        update-go -i
-        update-python
     fi
 }
 

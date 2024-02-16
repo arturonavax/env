@@ -21,9 +21,17 @@
       (Secondary click on the application in the Dock and "Quit" button, or on the
       name of the application in the top left and the "Quit" button, `Command-Q`).
 
-  - Context menu: Context menu: In MacOS the context menu is used much more than
+  - Context menu: In MacOS the context menu is used much more than
     in other operating systems, it is the top left bar where is the name of the
     active process, the "File" button, "Edit", "Selection", etc, etc.
+
+    - Some non-native MacOS options that are specific to each application may be
+      present in your context menu. For example: In MacOS is not really native the
+      option "Always On Top" so that a window is always on top of others, on the
+      other hand, there will be applications that if they implement the option,
+      an example is WhatsApp calls, it is in the context menu, Call -> Always On
+      Top. In general, in the contextual menu there may be many interesting options
+      that are worth reviewing.
 
 - App switcher (`Command-Tab`): The MacOS "App switcher" shows the open applications/processes,
   these processes do not necessarily have a graphical window open so it can be confusing.
@@ -117,7 +125,9 @@ maximum brightness with the bar in the options.
 
 - Refresh page (F5 in Windows): `Command-R`
 
-- Switch input source: `Control-Space` (Without delay) or `GlobeKey` (With delay)
+- Set the letter Ñ on non-Spanish keyboard: `Option-N n` or `Option-N N`
+
+- Switch input source: `Control-Space` (Without delay) or `GlobeKey` (🌐) (With delay)
 
 - Screenshots (I reconfigure it as follows):
 
@@ -715,6 +725,8 @@ or `Shift-Command-?`
 - Smooth scrolling: [Mos][mos]
 
   - _Pricing: Free._
+
+  - Note: When this process is started, scrolling screen capturers may have a problem.
 
 - Keyboard shortcut manager _(Consider [Raycast][raycast] or [Alfred][alfred])_:
 

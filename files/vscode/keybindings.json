@@ -128,16 +128,17 @@
 		"command": "workbench.action.findInFiles",
 		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
-	{
-		"key": "v",
-		"command": "explorer.openToSide",
-		"when": "vim.active && filesExplorerFocus || inSearchEditor && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
-	},
-	{
-		"key": "v",
-		"command": "openReferenceToSide",
-		"when": "vim.active && referenceSearchVisible || inReferenceSearchEditor && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
-	},
+	// TODO: fix
+	// {
+	// 	"key": "v",
+	// 	"command": "explorer.openToSide",
+	// 	"when": "vim.active && filesExplorerFocus || inSearchEditor && !textInputFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	// },
+	// {
+	// 	"key": "v",
+	// 	"command": "openReferenceToSide",
+	// 	"when": "vim.active && referenceSearchVisible || inReferenceSearchEditor && !textInputFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	// },
 	{
 		"key": "ctrl+v",
 		"command": "workbench.action.alternativeAcceptSelectedQuickOpenItem",

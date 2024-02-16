@@ -13,6 +13,9 @@
 	"window.zoomLevel": 1,
 	"workbench.editor.showTabs": "multiple",
 	"workbench.startupEditor": "none",
+	"window.density.editorTabHeight": "compact",
+	"accessibility.dimUnfocused.enabled": true,
+	"window.commandCenter": false,
 
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
@@ -78,14 +81,23 @@
 			}
 		]
 	},
-
 	"workbench.colorCustomizations": {
 		"[Tokyo Night]": {
-			"editorStickyScroll.background": "#212536"
+			"editorStickyScroll.background": "#212536",
+			"editorCodeLens.foreground": "#7982a9",
+			"window.inactiveBorder": "#000000",
+			"window.activeBorder": "#BF4B4B",
+
+			"tab.activeBackground": "#1a1b26",
+			"tab.activeBorder": "#BF4B4B"
 		},
 
 		"[Tokyo Night Light]": {
-			"editorStickyScroll.background": "#e4e4ea"
+			"editorStickyScroll.background": "#e4e4ea",
+			"window.activeBorder": "#BF4B4B",
+
+			"tab.activeBackground": "#d5d6db",
+			"tab.activeBorder": "#BF4B4B"
 		}
 	},
 
