@@ -16,6 +16,7 @@
 	"window.density.editorTabHeight": "compact",
 	"accessibility.dimUnfocused.enabled": true,
 	"window.commandCenter": false,
+	"accessibility.voice.speechLanguage": "es-MX",
 
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
@@ -133,6 +134,7 @@
 	},
 
 	"go.lintTool": "golangci-lint",
+	"go.toolsManagement.autoUpdate": true,
 	"go.useLanguageServer": true,
 	"gopls": {
 		"ui.codelenses": {

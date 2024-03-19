@@ -332,7 +332,7 @@ linters-settings:
 
     settings:
       hugeParam:
-        sizeThreshold: 80
+        sizeThreshold: 160
 
   gocognit:
     min-complexity: 30
