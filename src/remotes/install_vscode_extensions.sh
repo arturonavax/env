@@ -80,13 +80,15 @@ code --install-extension zxh404.vscode-proto3 # vscode-proto3
 code --install-extension astro-build.astro-vscode # Astro
 
 ## GIT
-code --install-extension eamodio.gitlens    # GitLens
 code --install-extension mhutchie.git-graph # Git Graph
 
 ## Markdown
 code --install-extension yzhang.markdown-all-in-one     # Markdown All in One
 code --install-extension jebbs.markdown-extended        # Markdown Extended
 code --install-extension DavidAnson.vscode-markdownlint # markdownlint
+
+# TODO Tree
+code --install-extension Gruntfuggly.todo-tree # Todo Tree
 
 ## Docker
 code --install-extension ms-azuretools.vscode-docker # Docker
