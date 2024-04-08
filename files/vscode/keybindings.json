@@ -9,11 +9,15 @@
 		"command": "workbench.view.extension.test"
 	},
 	{
-		"key": "ctrl+shift+y",
+		"key": "ctrl+shift+b",
+		"command": "debug.openView"
+	},
+	{
+		"key": "ctrl+shift+p",
 		"command": "projectManager.listProjects"
 	},
 	{
-		"key": "ctrl+shift+cmd+y",
+		"key": "ctrl+shift+cmd+p",
 		"command": "projectManager.listProjectsNewWindow"
 	},
 	{
@@ -126,6 +130,7 @@
 	{
 		"key": "space j",
 		"command": "workbench.action.findInFiles",
+		// "command": "workbench.action.experimental.quickTextSearch",
 		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	// TODO: fix
