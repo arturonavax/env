@@ -5,12 +5,90 @@
 		"command": "toggleVim"
 	},
 	{
-		"key": "ctrl+shift+t",
-		"command": "workbench.view.extension.test"
+		"key": "ctrl+h",
+		"command": "editor.action.triggerSuggest",
+		"when": "vim.active && vim.mode === 'Insert' && editorHasCompletionItemProvider && editorTextFocus && !editorReadonly"
 	},
 	{
-		"key": "ctrl+shift+b",
-		"command": "debug.openView"
+		"key": "ctrl+h",
+		"command": "toggleSuggestionDetails",
+		"when": "vim.active && vim.mode === 'Insert' && editorTextFocus && suggestWidgetVisible"
+	},
+	{
+		"key": "ctrl+alt+h",
+		"command": "toggleSuggestionFocus",
+		"when": "vim.active && vim.mode === 'Insert' && editorTextFocus && suggestWidgetVisible"
+	},
+	{
+		"key": "ctrl+shift+e",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.explorer",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+f",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.action.findInFiles",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+x",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.extensions",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+t",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.extension.test",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+y",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"todo-tree-view.focus",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+d",
+		"command": "runCommands",
+		"args": {
+			"commands": ["debug.openView", "workbench.action.focusActiveEditorGroup"]
+		}
+	},
+	{
+		"key": "ctrl+shift+g",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.scm",
+				"workbench.action.focusActiveEditorGroup"
+			]
+		}
+	},
+	{
+		"key": "ctrl+shift+c",
+		"command": "workbench.panel.chat.view.copilot.focus"
 	},
 	{
 		"key": "ctrl+shift+p",
@@ -29,7 +107,7 @@
 		"command": "workbench.action.switchWindow"
 	},
 	{
-		"key": "shift+cmd+o",
+		"key": "ctrl+shift+o",
 		"command": "workbench.action.files.openFolder"
 	},
 
@@ -108,6 +186,11 @@
 	},
 	{
 		"key": "q",
+		"command": "workbench.action.togglePanel",
+		"when": "vim.active && (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') && !referenceSearchVisible && !inReferenceSearchEditor"
+	},
+	{
+		"key": "q",
 		"command": "editor.closeTestPeek",
 		"when": "vim.active && !activeEditorGroupEmpty && testing.isPeekVisible && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
@@ -133,17 +216,16 @@
 		// "command": "workbench.action.experimental.quickTextSearch",
 		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
-	// TODO: fix
-	// {
-	// 	"key": "v",
-	// 	"command": "explorer.openToSide",
-	// 	"when": "vim.active && filesExplorerFocus || inSearchEditor && !textInputFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
-	// },
-	// {
-	// 	"key": "v",
-	// 	"command": "openReferenceToSide",
-	// 	"when": "vim.active && referenceSearchVisible || inReferenceSearchEditor && !textInputFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
-	// },
+	{
+		"key": "v",
+		"command": "explorer.openToSide",
+		"when": "vim.active && filesExplorerFocus && !textInputFocus && !inputFocus && !editorFocus"
+	},
+	{
+		"key": "v",
+		"command": "openReferenceToSide",
+		"when": "vim.active && referenceSearchVisible || inReferenceSearchEditor && !textInputFocus && !inputFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
 	{
 		"key": "ctrl+v",
 		"command": "workbench.action.alternativeAcceptSelectedQuickOpenItem",
@@ -187,17 +269,27 @@
 	{
 		"key": "ctrl+w shift+=",
 		"command": "workbench.action.increaseViewHeight",
-		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w -",
 		"command": "workbench.action.decreaseViewHeight",
-		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w =",
 		"command": "workbench.action.evenEditorWidths",
-		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "ctrl+z",
+		"command": "workbench.action.toggleMaximizedPanel",
+		"when": "vim.active && !editorFocus && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus)"
+	},
+	{
+		"key": "ctrl+z",
+		"command": "workbench.action.toggleMaximizeEditorGroup",
+		"when": "vim.active && editorFocus && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 
 	//// Remaps
@@ -291,12 +383,12 @@
 	{
 		"key": "ctrl+w k",
 		"command": "workbench.action.focusActiveEditorGroup",
-		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w h",
-		"command": "workbench.files.action.focusFilesExplorer",
-		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"command": "workbench.action.focusSideBar",
+		"when": "vim.active && (focusedView === 'workbench.panel.output' || focusedView === 'terminal' || focusedView === 'workbench.panel.markers.view' || focusedView === 'workbench.panel.testResults.view' || focusedView === 'workbench.panel.repl.view' || focusedView === '~remote.forwardedPorts' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemsFilterFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "space p",
@@ -325,7 +417,7 @@
 	{
 		"key": "ctrl+j",
 		"command": "search.action.focusNextSearchResult",
-		"when": "vim.active && hasSearchResult || inSearchEditor"
+		"when": "vim.active && (hasSearchResult || inSearchEditor) && activeViewlet === 'workbench.view.search' && !referenceSearchVisible && !inQuickOpen && !inFilesPicker && !problemsFilterFocus && !problemFocus"
 	},
 	{
 		"key": "ctrl+j",
@@ -371,7 +463,7 @@
 	{
 		"key": "ctrl+n",
 		"command": "search.action.focusNextSearchResult",
-		"when": "vim.active && hasSearchResult || inSearchEditor"
+		"when": "vim.active && (hasSearchResult || inSearchEditor) && activeViewlet === 'workbench.view.search' && !referenceSearchVisible && !inQuickOpen && !inFilesPicker && !problemsFilterFocus && !problemFocus"
 	},
 	{
 		"key": "ctrl+n",
@@ -405,7 +497,7 @@
 	{
 		"key": "ctrl+k",
 		"command": "search.action.focusPreviousSearchResult",
-		"when": "vim.active && hasSearchResult || inSearchEditor"
+		"when": "vim.active && (hasSearchResult || inSearchEditor) && activeViewlet === 'workbench.view.search' && !referenceSearchVisible && !inQuickOpen && !inFilesPicker && !problemsFilterFocus && !problemFocus"
 	},
 	{
 		"key": "ctrl+k",
@@ -451,7 +543,7 @@
 	{
 		"key": "ctrl+p",
 		"command": "search.action.focusPreviousSearchResult",
-		"when": "vim.active && hasSearchResult || inSearchEditor"
+		"when": "vim.active && (hasSearchResult || inSearchEditor) && activeViewlet === 'workbench.view.search' && !referenceSearchVisible && !inQuickOpen && !inFilesPicker && !problemsFilterFocus && !problemFocus"
 	},
 	{
 		"key": "ctrl+p",
@@ -473,24 +565,35 @@
 		"when": "vim.active && sideBarFocus && !editorFocus && !inputFocus && !textInputFocus && !renameInputVisible"
 	},
 	{
+		"key": "space shift+n",
+		"command": "workbench.action.toggleSidebarVisibility",
+		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && !renameInputVisible"
+	},
+	{
 		"key": "space n",
-		"command": "workbench.files.action.focusFilesExplorer",
-		"when": "vim.active && !explorerViewletVisible && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.action.focusSideBar",
+				"workbench.action.focusSideBar"
+			]
+		},
+		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "space n",
 		"command": "workbench.action.closeSidebar",
-		"when": "vim.active && explorerViewletVisible && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "space e",
 		"command": "revealInExplorer",
-		"when": "vim.active && !explorerViewletVisible && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "space e",
 		"command": "workbench.action.closeSidebar",
-		"when": "vim.active && explorerViewletVisible && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && explorerViewletFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w shift+.",
@@ -526,7 +629,15 @@
 	},
 	{
 		"key": "y",
-		"command": "copy-file-name.copyFileNameWithExtension",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"renameFile",
+				"editor.action.selectAll",
+				"editor.action.clipboardCopyAction",
+				"workbench.action.focusSideBar"
+			]
+		},
 		"when": "vim.active && filesExplorerFocus && !explorerResourceIsRoot && !inputFocus"
 	},
 	{
@@ -597,49 +708,18 @@
 	// Clear exits
 	{
 		"key": "escape",
-		"command": "runCommands",
-		"args": {
-			"commands": [
-				"search.action.clearSearchResults",
-				"revealInExplorer",
-				"workbench.action.closeSidebar"
-			]
-		},
-		"when": "vim.active && inSearchEditor || searchViewletFocus"
+		"command": "workbench.action.closeSidebar",
+		"when": "vim.active && sideBarFocus && !(sideBarFocus && activeViewlet === 'workbench.panel.chatSidebar' && !inChatInput) && focusedView !== 'workbench.explorer.fileView'"
 	},
 	{
 		"key": "escape",
-		"command": "runCommands",
-		"args": {
-			"commands": [
-				"problems.action.clearFilterText",
-				"workbench.actions.view.toggleProblems"
-			]
-		},
-		"when": "vim.active && problemFocus || problemsFilterFocus"
+		"command": "workbench.actions.view.toggleProblems",
+		"when": "vim.active && focusedView === 'workbench.panel.markers.view' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemFocus || problemsFilterFocus"
 	},
 	{
 		"key": "ctrl+c",
-		"command": "runCommands",
-		"args": {
-			"commands": [
-				"search.action.clearSearchResults",
-				"revealInExplorer",
-				"workbench.action.closeSidebar"
-			]
-		},
-		"when": "vim.active && inSearchEditor || searchViewletFocus"
-	},
-	{
-		"key": "ctrl+c",
-		"command": "runCommands",
-		"args": {
-			"commands": [
-				"problems.action.clearFilterText",
-				"workbench.actions.view.toggleProblems"
-			]
-		},
-		"when": "vim.active && problemFocus || problemsFilterFocus"
+		"command": "workbench.actions.view.toggleProblems",
+		"when": "vim.active && focusedView === 'workbench.panel.markers.view' || (panelFocus && activePanel === 'workbench.view.extension.tooltitude-refs') || problemFocus || problemsFilterFocus"
 	},
 
 	// Actions
@@ -704,40 +784,66 @@
 
 	// Debugger
 	{
+		"key": "ctrl+w h",
+		// "command": "workbench.debug.welcome.focus",
+		"command": "workbench.action.focusSideBar",
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "space s",
+		"command": "workbench.action.debug.start",
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "space r",
+		"command": "workbench.action.debug.restart",
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "space d",
+		"command": "workbench.action.debug.stop",
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "space c",
+		"command": "workbench.action.debug.configure",
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
 		"key": "c",
 		"command": "workbench.action.debug.continue",
-		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && debugState === 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "s",
 		"command": "workbench.action.debug.stepInto",
-		"when": "vim.active && debugState != 'inactive' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && debugState !== 'inactive' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "o",
 		"command": "workbench.action.debug.stepOut",
-		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && debugState === 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "n",
 		"command": "workbench.action.debug.stepOver",
-		"when": "vim.active && debugState == 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && debugState === 'stopped' && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "p",
 		"command": "editor.debug.action.showDebugHover",
-		"when": "vim.active && editorTextFocus && inDebugMode && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && editorTextFocus && inDebugMode && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "b",
 		"command": "editor.debug.action.toggleBreakpoint",
 		"when": "vim.active && debuggersAvailable && activeViewlet === 'workbench.view.debug' && editorTextFocus && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
-	{
-		"key": "e",
-		"command": "debug.setVariable",
-		"when": "vim.active && variablesFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
-	},
+	// {
+	// 	"key": "e",
+	// 	"command": "debug.setVariable",
+	// 	"when": "vim.active && variablesFocused && (!inputFocus || editorFocus) && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	// },
 	{
 		"key": "e",
 		"command": "debug.renameWatchExpression",
@@ -761,55 +867,149 @@
 	{
 		"key": "ctrl+w w",
 		"command": "workbench.debug.action.focusWatchView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w i",
 		"command": "workbench.debug.action.focusWatchView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w v",
 		"command": "workbench.debug.action.focusVariablesView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w b",
 		"command": "workbench.debug.action.focusBreakpointsView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w p",
 		"command": "workbench.debug.action.focusCallStackView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 	{
 		"key": "ctrl+w c",
 		"command": "workbench.debug.action.focusCallStackView",
-		"when": "vim.active && sideBarFocus && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+		"when": "vim.active && sideBarVisible && activeViewlet === 'workbench.view.debug' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 
 	// Language tools
+	//// Testing
 	{
-		"key": "space shift+t",
-		"command": "testing.runAll",
+		"key": "space t shift+t",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.extension.test",
+				"testing.showMostRecentOutput",
+				"testing.runAll",
+				"workbench.action.focusLastEditorGroup"
+			]
+		},
 		"when": "vim.active && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
+	},
+	{
+		"key": "space t t",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.extension.test",
+				"testing.showMostRecentOutput",
+				"testing.runAtCursor",
+				"workbench.action.focusLastEditorGroup"
+			]
+		},
+		"when": "vim.active && !(sideBarVisible && activeViewlet === 'workbench.view.debug') && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+	},
+	{
+		"key": "space t c",
+		"command": "runCommands",
+		"args": {
+			"commands": [
+				"workbench.view.extension.test",
+				"testing.showMostRecentOutput",
+				"testing.runCurrentFile",
+				"workbench.action.focusLastEditorGroup"
+			]
+		},
+		"when": "vim.active && !(sideBarVisible && activeViewlet === 'workbench.view.debug') && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+	},
+	{
+		"key": "ctrl+w j",
+		"command": "testing.showMostRecentOutput",
+		"when": "vim.active && panelVisible && activePanel === 'workbench.panel.testResults' && (vim.mode === 'Normal' && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode')"
 	},
 
 	//// Golang
 	{
 		"key": "space d",
 		"command": "go.show.commands",
-		"when": "vim.active && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+		"when": "vim.active && !(sideBarVisible && activeViewlet === 'workbench.view.debug') && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
 	},
 	{
-		"key": "space t",
+		"key": "space t f",
 		"command": "go.toggle.test.file",
-		"when": "vim.active && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+		"when": "vim.active && !(sideBarVisible && activeViewlet === 'workbench.view.debug') && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
 	},
 	{
-		"key": "space c",
+		"key": "space t c",
 		"command": "go.test.coverage",
-		"when": "vim.active && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+		"when": "vim.active && !(sideBarVisible && activeViewlet === 'workbench.view.debug') && (!inputFocus || editorFocus) && ((vim.mode === 'Normal' || vim.mode === 'Visual' || vim.mode === 'VisualLine' || vim.mode === 'VisualBlock') && vim.mode !== 'Insert' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && editorLangId === 'go'"
+	},
+
+	// Copilot
+	{
+		"key": "ctrl+l",
+		"command": "github.copilot.git.generateCommitMessage",
+		"when": "vim.active && focusedView === 'workbench.scm'"
+	},
+	{
+		"key": "ctrl+enter",
+		"command": "-github.copilot.generate",
+		"when": "editorTextFocus && github.copilot.activated && !inInteractiveInput && !interactiveEditorFocused"
+	},
+	{
+		"key": "cmd+enter",
+		"command": "github.copilot.generate",
+		"when": "vim.active && editorTextFocus && github.copilot.activated && !inInteractiveInput && !interactiveEditorFocused"
+	},
+	{
+		"key": "ctrl+enter",
+		"command": "editor.action.inlineSuggest.commit",
+		"when": "vim.active && editorFocus && (vim.mode === 'Insert' && vim.mode !== 'Normal' && vim.mode !== 'SearchInProgressMode' && vim.mode !== 'CommandlineInProgress' && vim.mode !== 'EasyMotionMode' && vim.mode !== 'EasyMotionInputMode' && vim.mode !== 'SurroundInputMode') && !renameInputVisible"
+	},
+	{
+		"key": "cmd+enter",
+		"command": "-inlineChat.acceptChanges",
+		"when": "inlineChatHasProvider && inlineChatVisible && !inlineChatDocumentChanged || inlineChatHasProvider && inlineChatVisible && config.inlineChat.mode != 'preview'"
+	},
+	{
+		"key": "ctrl+w k",
+		"command": "workbench.action.chat.previousCodeBlock",
+		"when": "vim.active && hasChatProvider && inChat"
+	},
+	{
+		"key": "ctrl+w j",
+		"command": "workbench.panel.chat.view.copilot.focus",
+		"when": "vim.active && hasChatProvider && inChat"
+	},
+	{
+		"key": "ctrl+enter",
+		"command": "workbench.action.chat.insertCodeBlock",
+		"when": "vim.active && accessibleViewInCodeBlock && hasChatProvider || hasChatProvider && inChat && !inChatInput"
 	}
+
+	// Git
+	// {
+	// 	"key": "a",
+	// 	"command": "git.stageAll",
+	// 	"when": "vim.active && focusedView === 'workbench.scm'"
+	// },
+	// {
+	// 	"key": "u",
+	// 	"command": "git.unstageAll",
+	// 	"when": "vim.active && focusedView === 'workbench.scm'"
+	// },
 ]

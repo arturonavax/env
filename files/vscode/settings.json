@@ -3,6 +3,17 @@
 	"editor.lineNumbers": "relative", // disable for streaming
 	"vim.smartRelativeLine": true, // disable for streaming
 
+	"protoc": {
+		"options": [
+			"--proto_path=protos/v3",
+			"--proto_path=protos/v2",
+			"--proto_path=${workspaceRoot}/proto",
+			"--proto_path=${env.HOME}/src",
+			"--proto_path=${env.HOME}/protobuf-extras/grpc-gateway",
+			"--proto_path=${env.HOME}/protobuf-extras/protoc-gen-validate"
+		]
+	},
+
 	"workbench.colorTheme": "Tokyo Night",
 	"workbench.preferredDarkColorTheme": "Tokyo Night",
 	"workbench.preferredLightColorTheme": "Tokyo Night Light",
@@ -21,22 +32,24 @@
 	"accessibility.dimUnfocused.enabled": true,
 	"window.commandCenter": false,
 	"accessibility.voice.speechLanguage": "es-MX",
+	"editor.peekWidgetDefaultFocus": "tree",
 
 	"editor.fontSize": 12,
 	"editor.lineHeight": 0,
 	"editor.tabSize": 4,
 	"editor.tabCompletion": "on",
 	"editor.autoClosingBrackets": "always",
-	"editor.fontFamily": "CaskaydiaCove Nerd Font Mono",
 	"editor.stickyScroll.enabled": true,
 	"workbench.tree.enableStickyScroll": true,
-	"editor.fontLigatures": false,
 	"editor.linkedEditing": true,
 	"editor.guides.bracketPairs": true,
 	"editor.formatOnSave": true,
 	"editor.formatOnPaste": false,
 	"editor.minimap.enabled": false,
 	"editor.suggestSelection": "first",
+	"editor.suggest.filterGraceful": true,
+	"editor.suggest.preview": false,
+	"editor.suggest.showInlineDetails": true,
 	"editor.wordWrap": "on",
 	"editor.insertSpaces": false,
 	"editor.inlayHints.enabled": "on",
@@ -45,10 +58,16 @@
 	"timeline.pageSize": 0,
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
-	"explorer.autoReveal": true,
+	"editor.parameterHints.enabled": true,
 	"security.workspace.trust.untrustedFiles": "open",
+	"editor.wordBasedSuggestions": "matchingDocuments",
+	"editor.quickSuggestions": {
+		"other": true,
+		"comments": false,
+		"strings": true
+	},
 
-	"terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font Mono",
+	"terminal.integrated.fontFamily": "Monaspace Neon, MonaspiceNe Nerd Font Mono",
 	"terminal.integrated.fontSize": 12,
 	"terminal.integrated.defaultProfile.linux": "tmux",
 	"terminal.integrated.env.linux": {},
@@ -76,10 +95,20 @@
 			"path": "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
 		}
 	},
+
+	"editor.fontLigatures": "'calt', 'liga'",
+	"editor.fontFamily": "Monaspace Neon, MonaspiceNe Nerd Font Mono",
+	"editor.inlineSuggest.fontFamily": "Monaspace Krypton",
+	"editor.inlayHints.fontFamily": "Monaspace Krypton",
+	"errorLens.fontFamily": "Monaspace Radon",
+	"errorLens.codeLensLength": {
+		"min": 10
+	},
+	"editor.codeLensFontFamily": "Monaspace Krypton Var",
 	"editor.tokenColorCustomizations": {
 		"textMateRules": [
 			{
-				"scope": ["comment", "keyword", "support.function"],
+				"scope": ["comment", "keyword"],
 				"settings": {
 					"fontStyle": "italic"
 				}
@@ -92,9 +121,22 @@
 			"editorCodeLens.foreground": "#7982a9",
 			"window.inactiveBorder": "#000000",
 			"window.activeBorder": "#BF4B4B",
+			"tab.activeBorder": "#BF4B4B",
 
-			"tab.activeBackground": "#1a1b26",
-			"tab.activeBorder": "#BF4B4B"
+			"tab.activeBackground": "#212536",
+
+			"editorSuggestWidget.background": "#212536",
+			"editorSuggestWidget.border": "#212536",
+			"editorSuggestWidget.selectedBackground": "#1a1b26",
+			"focusBorder": "#752b2b",
+			"peekView.border": "#752b2b",
+			"list.focusBackground": "#212536",
+			"list.activeSelectionBackground": "#212536",
+			"list.inactiveSelectionBackground": "#212536",
+
+			"editorInlayHint.background": "#24283a",
+			"editorInlayHint.parameterBackground": "#24283a",
+			"editor.lineHighlightBackground": "#222435"
 		},
 
 		"[Tokyo Night Light]": {
@@ -107,6 +149,7 @@
 	},
 
 	"gitlens.currentLine.enabled": false,
+	"git.suggestSmartCommit": true,
 
 	"prettier.enable": true,
 	"prettier.tabWidth": 2,
@@ -137,8 +180,22 @@
 		"typescript": "typescriptreact"
 	},
 
+	"javascript.referencesCodeLens.enabled": true,
+	"javascript.referencesCodeLens.showOnAllFunctions": true,
+	"typescript.referencesCodeLens.enabled": true,
+	"typescript.referencesCodeLens.showOnAllFunctions": true,
+	"typescript.implementationsCodeLens.enabled": true,
+	"typescript.implementationsCodeLens.showOnInterfaceMethods": true,
+
 	"go.lintTool": "golangci-lint",
+	"go.lintFlags": ["-exclude=vendor/..."],
 	"go.toolsManagement.autoUpdate": true,
+	"go.inlayHints.assignVariableTypes": false,
+	"go.inlayHints.parameterNames": true,
+	"go.inlayHints.constantValues": true,
+	"go.enableCodeLens": {
+		"runtest": true
+	},
 	"go.useLanguageServer": true,
 	"gopls": {
 		"ui.codelenses": {
@@ -152,7 +209,9 @@
 		"ui.semanticTokens": true,
 		"formatting.gofumpt": true,
 		"ui.diagnostic.staticcheck": true,
+		"ui.completion.usePlaceholders": false,
 		"analyses": {
+			"appends": true,
 			"asmdecl": true,
 			"assign": true,
 			"atomic": true,
@@ -169,12 +228,16 @@
 			"embed": true,
 			"errorsas": true,
 			"fieldalignment": true,
+			"fillreturns": true,
 			"httpresponse": true,
 			"ifaceassert": true,
+			"infertypeargs": true,
 			"loopclosure": true,
 			"lostcancel": true,
 			"nilfunc": true,
 			"nilness": true,
+			"nonewvars": true,
+			"noresultvalues": true,
 			"printf": true,
 			"shadow": true,
 			"shift": true,
@@ -184,26 +247,23 @@
 			"slog": true,
 			"sortslice": true,
 			"stdmethods": true,
+			"stdversion": true,
 			"stringintconv": true,
 			"structtag": true,
+			"stubmethods": true,
 			"testinggoroutine": true,
 			"tests": true,
 			"timeformat": true,
+			"undeclaredname": true,
 			"unmarshal": true,
 			"unreachable": true,
 			"unsafeptr": true,
 			"unusedparams": true,
 			"unusedresult": true,
+			"unusedvariable": true,
 			"unusedwrite": true,
 			"useany": true,
-			"fillreturns": true,
-			"nonewvars": true,
-			"noresultvalues": true,
-			"undeclaredname": true,
-			"unusedvariable": true,
-			"fillstruct": true,
-			"infertypeargs": true,
-			"stubmethods": true
+			"fillstruct": true
 		}
 	},
 
@@ -245,6 +305,18 @@
 		{
 			"before": ["k", "j"],
 			"after": ["<Esc>"]
+		},
+		{
+			"before": ["<C-l>"],
+			"commands": ["editor.action.inlineSuggest.acceptNextWord"]
+		},
+		{
+			"before": ["<C-]>"],
+			"commands": ["github.copilot.nextPanelSolution"]
+		},
+		{
+			"before": ["<C-[>"],
+			"commands": ["github.copilot.previousPanelSolution"]
 		}
 	],
 	// change vim to vscode undo/redo
@@ -288,6 +360,21 @@
 			"commands": ["editor.action.blockComment"]
 		},
 		{
+			"before": ["g", "d"],
+			"commands": ["editor.action.revealDefinition"]
+		},
+		{
+			"before": ["g", "v", "d"],
+			"commands": ["editor.action.revealDefinitionAside"]
+		},
+		{
+			"before": ["g", "s", "d"],
+			"commands": [
+				"workbench.action.splitEditorDown",
+				"editor.action.revealDefinition"
+			]
+		},
+		{
 			"before": ["g", "p", "d"],
 			"commands": ["editor.action.peekDefinition"]
 		},
@@ -298,6 +385,20 @@
 		{
 			"before": ["g", "i"],
 			"commands": ["editor.action.goToImplementation"]
+		},
+		{
+			"before": ["g", "v", "i"],
+			"commands": [
+				"workbench.action.splitEditorRight",
+				"editor.action.goToImplementation"
+			]
+		},
+		{
+			"before": ["g", "s", "i"],
+			"commands": [
+				"workbench.action.splitEditorDown",
+				"editor.action.goToImplementation"
+			]
 		},
 		{
 			"before": ["g", "p", "i"],
@@ -314,6 +415,20 @@
 		{
 			"before": ["g", "t"],
 			"commands": ["editor.action.goToTypeDefinition"]
+		},
+		{
+			"before": ["g", "v", "t"],
+			"commands": [
+				"workbench.action.splitEditorRight",
+				"editor.action.goToTypeDefinition"
+			]
+		},
+		{
+			"before": ["g", "s", "t"],
+			"commands": [
+				"workbench.action.splitEditorDown",
+				"editor.action.goToTypeDefinition"
+			]
 		},
 		{
 			"before": ["g", "p", "t"],
@@ -339,6 +454,11 @@
 			"commands": ["testing.goToPreviousMessage"],
 			"when": "editorFocus && testing.isPeekVisible"
 		}
+		// {
+		// 	"before": ["<C-w>", "z"],
+		// 	"commands": ["workbench.action.toggleMaximizeEditorGroup"],
+		// 	"when": "editorFocus"
+		// }
 	],
 	"vim.visualModeKeyBindings": [
 		{

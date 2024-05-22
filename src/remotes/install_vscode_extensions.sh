@@ -6,7 +6,6 @@ if [[ "$(command -v code)" == "" ]]; then
 	exit 1
 fi
 
-code --install-extension nemesv.copy-file-name                  # Copy file name
 code --install-extension enkia.tokyo-night                      # Tokyo Night
 code --install-extension PKief.material-icon-theme              # Material Icon Theme
 code --install-extension usernamehw.errorlens                   # Error Lens
@@ -27,7 +26,8 @@ code --install-extension humao.rest-client            # Rest Client
 code --install-extension rangav.vscode-thunder-client # Thunder Client
 
 ## Go
-code --install-extension golang.go # Go
+code --install-extension golang.go                 # Go
+code --install-extension tooltitudeteam.tooltitude # Tooltitude for Go (GoLang)
 
 ## Python
 code --install-extension ms-python.python         # Python

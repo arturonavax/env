@@ -37,7 +37,7 @@ repo_root_format = '[$read_only]($read_only_style)[$before_root_path]($before_re
 format = '[$read_only]($read_only_style)[$path]($style) '
 
 [git_branch]
-symbol = ''
+symbol = '󰘬 '
 
 [git_commit]
 format = 'on [\($hash$tag\)]($style) '
@@ -50,7 +50,7 @@ ahead = '[⇡](bold blue)'
 behind = '[⇣](bold cyan)'
 diverged = '[⇕](bold yellow)'
 untracked = '[?](bold yellow)'
-stashed = '[ﱾ](bold blue)'
+stashed = '[󰳉](bold blue)'
 deleted = '[](bold red)'
 modified = '[!](bold red)'
 style = 'bold white'

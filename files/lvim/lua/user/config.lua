@@ -9,7 +9,7 @@ Root_patterns = {
 	-- python
 	"requirement.txt",
 	-- java
-	"pom.xml", -- apache maven
+	"pom.xml",    -- apache maven
 	-- php
 	"composer.json", -- composer
 	-- c++
@@ -19,10 +19,10 @@ Root_patterns = {
 	-- kotlin
 	"build.gradle",
 	-- version control systems (vcs)
-	".git", -- git
-	".hg", -- mercurial
-	".bzr", -- bazaar
-	".svn", -- subversion
+	".git",  -- git
+	".hg",   -- mercurial
+	".bzr",  -- bazaar
+	".svn",  -- subversion
 	"_darcs", -- darcs
 	-- generals
 	"Makefile", -- make
@@ -41,7 +41,7 @@ vim.opt.completeopt = { "menuone", "noselect" }
 vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 vim.opt.foldlevel = 99
-vim.opt.guifont = "CaskaydiaCove Nerd Font Mono:h11"
+vim.opt.guifont = "MonaspiceNe Nerd Font Mono:h11"
 vim.opt.clipboard = ""
 vim.opt.mouse = "a"
 vim.opt.ignorecase = true

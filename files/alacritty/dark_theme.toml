@@ -17,19 +17,19 @@ args = ["-l", "-c", "tmux"]
 size = 14
 
 [font.bold]
-family = "CaskaydiaCove Nerd Font Mono"
+family = "MonaspiceNe Nerd Font Mono"
 style = "Bold"
 
 [font.bold_italic]
-family = "CaskaydiaCove Nerd Font Mono"
+family = "MonaspiceNe Nerd Font Mono"
 style = "Bold Italic"
 
 [font.italic]
-family = "CaskaydiaCove Nerd Font Mono"
+family = "MonaspiceNe Nerd Font Mono"
 style = "Italic"
 
 [font.normal]
-family = "CaskaydiaCove Nerd Font Mono"
+family = "MonaspiceNe Nerd Font Mono"
 style = "Regular"
 
 [[keyboard.bindings]]
