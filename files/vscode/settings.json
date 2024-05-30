@@ -1,7 +1,7 @@
 // Settings VSCode
 {
-	"editor.lineNumbers": "relative", // disable for streaming
-	"vim.smartRelativeLine": true, // disable for streaming
+	// "editor.lineNumbers": "relative", // disable for streaming
+	// "vim.smartRelativeLine": true, // disable for streaming
 
 	"protoc": {
 		"options": [
@@ -540,5 +540,6 @@
 			"italic": false
 		}
 	],
-	"console-ninja.featureSet": "Community"
+	"console-ninja.featureSet": "Community",
+	"github.copilot.editor.enableAutoCompletions": true
 }
