@@ -9,6 +9,14 @@ let linterListDeprecated = [
 	"- structcheck",
 	"- deadcode",
 	"- nosnakecase",
+	"- exhaustivestruct",
+	"- golint",
+	"- ifshort",
+	"- interfacer",
+	"- maligned",
+	"- scopelint",
+	"- gomnd",
+	"- execinquery",
 ];
 
 let myBlacklist = [
@@ -21,7 +29,7 @@ let myBlacklist = [
 	"- exhaustruct",
 	"- musttag",
 	"- tagliatelle",
-	"- taglign",
+	"- tagalign",
 	"- godox",
 	"- inamedparam",
 	"- gochecksumtype",
