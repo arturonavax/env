@@ -107,7 +107,7 @@ function install_terminal() {
 			sudo apt install -y netcat-traditional ssh
 
 			# Tools
-			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree exa ripgrep xclip xsel tor \
+			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan aircrack-ng sqlmap direnv
 
 			cargo install exa
