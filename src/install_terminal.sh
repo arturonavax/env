@@ -90,7 +90,7 @@ function install_terminal() {
 
 			## GUI and Qt dependencies
 			sudo apt install -y libxrandr2 libxrandr2 libxss1 \
-				libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6 libxcb-xfixes0-dev
+				libxcursor1 libxcomposite1 libxi6 libxtst6 libxcb-xfixes0-dev
 
 			## Fonts dependencies
 			sudo apt install -y pkg-config fontconfig libfreetype6-dev libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev
