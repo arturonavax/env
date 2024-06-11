@@ -91,6 +91,10 @@
 		"command": "workbench.panel.chat.view.copilot.focus"
 	},
 	{
+		"key": "shift+alt+p",
+		"command": "workbench.action.showCommands"
+	},
+	{
 		"key": "ctrl+shift+p",
 		"command": "projectManager.listProjects"
 	},
