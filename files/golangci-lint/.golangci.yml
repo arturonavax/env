@@ -257,6 +257,7 @@ linters-settings:
   funlen:
     lines: 140
     statements: 60
+    ignore-comments: true
 
   errcheck:
     check-type-assertions: true
@@ -424,3 +425,10 @@ linters-settings:
     # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
     # Default: false
     enable-all: true
+
+issues:
+  exclude-rules:
+    # disable funlen for test funcs
+    - source: "^func Test"
+      linters:
+        - funlen
