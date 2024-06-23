@@ -114,6 +114,10 @@
 		"key": "ctrl+shift+o",
 		"command": "workbench.action.files.openFolder"
 	},
+	{
+		"key": "ctrl+p",
+		"command": "-workbench.action.quickOpen"
+	},
 
 	// Editor Empty (Dashboard)
 	{
