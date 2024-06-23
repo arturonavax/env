@@ -476,6 +476,8 @@ _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment ap
     - In the Dock, the apps that are "Options" -> "Assign To" in "All Desktop"
       mode do not work well in Amethyst.
 
+    - !!! Rectangle may have lost its usefulness in MacOS 15.
+
 - App cleaner: [AppCleaner][appcleaner]
 
   - _Pricing: Free._
