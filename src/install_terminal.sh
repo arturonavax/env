@@ -107,10 +107,8 @@ function install_terminal() {
 			sudo apt install -y netcat-traditional ssh
 
 			# Tools
-			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree bat ripgrep xclip xsel tor \
+			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree eza bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan aircrack-ng sqlmap direnv
-
-			cargo install exa
 
 			sudo apt install -y wireshark tshark
 
@@ -141,7 +139,7 @@ function install_terminal() {
 
 			sudo dnf install -y netcat openssh
 
-			sudo dnf install -y mtr tmux tree exa bat ripgrep xclip xsel tor \
+			sudo dnf install -y mtr tmux tree eza bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan
 
 			sudo dnf install -y wireshark # includes tshark
@@ -185,7 +183,7 @@ function install_terminal() {
 		brew install netcat openssh
 
 		# Tools
-		brew install clang-format rar mtr exiftool git-flow tmux tree exa bat ripgrep xclip xsel tor \
+		brew install clang-format rar mtr exiftool git-flow tmux tree eza bat ripgrep xclip xsel tor \
 			shellcheck nmap arp-scan aircrack-ng sqlmap direnv
 
 		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh || :

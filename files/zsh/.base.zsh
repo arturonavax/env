@@ -365,11 +365,11 @@ if fd -q &>/dev/null; then
     alias find='fdfind --hidden'
 fi
 
-## Exa
-if [[ "$(command -v exa)" != "" ]]; then
-    alias ls='exa --icons --classify'
-    alias ll='exa --icons --classify -lh'
-    alias llt='exa --icons --classify --tree'
+## Eza
+if [[ "$(command -v eza)" != "" ]]; then
+    alias ls='eza --icons --classify'
+    alias ll='eza --icons --classify -lh'
+    alias llt='eza --icons --classify --tree'
 
 else
     alias ls='ls --color'
