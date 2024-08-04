@@ -137,13 +137,8 @@ function install_editor() {
 		brew install readline
 
 		# Install vscode
-		if [[ "$(command -v code)" == "" ]]; then
-			vscode_path="/Applications/Visual Studio Code.app"
-			[[ ! -f "$vscode_path" ]] && rm -f "$vscode_path"
-
-			brew install --cask visual-studio-code
-			xattr -d com.apple.quarantine "/Applications/Visual Studio Code.app" || :
-		fi
+		brew install --cask visual-studio-code || :
+		xattr -d com.apple.quarantine "/Applications/Visual Studio Code.app" || :
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
