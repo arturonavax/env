@@ -29,8 +29,11 @@ if [[ "$add_base" == 1 ]]; then
 	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.base\.zsh \]\] && source ~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo >>~/"$shell_file"
 
-		echo '# load base configuration' >>~/"$shell_file"
-		echo '[[ -f ~/.base.zsh ]] && source ~/.base.zsh' >>~/"$shell_file"
+		echo -e '# load base configuration
+[[ -f ~/.base.zsh ]] && source ~/.base.zsh' |
+			cat - "$shell_file" >"$shell_file".temp &&
+			mv "$shell_file".temp "$shell_file"
+		echo >>~/"$shell_file"
 	fi
 fi
 
@@ -39,8 +42,11 @@ if [[ "$add_tools" == 1 ]]; then
 	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.tools\.sh \]\] && source ~/\.tools\.sh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo >>~/"$shell_file"
 
-		echo '# load tools' >>~/"$shell_file"
-		echo '[[ -f ~/.tools.sh ]] && source ~/.tools.sh' >>~/"$shell_file"
+		echo -e '# load tools
+[[ -f ~/.tools.sh ]] && source ~/.tools.sh' |
+			cat - "$shell_file" >"$shell_file".temp &&
+			mv "$shell_file".temp "$shell_file"
+		echo >>~/"$shell_file"
 	fi
 fi
 
