@@ -159,15 +159,6 @@ function install_editor() {
 	node_package_module install --global tree-sitter-cli prettier eslint typescript emmet-ls bash-language-server \
 		markdownlint-cli @bufbuild/buf nginxbeautifier sql-formatter stylelint
 
-	# install node tools plugins in $HOME
-	cd ~
-	node_package_module install eslint-plugin-n
-
-	node_package_module install eslint typescript postcss stylelint eslint-plugin-react \
-		@typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-import eslint-plugin-n eslint-plugin-promise \
-		stylelint-config-standard
-	cd -
-
 	# check exists goenv
 	export GOENV_ROOT="$HOME/.goenv"
 
