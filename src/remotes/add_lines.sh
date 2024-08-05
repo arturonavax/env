@@ -24,7 +24,7 @@ esac
 
 touch ~/"$shell_file"
 
-# add 'source ~/.base.zsh' command to the end of the file
+# add 'source ~/.base.zsh' command to the begin of the file
 if [[ "$add_base" == 1 ]]; then
 	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.base\.zsh \]\] && source ~/\.base\.zsh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo | cat - "$shell_file" >"$shell_file".temp &&
@@ -37,7 +37,7 @@ if [[ "$add_base" == 1 ]]; then
 	fi
 fi
 
-# add 'source ~/.tools.sh' command to the end of the file
+# add 'source ~/.tools.sh' command to the begin of the file
 if [[ "$add_tools" == 1 ]]; then
 	if [[ "$(command grep '^[^#]*\[\[ -f ~/\.tools\.sh \]\] && source ~/\.tools\.sh' ~/"$shell_file")" == "" ]]; then
 		[[ "$(wc -l ~/"$shell_file" | awk '{print $1}')" != 0 ]] && echo | cat - "$shell_file" >"$shell_file".temp &&

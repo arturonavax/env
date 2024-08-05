@@ -426,9 +426,9 @@ function install_terminal() {
 
 	[[ ! -f ~/.zshrc ]] && touch ~/.zshrc
 
-	# add 'source ~/.base.zsh' command to the end of the file
-	# add 'source ~/.tools.sh' command to the end of the file
-	./src/remotes/add_lines.sh base tools
+	# add 'source ~/.tools.sh' command to the begin of the file
+	# add 'source ~/.base.zsh' command to the begin of the file
+	./src/remotes/add_lines.sh tools base
 
 	[[ "$(wc -l ~/.zshrc | awk '{print $1}')" == "$(wc -l ./files/zsh/.zshrc | awk '{print $1}')" ]] && cp ./files/zsh/.zshrc ~/.zshrc
 
