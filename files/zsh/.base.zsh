@@ -15,7 +15,13 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 # EDITOR
-[[ "$(command -v lvim)" != "" ]] && export EDITOR=lvim
+if [[ "$(command -v code)" != "" ]]; then
+  export EDITOR=code
+
+elif [[ "$(command -v lvim)" != "" ]]; then
+  export EDITOR=lvim
+
+fi
 
 # load zsh-completions
 autoload -Uz compinit && compinit
@@ -188,7 +194,7 @@ EOF
             pnpm add -g @pnpm/exe
             pnpm --global update
             cd "$HOME"
-            pnpm update
+            [[ -f "package.json" ]] && pnpm update
             cd -
         fi
 

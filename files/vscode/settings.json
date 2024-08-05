@@ -174,6 +174,7 @@
 	"[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
 	"[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
 	"[proto3]": { "editor.defaultFormatter": null },
+	"[shellscript]": { "editor.defaultFormatter": "foxundermoon.shell-format" },
 
 	"emmet.includeLanguages": {
 		"postcss": "css",
@@ -558,8 +559,5 @@
 		"*.db3": "${capture}.${extname}-*",
 		"*.sdb": "${capture}.${extname}-*",
 		"*.s3db": "${capture}.${extname}-*"
-	},
-	"[shellscript]": {
-		"editor.defaultFormatter": "foxundermoon.shell-format"
 	}
 }
