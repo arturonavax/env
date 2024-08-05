@@ -558,5 +558,8 @@
 		"*.db3": "${capture}.${extname}-*",
 		"*.sdb": "${capture}.${extname}-*",
 		"*.s3db": "${capture}.${extname}-*"
+	},
+	"[shellscript]": {
+		"editor.defaultFormatter": "foxundermoon.shell-format"
 	}
 }
