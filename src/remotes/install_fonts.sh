@@ -16,7 +16,6 @@ function install_fonts() {
 
 	tmp_dir="$(mktemp -d)"
 
-	echo "tmp_dir: $tmp_dir"
 	cd "$tmp_dir"
 
 	# Download Monaspace nerd font
