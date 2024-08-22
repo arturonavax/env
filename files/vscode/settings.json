@@ -152,6 +152,7 @@
 	"gitlens.currentLine.enabled": false,
 	"git.suggestSmartCommit": true,
 
+	"makefile.configureOnOpen": true,
 	"prettier.enable": true,
 	"prettier.tabWidth": 2,
 	"prettier.useTabs": true,
