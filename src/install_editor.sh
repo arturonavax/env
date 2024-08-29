@@ -283,6 +283,8 @@ function install_editor() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring tools GIT with vscode...${fgcolor_reset}"
+	git config --global color.ui auto
+
 	# git config --global core.editor lvim
 	git config --global core.editor 'code --wait'
 
