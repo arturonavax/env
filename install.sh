@@ -18,7 +18,7 @@ source ./src/remotes/_vars_colors.sh
 
 function install() {
 	# check arguments
-	./src/remotes/usage_install.sh "$@" || exit 0
+	./src/remotes/usage_install.sh "$@" || exit 1
 
 	for arg in "$@"; do
 		case "$arg" in

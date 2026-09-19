@@ -1,14 +1,22 @@
 #!/bin/bash
 # Run: bash <(curl -fsSL "https://env.arturonavax.dev/install.sh")
 # Parameter to install requirements: requirements
+# Parameter to install fonts: fonts
 # Parameter to install terminal: terminal
 # Parameter to install editor: editor
+# Parameter to install AI tooling: ai
 # Parameter to install OS config: osconfig
 # Parameter to install all: all
 # Parameter to help: help
 [[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
 
 bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
+
+for arg in "$@"; do
+	case "$arg" in
+	h | help) exit 0 ;;
+	esac
+done
 
 [[ -z "$installation_folder" ]] && installation_folder="$HOME/arturonavax-env"
 
