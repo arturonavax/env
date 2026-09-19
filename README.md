@@ -31,7 +31,8 @@ List of installation parameters:
 
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
-- `editor` / `e`: Install the editor (`lvim`) and development tools.
+- `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
+- `ai`: Install AI tooling (Antigravity CLI / agy, MCP environment, harnesses and prompt files).
 - `osconfig` / `o`: Configure the operationg system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
 
@@ -105,15 +106,17 @@ backup of all current files that it replaces in `~/.arturonavax-env-backups/`
 
 The backup script is: [`backup_config.sh`](./utils/backup_config.sh)
 
-## Features :ballot_box_with_check:
+---
+
+## Features :star:
 
 _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
 - **True Color** :rainbow:
 
-- Patched Mono Font: [Caskaydia Cove](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/CascadiaCode)
+- Patched Mono Font: [MonaspiceNe Nerd Font / Cascadia Code](https://github.com/ryanoasis/nerd-fonts)
 
-### Terminal :computer: ([`alacritty`](https://alacritty.org/))
+### Terminal :computer: ([`ghostty`](https://ghostty.org/))
 
 - [`tmux`](https://github.com/tmux/tmux)
 
@@ -129,7 +132,7 @@ _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
   - [FzF](https://github.com/junegunn/fzf) :mag: (`<Ctrl>r`)
 
-### Editor :pencil: ([`lvim`](https://www.lunarvim.org/))
+### Editor :pencil: ([`nvim` - LazyVim](https://www.lazyvim.org/))
 
 - Fast startup time :zap:
 
@@ -137,27 +140,27 @@ _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
 - LSP / Code Completion 🧠:thought_balloon:
 
-  - Installer (`:LspInstall <language>`)
+  - Built-in Mason package installer (`:Mason`)
 
-  - Automatic language installation! (config server `:LspSettings <server>`)
+  - Auto language LSP & Linters / Formatters integration
 
-  - Autocomplete signatures
+  - Autocomplete signatures & diagnostics
 
   - Hover documentation (`K`)
 
-  - Snippets
+  - Snippets (LuaSnip)
 
-- File search :mag::page_facing_up: (`<Space>f`)
+- File search :mag::page_facing_up: (`<Space><Space>` or `<Space>ff`)
 
-- Word search :mag::abc: (`<Space>j`)
+- Word search :mag::abc: (`<Space>/` or `<Space>sg`)
 
-- Linters :flashlight:
+- Linters :flashlight: (nvim-lint)
 
-- Formatters 🛠️
+- Formatters 🛠️ (conform.nvim)
 
-- Code Actions
+- AI & LLM Assistants (Avante.nvim, CodeCompanion)
 
-- Code Lens
+- Snacks.nvim & Neo-tree
 
 _**And much more :eyes:**_
 
@@ -172,33 +175,30 @@ without having to perform the complete installation.
 
 List of synchronization parameters:
 
-- `terminal` / `t`: Synchronize the Terminal settings.
-- `editor` / `e`: Synchronize Editor (lvim) settings.
+- `terminal` / `t`: Synchronize the Terminal settings (Ghostty, tmux, zsh, starship).
+- `editor` / `e`: Synchronize Editor (nvim - LazyVim) settings.
 - `osconfig` / `o`: Configure the operating system with personal preferences.
-- `plugins` / `p`: Synchronize Editor (lvim) plugins.
-- `vscode` / `v`: Synchronize Visual Studio Code settings.
+- `plugins` / `p`: Restore/synchronize Editor (nvim - LazyVim) plugins from lockfile.
+- `plugins-update` / `up`: Update Editor (nvim - LazyVim) plugins and lockfile.
+- `vscode` / `v`: Synchronize Visual Studio Code settings (explicit argument only).
+- `cursor` / `c`: Synchronize Cursor IDE settings (explicit argument only).
 - `devtools` / `d`: Synchronizes the configuration of development tools.
-- `all` / `a`: Synchronizes the configuration of all of the above.
+- `all` / `a`: Synchronizes all base configurations (excludes GUI IDEs).
 
 ## Custom configuration :gear:
 
-To add custom configurations do it in the `~/.lunarvim.lua` file
+To customize LazyVim, edit or add files in `~/.config/nvim/lua/plugins/` and `~/.config/nvim/lua/config/`.
 
-For example, to add more plugins would be:
+For example, to add custom plugins create a file in `~/.config/nvim/lua/plugins/custom.lua`:
 
 ```lua
-vim.list_extend(lvim.plugins,
-    {
-        "folke/lsp-colors.nvim",
-        event = "BufRead",
-    }
-)
-
--- change leader key
-lvim.leader = ","
-
--- change theme
-lvim.colorscheme = "onedarker"
+return {
+  {
+    "folke/trouble.nvim",
+    cmd = { "TroubleToggle", "Trouble" },
+    opts = { use_diagnostic_signs = true },
+  },
+}
 ```
 
 ## More keyboard speed :keyboard:

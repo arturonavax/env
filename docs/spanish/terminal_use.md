@@ -4,17 +4,16 @@ Desarrollo y trabajo utilizando 100% la terminal de Linux (menos el Navegador
 Web), editor de codigo, bases de datos, monitorizacion de sistema.
 
 La GUI de terminal que utilizo es indiferente a mi flujo de trabajo, suelo usar
-la [Alacritty](https://github.com/alacritty/alacritty) porque tiene aceleracion
-por GPU y se me hizo mas facil de transportar su configuracion, mi flujo de
+[Ghostty](https://ghostty.org/) porque tiene aceleracion por GPU nativa y alto rendimiento, mi flujo de
 trabajo se divide en :
 
-- Terminal GUI: [`alacritty`](https://github.com/alacritty/alacritty)
+- Terminal GUI: [`ghostty`](https://ghostty.org/)
 
-  - Nerd Font: [Caskaydia Cove](https://github.com/ryanoasis/nerd-fonts/tree/master/patched-fonts/CascadiaCode)
+  - Nerd Font: [MonaspiceNe Nerd Font](https://github.com/ryanoasis/nerd-fonts)
 
 - Shell: `zsh`
 - Terminal Multiplexor: `tmux`
-- Code editor: `lvim` ([LunarVim](https://www.lunarvim.org/))
+- Code editor: `nvim` ([LazyVim](https://www.lazyvim.org/))
 
 Para aumentar la velocidad del teclado seteo el delay y repeat rate para el
 servidor grafico con:
@@ -23,14 +22,13 @@ servidor grafico con:
 xset r rate 200 30
 ```
 
-Al encender mi maquina, abro la `alacritty`, voy a la carpeta de mi proyecto,
+Al encender mi maquina, abro `ghostty`, voy a la carpeta de mi proyecto,
 y presiono `<F11>` para trabajar con la terminal en pantalla completa.
 
-## Alacritty
+## Ghostty
 
-Utilizo `alacritty` como GUI de terminal, por la aceleracion por GPU que ofrece
-y la facil configuracion por un archivo .yml, esto ultimo me permite transportar
-facilmente la configuracion.
+Utilizo `ghostty` como GUI de terminal, por la aceleracion por GPU que ofrece,
+soporte moderno para Kitty Graphics (Snacks.image en Neovim), sincronización nativa OSC 52, y renderizado veloz.
 
 Esta terminal la tengo configurada sin bordes de ventana por decoracion, muevo y
 manejo la ventana por medio de los atajos de `<Super>` (Window Key)

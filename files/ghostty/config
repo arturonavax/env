@@ -1,0 +1,45 @@
+# --- Dimensiones y Estado ---
+window-width = 150
+window-height = 43
+# window-save-state = "always"
+
+# --- Tipografía ---
+font-family = "MonaspiceNe Nerd Font Mono"
+font-size = 13
+
+# --- Apariencia ---
+theme = "light:TokyoNight Day,dark:TokyoNight Night"
+
+background-opacity = 1.0
+background-blur-radius = 0
+
+
+window-decoration = true
+window-padding-balance = true
+window-colorspace = "display-p3"
+
+# Ajuste de grises para comentarios y texto secundario
+palette = 8=#808080
+palette = 0=#404040
+
+# --- Rendimiento y Comportamiento ---
+gtk-single-instance = true
+mouse-hide-while-typing = true
+auto-update = "off"
+gtk-titlebar = false
+cursor-style = block
+cursor-style-blink = false
+font-feature = []
+window-vsync = false
+
+# --- Inicio automático con tmux ---
+copy-on-select = clipboard
+# Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
+mouse-scroll-multiplier = 1
+
+command = sh -c "tmux new-session -s main 2>/dev/null || tmux new-session -t main \\; set-option destroy-unattached on"
+
+desktop-notifications = true
+notify-on-command-finish = unfocused
+notify-on-command-finish-action = notify
+notify-on-command-finish-after = 3s

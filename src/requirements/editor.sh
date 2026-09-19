@@ -32,19 +32,11 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 	required-commands brew
 fi
 
-required-commands git make python3 pip cargo node npm
-
-if ! python3 -m pip &>/dev/null; then
-	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}python3 must have the 'pip' module.${fgcolor_reset}"
-
-	exit 1
-fi
+required-commands git make curl tar python3 cargo node npm
 
 node_version_major="$(node --version | cut -d'.' -f1 | tr -d 'v')"
 
 ## check node version
-if ((node_version_major < 12)); then
-	echo -e "${fgcolor_white_bold}[Editor Error]: ${fgcolor_red_bold}NodeJs version must be equal to v12.0.0 or higher.${fgcolor_reset}"
-
-	exit 1
+if ((node_version_major < 18)); then
+	echo -e "${fgcolor_white_bold}[Editor Warning]: ${fgcolor_yellow_bold}NodeJs version is recommended to be v18.0.0 or higher.${fgcolor_reset}"
 fi

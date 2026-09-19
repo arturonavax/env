@@ -17,14 +17,13 @@ done
 ./src/requirements/editor.sh || exit 1
 
 source ./src/remotes/_vars_colors.sh
+source ./src/remotes/_versions.sh
 
-editor="lvim"
+editor="nvim"
 
 # install_editor install editor
 function install_editor() {
-	if [[ -f ~/.lunarvim.lua ]]; then
-		mv ~/.lunarvim.lua ~/.lunarvim.copy.lua
-	fi
+	command -v corepack &>/dev/null && corepack disable 2>/dev/null || :
 
 	set -o errexit
 	trap exit-error-message ERR SIGINT
@@ -79,74 +78,27 @@ function install_editor() {
 		fi
 
 		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			# Dependencies and keys for vscode
-			sudo apt-get -y install wget gpg
-			wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >packages.microsoft.gpg
-			sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
-			sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-			rm -f packages.microsoft.gpg
-
 			sudo apt update -y
-
-			sudo apt install -y apt-transport-https curl git xclip xsel ripgrep clang-format vim vim-nox
-
-			# Dependencies with different names between APT and Homebrew
-			sudo apt install -y silversearcher-ag fd-find \
-				libncurses5-dev libncursesw5-dev libncurses-dev ncurses-term # ncurses
-
-			# GNU/Linux only dependencies
-			sudo apt install -y python3-neovim python3-pip python3-dev
-
-			# Install vscode
-			sudo apt install -y code
+			sudo apt install -y apt-transport-https curl git xclip xsel ripgrep clang-format vim vim-nox fd-find pipx python3-pip python3-dev
 
 		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			# Dependencies and keys for vscode
-			sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-			sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
-
 			sudo dnf update -y
-			sudo dnf check-update
-
-			sudo dnf install -y curl git xclip xsel ripgrep
-
-			sudo dnf install -y the_silver_searcher \
-				ncurses ncurses-term ncurses-devel
-
-			sudo dnf install -y python3-pip
-
-			if [[ "$ID" == *"fedora"* ]]; then
-				sudo dnf install -y python3-neovim
-			fi
-
-			# Install vscode
-			sudo dnf install -y code
+			sudo dnf install -y curl git xclip xsel ripgrep pipx python3-pip
 
 		else
 			echo "The operating system is not compatible with this installation." && exit 1
 		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl git xclip xsel ripgrep vim lua
-
-		# Dependencies with different names between APT and Homebrew
-		brew install the_silver_searcher fd \
-			ncurses # ncurses
-
-		# MacOS only dependencies
-		brew install readline
-
-		# Install vscode
-		brew install --cask visual-studio-code || :
-		xattr -d com.apple.quarantine "/Applications/Visual Studio Code.app" || :
+		brew install curl git xclip xsel ripgrep vim lua fd readline
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
 	if [[ "$(uname -s)" == "Linux" && "$(command -v fdfind)" != "" ]]; then
-		sudo rm /usr/bin/fd || :
-		sudo ln -s "$(command -v fdfind)" /usr/bin/fd
+		sudo rm -f /usr/bin/fd || :
+		sudo ln -sf "$(command -v fdfind)" /usr/bin/fd 2>/dev/null || :
 	fi
 
 	# install yarn
@@ -170,26 +122,26 @@ function install_editor() {
 	fi
 
 	if [[ "$(command -v go)" != "" ]]; then
-		go install github.com/jesseduffield/lazygit@latest
-
-		go install golang.org/x/tools/gopls@latest
-		go install github.com/mgechev/revive@latest
-		go install mvdan.cc/gofumpt@latest
-		go install github.com/go-delve/delve/cmd/dlv@latest
-		go install github.com/rhysd/actionlint/cmd/actionlint@latest
-		go install github.com/bufbuild/buf-language-server/cmd/bufls@latest
-		go install github.com/mrtazz/checkmake/cmd/checkmake@latest
-		go install mvdan.cc/sh/v3/cmd/shfmt@latest
-		go install github.com/sonatype-nexus-community/nancy@latest
-		go install golang.org/x/vuln/cmd/govulncheck@latest
+		# Compiling tools locally from source with stripped symbols for maximum performance
+		go install -ldflags="-s -w" github.com/jesseduffield/lazygit@${LAZYGIT_VERSION}
+		go install -ldflags="-s -w" golang.org/x/tools/gopls@${GOPLS_VERSION}
+		go install -ldflags="-s -w" github.com/mgechev/revive@latest
+		go install -ldflags="-s -w" mvdan.cc/gofumpt@${GOFUMPT_VERSION}
+		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@${DLV_VERSION}
+		go install -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}
+		go install -ldflags="-s -w" github.com/bufbuild/buf-language-server/cmd/bufls@latest
+		go install -ldflags="-s -w" github.com/mrtazz/checkmake/cmd/checkmake@latest
+		go install -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION}
+		go install -ldflags="-s -w" github.com/sonatype-nexus-community/nancy@latest
+		go install -ldflags="-s -w" golang.org/x/vuln/cmd/govulncheck@latest
 
 		curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOSEC_VERSION}"
 
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin
+		curl -sSfL https://golangci-lint.run/install.sh |
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOLANGCI_LINT_VERSION}"
 
-		golangci-lint cache clean
+		golangci-lint cache clean || :
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Editor Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
@@ -197,16 +149,25 @@ function install_editor() {
 		echo
 	fi
 
-	python_binary_installer black
-	python_binary_installer pylint
-	python_binary_installer beautysh
-	python_binary_installer cmakelang
+	if [[ "$(command -v pipx)" != "" ]]; then
+		pipx install black || :
+		pipx install pylint || :
+		pipx install beautysh || :
+		pipx install cmakelang || :
+	elif [[ "$(command -v python_binary_installer)" != "" ]]; then
+		python_binary_installer black || :
+		python_binary_installer pylint || :
+		python_binary_installer beautysh || :
+		python_binary_installer cmakelang || :
+	fi
 
+	# Compiling Rust tools locally with native CPU optimizations
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		cargo install stylua shellharden
+		RUSTFLAGS="-C target-cpu=native" cargo install --locked stylua --version "${STYLUA_VERSION}" || cargo install stylua || :
+		RUSTFLAGS="-C target-cpu=native" cargo install --locked shellharden --version "${SHELLHARDEN_VERSION}" || cargo install shellharden || :
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install shellharden stylua
+		brew install shellharden stylua || :
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
@@ -216,97 +177,85 @@ function install_editor() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing NeoVim...${fgcolor_reset}"
-
-	cd ./downloads/
-	bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install-neovim-from-release) || :
-	cd .. # exit downloads/
-
-	echo
-
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Providers for NeoVim...${fgcolor_reset}"
-	node_package_module install -g neovim
-	python3 -m pip install --user --upgrade pynvim
-	python3 -m pip install --user --upgrade msgpack-python
-	python3 -m pip install --user --upgrade msgpack
-
-	echo
-
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Uninstalling LunarVim (lvim)...${fgcolor_reset}"
-	bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/uninstall.sh) &>/dev/null || :
-	rm -rf ~/.config/lvim || :
-
-	echo
-
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing LunarVim (lvim)...${fgcolor_reset}"
-	## Nightly
-	# bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/install.sh) \
-	# 	--yes --install-dependencies
-
-	## New release
-	LV_BRANCH='release-1.3/neovim-0.9' bash <(curl -s https://raw.githubusercontent.com/LunarVim/LunarVim/release-1.3/neovim-0.9/utils/installer/install.sh) \
-		--yes --install-dependencies
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Neovim (${NVIM_VERSION})...${fgcolor_reset}"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		if [[ "$(command -v desktop-file-install)" != "" ]]; then
-			sudo desktop-file-install ./files/lvim/lvim.desktop
+		arch="$(uname -m)"
+		nvim_tar=""
+		nvim_dir=""
+		if [[ "$arch" == "x86_64" ]]; then
+			nvim_tar="nvim-linux-x86_64.tar.gz"
+			nvim_dir="nvim-linux-x86_64"
+		elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+			nvim_tar="nvim-linux-arm64.tar.gz"
+			nvim_dir="nvim-linux-arm64"
 		fi
 
-		if [[ "$(command -v update-desktop-database)" != "" ]]; then
-			sudo update-desktop-database
+		if [[ -n "$nvim_tar" ]]; then
+			if [[ "$(command -v nvim)" != "" && "$(nvim --version 2>/dev/null | head -n 1)" == *"${NVIM_VERSION}"* && -x /usr/local/bin/nvim ]]; then
+				echo -e "${fgcolor_green_bold}[Editor Installer]: Neovim (${NVIM_VERSION}) is already installed at /usr/local/bin/nvim.${fgcolor_reset}"
+			else
+				cd ./downloads/
+				curl -sLO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/${nvim_tar}" ||
+					curl -sLO "https://github.com/neovim/neovim/releases/latest/download/${nvim_tar}"
+				sudo rm -rf "/opt/${nvim_dir}"
+				sudo tar -C /opt -xzf "${nvim_tar}"
+				sudo ln -sf "/opt/${nvim_dir}/bin/nvim" /usr/local/bin/nvim
+				mkdir -p "$HOME/.local/bin"
+				ln -sf "/opt/${nvim_dir}/bin/nvim" "$HOME/.local/bin/nvim"
+				cd .. # exit downloads/
+			fi
 		fi
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		brew install neovim || brew upgrade neovim || :
 	fi
 
 	echo
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Pasting configuration...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Providers for NeoVim...${fgcolor_reset}"
+	node_package_module install -g neovim || :
+	if [[ "$(command -v pipx)" != "" ]]; then
+		pipx install pynvim || :
+	fi
+
+	echo
+
+	# ---
+
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Pasting LazyVim configuration...${fgcolor_reset}"
 	bash ./utils/sync_config.sh editor devtools
 
 	echo
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing LunarVim (lvim) plugins...${fgcolor_reset}"
-	lvim --headless +LvimSyncCorePlugins +qa 2>/dev/null
-	lvim --headless +LvimCacheReset +qa 2>/dev/null
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Restoring/Syncing LazyVim plugins from lockfile...${fgcolor_reset}"
+	if [[ "$(command -v nvim)" != "" ]]; then
+		nvim --headless "+Lazy! restore" +qa 2>/dev/null || nvim --headless "+Lazy! sync" +qa 2>/dev/null || :
+	fi
 
 	echo
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring tools GIT with vscode...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring GIT with nvim...${fgcolor_reset}"
 	git config --global color.ui auto
 
-	# git config --global core.editor lvim
-	git config --global core.editor 'code --wait'
-
-	# git config --global diff.tool lvim
-	# git config --global difftool.lvim.cmd 'lvim -d $LOCAL $REMOTE'
-	git config --global diff.tool vscode
-	# shellcheck disable=SC2016
-	git config --global difftool.vscode.cmd 'code --wait --diff $LOCAL $REMOTE'
-
-	# git config --global merge.tool lvim
-	# git config --global mergetool.lvim.cmd 'lvim -d $LOCAL $REMOTE $MERGED'
-	# git config --global mergetool.lvim.trustExitCode true
-	git config --global merge.tool vscode
-	# shellcheck disable=SC2016
-	git config --global mergetool.vscode.cmd 'code --wait $MERGED'
+	if [[ "$(command -v nvim)" != "" ]]; then
+		git config --global core.editor nvim
+		git config --global diff.tool nvimdiff
+		git config --global merge.tool nvimdiff
+	fi
 
 	echo
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: ${fgcolor_green_bold}✔️ Editor ($editor) successfully installed!${fgcolor_reset}"
-	echo -e "${fgcolor_white_bold}[Editor Installer]: (Read ~/.config/lvim/config.lua)${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: ${fgcolor_green_bold}✔️ Editor ($editor - LazyVim) successfully installed!${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: (Read ~/.config/nvim/init.lua and ~/.config/nvim/lua/)${fgcolor_reset}"
 
 	echo -en "$fgcolor_reset"
 
@@ -315,17 +264,9 @@ function install_editor() {
 	fi
 
 	./src/remotes/fixer.sh
-
-	if [[ -f ~/.lunarvim.copy.lua ]]; then
-		mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
-	fi
 }
 
 function exit-error-message() {
-	if [[ -f ~/.lunarvim.copy.lua ]]; then
-		mv ~/.lunarvim.copy.lua ~/.lunarvim.lua
-	fi
-
 	echo -e "$(
 		cat <<EOF
 

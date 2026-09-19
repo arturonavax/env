@@ -33,7 +33,7 @@ function uninstall() {
 	fi
 
 	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - Uninstalling alacritty, vim, neovim and lunarvim..."
+	echo "[Uninstaller]: - Uninstalling ghostty, alacritty, vim, and neovim..."
 
 	echo -en "$fgcolor_yellow_bold"
 
@@ -54,23 +54,23 @@ function uninstall() {
 	echo "[Uninstaller]: - ... Phase 1/3"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt remove -y --purge alacritty vim neovim fzf &>/dev/null
-		sudo snap remove --purge zsh &>/dev/null
-		sudo snap remove --purge tmux &>/dev/null
-		sudo snap remove --purge alacritty &>/dev/null
-		sudo snap remove --purge vim-editor &>/dev/null
-		sudo snap remove --purge nvim &>/dev/null
+		sudo apt remove -y --purge alacritty vim neovim fzf &>/dev/null || :
+		sudo snap remove --purge ghostty &>/dev/null || :
+		sudo snap remove --purge alacritty &>/dev/null || :
+		sudo snap remove --purge tmux &>/dev/null || :
+		sudo snap remove --purge vim-editor &>/dev/null || :
+		sudo snap remove --purge nvim &>/dev/null || :
+		sudo rm -rf /opt/nvim-linux-* /usr/local/bin/nvim "$HOME/.local/bin/nvim" &>/dev/null || :
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew uninstall alacritty neovim fzf &>/dev/null
+		brew uninstall --cask ghostty &>/dev/null || :
+		brew uninstall alacritty neovim fzf &>/dev/null || :
 	fi
 
 	echo "[Uninstaller]: - ... Phase 2/3"
 
 	cargo uninstall alacritty &>/dev/null || :
-
-	bash <(curl -s https://raw.githubusercontent.com/lunarvim/lunarvim/master/utils/installer/uninstall.sh) &>/dev/null || :
-	rm -rf ~/.config/lvim || :
+	rm -rf ~/.config/lvim ~/.config/ghostty ~/.config/nvim || :
 
 	echo "[Uninstaller]: - ... Phase 3/3"
 	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
@@ -78,6 +78,7 @@ function uninstall() {
 	echo
 	echo "[Uninstaller]: - Deleting configuration files and caches..."
 	rm -rf ~/.config/lvim &>/dev/null
+	rm -rf ~/.config/ghostty &>/dev/null
 	rm -rf ~/.config/nvim &>/dev/null
 	rm -rf ~/.local/share/nvim &>/dev/null
 	rm -rf ~/.local/share/lunarvim &>/dev/null
@@ -88,7 +89,7 @@ function uninstall() {
 	rm -rf ~/.cache/nvim.bak &>/dev/null
 	rm -rf ~/.config/alacritty &>/dev/null
 	rm -rf ~/.tmux &>/dev/null
-	golangci-lint cache clean &>/dev/null
+	golangci-lint cache clean &>/dev/null || :
 	echo "[Uninstaller]: - ... Phase 1/1"
 	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
 

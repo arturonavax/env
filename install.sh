@@ -17,15 +17,21 @@ done
 source ./src/remotes/_vars_colors.sh
 
 function install() {
+	# check arguments
+	./src/remotes/usage_install.sh "$@" || exit 0
+
+	for arg in "$@"; do
+		case "$arg" in
+		h | help) exit 0 ;;
+		esac
+	done
+
 	echo -e "${fgcolor_white_bold}[Installer]: Running Backup script (~/.arturonavax-env-backups/)...${fgcolor_reset}"
 	./utils/backup_config.sh &>/dev/null || :
 	echo -e "${fgcolor_white_bold}[Installer]: Backup ready${fgcolor_reset}"
 
 	set -o errexit
 	trap exit-error-message ERR SIGINT
-
-	# check arguments
-	./src/remotes/usage_install.sh "$@"
 
 	# get arguments
 	for arg in "$@"; do
@@ -34,6 +40,7 @@ function install() {
 		fonts | f) install_fonts=1 ;;
 		terminal | t) install_terminal=1 ;;
 		editor | e) install_editor=1 ;;
+		ai) install_ai=1 ;;
 		osconfig | o) install_osconfig=1 ;;
 		all | a) install_all=1 ;;
 		esac
@@ -46,6 +53,7 @@ function install() {
 		install_fonts=1
 		install_terminal=1
 		install_editor=1
+		install_ai=1
 		install_osconfig=1
 	fi
 
@@ -79,7 +87,7 @@ function install() {
 	required-commands git
 
 	echo -e "${fgcolor_white_bold}[Installer]: Downloading the latest version of the repository...${fgcolor_reset}"
-	git pull origin main
+	git pull origin main || :
 	echo
 
 	# check requireds install_fonts
@@ -98,6 +106,11 @@ function install() {
 		./src/requirements/editor.sh
 	fi
 
+	# check requireds install_ai
+	if [[ "$install_ai" == 1 ]]; then
+		./src/requirements/ai.sh
+	fi
+
 	# ---
 
 	# installs
@@ -113,6 +126,11 @@ function install() {
 
 	if [[ "$install_editor" == 1 ]]; then
 		./src/install_editor.sh
+		echo
+	fi
+
+	if [[ "$install_ai" == 1 ]]; then
+		./src/install_ai.sh
 	fi
 
 	if [[ "$install_osconfig" == 1 ]]; then

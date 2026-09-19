@@ -17,9 +17,11 @@ done
 ./src/requirements/terminal.sh || exit 1
 
 source ./src/remotes/_vars_colors.sh
+source ./src/remotes/_versions.sh
 
 # install_terminal install terminal and tools
 function install_terminal() {
+	command -v corepack &>/dev/null && corepack disable 2>/dev/null || :
 	set -o errexit
 	trap exit-error-message ERR SIGINT
 
@@ -28,9 +30,7 @@ function install_terminal() {
 
 	source ./src/remotes/_basics.sh
 
-	if [[ "$(command -v alacritty)" != "" ]]; then
-		alacritty_version_minor="$(alacritty --version | cut -d' ' -f2 | tr -d '\-dev' | cut -d. -f2)"
-	fi
+
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: Starting install_terminal.sh script...${fgcolor_reset}"
 
@@ -82,18 +82,14 @@ function install_terminal() {
 			sudo locale-gen en_US.UTF-8
 
 			# GNU/Linux only dependencies
-			## CLI/TUI depedencies
+			## CLI/TUI dependencies
 			sudo apt install -y libncurses5-dev libncursesw5-dev libncurses-dev ncurses-term
 
 			## Async dependencies
 			sudo apt install -y libevent-dev
 
-			## GUI and Qt dependencies
-			sudo apt install -y libxrandr2 libxrandr2 libxss1 \
-				libxcursor1 libxcomposite1 libxi6 libxtst6 libxcb-xfixes0-dev
-
 			## Fonts dependencies
-			sudo apt install -y pkg-config fontconfig libfreetype6-dev libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev
+			sudo apt install -y pkg-config fontconfig
 
 			# GNU/Linux base tools
 			sudo apt install -y ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
@@ -107,7 +103,7 @@ function install_terminal() {
 			sudo apt install -y netcat-traditional ssh
 
 			# Tools
-			sudo apt install -y clang-format rar mtr exiftool git-flow tmux tree eza bat ripgrep xclip xsel tor \
+			sudo apt install -y clang-format rar mtr exiftool git-flow tree eza bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan aircrack-ng sqlmap direnv
 
 			sudo apt install -y wireshark tshark
@@ -128,7 +124,7 @@ function install_terminal() {
 
 			sudo dnf install -y libevent
 
-			sudo dnf install -y fontconfig freetype-devel fontconfig-devel libxcb-devel libxkbcommon-devel
+			sudo dnf install -y fontconfig
 			sudo dnf group install -y "Development Tools"
 
 			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
@@ -139,7 +135,7 @@ function install_terminal() {
 
 			sudo dnf install -y netcat openssh
 
-			sudo dnf install -y mtr tmux tree eza bat ripgrep xclip xsel tor \
+			sudo dnf install -y mtr tree eza bat ripgrep xclip xsel tor \
 				shellcheck nmap arp-scan
 
 			sudo dnf install -y wireshark # includes tshark
@@ -231,31 +227,31 @@ function install_terminal() {
 	fi
 
 	if [[ "$(command -v go)" != "" ]]; then
-		# install fx (JSON Viewer)
-		go install github.com/antonmedv/fx@latest
+		# install fx (JSON Viewer) - compiled locally
+		go install -ldflags="-s -w" github.com/antonmedv/fx@${FX_VERSION}
 
-		# install protobuf golang plugins
-		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+		# install protobuf golang plugins - compiled locally
+		go install -ldflags="-s -w" google.golang.org/protobuf/cmd/protoc-gen-go@latest
+		go install -ldflags="-s -w" google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-		# install sec tools
-		go install github.com/sonatype-nexus-community/nancy@latest
-		go install golang.org/x/vuln/cmd/govulncheck@latest
+		# install sec tools - compiled locally
+		go install -ldflags="-s -w" github.com/sonatype-nexus-community/nancy@latest
+		go install -ldflags="-s -w" golang.org/x/vuln/cmd/govulncheck@latest
 		curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOSEC_VERSION}"
 
 		# install air
 		curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin
+			sh -s -- -b "$(go env GOPATH)"/bin "${AIR_VERSION}"
 
-		# install golangci-lint
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin
+		# install golangci-lint with pinned version
+		curl -sSfL https://golangci-lint.run/install.sh |
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOLANGCI_LINT_VERSION}"
 
-		# install delve
-		go install github.com/go-delve/delve/cmd/dlv@latest
+		# install delve - compiled locally
+		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@${DLV_VERSION}
 
-		golangci-lint cache clean
+		golangci-lint cache clean || :
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
@@ -285,80 +281,84 @@ function install_terminal() {
 	echo
 
 	# ---
+	# Install Ghostty
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Ghostty...${fgcolor_reset}"
 
-	if ((alacritty_version_minor <= 11)); then
-		echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Alacritty...${fgcolor_reset}"
-
-		if [[ "$(uname -s)" == "Linux" ]]; then
-			if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* && "$(command -v add-apt-repository)" != "" ]]; then
-				# sudo add-apt-repository ppa:aslatter/ppa -y
-
-				sudo apt install alacritty
-
-			elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-				if [[ "$ID" == *"fedora"* ]]; then
-					sudo dnf install -y alacritty
-
-				else
-					cd ./downloads/
-					git clone --depth 1 https://github.com/alacritty/alacritty
-					cd ./alacritty/
-
-					cargo build --release
-					infocmp alacritty &>/dev/null || :
-					sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
-
-					sudo cp target/release/alacritty /usr/local/bin
-					sudo cp extra/logo/alacritty-term.svg /usr/share/pixmaps/Alacritty.svg
-					sudo desktop-file-install extra/linux/Alacritty.desktop
-					sudo update-desktop-database
-
-					cd ../.. # exit downloads/
-				fi
-
-			else
-				echo "The operating system is not compatible with this installation." && exit 1
-			fi
-
-		elif [[ "$(uname -s)" == "Darwin" ]]; then
-			brew tap --force homebrew/cask
-
-			brew reinstall --cask alacritty
-
-			xattr -d com.apple.quarantine /Applications/Alacritty.app || :
-
-			## Compiling Alacritty on MacOS
-			# cd ./downloads/
-			# git clone --depth 1 https://github.com/alacritty/alacritty
-			# cd ./alacritty/
-			# make app
-			# cp -r target/release/osx/Alacritty.app /Applications/
-			# sudo ln -s target/release/alacritty /usr/local/bin/alacritty || :
-			# infocmp alacritty &>/dev/null || :
-			# sudo tic -xe alacritty,alacritty-direct extra/alacritty.info || :
-			# cd ../.. # exit downloads/
-
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		if [[ "$(command -v snap)" != "" ]]; then
+			sudo snap install ghostty --classic || sudo snap refresh ghostty --classic
+		elif [[ "$ID" == *"fedora"* ]]; then
+			sudo dnf copr enable -y pgdev/ghostty || :
+			sudo dnf install -y ghostty || :
+		elif [[ "$(command -v pacman)" != "" ]]; then
+			sudo pacman -S --noconfirm ghostty || :
 		else
-			echo "The operating system is not compatible with this installation." && exit 1
+			echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Please install Ghostty manually or via snap: sudo snap install ghostty --classic${fgcolor_reset}"
 		fi
 
-		echo
+		# Ensure handy symlinks for Linux
+		mkdir -p "$HOME/.local/bin"
+		if [[ "$(command -v batcat)" != "" ]]; then
+			sudo ln -sf "$(command -v batcat)" /usr/local/bin/bat 2>/dev/null || ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
+		fi
+		if [[ "$(command -v fdfind)" != "" ]]; then
+			sudo ln -sf "$(command -v fdfind)" /usr/local/bin/fd 2>/dev/null || ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+		fi
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		brew tap --force homebrew/cask
+		brew install --cask ghostty || brew upgrade --cask ghostty || :
+		xattr -d com.apple.quarantine /Applications/Ghostty.app 2>/dev/null || :
+
+	else
+		echo "The operating system is not compatible with this installation." && exit 1
 	fi
+
+	echo
+
+	# ---
+	# Install Tmux (Compiled from source for native CPU performance)
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing/Compiling Tmux (${TMUX_VERSION}) from source...${fgcolor_reset}"
+
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		if [[ "$(tmux -V 2>/dev/null)" == "tmux ${TMUX_VERSION}" && -x /usr/local/bin/tmux ]]; then
+			echo -e "${fgcolor_green_bold}[Terminal Installer]: Tmux ${TMUX_VERSION} is already compiled and installed at /usr/local/bin/tmux.${fgcolor_reset}"
+		else
+			cd ./downloads/
+			if curl -sSfL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o "tmux-${TMUX_VERSION}.tar.gz"; then
+				rm -rf "tmux-${TMUX_VERSION}"
+				tar -xzf "tmux-${TMUX_VERSION}.tar.gz"
+				cd "tmux-${TMUX_VERSION}"
+				CFLAGS="-O3 -march=native" ./configure --prefix=/usr/local
+				make -j"$(nproc)"
+				sudo make install
+				cd ..
+			else
+				echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Fallback installing tmux from package manager...${fgcolor_reset}"
+				if [[ "$(command -v snap)" != "" ]]; then
+					sudo snap install tmux --classic || sudo snap refresh tmux --classic || :
+				elif [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
+					sudo apt install -y tmux
+				elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
+					sudo dnf install -y tmux
+				fi
+			fi
+			cd .. # exit downloads/
+		fi
+
+	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		brew install tmux || brew upgrade tmux || :
+	fi
+
+	echo
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing alacritty color and tmux-256color info...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tmux-256color info...${fgcolor_reset}"
 
 	cd ./downloads/
-
-	curl -LO https://invisible-island.net/datafiles/current/terminfo.src.gz && gunzip terminfo.src.gz
-
-	sudo tic -xe tmux-256color terminfo.src
-
-	curl -LO https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
-
-	sudo tic -xe alacritty,alacritty-direct alacritty.info
-
+	curl -LO https://invisible-island.net/datafiles/current/terminfo.src.gz && gunzip -f terminfo.src.gz
+	sudo tic -xe tmux-256color terminfo.src || :
 	cd .. # exit downloads/
 
 	echo
@@ -387,10 +387,21 @@ function install_terminal() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins...${fgcolor_reset}"
-	git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions || :
-	git clone https://github.com/zdharma-continuum/fast-syntax-highlighting ~/.zsh/fast-syntax-highlighting || :
-	git clone https://github.com/zsh-users/zsh-completions.git ~/.zsh/zsh-completions || :
-	git clone https://github.com/Aloxaf/fzf-tab ~/.zsh/fzf-tab || :
+	mkdir -p ~/.zsh
+	for plugin_spec in \
+		"https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions" \
+		"https://github.com/zdharma-continuum/fast-syntax-highlighting ~/.zsh/fast-syntax-highlighting" \
+		"https://github.com/zsh-users/zsh-completions.git ~/.zsh/zsh-completions" \
+		"https://github.com/Aloxaf/fzf-tab ~/.zsh/fzf-tab"; do
+		plugin_url="${plugin_spec% *}"
+		plugin_dest="${plugin_spec#* }"
+		if [[ -d "$plugin_dest/.git" ]]; then
+			git -C "$plugin_dest" pull --quiet || :
+		else
+			rm -rf "$plugin_dest"
+			git clone --quiet "$plugin_url" "$plugin_dest" || :
+		fi
+	done
 	rm -f ~/.zcompdump
 	if [[ "$(command -v compinit)" != "" ]]; then
 		compinit || :
@@ -401,8 +412,12 @@ function install_terminal() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Downloading Tmux Plugin Manager...${fgcolor_reset}"
-	rm -rf ~/.tmux/plugins
-	git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+	if [[ ! -d ~/.tmux/plugins/tpm/.git ]]; then
+		mkdir -p ~/.tmux/plugins
+		git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+	else
+		git -C ~/.tmux/plugins/tpm pull --quiet || :
+	fi
 
 	echo
 
@@ -435,8 +450,12 @@ function install_terminal() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing fzf...${fgcolor_reset}"
-	rm -rf ~/.fzf
-	git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+	if [[ ! -d ~/.fzf/.git ]]; then
+		rm -rf ~/.fzf
+		git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+	else
+		git -C ~/.fzf pull --quiet || :
+	fi
 	~/.fzf/install --all --no-update-rc
 
 	echo

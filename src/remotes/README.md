@@ -20,7 +20,7 @@ List of installation parameters:
 - `requirements` / `r`: Install the necessary tools, languages and dependencies.
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
-- `editor` / `e`: Install the editor (`lvim`) and development tools.
+- `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
 - `osconfig` / `o`: Configure the operationg system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
 

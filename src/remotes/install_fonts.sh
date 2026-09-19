@@ -4,6 +4,7 @@ repo_remote_files="https://env.arturonavax.dev"
 
 # shellcheck disable=SC1090
 source <(curl -fsSL "$repo_remote_files/_vars_colors.sh" | cat)
+[[ -f ./src/remotes/_versions.sh ]] && source ./src/remotes/_versions.sh
 
 # shellcheck disable=SC2154
 function install_fonts() {
@@ -20,40 +21,28 @@ function install_fonts() {
 
 	# Download Monaspace nerd font
 	repo_font="ryanoasis/nerd-fonts"
-	asset_name="Monaspace"
+	font_version="${NERD_FONTS_VERSION:-v3.5.1}"
 
-	latest_release=$(curl -s "https://api.github.com/repos/$repo_font/releases/latest")
-	tag_name=$(echo "$latest_release" | grep '"tag_name":' | awk -F'"' '{print $4}')
+	download_url="https://github.com/$repo_font/releases/download/${font_version}/Monaspace.tar.xz"
 
-	asset_folder="$asset_name$tag_name"
+	mkdir -p "NerdMonaspace"
+	curl -sL -o "Monaspace.tar.xz" "$download_url"
 
-	if [ -z "$tag_name" ]; then
-		echo "The latest version could not be obtained. Please check the GitHub API response." && exit 1
-	fi
-
-	download_url="https://github.com/$repo_font/releases/download/$tag_name/${asset_name}.zip"
-
-	curl -sL -o "Nerd${asset_folder}.zip" "$download_url"
-
-	unzip -q "Nerd${asset_folder}.zip" -d "Nerd${asset_folder}"
-
-	cd "Nerd$asset_folder"
+	tar -xJf "Monaspace.tar.xz" -C "NerdMonaspace"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
 		sudo mkdir -p /usr/local/share/fonts/patched-fonts
 
-		sudo cp ./* /usr/local/share/fonts/patched-fonts/.
+		sudo cp ./NerdMonaspace/* /usr/local/share/fonts/patched-fonts/. 2>/dev/null || :
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
 		sudo mkdir -p /Library/Fonts/patched-fonts
 
-		sudo cp ./* /Library/Fonts/patched-fonts/.
+		sudo cp ./NerdMonaspace/* /Library/Fonts/patched-fonts/. 2>/dev/null || :
 
 	else
 		echo "The operating system is not compatible with this installation." && exit 1
 	fi
-
-	cd ..
 
 	# Download Monaspace font
 	repo_font="githubnext/monaspace"
@@ -87,6 +76,7 @@ function install_fonts() {
 	fi
 
 	cd "$original_folder"
+	rm -rf "$tmp_dir"
 
 	sudo fc-cache -f &>/dev/null || :
 

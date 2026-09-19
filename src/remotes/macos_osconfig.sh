@@ -142,10 +142,10 @@ defaults write com.apple.menuextra.clock DateFormat -string "\"h:mm:ss\""
 # Feedback Assistant gathers large files when submitting a report
 defaults write com.apple.appleseed.FeedbackAssistant Autogather -bool true
 
-# Disable save state of Alacritty
-mkdir -p "$HOME/Library/Saved Application State/org.alacritty.savedState/"
-rm -rf "$HOME/Library/Saved Application State/org.alacritty.savedState/*"
-chmod -R a-w "$HOME/Library/Saved Application State/org.alacritty.savedState/"
+# Disable save state of Ghostty
+mkdir -p "$HOME/Library/Saved Application State/com.mitchellh.ghostty.savedState/"
+rm -rf "$HOME/Library/Saved Application State/com.mitchellh.ghostty.savedState/*"
+chmod -R a-w "$HOME/Library/Saved Application State/com.mitchellh.ghostty.savedState/" 2>/dev/null || :
 
 # Creates symbolic link for "airport" command
 [[ "$(command -v airport)" == "" ]] && sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/bin/airport

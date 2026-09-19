@@ -15,12 +15,15 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 # EDITOR
-if [[ "$(command -v code)" != "" ]]; then
+if [[ "$(command -v nvim)" != "" ]]; then
+  export EDITOR=nvim
+  export VISUAL=nvim
+elif [[ "$(command -v code)" != "" ]]; then
   export EDITOR=code
-
-elif [[ "$(command -v lvim)" != "" ]]; then
-  export EDITOR=lvim
-
+  export VISUAL=code
+elif [[ "$(command -v vim)" != "" ]]; then
+  export EDITOR=vim
+  export VISUAL=vim
 fi
 
 # load zsh-completions
@@ -93,21 +96,16 @@ zstyle ':completion:*' matcher-list '' 'm:{[:lower:][:upper:]-_}={[:upper:][:low
 
 # Toggle transparency
 function transparent() {
-    origen_file="$HOME/.config/alacritty/alacritty.yml"
-
-    content_new="$(awk '
-	{
-		if (/[^#]opacity:/) {
-			gsub ("opacity:", "#opacity:");
-		} else if (/#opacity:/) {
-		gsub ("#opacity:", "opacity:");
-	}
-
-	print
-}
-    ' "$origen_file")"
-
-    echo "$content_new" >"$origen_file"
+    if [[ -f "$HOME/.config/ghostty/config" ]]; then
+        local ghostty_conf="$HOME/.config/ghostty/config"
+        if grep -q "^background-opacity = 1" "$ghostty_conf"; then
+            sed -i 's/^background-opacity = 1.*/background-opacity = 0.88/' "$ghostty_conf"
+            echo "Ghostty transparency enabled (opacity: 0.88)"
+        else
+            sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$ghostty_conf"
+            echo "Ghostty transparency disabled (opacity: 1.0)"
+        fi
+    fi
 }
 
 alias tt='transparent'
@@ -191,11 +189,9 @@ EOF
         fi
 
         if [[ "$(command -v pnpm)" != "" ]]; then
-            pnpm add -g @pnpm/exe
+            pnpm self-update
             pnpm --global update
-            cd "$HOME"
-            [[ -f "package.json" ]] && pnpm update
-            cd -
+            [[ -f "$HOME/package.json" ]] && pnpm --dir "$HOME" update
         fi
 
         if [[ "$(command -v python3)" != "" ]]; then
@@ -265,7 +261,9 @@ function lighttheme() {
     [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
     [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
 
-    [[ -f ~/.config/alacritty/light_theme.toml ]] && cp ~/.config/alacritty/light_theme.toml ~/.config/alacritty/alacritty.toml
+    if [[ -f ~/.config/ghostty/auto/theme.ghostty ]]; then
+        echo "theme = TokyoNight Day" > ~/.config/ghostty/auto/theme.ghostty
+    fi
 }
 
 alias li=lighttheme
@@ -289,7 +287,9 @@ function darktheme() {
     [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
     [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
 
-    [[ -f ~/.config/alacritty/dark_theme.toml ]] && cp ~/.config/alacritty/dark_theme.toml ~/.config/alacritty/alacritty.toml
+    if [[ -f ~/.config/ghostty/auto/theme.ghostty ]]; then
+        echo "theme = TokyoNight Night" > ~/.config/ghostty/auto/theme.ghostty
+    fi
 }
 
 alias da=darktheme

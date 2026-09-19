@@ -264,7 +264,7 @@ window-minimum-width: 0
 
 # List of bundle identifiers for applications to either be automatically floating or automatically tiled based on floating-is-blacklist (default []).
 floating: [
-    # "org.alacritty", # I don't integrate the terminal into Amethyst because using tmux I don't need to manage many terminal windows, so it is not part of the necessary flow of managed windows.
+    # "com.mitchellh.ghostty", # I don't integrate the terminal into Amethyst because using tmux I don't need to manage many terminal windows, so it is not part of the necessary flow of managed windows.
     "com.microsoft.VSCode",
   ]
 

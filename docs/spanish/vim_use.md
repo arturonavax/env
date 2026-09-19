@@ -1,7 +1,7 @@
 # How do I use VIM?
 
-Este entorno usa [LunarVim](https://www.lunarvim.org/), por lo cual el
-comando editor es `lvim`.
+Este entorno usa [LazyVim](https://www.lazyvim.org/) sobre Neovim, por lo cual el
+comando editor es `nvim`.
 
 Cuando empece en VIM sin conocimientos para moverme rapidamente en el
 editor no lo pense mucho, dejaba presionado `j` o `k` para moverme arriba
@@ -443,8 +443,8 @@ background puedes volver a el ejecutando `%` en la terminal
 
 ## 🔥 Programming in Vim 🔥
 
-Este entorno usa [LunarVim](https://www.lunarvim.org/), por lo cual el comando
-editor es `lvim`.
+Este entorno usa [LazyVim](https://www.lazyvim.org/) sobre Neovim, por lo cual el comando
+editor es `nvim`.
 
 ### Common actions
 

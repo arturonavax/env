@@ -22,6 +22,7 @@ repo_remote_files="https://env.arturonavax.dev"
 
 source ./src/remotes/_basics.sh
 source ./src/remotes/_vars_colors.sh
+source ./src/remotes/_versions.sh
 
 echo -e "${fgcolor_white_bold}[Requirements Installer]: Starting _install_requirements.sh script...${fgcolor_reset}"
 
@@ -119,7 +120,7 @@ if [[ "$(command -v pnpm)" == "" ]]; then
 	## download pnpm
 	tmp_shell="$SHELL"
 	export SHELL="bash" # To prevent the following installer, write to the ~/.zshrc file
-	curl -fsSL https://get.pnpm.io/install.sh | sh -
+	curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${PNPM_VERSION}" sh -
 	export SHELL="$tmp_shell"
 
 	echo
@@ -169,6 +170,11 @@ if ! command -v node | grep -q "fnm"; then
 	fnm default "$node_latest_label"
 
 	echo
+fi
+
+# Decouple and disable corepack
+if command -v corepack &>/dev/null; then
+	corepack disable 2>/dev/null || :
 fi
 
 # ---
