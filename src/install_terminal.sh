@@ -330,7 +330,7 @@ function install_terminal() {
 				tar -xzf "tmux-${TMUX_VERSION}.tar.gz"
 				cd "tmux-${TMUX_VERSION}"
 				CFLAGS="-O3 -march=native" ./configure --prefix=/usr/local
-				make -j"$(nproc)"
+				make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
 				sudo make install
 				cd ..
 			else
@@ -357,8 +357,9 @@ function install_terminal() {
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tmux-256color info...${fgcolor_reset}"
 
 	cd ./downloads/
-	curl -LO https://invisible-island.net/datafiles/current/terminfo.src.gz && gunzip -f terminfo.src.gz
-	sudo tic -xe tmux-256color terminfo.src || :
+	if curl -fsSL -o terminfo.src.gz https://invisible-island.net/datafiles/current/terminfo.src.gz 2>/dev/null; then
+		gunzip -f terminfo.src.gz 2>/dev/null && sudo tic -xe tmux-256color terminfo.src 2>/dev/null || :
+	fi
 	cd .. # exit downloads/
 
 	echo
@@ -431,7 +432,9 @@ function install_terminal() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Tmux Plugins...${fgcolor_reset}"
-	bash ~/.tmux/plugins/tpm/scripts/install_plugins.sh
+	if [[ -f ~/.tmux/plugins/tpm/scripts/install_plugins.sh ]]; then
+		bash ~/.tmux/plugins/tpm/scripts/install_plugins.sh || :
+	fi
 
 	echo
 
@@ -456,7 +459,9 @@ function install_terminal() {
 	else
 		git -C ~/.fzf pull --quiet || :
 	fi
-	~/.fzf/install --all --no-update-rc
+	if [[ -f ~/.fzf/install ]]; then
+		~/.fzf/install --all --no-update-rc || :
+	fi
 
 	echo
 

@@ -10,7 +10,13 @@
 # Parameter to help: help
 [[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
 
-bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
+if [[ -f ./src/remotes/usage_install.sh ]]; then
+	./src/remotes/usage_install.sh "$@" || exit 1
+elif [[ -f "$(dirname "$0")/usage_install.sh" ]]; then
+	"$(dirname "$0")/usage_install.sh" "$@" || exit 1
+else
+	bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
+fi
 
 for arg in "$@"; do
 	case "$arg" in

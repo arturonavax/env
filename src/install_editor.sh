@@ -196,13 +196,16 @@ function install_editor() {
 				echo -e "${fgcolor_green_bold}[Editor Installer]: Neovim (${NVIM_VERSION}) is already installed at /usr/local/bin/nvim.${fgcolor_reset}"
 			else
 				cd ./downloads/
-				curl -sLO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/${nvim_tar}" ||
-					curl -sLO "https://github.com/neovim/neovim/releases/latest/download/${nvim_tar}"
-				sudo rm -rf "/opt/${nvim_dir}"
-				sudo tar -C /opt -xzf "${nvim_tar}"
-				sudo ln -sf "/opt/${nvim_dir}/bin/nvim" /usr/local/bin/nvim
-				mkdir -p "$HOME/.local/bin"
-				ln -sf "/opt/${nvim_dir}/bin/nvim" "$HOME/.local/bin/nvim"
+				if curl -fsSL -O "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/${nvim_tar}" ||
+					curl -fsSL -O "https://github.com/neovim/neovim/releases/latest/download/${nvim_tar}"; then
+					if [[ -f "${nvim_tar}" ]]; then
+						sudo rm -rf "/opt/${nvim_dir}"
+						sudo tar -C /opt -xzf "${nvim_tar}"
+						sudo ln -sf "/opt/${nvim_dir}/bin/nvim" /usr/local/bin/nvim
+						mkdir -p "$HOME/.local/bin"
+						ln -sf "/opt/${nvim_dir}/bin/nvim" "$HOME/.local/bin/nvim"
+					fi
+				fi
 				cd .. # exit downloads/
 			fi
 		fi

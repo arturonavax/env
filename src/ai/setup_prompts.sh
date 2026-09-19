@@ -2,7 +2,11 @@
 # Prepares directories and templates for AI prompting, rules, and system instructions.
 #
 # Run: ./src/ai/setup_prompts.sh
-source ./src/remotes/_vars_colors.sh
+if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	source ./src/remotes/_vars_colors.sh
+elif [[ -f "$(dirname "$0")/../remotes/_vars_colors.sh" ]]; then
+	source "$(dirname "$0")/../remotes/_vars_colors.sh"
+fi
 
 echo -e "${fgcolor_white_bold}[AI Installer]: - Setting up AI prompting and rules environment...${fgcolor_reset}"
 

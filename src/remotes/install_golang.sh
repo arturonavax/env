@@ -64,26 +64,27 @@ latest_version="$(wget -qO- "$url_webscraping" | command grep -E "/go1(\.[0-9]+)
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 if [[ "$(uname -s)" == "Linux" ]]; then
-	if [[ "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
+	linux_arch="$(uname -m)"
+	if [[ "$linux_arch" == "x86_64" || "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
 		arch="amd64"
 
-	elif [[ "$(uname -p)" == "i386" ]]; then
-		arch="386"
-
-	elif [[ "$(uname -p)" == "arm64" ]]; then
+	elif [[ "$linux_arch" == "aarch64" || "$linux_arch" == "arm64" || "$(uname -p)" == "arm64" ]]; then
 		arch="arm64"
 
-	elif [[ "$(uname -p)" == "armv6l" ]]; then
+	elif [[ "$linux_arch" == "i386" || "$linux_arch" == "i686" || "$(uname -p)" == "i386" ]]; then
+		arch="386"
+
+	elif [[ "$linux_arch" == "armv6l" || "$(uname -p)" == "armv6l" ]]; then
 		arch="armv6l"
 
-	elif [[ "$(uname -p)" == "ppc64le" ]]; then
+	elif [[ "$linux_arch" == "ppc64le" || "$(uname -p)" == "ppc64le" ]]; then
 		arch="ppc64le"
 
-	elif [[ "$(uname -p)" == "s390x" ]]; then
+	elif [[ "$linux_arch" == "s390x" || "$(uname -p)" == "s390x" ]]; then
 		arch="s390x"
 
 	else
-		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
+		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}❌ The architecture ($linux_arch) is not compatible with this installation."
 
 		exit 1
 	fi

@@ -68,7 +68,7 @@ return {
             },
           })
         end,
-        desc = "Lanzar Antigravity CLI (agy)",
+        desc = "Toggle AI CLI",
       },
     },
   },

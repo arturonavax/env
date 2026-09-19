@@ -132,7 +132,11 @@ if [[ "$(command -v go)" == "" ]]; then
 	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
 
 	## download go
-	curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
+	if [[ -f ./src/remotes/install_golang.sh ]]; then
+		bash ./src/remotes/install_golang.sh -i
+	else
+		curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
+	fi
 
 	echo
 fi

@@ -15,7 +15,7 @@ function usage() {
   ${fcwb}fonts ${fcr}/ ${fcwb}f        ${fcr}- Install patched mono fonts.
   ${fcwb}terminal ${fcr}/ ${fcwb}t     ${fcr}- Install the terminal, shell, prompt, tmux and terminal tools.
   ${fcwb}editor ${fcr}/ ${fcwb}e       ${fcr}- Install the editor ($editor) and development tools.
-  ${fcwb}ai ${fcr}              - Install AI tooling (Antigravity CLI / agy, MCP environment, harnesses).
+  ${fcwb}ai ${fcr}              - Install AI tooling (CLI assistants, MCP environment, harnesses).
   ${fcwb}osconfig ${fcr}/ ${fcwb}o     ${fcr}- Configure the operating system with personal preferences.
   ${fcwb}all ${fcr}/ ${fcwb}a          ${fcr}- Install and integrate all of the above.
   ${fcwb}help ${fcr}/ ${fcwb}h         ${fcr}- This helpful explanation.${fcr}

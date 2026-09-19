@@ -32,7 +32,7 @@ List of installation parameters:
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
 - `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
-- `ai`: Install AI tooling (Antigravity CLI / agy, MCP environment, harnesses and prompt files).
+- `ai`: Install AI tooling (CLI assistants, MCP environment, harnesses and prompt files).
 - `osconfig` / `o`: Configure the operationg system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
 

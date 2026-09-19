@@ -2,7 +2,11 @@
 # Prepares directories and hooks for agent harnesses, evaluation runners, and orchestrators.
 #
 # Run: ./src/ai/setup_harnesses.sh
-source ./src/remotes/_vars_colors.sh
+if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	source ./src/remotes/_vars_colors.sh
+elif [[ -f "$(dirname "$0")/../remotes/_vars_colors.sh" ]]; then
+	source "$(dirname "$0")/../remotes/_vars_colors.sh"
+fi
 
 echo -e "${fgcolor_white_bold}[AI Installer]: - Setting up AI harnesses and orchestrator environment...${fgcolor_reset}"
 

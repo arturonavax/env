@@ -2,7 +2,11 @@
 # Prepares the environment, directories and definitions for Model Context Protocol (MCP) servers.
 #
 # Run: ./src/ai/setup_mcp.sh
-source ./src/remotes/_vars_colors.sh
+if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	source ./src/remotes/_vars_colors.sh
+elif [[ -f "$(dirname "$0")/../remotes/_vars_colors.sh" ]]; then
+	source "$(dirname "$0")/../remotes/_vars_colors.sh"
+fi
 
 echo -e "${fgcolor_white_bold}[AI Installer]: - Configuring Model Context Protocol (MCP) ecosystem...${fgcolor_reset}"
 

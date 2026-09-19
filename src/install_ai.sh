@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs AI tooling, Antigravity CLI (agy / agy-cli), MCP environment, harnesses and prompts.
+# Installs AI tooling, CLI assistants, MCP environment, harnesses and prompts.
 #
 # Run: ./src/install_ai.sh
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
@@ -27,7 +27,7 @@ function install_ai() {
 
 	echo -e "${fgcolor_white_bold}[AI Installer]: Starting install_ai.sh script...${fgcolor_reset}"
 
-	# 1. Antigravity CLI (agy / agy-cli)
+	# 1. AI CLI Assistant
 	bash ./src/ai/install_agy.sh
 
 	# 2. Model Context Protocol (MCP) Ecosystem
