@@ -394,11 +394,6 @@ if [[ "$(command -v zoxide)" != "" ]]; then
     eval "$(zoxide init zsh)"
 fi
 
-## ngrok
-if [[ "$(command -v ngrok)" != "" ]]; then
-    alias ngrok='TERM=xterm-256color ngrok'
-fi
-
 ## direnv
 if [[ "$(command -v direnv)" != "" ]]; then
     eval "$(direnv hook zsh)"

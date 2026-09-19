@@ -110,10 +110,6 @@ function install_terminal() {
 
 			# Tools with different names between APT and Homebrew
 			sudo apt install -y tidy protobuf-compiler john fd-find
-			sudo snap install ngrok
-
-			./src/remotes/add_lines.sh ngrok
-			ngrok config upgrade
 
 			sudo apt install -y clang
 
@@ -190,10 +186,7 @@ function install_terminal() {
 		xattr -d com.apple.quarantine /Applications/Wireshark.app || :
 
 		# Tools with different names between APT and Homebrew
-		brew install tidy-html5 protobuf john-jumbo fd ngrok/ngrok/ngrok
-
-		./src/remotes/add_lines.sh ngrok
-		ngrok config upgrade
+		brew install tidy-html5 protobuf john-jumbo fd
 
 		# clang is installed with xcode-select --install
 
