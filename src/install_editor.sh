@@ -101,6 +101,10 @@ function install_editor() {
 		sudo ln -sf "$(command -v fdfind)" /usr/bin/fd 2>/dev/null || :
 	fi
 
+	# clean legacy npm/pnpm packages migrated to cargo or go
+	node_package_module uninstall -g tree-sitter-cli @bufbuild/buf 2>/dev/null || :
+	rm -f "$HOME/.local/share/pnpm/tree-sitter" "$HOME/.local/share/pnpm/buf" 2>/dev/null || :
+
 	# install yarn
 	node_package_module install -g yarn
 
@@ -176,6 +180,13 @@ function install_editor() {
 		echo "The operating system is not compatible with this installation." && exit 1
 	fi
 
+	# Clean stale tree-sitter locks and ensure native binary takes precedence in ~/.local/bin
+	rm -rf "$HOME/.cache/tree-sitter/lock" 2>/dev/null || :
+	if [[ -f "$HOME/.cargo/bin/tree-sitter" ]]; then
+		mkdir -p "$HOME/.local/bin"
+		ln -sf "$HOME/.cargo/bin/tree-sitter" "$HOME/.local/bin/tree-sitter"
+	fi
+
 	echo
 
 	# ---
@@ -243,9 +254,12 @@ function install_editor() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Editor Installer]: - Restoring/Syncing LazyVim plugins from lockfile...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Editor Installer]: - Restoring/Syncing LazyVim plugins and Treesitter parsers...${fgcolor_reset}"
 	if [[ "$(command -v nvim)" != "" ]]; then
+		rm -rf "$HOME/.cache/tree-sitter/lock" 2>/dev/null || :
 		nvim --headless "+Lazy! restore" +qa </dev/null &>/dev/null || nvim --headless "+Lazy! sync" +qa </dev/null &>/dev/null || :
+		# Pre-compile LazyVim treesitter parsers headless so the first interactive launch is clean and instant
+		nvim --headless -c "Lazy load nvim-treesitter" -c "TSUpdate" -c "sleep 12" -c "qa" </dev/null &>/dev/null || :
 	fi
 
 	echo
