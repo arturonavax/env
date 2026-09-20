@@ -118,7 +118,7 @@ esac
 function eval_installation() {
 	[[ "$1" == "" ]] && return
 
-	echo -n "rm -f ${go_latest_filename} ; wget ${go_latest_url} && sudo rm -rf ${1}go && sudo tar -C ${1} -xzf ${go_latest_filename} && rm -f ${go_latest_filename}"
+	echo -n "rm -f ${go_latest_filename} ; wget ${go_latest_url} && sudo rm -rf ${1}go && sudo tar -C ${1} -xzf ${go_latest_filename} && sudo chmod -R a+rX ${1}go 2>/dev/null && rm -f ${go_latest_filename}"
 }
 
 line_installation=$(

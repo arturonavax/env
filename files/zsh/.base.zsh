@@ -398,4 +398,80 @@ fi
 if [[ "$(command -v direnv)" != "" ]]; then
     eval "$(direnv hook zsh)"
 fi
+
+## GPG TTY
+export GPG_TTY=$(tty 2>/dev/null || echo "")
+
+## Cursor IDE alias (AppImage or system binary)
+if [[ "$(command -v cursor)" == "" && -d "$HOME/Applications" ]]; then
+    cursor_appimage=$(find "$HOME/Applications" -maxdepth 1 -name "Cursor-*.AppImage" 2>/dev/null | head -n 1)
+    [[ -n "$cursor_appimage" ]] && alias cursor="$cursor_appimage --no-sandbox"
+fi
+
+## Notificaciones automáticas en segundo plano (Zsh + tmux)
+zmodload zsh/datetime 2>/dev/null || :
+autoload -Uz add-zsh-hook 2>/dev/null || :
+
+export NOTIFY_THRESHOLD=3
+
+__notify_preexec() {
+    __cmd_start=$EPOCHSECONDS
+    __cmd_name="$1"
+}
+
+__notify_precmd() {
+    local exit_code=$?
+
+    if [[ -n "$__cmd_start" ]]; then
+        local elapsed=$(( EPOCHSECONDS - __cmd_start ))
+        local cmd="$__cmd_name"
+
+        unset __cmd_start __cmd_name
+
+        if (( elapsed >= ${NOTIFY_THRESHOLD:-3} )); then
+            if [[ -n "$TMUX" ]]; then
+                local is_focused=$(tmux list-clients -F '#{m:*focused*,#{client_flags}}' 2>/dev/null | head -n 1)
+                if [[ "$is_focused" == "0" ]]; then
+                    local title="Comando finalizado (${elapsed}s)"
+                    local urgency="normal"
+
+                    if (( exit_code != 0 )); then
+                        title="Comando fallido (código $exit_code) (${elapsed}s)"
+                        urgency="critical"
+                    fi
+
+                    notify-send -u "$urgency" -i utilities-terminal "$title" "$cmd" >/dev/null 2>&1
+                fi
+            fi
+        fi
+    fi
+}
+
+add-zsh-hook preexec __notify_preexec 2>/dev/null || :
+add-zsh-hook precmd __notify_precmd 2>/dev/null || :
+
+## Wrapper para asistente CLI con monitor de silencio en tmux
+if command -v agy &>/dev/null; then
+    agy() {
+        if [[ -n "$TMUX" ]]; then
+            local wid
+            wid=$(tmux display-message -p '#{window_id}')
+
+            tmux set-window-option -t "$wid" visual-silence off
+            tmux set-window-option -t "$wid" monitor-silence 3
+
+            tmux set-hook -t "$wid" -w alert-silence \
+                'run-shell -b '\''[ "$(tmux list-clients -F "##{m:*focused*,##{client_flags}}" 2>/dev/null | head -n 1)" = "0" ] && notify-send -u normal -i utilities-terminal "AI CLI" "Respuesta completada"'\'''
+
+            trap "tmux set-window-option -t '$wid' monitor-silence 0; tmux set-hook -t '$wid' -w -u alert-silence; trap - EXIT INT TERM" EXIT INT TERM
+        fi
+
+        command agy "$@"
+    }
+fi
+
+## Bun completions
+if [[ -d "$HOME/.bun" && -s "$HOME/.bun/_bun" ]]; then
+    source "$HOME/.bun/_bun"
+fi
 :

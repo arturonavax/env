@@ -36,4 +36,20 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 [[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
+
+# bun
+if [[ -d "$HOME/.bun" ]]; then
+	export BUN_INSTALL="$HOME/.bun"
+	export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+# foundry
+[[ -d "$HOME/.foundry/bin" ]] && export PATH="$HOME/.foundry/bin:$PATH"
+
+# console-ninja
+[[ -d "$HOME/.console-ninja/.bin" ]] && export PATH="$HOME/.console-ninja/.bin:$PATH"
+
+# Local private environment secrets (API keys, tokens - never committed to git)
+[[ -f "$HOME/.env.secret" ]] && source "$HOME/.env.secret"
+[[ -f "$HOME/.env.local" ]] && source "$HOME/.env.local"
 :

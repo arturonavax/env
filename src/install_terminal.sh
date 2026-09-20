@@ -381,12 +381,12 @@ function install_terminal() {
 	# ---
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins...${fgcolor_reset}"
-	mkdir -p ~/.zsh
+	mkdir -p "$HOME/.zsh"
 	for plugin_spec in \
-		"https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions" \
-		"https://github.com/zdharma-continuum/fast-syntax-highlighting ~/.zsh/fast-syntax-highlighting" \
-		"https://github.com/zsh-users/zsh-completions.git ~/.zsh/zsh-completions" \
-		"https://github.com/Aloxaf/fzf-tab ~/.zsh/fzf-tab"; do
+		"https://github.com/zsh-users/zsh-autosuggestions $HOME/.zsh/zsh-autosuggestions" \
+		"https://github.com/zdharma-continuum/fast-syntax-highlighting $HOME/.zsh/fast-syntax-highlighting" \
+		"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions" \
+		"https://github.com/Aloxaf/fzf-tab $HOME/.zsh/fzf-tab"; do
 		plugin_url="${plugin_spec% *}"
 		plugin_dest="${plugin_spec#* }"
 		if [[ -d "$plugin_dest/.git" ]]; then
@@ -426,6 +426,9 @@ function install_terminal() {
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Tmux Plugins...${fgcolor_reset}"
 	if [[ -f ~/.tmux/plugins/tpm/scripts/install_plugins.sh ]]; then
+		tmux start-server 2>/dev/null || :
+		tmux set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/" 2>/dev/null || :
+		tmux source-file ~/.tmux.conf 2>/dev/null || :
 		bash ~/.tmux/plugins/tpm/scripts/install_plugins.sh || :
 	fi
 

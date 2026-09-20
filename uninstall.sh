@@ -25,15 +25,15 @@ function uninstall() {
 	source ./src/remotes/_required_commands.sh
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		required-commands curl cargo
-		required-sudo-commands snap apt
+		required-commands curl
+		required-sudo-commands apt
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		required-commands brew curl cargo
+		required-commands brew curl
 	fi
 
 	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - Uninstalling ghostty, alacritty, vim, and neovim..."
+	echo "[Uninstaller]: - Uninstalling ghostty, tmux, and neovim..."
 
 	echo -en "$fgcolor_yellow_bold"
 
@@ -51,46 +51,36 @@ function uninstall() {
 	echo -en "$fgcolor_reset"
 
 	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - ... Phase 1/3"
+	echo "[Uninstaller]: - ... Phase 1/2"
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt remove -y --purge alacritty vim neovim fzf &>/dev/null || :
+		sudo apt remove -y --purge neovim fzf &>/dev/null || :
 		sudo snap remove --purge ghostty &>/dev/null || :
-		sudo snap remove --purge alacritty &>/dev/null || :
 		sudo snap remove --purge tmux &>/dev/null || :
-		sudo snap remove --purge vim-editor &>/dev/null || :
 		sudo snap remove --purge nvim &>/dev/null || :
-		sudo rm -rf /opt/nvim-linux-* /usr/local/bin/nvim "$HOME/.local/bin/nvim" &>/dev/null || :
+		sudo rm -rf /opt/nvim-linux-* /usr/local/bin/nvim "$HOME/.local/bin/nvim" /usr/local/bin/tmux &>/dev/null || :
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
 		brew uninstall --cask ghostty &>/dev/null || :
-		brew uninstall alacritty neovim fzf &>/dev/null || :
+		brew uninstall tmux neovim fzf &>/dev/null || :
 	fi
 
-	echo "[Uninstaller]: - ... Phase 2/3"
+	echo "[Uninstaller]: - ... Phase 2/2"
 
-	cargo uninstall alacritty &>/dev/null || :
-	rm -rf ~/.config/lvim ~/.config/ghostty ~/.config/nvim || :
+	rm -rf ~/.config/ghostty ~/.config/nvim || :
 
-	echo "[Uninstaller]: - ... Phase 3/3"
 	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
 
 	echo
 	echo "[Uninstaller]: - Deleting configuration files and caches..."
-	rm -rf ~/.config/lvim &>/dev/null
-	rm -rf ~/.config/ghostty &>/dev/null
-	rm -rf ~/.config/nvim &>/dev/null
-	rm -rf ~/.local/share/nvim &>/dev/null
-	rm -rf ~/.local/share/lunarvim &>/dev/null
-	rm -rf ~/.local/share/lvim &>/dev/null
-	rm -rf ~/.local/bin/lvim &>/dev/null
-	rm -rf ~/.cache/nvim &>/dev/null
-	rm -rf ~/.cache/tmux &>/dev/null
-	rm -rf ~/.cache/nvim.bak &>/dev/null
-	rm -rf ~/.config/alacritty &>/dev/null
-	rm -rf ~/.tmux &>/dev/null
+	rm -rf ~/.config/ghostty &>/dev/null || :
+	rm -rf ~/.config/nvim &>/dev/null || :
+	rm -rf ~/.local/share/nvim &>/dev/null || :
+	rm -rf ~/.local/state/nvim &>/dev/null || :
+	rm -rf ~/.cache/nvim &>/dev/null || :
+	rm -rf ~/.cache/tmux &>/dev/null || :
+	rm -rf ~/.tmux &>/dev/null || :
 	golangci-lint cache clean &>/dev/null || :
-	echo "[Uninstaller]: - ... Phase 1/1"
 	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
 
 	echo

@@ -4,3 +4,7 @@ yarn.lock
 logs/
 downloads/
 lv-settings.lua
+*.secret
+*.local
+.env*
+!.env.example

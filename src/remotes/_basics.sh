@@ -3,7 +3,7 @@
 #
 # Run: source <(curl -fsSL "https://env.arturonavax.dev/_basics.sh" | cat)
 mkdir -p "$HOME/.local/bin/"
-sudo mkdir -m 755 -p /usr/local/bin # there are MacOS systems that do not have this folder
+[[ ! -d /usr/local/bin ]] && sudo mkdir -m 755 -p /usr/local/bin 2>/dev/null || : # there are MacOS systems that do not have this folder
 
 # Basics
 # shellcheck disable=SC2015

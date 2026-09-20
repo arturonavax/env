@@ -108,8 +108,8 @@ function install_editor() {
 	node_package_module install -g eslint typescript
 
 	# install global node tools
-	node_package_module install --global tree-sitter-cli prettier eslint typescript emmet-ls bash-language-server \
-		markdownlint-cli @bufbuild/buf nginxbeautifier sql-formatter stylelint
+	node_package_module install --global prettier eslint typescript emmet-ls bash-language-server \
+		markdownlint-cli nginxbeautifier sql-formatter stylelint
 
 	# check exists goenv
 	export GOENV_ROOT="$HOME/.goenv"
@@ -130,7 +130,8 @@ function install_editor() {
 		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@${DLV_VERSION}
 		go install -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}
 		go install -ldflags="-s -w" github.com/bufbuild/buf-language-server/cmd/bufls@latest
-		go install -ldflags="-s -w" github.com/mrtazz/checkmake/cmd/checkmake@latest
+		go install -ldflags="-s -w" github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}
+		go install -ldflags="-s -w" github.com/checkmake/checkmake/cmd/checkmake@${CHECKMAKE_VERSION}
 		go install -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION}
 		go install -ldflags="-s -w" github.com/sonatype-nexus-community/nancy@latest
 		go install -ldflags="-s -w" golang.org/x/vuln/cmd/govulncheck@latest
@@ -145,7 +146,7 @@ function install_editor() {
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Editor Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tlazygit, gopls, revive, gofumpt, dlv, actionlint, bufls, checkmake, shfmt, nancy, govulncheck, gosec, golangci-lint${fgcolor_reset}"
+        \tlazygit, gopls, revive, gofumpt, dlv, actionlint, bufls, buf, checkmake, shfmt, nancy, govulncheck, gosec, golangci-lint${fgcolor_reset}"
 		echo
 	fi
 
@@ -163,10 +164,12 @@ function install_editor() {
 
 	# Compiling Rust tools locally with native CPU optimizations
 	if [[ "$(uname -s)" == "Linux" ]]; then
+		RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || cargo install tree-sitter-cli || :
 		RUSTFLAGS="-C target-cpu=native" cargo install --locked stylua --version "${STYLUA_VERSION}" || cargo install stylua || :
 		RUSTFLAGS="-C target-cpu=native" cargo install --locked shellharden --version "${SHELLHARDEN_VERSION}" || cargo install shellharden || :
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
+		RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || brew install tree-sitter || :
 		brew install shellharden stylua || :
 
 	else
@@ -192,6 +195,10 @@ function install_editor() {
 		fi
 
 		if [[ -n "$nvim_tar" ]]; then
+			if [[ -d "/opt/${nvim_dir}" ]]; then
+				sudo chmod -R a+rX "/opt/${nvim_dir}" 2>/dev/null || :
+			fi
+
 			if [[ "$(command -v nvim)" != "" && "$(nvim --version 2>/dev/null | head -n 1)" == *"${NVIM_VERSION}"* && -x /usr/local/bin/nvim ]]; then
 				echo -e "${fgcolor_green_bold}[Editor Installer]: Neovim (${NVIM_VERSION}) is already installed at /usr/local/bin/nvim.${fgcolor_reset}"
 			else
@@ -201,6 +208,7 @@ function install_editor() {
 					if [[ -f "${nvim_tar}" ]]; then
 						sudo rm -rf "/opt/${nvim_dir}"
 						sudo tar -C /opt -xzf "${nvim_tar}"
+						sudo chmod -R a+rX "/opt/${nvim_dir}" 2>/dev/null || :
 						sudo ln -sf "/opt/${nvim_dir}/bin/nvim" /usr/local/bin/nvim
 						mkdir -p "$HOME/.local/bin"
 						ln -sf "/opt/${nvim_dir}/bin/nvim" "$HOME/.local/bin/nvim"
@@ -221,7 +229,7 @@ function install_editor() {
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing Providers for NeoVim...${fgcolor_reset}"
 	node_package_module install -g neovim || :
 	if [[ "$(command -v pipx)" != "" ]]; then
-		pipx install pynvim || :
+		pipx install pynvim || pipx upgrade pynvim || :
 	fi
 
 	echo
@@ -237,7 +245,7 @@ function install_editor() {
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Restoring/Syncing LazyVim plugins from lockfile...${fgcolor_reset}"
 	if [[ "$(command -v nvim)" != "" ]]; then
-		nvim --headless "+Lazy! restore" +qa 2>/dev/null || nvim --headless "+Lazy! sync" +qa 2>/dev/null || :
+		nvim --headless "+Lazy! restore" +qa </dev/null &>/dev/null || nvim --headless "+Lazy! sync" +qa </dev/null &>/dev/null || :
 	fi
 
 	echo
