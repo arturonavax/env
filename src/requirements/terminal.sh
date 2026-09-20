@@ -20,7 +20,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 	source /etc/os-release
 
 	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		required-sudo-commands apt snap
+		required-sudo-commands apt
 
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 		required-sudo-commands dnf

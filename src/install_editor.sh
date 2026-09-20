@@ -28,8 +28,8 @@ function install_editor() {
 	set -o errexit
 	trap exit-error-message ERR SIGINT
 
-	rm -rf ./downloads/
-	mkdir ./downloads/
+	sudo rm -rf ./downloads/ 2>/dev/null || rm -rf ./downloads/ 2>/dev/null || :
+	mkdir -p ./downloads/
 
 	source ./src/remotes/_basics.sh
 
@@ -285,7 +285,7 @@ function install_editor() {
 	echo -en "$fgcolor_reset"
 
 	if [[ -d ./downloads/ ]]; then
-		rm -rf ./downloads/
+		sudo rm -rf ./downloads/ 2>/dev/null || rm -rf ./downloads/ 2>/dev/null || :
 	fi
 
 	./src/remotes/fixer.sh

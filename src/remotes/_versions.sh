@@ -5,6 +5,7 @@
 
 # Terminal & Editors
 export GHOSTTY_VERSION="${GHOSTTY_VERSION:-1.3.1}"
+export ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
 export NVIM_VERSION="${NVIM_VERSION:-v0.12.5}"
 export TMUX_VERSION="${TMUX_VERSION:-3.7c}"
 

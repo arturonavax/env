@@ -58,10 +58,17 @@ function uninstall() {
 		sudo snap remove --purge ghostty &>/dev/null || :
 		sudo snap remove --purge tmux &>/dev/null || :
 		sudo snap remove --purge nvim &>/dev/null || :
-		sudo rm -rf /opt/nvim-linux-* /usr/local/bin/nvim "$HOME/.local/bin/nvim" /usr/local/bin/tmux &>/dev/null || :
+		sudo rm -rf /opt/nvim-linux-* /opt/zig-* /usr/local/bin/zig /usr/local/bin/nvim "$HOME/.local/bin/nvim" \
+			/usr/local/bin/tmux /usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
+			/usr/share/applications/*ghostty*.desktop /usr/share/terminfo/g/ghostty* \
+			/usr/share/terminfo/x/xterm-ghostty* /usr/share/icons/hicolor/*/apps/*ghostty* &>/dev/null || :
+		if command -v update-desktop-database &>/dev/null; then
+			sudo update-desktop-database /usr/share/applications &>/dev/null || :
+		fi
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
 		brew uninstall --cask ghostty &>/dev/null || :
+		rm -rf /Applications/Ghostty.app /usr/local/bin/ghostty "$HOME/.local/bin/ghostty" &>/dev/null || :
 		brew uninstall tmux neovim fzf &>/dev/null || :
 	fi
 
