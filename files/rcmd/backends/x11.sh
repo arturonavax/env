@@ -8,31 +8,39 @@
 # - Cleans desktop prefixes: gnome-, xfce4-, xfce-, kde- (e.g. gnome-calculator -> calculator)
 # - Filters system panels, docks, desktop elements (e.g. xfce4-panel Clock)
 # - MRU focus + sister windows raising when coming from another app
+# - Optimized for near-instant execution (hash maps & pure bash builtins)
 # ==============================================================================
 
 find_dynamic_app_x11() {
     local key="${1,,}"
-    local stack
+
+    # 1. Obtain stacking order (MRU: top to bottom)
+    local stack=()
     mapfile -t stack < <(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null | grep -o "0x[0-9a-fA-F]*" | tac)
+    if [ ${#stack[@]} -eq 0 ]; then
+        mapfile -t stack < <(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -o "0x[0-9a-fA-F]*" | tac)
+    fi
     [ ${#stack[@]} -eq 0 ] && return 1
 
-    local wmlist
-    wmlist=$(wmctrl -lxp)
-    [ -z "$wmlist" ] && return 1
+    # 2. Pre-parse open client windows into associative array (O(1) lookups)
+    declare -A win_data
+    local w d p c t norm_w
+    while read -r w d p c _ t; do
+        [ -z "$w" ] && continue
+        printf -v norm_w "0x%08x" "$((w))" 2>/dev/null || norm_w="${w,,}"
+        win_data["$norm_w"]="$d|$p|$c|$t"
+    done < <(wmctrl -lxp 2>/dev/null)
 
+    # 3. Search in stacking order (MRU)
     for wid_raw in "${stack[@]}"; do
         local wid_hex
-        wid_hex=$(printf "0x%08x" "$((wid_raw))" 2>/dev/null)
-        local line
-        line=$(grep -i "^$wid_hex" <<< "$wmlist" | head -n1)
-        [ -z "$line" ] && continue
+        printf -v wid_hex "0x%08x" "$((wid_raw))" 2>/dev/null || continue
+        local info="${win_data[$wid_hex]:-}"
+        [ -z "$info" ] && continue
 
         local desk pid wmclass title
-        desk=$(awk '{print $2}' <<< "$line")
+        IFS='|' read -r desk pid wmclass title <<< "$info"
         [ "$desk" = "-1" ] && continue
-
-        pid=$(awk '{print $3}' <<< "$line")
-        wmclass=$(awk '{print $4}' <<< "$line")
 
         # Skip system desktop elements, panels, docks, trays
         local wmclass_l="${wmclass,,}"
@@ -40,16 +48,13 @@ find_dynamic_app_x11() {
             continue
         fi
 
-        # In wmctrl -lxp: 1=wid, 2=desk, 3=pid, 4=wmclass, 5=client_machine, 6+=title
-        title=$(awk '{$1=$2=$3=$4=$5=""; print $0}' <<< "$line" | sed 's/^[[:space:]]*//')
-
-        # Process name from /proc/$pid/comm
+        # Process name from /proc/$pid/comm (pure bash redirection, 0 forks)
         local comm=""
-        if [ -n "$pid" ] && [ "$pid" != "0" ]; then
-            comm=$(cat "/proc/$pid/comm" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/comm" ]; then
+            read -r comm < "/proc/$pid/comm" 2>/dev/null || comm=""
         fi
 
-        # Convert to lowercase and clean suffixes
+        # Convert to lowercase and clean runtime suffixes
         local comm_l="${comm,,}"
         comm_l="${comm_l%-bin}"
         comm_l="${comm_l%.real}"
@@ -61,7 +66,7 @@ find_dynamic_app_x11() {
         local cls="${wmclass##*.}"
         local cls_l="${cls,,}"
 
-        # Clean desktop prefixes: gnome-, xfce4-, xfce-, kde-
+        # Clean desktop environment prefixes
         local comm_clean="${comm_l#gnome-}"
         comm_clean="${comm_clean#xfce4-}"
         comm_clean="${comm_clean#xfce-}"
@@ -79,7 +84,7 @@ find_dynamic_app_x11() {
 
         local candidates=("$inst_l" "$inst_clean" "$cls_l" "$cls_clean" "$comm_l" "$comm_clean")
 
-        # Extract app name from title
+        # Extract app name from title if available
         if [ -n "$title" ]; then
             local title_l="${title,,}"
             # If title has separator like ' — ' or ' - ', the app name is at the end (e.g. "... — Mozilla Firefox")
@@ -91,8 +96,7 @@ find_dynamic_app_x11() {
                 done
             else
                 # Standalone title (e.g. "Calculator", "Ghostty")
-                local clean_title
-                clean_title=$(sed -E 's/^\([0-9]+\+?\)[[:space:]]*//' <<< "$title_l")
+                local clean_title="${title_l#\(*\)[[:space:]]}"
                 candidates+=("$clean_title")
                 for w in $clean_title; do
                     candidates+=("$w")
@@ -118,6 +122,15 @@ rcmd_backend_x11() {
     local pattern="$3"
     local match_mode="${4:-class}"
 
+    # Defensive check: ensure required X11 tools exist
+    if ! command -v wmctrl >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1; then
+        echo "Error: rcmd requires 'wmctrl' and 'xdotool' on X11." >&2
+        if [ -n "$cmd" ]; then
+            nohup bash -c "$cmd" >/dev/null 2>&1 &
+        fi
+        exit 1
+    fi
+
     # --------------------------------------------------------------------------
     # 1. Dynamic Mode (Unconfigured letter shortcut: only focus currently open apps)
     # --------------------------------------------------------------------------
@@ -139,7 +152,7 @@ rcmd_backend_x11() {
         # Active window check
         local active_dec active_hex
         active_dec=$(xdotool getactivewindow 2>/dev/null || echo 0)
-        active_hex=$(printf "0x%08x" "$active_dec")
+        printf -v active_hex "0x%08x" "$active_dec" 2>/dev/null || active_hex="0x00000000"
 
         local is_active_in_app=0
         local current_index=-1
@@ -178,10 +191,8 @@ rcmd_backend_x11() {
 
     local WINS=()
     if [ "$match_mode" = "title" ]; then
-        # Busca en el título (columna 4 en adelante de wmctrl -l, tolera badges como "(1)")
         mapfile -t WINS < <(wmctrl -l | awk -v pat="$pattern" 'tolower($0) ~ tolower(pat) {print tolower($1)}')
     else
-        # Busca en WM_CLASS (columna 3 de wmctrl -lx)
         mapfile -t WINS < <(wmctrl -lx | awk -v pat="$pattern" 'tolower($3) ~ tolower(pat) {print tolower($1)}')
     fi
 
@@ -196,7 +207,7 @@ rcmd_backend_x11() {
     # Obtener el ID de la ventana activa en formato hex normalizado (0x00000000)
     local active_dec active_hex
     active_dec=$(xdotool getactivewindow 2>/dev/null || echo 0)
-    active_hex=$(printf "0x%08x" "$active_dec")
+    printf -v active_hex "0x%08x" "$active_dec" 2>/dev/null || active_hex="0x00000000"
 
     local is_active_in_app=0
     local current_index=-1
@@ -216,11 +227,14 @@ rcmd_backend_x11() {
         target_win="${WINS[$next_index]}"
     else
         # Vienes de otra app: buscar en el stack X11 la ventana más reciente (MRU)
-        local stack
-        stack=$(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null | grep -o '0x[0-9a-fA-F]*' | tac)
-        for s_id in $stack; do
+        local stack=()
+        mapfile -t stack < <(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null | grep -o '0x[0-9a-fA-F]*' | tac)
+        if [ ${#stack[@]} -eq 0 ]; then
+            mapfile -t stack < <(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -o '0x[0-9a-fA-F]*' | tac)
+        fi
+        for s_id in "${stack[@]}"; do
             local s_hex
-            s_hex=$(printf "0x%08x" "$((s_id))" 2>/dev/null)
+            printf -v s_hex "0x%08x" "$((s_id))" 2>/dev/null || continue
             for w in "${WINS[@]}"; do
                 if [ "$w" = "$s_hex" ]; then
                     target_win="$w"
