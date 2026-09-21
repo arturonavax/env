@@ -2,10 +2,11 @@
 # ==============================================================================
 # rcmd backend: Hyprland (Wayland)
 # Uses hyprctl to query and focus windows with MRU ordering, cycling, and title match.
+# Cleans desktop prefixes (gnome-, xfce4-, kde-) in dynamic mode.
 # ==============================================================================
 
 rcmd_backend_hyprland() {
-    local key="$1"
+    local key="${1,,}"
     local cmd="$2"
     local pattern="$3"
     local match_mode="${4:-class}"
@@ -16,7 +17,7 @@ rcmd_backend_hyprland() {
     fi
 
     python3 -c "
-import json, subprocess, sys
+import json, subprocess, sys, re
 
 key = sys.argv[1].lower()
 cmd = sys.argv[2]
@@ -36,7 +37,6 @@ try:
 except Exception:
     active_addr = ''
 
-# Filter matching windows
 matched = []
 if pattern:
     if match_mode == 'title':
@@ -44,24 +44,34 @@ if pattern:
     else:
         matched = [c for c in clients if pattern in c.get('class', '').lower() or pattern in c.get('title', '').lower()]
 elif key:
-    # Dynamic fallback: find first client starting with key
+    # Dynamic fallback: ONLY currently open apps starting with that letter (lowercase)
     sorted_clients = sorted(clients, key=lambda c: c.get('focusHistoryID', 999))
     matched_class = ''
     for c in sorted_clients:
-        cls = c.get('class', '').lower()
+        raw_cls = c.get('class', '').lower()
         title = c.get('title', '').lower()
-        if cls.startswith(key) or title.startswith(key):
-            matched_class = cls
+        clean_cls = re.sub(r'^(gnome-|xfce4-|xfce-|kde-|org\.[^.]+\.|com\.[^.]+\.)', '', raw_cls)
+        candidates = [raw_cls, clean_cls]
+        if ' - ' in title or ' — ' in title:
+            parts = re.split(r' [—\-] ', title)
+            candidates.append(parts[-1].strip())
+        else:
+            clean_title = re.sub(r'^\([0-9]+\+?\)[[:space:]]*', '', title)
+            candidates.extend(clean_title.split())
+
+        if any(cand.startswith(key) for cand in candidates if cand):
+            matched_class = c.get('class')
             break
     if matched_class:
-        matched = [c for c in clients if c.get('class', '').lower() == matched_class]
+        matched = [c for c in clients if c.get('class') == matched_class]
+    else:
+        sys.exit(0)
 
 if not matched:
     if cmd:
         subprocess.Popen(cmd, shell=True)
     sys.exit(0)
 
-# Check if active window is in matched
 addrs = [c.get('address') for c in matched]
 if active_addr in addrs:
     curr_idx = addrs.index(active_addr)

@@ -2,10 +2,11 @@
 # ==============================================================================
 # rcmd backend: Sway / i3 (wlroots / Wayland)
 # Uses swaymsg to query and focus containers with dynamic matching and title support.
+# Cleans desktop prefixes (gnome-, xfce4-, kde-) in dynamic mode.
 # ==============================================================================
 
 rcmd_backend_sway() {
-    local key="$1"
+    local key="${1,,}"
     local cmd="$2"
     local pattern="$3"
     local match_mode="${4:-class}"
@@ -19,7 +20,7 @@ rcmd_backend_sway() {
     fi
 
     python3 -c "
-import json, subprocess, sys
+import json, subprocess, sys, re
 
 key = sys.argv[1].lower()
 cmd = sys.argv[2]
@@ -40,7 +41,6 @@ def get_nodes(node):
     if node.get('floating_nodes'):
         for n in node['floating_nodes']:
             res.extend(get_nodes(n))
-    # Window leaf
     app_id = (node.get('app_id') or '').lower()
     wp = node.get('window_properties') or {}
     cls = (wp.get('class') or '').lower()
@@ -63,21 +63,33 @@ if pattern:
     else:
         matched = [n for n in nodes if pattern in n['app_id'] or pattern in n['class']]
 elif key:
-    # Dynamic fallback
+    # Dynamic fallback: ONLY currently open apps starting with that letter (lowercase)
     target_cls = ''
     for n in nodes:
-        if n['app_id'].startswith(key) or n['class'].startswith(key) or n['name'].startswith(key):
+        raw_app = n['app_id'] or n['class']
+        clean_app = re.sub(r'^(gnome-|xfce4-|xfce-|kde-|org\.[^.]+\.|com\.[^.]+\.)', '', raw_app)
+        candidates = [raw_app, clean_app]
+        title = n['name']
+        if ' - ' in title or ' — ' in title:
+            parts = re.split(r' [—\-] ', title)
+            candidates.append(parts[-1].strip())
+        else:
+            clean_title = re.sub(r'^\([0-9]+\+?\)[[:space:]]*', '', title)
+            candidates.extend(clean_title.split())
+
+        if any(cand.startswith(key) for cand in candidates if cand):
             target_cls = n['app_id'] or n['class']
             break
     if target_cls:
-        matched = [n for n in nodes if n['app_id'] == target_cls or n['class'] == target_cls]
+        matched = [n for n in nodes if n['app_id'].lower() == target_cls or n['class'].lower() == target_cls]
+    else:
+        sys.exit(0)
 
 if not matched:
     if cmd:
         subprocess.Popen(f'{msg_cmd} exec \"{cmd}\"', shell=True)
     sys.exit(0)
 
-# Check cycling
 focused_in_matched = [n for n in matched if n['focused']]
 if focused_in_matched:
     curr_idx = matched.index(focused_in_matched[0])

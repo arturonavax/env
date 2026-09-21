@@ -85,6 +85,8 @@ cp ~/.sql-formatter.json ./files/sql-formatter/.
 
 # Copy rcmd files
 mkdir -p ./files/rcmd/
-[[ -f ~/.config/rcmd/rcmd.conf ]] && cp ~/.config/rcmd/rcmd.conf ./files/rcmd/. || :
+if [[ -f ~/.config/rcmd/rcmd.conf ]]; then
+	cp ~/.config/rcmd/rcmd.conf ./files/rcmd/.
+fi
 
 echo "Configuration files successfully copied to repository!"
