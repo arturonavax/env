@@ -429,19 +429,41 @@ __notify_precmd() {
         unset __cmd_start __cmd_name
 
         if (( elapsed >= ${NOTIFY_THRESHOLD:-3} )); then
+            local should_notify=0
+
             if [[ -n "$TMUX" ]]; then
-                local is_focused=$(tmux list-clients -F '#{m:*focused*,#{client_flags}}' 2>/dev/null | head -n 1)
-                if [[ "$is_focused" == "0" ]]; then
-                    local title="Comando finalizado (${elapsed}s)"
-                    local urgency="normal"
-
-                    if (( exit_code != 0 )); then
-                        title="Comando fallido (código $exit_code) (${elapsed}s)"
-                        urgency="critical"
-                    fi
-
-                    notify-send -u "$urgency" -i utilities-terminal "$title" "$cmd" >/dev/null 2>&1
+                local pane_target="${TMUX_PANE:-}"
+                local is_pane_focused
+                if [[ -n "$pane_target" ]]; then
+                    is_pane_focused=$(tmux display-message -p -t "$pane_target" '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
+                else
+                    is_pane_focused=$(tmux display-message -p '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
                 fi
+
+                # Si no es exactamente '1', el panel exacto no está enfocado (otro panel, otra ventana, otra sesión o terminal en segundo plano)
+                if [[ "$is_pane_focused" != "1" ]]; then
+                    should_notify=1
+                fi
+            else
+                # Fuera de tmux: verificar foco de ventana en X11 si xdotool está disponible
+                if command -v xdotool &>/dev/null && [[ -n "$WINDOWID" ]]; then
+                    local active_win=$(xdotool getactivewindow 2>/dev/null)
+                    if [[ -n "$active_win" && "$active_win" != "$WINDOWID" ]]; then
+                        should_notify=1
+                    fi
+                fi
+            fi
+
+            if (( should_notify )); then
+                local title="Comando finalizado (${elapsed}s)"
+                local urgency="normal"
+
+                if (( exit_code != 0 )); then
+                    title="Comando fallido (código $exit_code) (${elapsed}s)"
+                    urgency="critical"
+                fi
+
+                notify-send -u "$urgency" -i utilities-terminal "$title" "$cmd" >/dev/null 2>&1
             fi
         fi
     fi
@@ -450,25 +472,6 @@ __notify_precmd() {
 add-zsh-hook preexec __notify_preexec 2>/dev/null || :
 add-zsh-hook precmd __notify_precmd 2>/dev/null || :
 
-## Wrapper para asistente CLI con monitor de silencio en tmux
-if command -v agy &>/dev/null; then
-    agy() {
-        if [[ -n "$TMUX" ]]; then
-            local wid
-            wid=$(tmux display-message -p '#{window_id}')
-
-            tmux set-window-option -t "$wid" visual-silence off
-            tmux set-window-option -t "$wid" monitor-silence 3
-
-            tmux set-hook -t "$wid" -w alert-silence \
-                'run-shell -b '\''[ "$(tmux list-clients -F "##{m:*focused*,##{client_flags}}" 2>/dev/null | head -n 1)" = "0" ] && notify-send -u normal -i utilities-terminal "AI CLI" "Respuesta completada"'\'''
-
-            trap "tmux set-window-option -t '$wid' monitor-silence 0; tmux set-hook -t '$wid' -w -u alert-silence; trap - EXIT INT TERM" EXIT INT TERM
-        fi
-
-        command agy "$@"
-    }
-fi
 
 ## Bun completions
 if [[ -d "$HOME/.bun" && -s "$HOME/.bun/_bun" ]]; then
