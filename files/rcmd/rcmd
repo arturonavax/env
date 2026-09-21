@@ -5,6 +5,7 @@
 # Focuses, cycles, or launches applications via Right Alt shortcuts.
 # Agnostic to window managers: Supports X11 (Xfce, etc.) and Wayland (GNOME,
 # Hyprland, Sway, KDE).
+# Supports matching by WM_CLASS or window TITLE (e.g. for WhatsApp web app).
 # ==============================================================================
 
 set -eo pipefail
@@ -109,7 +110,7 @@ lookup_key_in_config() {
     [ -z "$CONFIG_FILE" ] && return 1
     [ ! -f "$CONFIG_FILE" ] && return 1
 
-    while IFS='|' read -r k cmd pat rest; do
+    while IFS='|' read -r k cmd pat mode rest; do
         # Fast trim whitespace
         k="${k#"${k%%[![:space:]]*}"}"
         k="${k%"${k##*[![:space:]]}"}"
@@ -121,8 +122,11 @@ lookup_key_in_config() {
             cmd="${cmd%"${cmd##*[![:space:]]}"}"
             pat="${pat#"${pat%%[![:space:]]*}"}"
             pat="${pat%"${pat##*[![:space:]]}"}"
+            mode="${mode#"${mode%%[![:space:]]*}"}"
+            mode="${mode%"${mode##*[![:space:]]}"}"
             [ -z "$pat" ] && pat="$cmd"
-            echo "$cmd|$pat"
+            [ -z "$mode" ] && mode="class"
+            echo "$cmd|$pat|$mode"
             return 0
         fi
     done < "$CONFIG_FILE"
@@ -239,10 +243,10 @@ list_mappings() {
         exit 0
     fi
     echo "Configuration: $CONFIG_FILE"
-    echo "--------------------------------------------------------"
-    printf "%-6s | %-20s | %-20s\n" "KEY" "COMMAND" "WINDOW PATTERN"
-    echo "--------------------------------------------------------"
-    while IFS='|' read -r k cmd pat rest; do
+    echo "---------------------------------------------------------------------------------"
+    printf "%-6s | %-45s | %-16s | %-6s\n" "KEY" "COMMAND" "WINDOW PATTERN" "MODE"
+    echo "---------------------------------------------------------------------------------"
+    while IFS='|' read -r k cmd pat mode rest; do
         k="${k#"${k%%[![:space:]]*}"}"
         k="${k%"${k##*[![:space:]]}"}"
         [[ "$k" =~ ^# ]] && continue
@@ -251,10 +255,13 @@ list_mappings() {
         cmd="${cmd%"${cmd##*[![:space:]]}"}"
         pat="${pat#"${pat%%[![:space:]]*}"}"
         pat="${pat%"${pat##*[![:space:]]}"}"
+        mode="${mode#"${mode%%[![:space:]]*}"}"
+        mode="${mode%"${mode##*[![:space:]]}"}"
         [ -z "$pat" ] && pat="$cmd"
-        printf "%-6s | %-20s | %-20s\n" "$k" "$cmd" "$pat"
+        [ -z "$mode" ] && mode="class"
+        printf "%-6s | %-45s | %-16s | %-6s\n" "$k" "$cmd" "$pat" "$mode"
     done < "$CONFIG_FILE"
-    echo "--------------------------------------------------------"
+    echo "---------------------------------------------------------------------------------"
     echo "Note: Unconfigured keys dynamically focus open windows starting with that letter."
 }
 
@@ -273,14 +280,17 @@ show_status() {
 
 show_help() {
     cat <<EOF
-Usage: rcmd <KEY | COMMAND> [PATTERN]
+Usage: rcmd <KEY>
+       rcmd <COMMAND> [PATTERN] [MODE]
        rcmd [OPTION]
 
 Arguments:
-  <KEY>               Single key letter (e.g. 't', 'b', 'f').
+  <KEY>               Single key letter (e.g. 't', 'b', 'w').
                       - If configured in rcmd.conf: launches or focuses that app.
                       - If NOT configured: dynamically focuses open window starting with that letter.
-  <COMMAND> [PATTERN] Direct invocation (drop-in replacement for run-or-raise).
+  <COMMAND> [PATTERN] [MODE]
+                      Direct invocation (drop-in replacement for run-or-raise).
+                      MODE can be 'class' (default) or 'title'.
 
 Options:
   --sync-xfce         Register all a-z shortcuts in Xfce via xfconf-query
@@ -292,9 +302,12 @@ Options:
   --status            Display detected environment and backend status
   -h, --help          Show this help message
 
-Configuration file locations:
-  ~/.config/rcmd/rcmd.conf
-  ~/.config/rcmd.conf
+Configuration file format (rcmd.conf):
+  KEY | COMMAND | [WINDOW_PATTERN] | [MATCH_MODE (class|title)]
+
+Examples:
+  t | ghostty | ghostty | class
+  w | firefox --new-window https://web.whatsapp.com | WhatsApp | title
 EOF
 }
 
@@ -346,11 +359,12 @@ main() {
     backend="$(detect_backend)"
     load_backend "$backend"
 
-    # Direct invocation with 2 arguments (e.g., rcmd ghostty ghostty)
+    # Direct invocation with 2 or 3 arguments (e.g., rcmd "firefox --new-window ..." "WhatsApp" "title")
     if [ $# -ge 2 ]; then
         local direct_cmd="$1"
         local direct_pattern="$2"
-        "rcmd_backend_${backend}" "" "$direct_cmd" "$direct_pattern"
+        local direct_mode="${3:-class}"
+        "rcmd_backend_${backend}" "" "$direct_cmd" "$direct_pattern" "$direct_mode"
         exit 0
     fi
 
@@ -362,16 +376,16 @@ main() {
     entry="$(lookup_key_in_config "$input" || echo "")"
 
     if [ -n "$entry" ]; then
-        local cmd pat
-        IFS='|' read -r cmd pat <<< "$entry"
-        "rcmd_backend_${backend}" "$input" "$cmd" "$pat"
+        local cmd pat mode
+        IFS='|' read -r cmd pat mode <<< "$entry"
+        "rcmd_backend_${backend}" "$input" "$cmd" "$pat" "${mode:-class}"
     else
         # If single character (or keyname), trigger dynamic fallback
         # If full command not in config, treat as command with empty pattern
         if [ ${#input} -eq 1 ]; then
-            "rcmd_backend_${backend}" "$input" "" ""
+            "rcmd_backend_${backend}" "$input" "" "" "class"
         else
-            "rcmd_backend_${backend}" "" "$input" "$input"
+            "rcmd_backend_${backend}" "" "$input" "$input" "class"
         fi
     fi
 }

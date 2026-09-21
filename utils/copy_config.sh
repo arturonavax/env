@@ -83,4 +83,8 @@ cp ~/.sql-formatter.json ./files/sql-formatter/.
 [[ -f ~/.amethyst.yml ]] && cp ~/.amethyst.yml ./files/amethyst/. || :
 [[ -f ~/.config/karabiner/karabiner.json ]] && cp ~/.config/karabiner/karabiner.json ./files/karabiner/. || :
 
+# Copy rcmd files
+mkdir -p ./files/rcmd/
+[[ -f ~/.config/rcmd/rcmd.conf ]] && cp ~/.config/rcmd/rcmd.conf ./files/rcmd/. || :
+
 echo "Configuration files successfully copied to repository!"

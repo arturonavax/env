@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # rcmd backend: X11 (Universal EWMH: wmctrl + xdotool + xprop)
-# Supports macOS rcmd behavior:
+# Supports:
+# - Matching by WM_CLASS or by window TITLE (e.g. for WhatsApp, web apps)
 # - Cycle through open windows if app is currently focused
 # - MRU focus + sister windows raising when coming from another app
 # - Launch application if closed (when configured)
@@ -36,22 +37,27 @@ find_dynamic_pattern_x11() {
         local comm=""
         [ -n "$pid" ] && [ "$pid" != "0" ] && comm=$(cat "/proc/$pid/comm" 2>/dev/null || echo "")
         
+        # Strip notification prefix like (1) or (99+) from title for matching
+        local clean_title
+        clean_title=$(sed -E 's/^\([0-9]+\+?\)[[:space:]]*//' <<< "$title")
+        
         local inst_l="${inst,,}"
         local cls_l="${cls,,}"
         local comm_l="${comm,,}"
-        local title_l="${title,,}"
+        local clean_title_l="${clean_title,,}"
         
         if [[ "$inst_l" == "$key"* ]]; then
-            echo "$inst"
+            echo "${inst}:class"
             return 0
         elif [[ "$cls_l" == "$key"* ]]; then
-            echo "$cls"
+            echo "${cls}:class"
             return 0
         elif [[ "$comm_l" == "$key"* ]]; then
-            echo "$comm"
+            echo "${comm}:class"
             return 0
-        elif [[ "$title_l" == "$key"* ]]; then
-            echo "${cls:-$inst}"
+        elif [[ "$clean_title_l" == "$key"* ]]; then
+            local first_word="${clean_title%% *}"
+            echo "${first_word:-$clean_title}:title"
             return 0
         fi
     done
@@ -62,18 +68,36 @@ rcmd_backend_x11() {
     local key="$1"
     local cmd="$2"
     local pattern="$3"
+    local match_mode="${4:-class}"
 
     # Dynamic fallback if no pattern or command was provided
     if [ -z "$pattern" ] && [ -z "$cmd" ]; then
-        pattern=$(find_dynamic_pattern_x11 "$key" || true)
+        local dyn_res
+        dyn_res=$(find_dynamic_pattern_x11 "$key" || true)
         # If no open window matches the requested key, nothing to do
-        [ -z "$pattern" ] && exit 0
+        [ -z "$dyn_res" ] && exit 0
+        if [[ "$dyn_res" == *":title" ]]; then
+            pattern="${dyn_res%:title}"
+            match_mode="title"
+        elif [[ "$dyn_res" == *":class" ]]; then
+            pattern="${dyn_res%:class}"
+            match_mode="class"
+        else
+            pattern="$dyn_res"
+        fi
     fi
 
     [ -z "$pattern" ] && pattern="$cmd"
 
-    # 1. Obtener ventanas cuya clase coincida con el patrón (case-insensitive)
-    mapfile -t WINS < <(wmctrl -lx | awk -v pat="$pattern" 'tolower($3) ~ tolower(pat) {print tolower($1)}')
+    # 1. Obtener ventanas según modo de coincidencia
+    local WINS=()
+    if [ "$match_mode" = "title" ]; then
+        # Busca en el título (columna 4 en adelante de wmctrl -l, tolera badges como "(1)")
+        mapfile -t WINS < <(wmctrl -l | awk -v pat="$pattern" 'tolower($0) ~ tolower(pat) {print tolower($1)}')
+    else
+        # Busca en WM_CLASS (columna 3 de wmctrl -lx)
+        mapfile -t WINS < <(wmctrl -lx | awk -v pat="$pattern" 'tolower($3) ~ tolower(pat) {print tolower($1)}')
+    fi
 
     # Si no hay ventanas abiertas
     if [ ${#WINS[@]} -eq 0 ]; then

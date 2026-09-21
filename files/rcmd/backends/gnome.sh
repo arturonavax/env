@@ -8,6 +8,7 @@ rcmd_backend_gnome() {
     local key="$1"
     local cmd="$2"
     local pattern="${3:-$cmd}"
+    # local match_mode="${4:-class}"
 
     # Target pattern: configured pattern or key
     local target="${pattern:-$key}"

@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # rcmd backend: Hyprland (Wayland)
-# Uses hyprctl to query and focus windows with MRU ordering and window cycling.
+# Uses hyprctl to query and focus windows with MRU ordering, cycling, and title match.
 # ==============================================================================
 
 rcmd_backend_hyprland() {
     local key="$1"
     local cmd="$2"
     local pattern="$3"
+    local match_mode="${4:-class}"
 
     if ! command -v hyprctl >/dev/null 2>&1; then
         [ -n "$cmd" ] && nohup bash -c "$cmd" >/dev/null 2>&1 &
         return 0
     fi
 
-    # Read clients and active window via python helper for JSON handling
     python3 -c "
 import json, subprocess, sys
 
 key = sys.argv[1].lower()
 cmd = sys.argv[2]
 pattern = sys.argv[3].lower()
+match_mode = sys.argv[4].lower()
 
 try:
     clients_raw = subprocess.check_output(['hyprctl', 'clients', '-j']).decode('utf-8')
@@ -38,10 +39,12 @@ except Exception:
 # Filter matching windows
 matched = []
 if pattern:
-    matched = [c for c in clients if pattern in c.get('class', '').lower() or pattern in c.get('title', '').lower()]
+    if match_mode == 'title':
+        matched = [c for c in clients if pattern in c.get('title', '').lower()]
+    else:
+        matched = [c for c in clients if pattern in c.get('class', '').lower() or pattern in c.get('title', '').lower()]
 elif key:
     # Dynamic fallback: find first client starting with key
-    # Sort clients by focusHistoryID (0 is most recent)
     sorted_clients = sorted(clients, key=lambda c: c.get('focusHistoryID', 999))
     matched_class = ''
     for c in sorted_clients:
@@ -61,16 +64,14 @@ if not matched:
 # Check if active window is in matched
 addrs = [c.get('address') for c in matched]
 if active_addr in addrs:
-    # Cycle to next window
     curr_idx = addrs.index(active_addr)
     next_idx = (curr_idx + 1) % len(addrs)
     target_addr = addrs[next_idx]
 else:
-    # Pick lowest focusHistoryID (MRU)
     matched.sort(key=lambda c: c.get('focusHistoryID', 999))
     target_addr = matched[0].get('address')
 
 if target_addr:
     subprocess.run(['hyprctl', 'dispatch', 'focuswindow', f'address:{target_addr}'], check=False)
-" "$key" "$cmd" "$pattern"
+" "$key" "$cmd" "$pattern" "$match_mode"
 }

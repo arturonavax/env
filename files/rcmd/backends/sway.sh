@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # rcmd backend: Sway / i3 (wlroots / Wayland)
-# Uses swaymsg to query and focus containers with dynamic matching.
+# Uses swaymsg to query and focus containers with dynamic matching and title support.
 # ==============================================================================
 
 rcmd_backend_sway() {
     local key="$1"
     local cmd="$2"
     local pattern="$3"
+    local match_mode="${4:-class}"
 
     local msg_cmd="swaymsg"
     command -v swaymsg >/dev/null 2>&1 || msg_cmd="i3-msg"
@@ -23,7 +24,8 @@ import json, subprocess, sys
 key = sys.argv[1].lower()
 cmd = sys.argv[2]
 pattern = sys.argv[3].lower()
-msg_cmd = sys.argv[4]
+match_mode = sys.argv[4].lower()
+msg_cmd = sys.argv[5]
 
 try:
     tree = json.loads(subprocess.check_output([msg_cmd, '-t', 'get_tree']).decode('utf-8'))
@@ -56,7 +58,10 @@ def get_nodes(node):
 nodes = get_nodes(tree)
 matched = []
 if pattern:
-    matched = [n for n in nodes if pattern in n['app_id'] or pattern in n['class'] or pattern in n['name']]
+    if match_mode == 'title':
+        matched = [n for n in nodes if pattern in n['name']]
+    else:
+        matched = [n for n in nodes if pattern in n['app_id'] or pattern in n['class']]
 elif key:
     # Dynamic fallback
     target_cls = ''
@@ -81,5 +86,5 @@ else:
     next_node = matched[0]
 
 subprocess.run([msg_cmd, f'[con_id={next_node[\"id\"]}] focus'], check=False)
-" "$key" "$cmd" "$pattern" "$msg_cmd"
+" "$key" "$cmd" "$pattern" "$match_mode" "$msg_cmd"
 }
