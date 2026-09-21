@@ -36,7 +36,7 @@ copy-on-select = clipboard
 # Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
 mouse-scroll-multiplier = 1
 
-command = sh -c "tmux new-session -s main 2>/dev/null || tmux new-session -t main \\; set-option destroy-unattached on"
+command = sh -c "cd && (tmux new-session -s main -c ~ 2>/dev/null || tmux new-session -t main \\; set-option destroy-unattached on)"
 
 desktop-notifications = true
 notify-on-command-finish = unfocused

@@ -279,6 +279,49 @@ function install_editor() {
 
 	# ---
 
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		echo -e "${fgcolor_white_bold}[Editor Installer]: - Configuring Desktop entries and default MIME associations...${fgcolor_reset}"
+
+		# Remove legacy LunarVim (lvim) desktop entries
+		sudo rm -f /usr/share/applications/lvim.desktop /usr/local/share/applications/lvim.desktop 2>/dev/null || :
+		rm -f "$HOME/.local/share/applications/lvim.desktop" 2>/dev/null || :
+
+		# Install Neovim icons if present
+		if [[ -n "$nvim_dir" && -d "/opt/${nvim_dir}/share/icons/hicolor" ]]; then
+			sudo cp -rn "/opt/${nvim_dir}/share/icons/hicolor" /usr/share/icons/ 2>/dev/null || :
+		fi
+
+		# Install Neovim desktop file
+		if [[ -f "./files/nvim/nvim.desktop" ]]; then
+			if [[ "$(command -v desktop-file-install)" != "" ]]; then
+				sudo desktop-file-install ./files/nvim/nvim.desktop 2>/dev/null || :
+			else
+				sudo cp ./files/nvim/nvim.desktop /usr/share/applications/ 2>/dev/null || :
+			fi
+
+			mkdir -p "$HOME/.local/share/applications"
+			cp ./files/nvim/nvim.desktop "$HOME/.local/share/applications/" 2>/dev/null || :
+		fi
+
+		if [[ "$(command -v update-desktop-database)" != "" ]]; then
+			sudo update-desktop-database /usr/share/applications 2>/dev/null || :
+			update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || :
+		fi
+
+		# Set nvim as default text editor for common formats
+		if [[ "$(command -v xdg-mime)" != "" ]]; then
+			for mime in text/plain text/english text/markdown text/x-c text/x-c++ text/x-c++hdr text/x-c++src \
+				text/x-chdr text/x-csrc text/x-java text/x-makefile text/x-python text/rust text/x-go \
+				application/json application/javascript application/x-yaml application/x-shellscript; do
+				xdg-mime default nvim.desktop "$mime" 2>/dev/null || :
+			done
+		fi
+
+		echo
+	fi
+
+	# ---
+
 	echo -e "${fgcolor_white_bold}[Editor Installer]: ${fgcolor_green_bold}✔️ Editor ($editor - LazyVim) successfully installed!${fgcolor_reset}"
 	echo -e "${fgcolor_white_bold}[Editor Installer]: (Read ~/.config/nvim/init.lua and ~/.config/nvim/lua/)${fgcolor_reset}"
 
