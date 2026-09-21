@@ -1,0 +1,379 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rcmd - macOS rcmd-style Application Launcher & Switcher for Linux
+# ==============================================================================
+# Focuses, cycles, or launches applications via Right Alt shortcuts.
+# Agnostic to window managers: Supports X11 (Xfce, etc.) and Wayland (GNOME,
+# Hyprland, Sway, KDE).
+# ==============================================================================
+
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ------------------------------------------------------------------------------
+# Configuration Resolution
+# ------------------------------------------------------------------------------
+find_config() {
+    if [ -n "$RCMD_CONFIG" ] && [ -f "$RCMD_CONFIG" ]; then
+        echo "$RCMD_CONFIG"
+        return 0
+    fi
+    local xdg_config="${XDG_CONFIG_HOME:-$HOME/.config}/rcmd/rcmd.conf"
+    if [ -f "$xdg_config" ]; then
+        echo "$xdg_config"
+        return 0
+    fi
+    if [ -f "$HOME/.config/rcmd.conf" ]; then
+        echo "$HOME/.config/rcmd.conf"
+        return 0
+    fi
+    if [ -f "$SCRIPT_DIR/rcmd.conf" ]; then
+        echo "$SCRIPT_DIR/rcmd.conf"
+        return 0
+    fi
+    return 1
+}
+
+CONFIG_FILE="$(find_config || echo "")"
+
+# ------------------------------------------------------------------------------
+# Backend Detection
+# ------------------------------------------------------------------------------
+detect_backend() {
+    if [ -n "$RCMD_BACKEND" ]; then
+        echo "$RCMD_BACKEND"
+        return 0
+    fi
+
+    local session="${XDG_SESSION_TYPE:-}"
+    local desktop="${XDG_CURRENT_DESKTOP:-}"
+
+    if [ "$session" = "wayland" ]; then
+        if [[ "$desktop" =~ [Hh]yprland ]]; then
+            echo "hyprland"
+        elif [[ "$desktop" =~ [Ss]way ]]; then
+            echo "sway"
+        elif [[ "$desktop" =~ [Gg][Nn][Oo][Mm][Ee] ]]; then
+            echo "gnome"
+        elif [[ "$desktop" =~ [Kk][Dd][Ee] ]]; then
+            echo "kwin"
+        elif command -v hyprctl >/dev/null 2>&1; then
+            echo "hyprland"
+        elif command -v swaymsg >/dev/null 2>&1; then
+            echo "sway"
+        else
+            echo "gnome"
+        fi
+    else
+        # Default X11 (universal EWMH)
+        echo "x11"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Load Backend Module
+# ------------------------------------------------------------------------------
+load_backend() {
+    local backend="$1"
+    local backend_loaded=0
+
+    # Search order:
+    # 1. ~/.local/lib/rcmd/backends/
+    # 2. SCRIPT_DIR/backends/
+    # 3. Built-in embedded fallback
+    local user_lib="$HOME/.local/lib/rcmd/backends/${backend}.sh"
+    local local_lib="${SCRIPT_DIR}/backends/${backend}.sh"
+
+    if [ -f "$user_lib" ]; then
+        # shellcheck source=/dev/null
+        source "$user_lib"
+        backend_loaded=1
+    elif [ -f "$local_lib" ]; then
+        # shellcheck source=/dev/null
+        source "$local_lib"
+        backend_loaded=1
+    fi
+
+    if [ "$backend_loaded" -eq 0 ] && ! declare -f "rcmd_backend_${backend}" >/dev/null 2>&1; then
+        echo "Error: Backend '$backend' not found." >&2
+        exit 1
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Config Lookup
+# ------------------------------------------------------------------------------
+lookup_key_in_config() {
+    local key="${1,,}"
+    [ -z "$CONFIG_FILE" ] && return 1
+    [ ! -f "$CONFIG_FILE" ] && return 1
+
+    while IFS='|' read -r k cmd pat rest; do
+        # Fast trim whitespace
+        k="${k#"${k%%[![:space:]]*}"}"
+        k="${k%"${k##*[![:space:]]}"}"
+        [[ "$k" =~ ^# ]] && continue
+        [ -z "$k" ] && continue
+
+        if [ "${k,,}" = "$key" ]; then
+            cmd="${cmd#"${cmd%%[![:space:]]*}"}"
+            cmd="${cmd%"${cmd##*[![:space:]]}"}"
+            pat="${pat#"${pat%%[![:space:]]*}"}"
+            pat="${pat%"${pat##*[![:space:]]}"}"
+            [ -z "$pat" ] && pat="$cmd"
+            echo "$cmd|$pat"
+            return 0
+        fi
+    done < "$CONFIG_FILE"
+    return 1
+}
+
+# ------------------------------------------------------------------------------
+# Management & Setup Utilities
+# ------------------------------------------------------------------------------
+sync_xfce() {
+    local rcmd_path
+    rcmd_path="$(command -v rcmd || echo "$HOME/.local/bin/rcmd")"
+    echo "Registering rcmd shortcuts in Xfce (a-z) to '$rcmd_path'..."
+    for letter in {a..z}; do
+        local prop="/commands/custom/<Primary><Shift><Super>${letter}"
+        local cmd="${rcmd_path} ${letter}"
+        xfconf-query -c xfce4-keyboard-shortcuts -p "$prop" -n -t string -s "$cmd"
+        echo "  [OK] RightAlt + $letter (<Primary><Shift><Super>${letter}) -> rcmd $letter"
+    done
+    echo "Done! All 26 letters registered in Xfce."
+}
+
+sync_gnome() {
+    local rcmd_path
+    rcmd_path="$(command -v rcmd || echo "$HOME/.local/bin/rcmd")"
+    echo "Registering rcmd shortcuts in GNOME (a-z) to '$rcmd_path'..."
+    
+    local path_prefix="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"
+    local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
+    
+    local new_bindings=()
+    for letter in {a..z}; do
+        local key_id="rcmd_${letter}"
+        local custom_path="${path_prefix}/${key_id}/"
+        new_bindings+=("'$custom_path'")
+        
+        gsettings set "${schema}:${custom_path}" name "rcmd ${letter}"
+        gsettings set "${schema}:${custom_path}" command "${rcmd_path} ${letter}"
+        gsettings set "${schema}:${custom_path}" binding "<Primary><Shift><Super>${letter}"
+    done
+    
+    local array_str
+    array_str="[$(IFS=, ; echo "${new_bindings[*]}")]"
+    gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$array_str"
+    echo "Done! All 26 letters registered in GNOME."
+}
+
+show_keyd() {
+    cat <<'EOF'
+# Place this in /etc/keyd/default.conf
+# Then run: sudo keyd reload
+
+[ids]
+*
+
+[main]
+# Right Alt triggers the rcmd layer
+rightalt = layer(rcmd)
+
+[rcmd]
+# Map a-z to Ctrl+Super+Shift+<letter>
+a = C-M-S-a
+b = C-M-S-b
+c = C-M-S-c
+d = C-M-S-d
+e = C-M-S-e
+f = C-M-S-f
+g = C-M-S-g
+h = C-M-S-h
+i = C-M-S-i
+j = C-M-S-j
+k = C-M-S-k
+l = C-M-S-l
+m = C-M-S-m
+n = C-M-S-n
+o = C-M-S-o
+p = C-M-S-p
+q = C-M-S-q
+r = C-M-S-r
+s = C-M-S-s
+t = C-M-S-t
+u = C-M-S-u
+v = C-M-S-v
+w = C-M-S-w
+x = C-M-S-x
+y = C-M-S-y
+z = C-M-S-z
+EOF
+}
+
+show_hyprland() {
+    local rcmd_path
+    rcmd_path="$(command -v rcmd || echo "$HOME/.local/bin/rcmd")"
+    echo "# Add to ~/.config/hypr/hyprland.conf:"
+    for letter in {a..z}; do
+        local uletter="${letter^^}"
+        echo "bind = SUPER CTRL SHIFT, $uletter, exec, $rcmd_path $letter"
+    done
+}
+
+show_sway() {
+    local rcmd_path
+    rcmd_path="$(command -v rcmd || echo "$HOME/.local/bin/rcmd")"
+    echo "# Add to ~/.config/sway/config:"
+    for letter in {a..z}; do
+        echo "bindsym Mod4+Ctrl+Shift+$letter exec $rcmd_path $letter"
+    done
+}
+
+list_mappings() {
+    if [ -z "$CONFIG_FILE" ]; then
+        echo "No configuration file found."
+        echo "Looked in: ~/.config/rcmd/rcmd.conf, ~/.config/rcmd.conf"
+        exit 0
+    fi
+    echo "Configuration: $CONFIG_FILE"
+    echo "--------------------------------------------------------"
+    printf "%-6s | %-20s | %-20s\n" "KEY" "COMMAND" "WINDOW PATTERN"
+    echo "--------------------------------------------------------"
+    while IFS='|' read -r k cmd pat rest; do
+        k="${k#"${k%%[![:space:]]*}"}"
+        k="${k%"${k##*[![:space:]]}"}"
+        [[ "$k" =~ ^# ]] && continue
+        [ -z "$k" ] && continue
+        cmd="${cmd#"${cmd%%[![:space:]]*}"}"
+        cmd="${cmd%"${cmd##*[![:space:]]}"}"
+        pat="${pat#"${pat%%[![:space:]]*}"}"
+        pat="${pat%"${pat##*[![:space:]]}"}"
+        [ -z "$pat" ] && pat="$cmd"
+        printf "%-6s | %-20s | %-20s\n" "$k" "$cmd" "$pat"
+    done < "$CONFIG_FILE"
+    echo "--------------------------------------------------------"
+    echo "Note: Unconfigured keys dynamically focus open windows starting with that letter."
+}
+
+show_status() {
+    local backend
+    backend="$(detect_backend)"
+    echo "rcmd System Status"
+    echo "--------------------------------------------------------"
+    echo "Active Backend    : $backend"
+    echo "Session Type      : ${XDG_SESSION_TYPE:-unknown}"
+    echo "Current Desktop   : ${XDG_CURRENT_DESKTOP:-unknown}"
+    echo "Config File       : ${CONFIG_FILE:-Not found (using dynamic fallback only)}"
+    echo "Installed Binary  : $(command -v rcmd || echo "$SCRIPT_DIR/rcmd")"
+    echo "--------------------------------------------------------"
+}
+
+show_help() {
+    cat <<EOF
+Usage: rcmd <KEY | COMMAND> [PATTERN]
+       rcmd [OPTION]
+
+Arguments:
+  <KEY>               Single key letter (e.g. 't', 'b', 'f').
+                      - If configured in rcmd.conf: launches or focuses that app.
+                      - If NOT configured: dynamically focuses open window starting with that letter.
+  <COMMAND> [PATTERN] Direct invocation (drop-in replacement for run-or-raise).
+
+Options:
+  --sync-xfce         Register all a-z shortcuts in Xfce via xfconf-query
+  --sync-gnome        Register all a-z shortcuts in GNOME via gsettings
+  --show-keyd         Display recommended /etc/keyd/default.conf snippet
+  --show-hyprland     Display Hyprland keybindings configuration
+  --show-sway         Display Sway/i3 keybindings configuration
+  --list              List currently configured key mappings
+  --status            Display detected environment and backend status
+  -h, --help          Show this help message
+
+Configuration file locations:
+  ~/.config/rcmd/rcmd.conf
+  ~/.config/rcmd.conf
+EOF
+}
+
+# ------------------------------------------------------------------------------
+# Main Dispatcher
+# ------------------------------------------------------------------------------
+main() {
+    if [ $# -eq 0 ]; then
+        show_help
+        exit 0
+    fi
+
+    case "$1" in
+        -h|--help|help)
+            show_help
+            exit 0
+            ;;
+        --sync-xfce)
+            sync_xfce
+            exit 0
+            ;;
+        --sync-gnome)
+            sync_gnome
+            exit 0
+            ;;
+        --show-keyd)
+            show_keyd
+            exit 0
+            ;;
+        --show-hyprland)
+            show_hyprland
+            exit 0
+            ;;
+        --show-sway)
+            show_sway
+            exit 0
+            ;;
+        --list|-l)
+            list_mappings
+            exit 0
+            ;;
+        --status|-s)
+            show_status
+            exit 0
+            ;;
+    esac
+
+    local backend
+    backend="$(detect_backend)"
+    load_backend "$backend"
+
+    # Direct invocation with 2 arguments (e.g., rcmd ghostty ghostty)
+    if [ $# -ge 2 ]; then
+        local direct_cmd="$1"
+        local direct_pattern="$2"
+        "rcmd_backend_${backend}" "" "$direct_cmd" "$direct_pattern"
+        exit 0
+    fi
+
+    # Single argument: key or command
+    local input="$1"
+
+    # Check if input is configured in rcmd.conf
+    local entry
+    entry="$(lookup_key_in_config "$input" || echo "")"
+
+    if [ -n "$entry" ]; then
+        local cmd pat
+        IFS='|' read -r cmd pat <<< "$entry"
+        "rcmd_backend_${backend}" "$input" "$cmd" "$pat"
+    else
+        # If single character (or keyname), trigger dynamic fallback
+        # If full command not in config, treat as command with empty pattern
+        if [ ${#input} -eq 1 ]; then
+            "rcmd_backend_${backend}" "$input" "" ""
+        else
+            "rcmd_backend_${backend}" "" "$input" "$input"
+        fi
+    fi
+}
+
+main "$@"
