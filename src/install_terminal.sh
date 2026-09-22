@@ -292,17 +292,29 @@ function install_terminal() {
 	if [[ "$(uname -s)" == "Linux" ]]; then
 		ghostty_already_compiled=false
 
-		if [[ -f /usr/share/ghostty/.compiled_from_source && -x /usr/bin/ghostty ]]; then
+		if [[ -f /usr/bin/ghostty ]]; then
+			sudo chmod 755 /usr/bin/ghostty 2>/dev/null || :
+			sudo chmod 755 /usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* 2>/dev/null || :
+			sudo chmod 644 /usr/include/ghostty* /usr/include/gtk4-layer-shell* 2>/dev/null || :
+			sudo chmod -R a+rX /usr/share/ghostty /usr/share/applications/*ghostty* /usr/share/icons/hicolor/*/apps/*ghostty* /usr/share/terminfo/*/*ghostty* 2>/dev/null || :
+			sudo ldconfig 2>/dev/null || :
 			installed_ver="$(/usr/bin/ghostty +version 2>/dev/null || /usr/bin/ghostty --version 2>/dev/null)"
 			if [[ "$installed_ver" == *"${GHOSTTY_VERSION}"* ]]; then
 				echo -e "${fgcolor_green_bold}[Terminal Installer]: Ghostty ${GHOSTTY_VERSION} is already compiled from source at /usr/bin/ghostty.${fgcolor_reset}"
 				ghostty_already_compiled=true
+				sudo mkdir -p /usr/share/ghostty 2>/dev/null || :
+				sudo touch /usr/share/ghostty/.compiled_from_source 2>/dev/null || :
+				sudo chmod a+r /usr/share/ghostty/.compiled_from_source 2>/dev/null || :
 			fi
 		fi
 
 		ghostty_installed=false
 		if [[ "$ghostty_already_compiled" == true ]]; then
 			ghostty_installed=true
+			if snap list ghostty &>/dev/null; then
+				echo -e "${fgcolor_white_bold}[Terminal Installer]: Removing uncompiled snap Ghostty...${fgcolor_reset}"
+				sudo snap remove ghostty 2>/dev/null || sudo snap remove --purge ghostty 2>/dev/null || :
+			fi
 		else
 			if snap list ghostty &>/dev/null || [[ "$(command -v ghostty 2>/dev/null)" != "" ]]; then
 				echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Ghostty is currently installed without source compilation. Replacing with compiled version...${fgcolor_reset}"
@@ -372,7 +384,7 @@ function install_terminal() {
 						echo -e "${fgcolor_white_bold}[Terminal Installer]: - - Compiling Ghostty with Zig (${zig_cmd}) [attempt ${attempt}/3]...${fgcolor_reset}"
 						if (
 							cd "./downloads/ghostty-${GHOSTTY_VERSION}" || exit 1
-							sudo "$zig_cmd" build "${build_flags[@]}"
+							sudo bash -c 'umask 022 && "$@"' -- "$zig_cmd" build "${build_flags[@]}"
 						); then
 							build_success=true
 							break
@@ -382,7 +394,16 @@ function install_terminal() {
 						fi
 					done
 
-					if [[ "$build_success" == true && -x /usr/bin/ghostty ]]; then
+					sudo chmod 755 /usr/bin/ghostty 2>/dev/null || :
+					sudo chmod 755 /usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* 2>/dev/null || :
+					sudo chmod 644 /usr/include/ghostty* /usr/include/gtk4-layer-shell* 2>/dev/null || :
+					sudo chmod -R a+rX /usr/share/ghostty 2>/dev/null || :
+					sudo chmod a+rX /usr/share/applications/*ghostty*.desktop 2>/dev/null || :
+					sudo chmod -R a+rX /usr/share/icons/hicolor/*/apps/*ghostty* 2>/dev/null || :
+					sudo chmod -R a+rX /usr/share/terminfo/*/xterm-ghostty* /usr/share/terminfo/*/ghostty* 2>/dev/null || :
+					sudo ldconfig 2>/dev/null || :
+
+					if [[ "$build_success" == true && -f /usr/bin/ghostty ]]; then
 						if [[ "${build_flags[*]}" == *"-fno-sys=gtk4-layer-shell"* ]] && command -v patchelf &>/dev/null; then
 							sudo patchelf --set-rpath '$ORIGIN/../lib' /usr/bin/ghostty 2>/dev/null || :
 						fi
@@ -403,11 +424,12 @@ function install_terminal() {
 						# Mark as compiled from source
 						sudo mkdir -p /usr/share/ghostty
 						sudo touch /usr/share/ghostty/.compiled_from_source
+						sudo chmod a+r /usr/share/ghostty/.compiled_from_source
 
 						# Remove previous uncompiled installations to complete replacement
 						if snap list ghostty &>/dev/null; then
 							echo -e "${fgcolor_white_bold}[Terminal Installer]: Removing uncompiled snap Ghostty...${fgcolor_reset}"
-							sudo snap remove ghostty 2>/dev/null || :
+							sudo snap remove ghostty 2>/dev/null || sudo snap remove --purge ghostty 2>/dev/null || :
 						fi
 						if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
 							sudo apt remove -y ghostty 2>/dev/null || :

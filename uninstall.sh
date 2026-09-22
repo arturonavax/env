@@ -60,10 +60,13 @@ function uninstall() {
 		sudo snap remove --purge nvim &>/dev/null || :
 		sudo rm -rf /opt/nvim-linux-* /opt/zig-* /usr/local/bin/zig /usr/local/bin/nvim "$HOME/.local/bin/nvim" \
 			/usr/local/bin/tmux /usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
+			/usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* \
+			/usr/include/ghostty* /usr/include/gtk4-layer-shell* \
 			/usr/share/applications/*ghostty*.desktop /usr/share/applications/nvim.desktop /usr/share/applications/lvim.desktop \
 			"$HOME/.local/share/applications/nvim.desktop" "$HOME/.local/share/applications/lvim.desktop" \
 			/usr/share/terminfo/g/ghostty* \
 			/usr/share/terminfo/x/xterm-ghostty* /usr/share/icons/hicolor/*/apps/*ghostty* &>/dev/null || :
+		sudo ldconfig &>/dev/null || :
 		if command -v update-desktop-database &>/dev/null; then
 			sudo update-desktop-database /usr/share/applications &>/dev/null || :
 			update-desktop-database "$HOME/.local/share/applications" &>/dev/null || :
