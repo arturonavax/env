@@ -304,7 +304,7 @@ function install_editor() {
 		fi
 
 		if [[ "$(command -v update-desktop-database)" != "" ]]; then
-			sudo update-desktop-database /usr/share/applications 2>/dev/null || :
+			sudo bash -c 'umask 022 && update-desktop-database /usr/share/applications && chmod a+r /usr/share/applications/mimeinfo.cache' 2>/dev/null || :
 			update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || :
 		fi
 

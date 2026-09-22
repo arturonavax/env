@@ -66,9 +66,14 @@ function uninstall() {
 			"$HOME/.local/share/applications/nvim.desktop" "$HOME/.local/share/applications/lvim.desktop" \
 			/usr/share/terminfo/g/ghostty* \
 			/usr/share/terminfo/x/xterm-ghostty* /usr/share/icons/hicolor/*/apps/*ghostty* &>/dev/null || :
+		systemctl --user stop app-com.mitchellh.ghostty.service ghostty.service &>/dev/null || :
+		systemctl --user disable app-com.mitchellh.ghostty.service ghostty.service &>/dev/null || :
+		rm -f "$HOME/.config/systemd/user/"*ghostty* "$HOME/.local/share/applications/"*ghostty*.desktop 2>/dev/null || :
+		sudo rm -f /usr/lib/systemd/user/*ghostty* /usr/share/systemd/user/*ghostty* 2>/dev/null || :
+		systemctl --user daemon-reload &>/dev/null || :
 		sudo ldconfig &>/dev/null || :
 		if command -v update-desktop-database &>/dev/null; then
-			sudo update-desktop-database /usr/share/applications &>/dev/null || :
+			sudo bash -c 'umask 022 && update-desktop-database /usr/share/applications && chmod a+r /usr/share/applications/mimeinfo.cache' &>/dev/null || :
 			update-desktop-database "$HOME/.local/share/applications" &>/dev/null || :
 		fi
 

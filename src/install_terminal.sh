@@ -292,6 +292,39 @@ function install_terminal() {
 	if [[ "$(uname -s)" == "Linux" ]]; then
 		ghostty_already_compiled=false
 
+		function _setup_ghostty_systemd_and_desktop() {
+			mkdir -p "$HOME/.config/systemd/user"
+			cat <<'EOF' > "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service"
+[Unit]
+Description=Ghostty
+After=graphical-session.target
+After=dbus.socket
+Requires=dbus.socket
+
+[Service]
+Type=notify-reload
+ReloadSignal=SIGUSR2
+BusName=com.mitchellh.ghostty
+ExecStart=/usr/bin/ghostty --gtk-single-instance=true --initial-window=false
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+			ln -sf "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service" "$HOME/.config/systemd/user/ghostty.service" 2>/dev/null || :
+
+			if [[ -d /usr/lib/systemd/user ]]; then
+				sudo cp -f "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service" /usr/lib/systemd/user/ 2>/dev/null || :
+				sudo ln -sf /usr/lib/systemd/user/app-com.mitchellh.ghostty.service /usr/lib/systemd/user/ghostty.service 2>/dev/null || :
+				sudo chmod 644 /usr/lib/systemd/user/*ghostty* 2>/dev/null || :
+			fi
+
+			systemctl --user daemon-reload 2>/dev/null || :
+
+			# Ensure no duplicate desktop entries exist in user directory so only the system one is indexed
+			rm -f "$HOME/.local/share/applications/ghostty.desktop" "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop" 2>/dev/null || :
+			update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || :
+		}
+
 		if [[ -f /usr/bin/ghostty ]]; then
 			sudo chmod 755 /usr/bin/ghostty 2>/dev/null || :
 			sudo chmod 755 /usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* 2>/dev/null || :
@@ -305,6 +338,7 @@ function install_terminal() {
 				sudo mkdir -p /usr/share/ghostty 2>/dev/null || :
 				sudo touch /usr/share/ghostty/.compiled_from_source 2>/dev/null || :
 				sudo chmod a+r /usr/share/ghostty/.compiled_from_source 2>/dev/null || :
+				_setup_ghostty_systemd_and_desktop
 			fi
 		fi
 
@@ -407,24 +441,20 @@ function install_terminal() {
 						if [[ "${build_flags[*]}" == *"-fno-sys=gtk4-layer-shell"* ]] && command -v patchelf &>/dev/null; then
 							sudo patchelf --set-rpath '$ORIGIN/../lib' /usr/bin/ghostty 2>/dev/null || :
 						fi
-						if command -v update-desktop-database &>/dev/null; then
-							sudo update-desktop-database /usr/share/applications 2>/dev/null || :
-						fi
-						if command -v gtk-update-icon-cache &>/dev/null; then
-							sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || :
-						fi
-						if command -v glib-compile-schemas &>/dev/null; then
-							sudo glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || :
-						fi
-						if command -v update-mime-database &>/dev/null; then
-							sudo update-mime-database /usr/share/mime 2>/dev/null || :
-						fi
-						sudo ldconfig 2>/dev/null || :
+						sudo bash -c 'umask 022
+							command -v update-desktop-database &>/dev/null && update-desktop-database /usr/share/applications 2>/dev/null || :
+							command -v gtk-update-icon-cache &>/dev/null && gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || :
+							command -v glib-compile-schemas &>/dev/null && glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || :
+							command -v update-mime-database &>/dev/null && update-mime-database /usr/share/mime 2>/dev/null || :
+							ldconfig 2>/dev/null || :
+							chmod -R a+rX /usr/share/applications /usr/share/icons /usr/share/glib-2.0 /usr/share/mime 2>/dev/null || :
+						'
 
 						# Mark as compiled from source
 						sudo mkdir -p /usr/share/ghostty
 						sudo touch /usr/share/ghostty/.compiled_from_source
 						sudo chmod a+r /usr/share/ghostty/.compiled_from_source
+						_setup_ghostty_systemd_and_desktop
 
 						# Remove previous uncompiled installations to complete replacement
 						if snap list ghostty &>/dev/null; then
