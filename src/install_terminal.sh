@@ -293,32 +293,22 @@ function install_terminal() {
 		ghostty_already_compiled=false
 
 		function _setup_ghostty_systemd_and_desktop() {
-			mkdir -p "$HOME/.config/systemd/user"
-			cat <<'EOF' > "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service"
-[Unit]
-Description=Ghostty
-After=graphical-session.target
-After=dbus.socket
-Requires=dbus.socket
-
-[Service]
-Type=notify-reload
-ReloadSignal=SIGUSR2
-BusName=com.mitchellh.ghostty
-ExecStart=/usr/bin/ghostty --gtk-single-instance=true --initial-window=false
-
-[Install]
-WantedBy=graphical-session.target
-EOF
-			ln -sf "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service" "$HOME/.config/systemd/user/ghostty.service" 2>/dev/null || :
-
+			# Cleanup any previous resident systemd daemon that retains leaked textures across sessions
+			systemctl --user stop app-com.mitchellh.ghostty.service ghostty.service 2>/dev/null || :
+			systemctl --user disable app-com.mitchellh.ghostty.service ghostty.service 2>/dev/null || :
+			rm -f "$HOME/.config/systemd/user/"*ghostty* 2>/dev/null || :
 			if [[ -d /usr/lib/systemd/user ]]; then
-				sudo cp -f "$HOME/.config/systemd/user/app-com.mitchellh.ghostty.service" /usr/lib/systemd/user/ 2>/dev/null || :
-				sudo ln -sf /usr/lib/systemd/user/app-com.mitchellh.ghostty.service /usr/lib/systemd/user/ghostty.service 2>/dev/null || :
-				sudo chmod 644 /usr/lib/systemd/user/*ghostty* 2>/dev/null || :
+				sudo rm -f /usr/lib/systemd/user/*ghostty* 2>/dev/null || :
 			fi
-
 			systemctl --user daemon-reload 2>/dev/null || :
+
+			# Patch desktop entry to disable D-Bus activation and enforce GSK_RENDERER=gl for rock-solid Wayland rendering
+			if [[ -f /usr/share/applications/com.mitchellh.ghostty.desktop ]]; then
+				sudo sed -i 's/^DBusActivatable=true/DBusActivatable=false/' /usr/share/applications/com.mitchellh.ghostty.desktop 2>/dev/null || :
+				sudo sed -i 's/ --gtk-single-instance=true//g' /usr/share/applications/com.mitchellh.ghostty.desktop 2>/dev/null || :
+				sudo sed -i 's|^Exec=/usr/bin/ghostty|Exec=env GSK_RENDERER=gl /usr/bin/ghostty|' /usr/share/applications/com.mitchellh.ghostty.desktop 2>/dev/null || :
+				sudo update-desktop-database /usr/share/applications 2>/dev/null || :
+			fi
 
 			# Ensure no duplicate desktop entries exist in user directory so only the system one is indexed
 			rm -f "$HOME/.local/share/applications/ghostty.desktop" "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop" 2>/dev/null || :

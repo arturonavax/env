@@ -7,6 +7,11 @@ bindkey -e
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
 
+# Linux - GTK Renderer (Estabilidad y prevención de fugas de texturas en GTK 4.14 / Wayland)
+if [[ "$(uname -s)" == "Linux" ]]; then
+    export GSK_RENDERER=gl
+fi
+
 # MacOS - Homebrew
 if [[ "$(uname -s)" == "Darwin" ]]; then
     brewbin="/usr/local/bin/brew"
