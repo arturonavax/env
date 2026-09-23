@@ -38,3 +38,7 @@ vim.opt.linebreak = true -- corta por palabras completas en vez de cortar a mita
 vim.opt.timeoutlen = 300 -- Tiempo para resolver mapeos compuestos (Leader, jk, etc.)
 vim.opt.ttimeoutlen = 10 -- Tiempo de espera para secuencias de escape de terminal
 vim.opt.updatetime = 200 -- Escribe en disco y dispara CursorHold más rápido sin trabar la UI
+
+-- Lista de exclusión para autocompletado nativo, wildmenu y comandos de Neovim
+local exclusions = require("config.exclusions")
+vim.opt.wildignore:append(exclusions.wildignore)

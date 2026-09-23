@@ -11,3 +11,16 @@ vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold" }, {
   pattern = "*",
   command = "if mode() != 'c' | checktime | endif",
 })
+
+-- Desactiva diagnósticos y formateo automático al inspeccionar archivos de vendors o carpetas excluidas
+local exclusions = require("config.exclusions")
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "LspAttach" }, {
+  group = vim.api.nvim_create_augroup("user_exclusions_buffer_settings", { clear = true }),
+  callback = function(args)
+    local name = vim.api.nvim_buf_get_name(args.buf)
+    if exclusions.is_path_excluded(name) then
+      vim.b[args.buf].autoformat = false
+      pcall(vim.diagnostic.enable, false, { bufnr = args.buf })
+    end
+  end,
+})
