@@ -186,13 +186,16 @@ if [[ "$sync_osconfig" == 1 ]]; then
 	echo "Synchronizing OS config..."
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
-		mkdir -p ~/.config/rcmd/ ~/.local/lib/rcmd/backends/ ~/.local/bin/
+		mkdir -p ~/.config/rcmd/ ~/.local/lib/rcmd/backends/ ~/.local/bin/ ~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev/
 		if [[ -f ./files/rcmd/rcmd.conf && ! -f ~/.config/rcmd/rcmd.conf ]]; then
 			cp ./files/rcmd/rcmd.conf ~/.config/rcmd/.
 		fi
 		cp ./files/rcmd/backends/*.sh ~/.local/lib/rcmd/backends/. 2>/dev/null || :
 		cp ./files/rcmd/rcmd ~/.local/bin/rcmd 2>/dev/null || :
 		chmod +x ~/.local/bin/rcmd ~/.local/lib/rcmd/backends/*.sh 2>/dev/null || :
+		if [[ -d ./files/gnome/extensions/rcmd-shell@arturonavax.dev ]]; then
+			cp -r ./files/gnome/extensions/rcmd-shell@arturonavax.dev/* ~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev/ 2>/dev/null || :
+		fi
 		./src/remotes/linux_osconfig.sh
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then

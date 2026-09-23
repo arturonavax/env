@@ -50,6 +50,10 @@ if [[ -n "$repo_root" ]]; then
 	if [[ ! -f "$HOME/.config/rcmd/rcmd.conf" ]]; then
 		cp "$repo_root/files/rcmd/rcmd.conf" "$HOME/.config/rcmd/rcmd.conf"
 	fi
+	if [[ -d "$repo_root/files/gnome/extensions/rcmd-shell@arturonavax.dev" ]]; then
+		mkdir -p "$HOME/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev"
+		cp -r "$repo_root/files/gnome/extensions/rcmd-shell@arturonavax.dev/"* "$HOME/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev/" 2>/dev/null || :
+	fi
 else
 	# Remote install fallback via curl
 	curl -fsSL "$repo_remote_files/files/rcmd/rcmd" -o "$HOME/.local/bin/rcmd" 2>/dev/null || :

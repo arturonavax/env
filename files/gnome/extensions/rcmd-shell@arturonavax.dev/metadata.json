@@ -1,0 +1,15 @@
+{
+  "name": "rcmd Shell Integration",
+  "description": "Native window focus, cycling, and dynamic matching D-Bus service for rcmd",
+  "uuid": "rcmd-shell@arturonavax.dev",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50"
+  ],
+  "url": "https://github.com/arturonavax/env",
+  "version": 1
+}
