@@ -10,26 +10,26 @@ font-size = 13
 # --- Apariencia ---
 theme = "light:TokyoNight Day,dark:TokyoNight Night"
 
-background-opacity = 0.97
+background-opacity = 1.0
 background-blur-radius = 0
 
 window-decoration = true
 window-padding-balance = true
-window-colorspace = "display-p3"
+# window-colorspace = "display-p3" # Exclusivo de macOS (Metal Wide Color)
 
 # Ajuste de grises para comentarios y texto secundario
 palette = 8=#808080
 palette = 0=#404040
 
 # --- Rendimiento y Comportamiento ---
-gtk-single-instance = true
+gtk-single-instance = false
 mouse-hide-while-typing = true
 auto-update = "off"
 gtk-titlebar = false
 cursor-style = block
 cursor-style-blink = false
 font-feature = []
-window-vsync = false
+window-vsync = true
 
 # --- Inicio automático con tmux ---
 copy-on-select = clipboard
