@@ -99,8 +99,20 @@ if [[ "$sync_terminal" == 1 ]]; then
 	cp ./files/zsh/.base.zsh ~/.
 	cp ./files/zsh/.tools.sh ~/.
 
+	# Clean compiled byte-code (ZWC) and completion dumps
+	rm -f ~/.base.zsh.zwc ~/.zshrc.zwc ~/.tools.sh.zwc ~/.lscolors.sh.zwc ~/.alias.zwc 2>/dev/null
+	rm -f "${ZDOTDIR:-$HOME}"/.zcompdump* 2>/dev/null
+
+	# Recompile byte-code and pre-cache completions
 	if command -v zsh &>/dev/null; then
-		zsh -c 'for f in ~/.zshrc ~/.base.zsh ~/.tools.sh ~/.lscolors.sh; do [[ -f "$f" ]] && zcompile "$f" 2>/dev/null || :; done' 2>/dev/null || :
+		zsh -c '
+			autoload -Uz compinit
+			compinit -d "${ZDOTDIR:-$HOME}/.zcompdump" 2>/dev/null || :
+			[[ -f "${ZDOTDIR:-$HOME}/.zcompdump" ]] && zcompile "${ZDOTDIR:-$HOME}/.zcompdump" 2>/dev/null || :
+			for f in ~/.zshrc ~/.base.zsh ~/.tools.sh ~/.lscolors.sh ~/.alias; do
+				[[ -f "$f" ]] && zcompile "$f" 2>/dev/null || :
+			done
+		' 2>/dev/null || :
 	fi
 
 	echo -e "${fcgreenb}Synchronized Terminal configuration files!${fcr}"
