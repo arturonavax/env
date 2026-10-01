@@ -12,3 +12,4 @@ lv-settings.lua
 .atl/
 .codegraph/
 .engram/
+*.zwc

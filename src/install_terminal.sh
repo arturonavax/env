@@ -792,6 +792,7 @@ function install_terminal() {
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins...${fgcolor_reset}"
 	mkdir -p "$HOME/.zsh"
 	for plugin_spec in \
+		"https://github.com/Aloxaf/fzf-tab $HOME/.zsh/fzf-tab" \
 		"https://github.com/zsh-users/zsh-autosuggestions $HOME/.zsh/zsh-autosuggestions" \
 		"https://github.com/zdharma-continuum/fast-syntax-highlighting $HOME/.zsh/fast-syntax-highlighting" \
 		"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions"; do
@@ -840,6 +841,9 @@ function install_terminal() {
 	fi
 	if [[ -f ~/.fzf/install ]]; then
 		~/.fzf/install --all --no-update-rc || :
+		mkdir -p "$HOME/.local/bin"
+		ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" 2>/dev/null || :
+		sudo ln -sf "$HOME/.fzf/bin/fzf" /usr/local/bin/fzf 2>/dev/null || :
 	fi
 
 	echo

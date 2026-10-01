@@ -10,6 +10,10 @@
     "49",
     "50"
   ],
+  "session-modes": [
+    "user",
+    "unlock-dialog"
+  ],
   "url": "https://github.com/arturonavax/env",
   "version": 1
 }

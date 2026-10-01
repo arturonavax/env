@@ -47,7 +47,7 @@ if [[ -n "$repo_root" ]]; then
 	# Local install from repository
 	cp "$repo_root/files/rcmd/rcmd" "$HOME/.local/bin/rcmd"
 	cp "$repo_root/files/rcmd/backends/"*.sh "$HOME/.local/lib/rcmd/backends/" 2>/dev/null || :
-	if [[ ! -f "$HOME/.config/rcmd/rcmd.conf" ]]; then
+	if [[ ! -s "$HOME/.config/rcmd/rcmd.conf" && ! -s "$HOME/.config/rcmd.conf" ]]; then
 		cp "$repo_root/files/rcmd/rcmd.conf" "$HOME/.config/rcmd/rcmd.conf"
 	fi
 	if [[ -d "$repo_root/files/gnome/extensions/rcmd-shell@arturonavax.dev" ]]; then
@@ -60,12 +60,17 @@ else
 	for backend in x11 gnome hyprland sway kwin; do
 		curl -fsSL "$repo_remote_files/files/rcmd/backends/${backend}.sh" -o "$HOME/.local/lib/rcmd/backends/${backend}.sh" 2>/dev/null || :
 	done
-	if [[ ! -f "$HOME/.config/rcmd/rcmd.conf" ]]; then
+	if [[ ! -s "$HOME/.config/rcmd/rcmd.conf" && ! -s "$HOME/.config/rcmd.conf" ]]; then
 		curl -fsSL "$repo_remote_files/files/rcmd/rcmd.conf" -o "$HOME/.config/rcmd/rcmd.conf" 2>/dev/null || :
 	fi
 fi
 
 chmod +x "$HOME/.local/bin/rcmd" "$HOME/.local/lib/rcmd/backends/"*.sh 2>/dev/null || :
+
+# Ensure 'brave' command is available if 'brave-browser' is installed
+if command -v brave-browser >/dev/null 2>&1 && ! command -v brave >/dev/null 2>&1; then
+	ln -sf "$(command -v brave-browser)" "$HOME/.local/bin/brave" 2>/dev/null || :
+fi
 
 # Compatibility wrapper for run-or-raise
 cat << 'EOF' > "$HOME/.local/bin/run-or-raise"

@@ -2,6 +2,7 @@
 # Basics
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+[[ -d "$HOME/.fzf/bin" && ":$PATH:" != *":$HOME/.fzf/bin:"* ]] && export PATH="$HOME/.fzf/bin:$PATH"
 
 # go
 [[ -d /usr/local/go/bin/ ]] && export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"

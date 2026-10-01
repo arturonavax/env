@@ -4,8 +4,7 @@ command_timeout = 1000
 add_newline = true
 
 # Layout de dos líneas limpio
-format = """
-$directory\
+format = """┌─ $directory\
 $git_branch\
 $git_status\
 $git_state\
@@ -16,15 +15,21 @@ $docker_context\
 $cmd_duration\
 $custom\
 $line_break\
-$character"""
+└─$sudo$character"""
 
 # Línea de entrada simple (rojo si el comando anterior falló)
 [character]
 success_symbol = "[❯](bold green)"
 error_symbol = "[❯](bold red)"
 
+[sudo]
+disabled = false
+symbol = ' 🦊 '
+format = '[$symbol]($style)'
+
 [directory]
-truncation_length = 3
+truncation_length = 6
+truncation_symbol = '.../'
 truncate_to_repo = true
 style = "bold cyan"
 
@@ -33,8 +38,17 @@ symbol = "󰘬 "
 style = "bold purple"
 
 [git_status]
-style = "bold red"
-format = '([\[$all_status$ahead_behind\]]($style) )'
+format = '([\[$all_status$ahead_behind\]](bold bright-black) )'
+conflicted = "[=](bold red)"
+ahead = "[⇡](bold cyan)"
+behind = "[⇣](bold red)"
+diverged = "[⇕](bold yellow)"
+untracked = "[?](bold blue)"
+stashed = "[$](bold cyan)"
+modified = "[!](bold yellow)"
+staged = "[+](bold green)"
+renamed = "[»](bold purple)"
+deleted = "[✘](bold red)"
 
 [golang]
 symbol = " "
@@ -53,7 +67,8 @@ style = "yellow"
 
 [cmd_duration]
 min_time = 2_000
-format = "took [$duration]($style) "
+show_milliseconds = true
+format = '[took](italic) [$duration]($style) '
 style = "bold yellow"
 
 [docker_context]

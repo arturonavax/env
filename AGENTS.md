@@ -115,6 +115,12 @@ To maximize terminal responsiveness and eliminate subshell latency, shell initia
   - Uses `eval "$(fzf --zsh)"` to avoid bloated legacy wrapper plugins.
   - File and directory searches default to `fd` (`--strip-cwd-prefix --hidden --follow --exclude .git`).
   - Previews use `bat` for files and `eza` for directories (`--preview-window right:60%:hidden:wrap`), hidden by default to eliminate I/O overhead upon opening and toggled via `ctrl-/`.
+- **Interactive Tab Completion (`fzf-tab`)**:
+  - Replaces Zsh's standard completion selection menu with interactive FZF search.
+  - Dynamically fuzzy-filters commands, subcommands, flags/options, git branches, processes, environment variables, and filesystem paths.
+  - Contextual previews: files (`bat`), directories (`eza`), command and flag descriptions (`$desc`), git history (`git log`), processes (`ps`), and system services (`systemctl`).
+  - Navigational shortcuts: `,` and `.` to cycle candidate groups, `/` for continuous path completion into subdirectories, and `Ctrl-Space` for multi-selection.
+  - Strict load order: loads immediately after `compinit` and `fzf --zsh`, and prior to widget wrappers (`zsh-autosuggestions`, `fast-syntax-highlighting`).
 - **SQLite-Backed Shell History (`atuin`)**:
   - Replaces plaintext `Ctrl-R` (`~/.zsh_history`) with an embedded SQLite database.
   - Sub-millisecond indexed queries across 500k+ commands with execution directory scoping (`filter_mode = "directory"`), exit codes, durations, and fuzzy matching.
@@ -173,7 +179,7 @@ Standard Unix utilities (`grep`, `find`, `cat`, `less`) **MUST NEVER** be aliase
      - `fdh='fd --hidden'` (fd with hidden files)
      - `preview='bat'` (syntax-highlighted inspection)
      - `dft='difft'` (Tree-sitter structural diff)
-     - `l='eza --icons --classify'`, `ll`, `la`, `lt` (modern file listing)
+     - `l='eza --icons --classify=always'`, `ll`, `la`, `lt` (modern file listing)
 
 #### 3. Optimal Multi-Platform Installation Strategy
 

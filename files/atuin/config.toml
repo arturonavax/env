@@ -4,8 +4,11 @@
 # Modo de búsqueda fuzzy ultra rápido
 search_mode = "fuzzy"
 
-# Filtrar por defecto solo los comandos ejecutados en el directorio actual
-filter_mode = "directory"
+# Filtrar por defecto de forma global para no ocultar comandos de otros directorios al entrar a la terminal
+filter_mode = "global"
+
+# Filtrar por directorio al usar la tecla flecha arriba (Up Arrow)
+filter_mode_shell_up_key_binding = "directory"
 
 # Desactivar sincronización remota (100% local y offline)
 auto_sync = false

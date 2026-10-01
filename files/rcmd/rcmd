@@ -157,7 +157,27 @@ sync_gnome() {
     local path_prefix="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"
     local schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
     
+    # Read existing custom keybindings and retain non-rcmd bindings
+    local existing=()
+    if command -v python3 >/dev/null 2>&1; then
+        mapfile -t existing < <(python3 -c "
+import subprocess, ast
+try:
+    current = subprocess.check_output(['gsettings', 'get', 'org.gnome.settings-daemon.plugins.media-keys', 'custom-keybindings']).decode().strip()
+    bindings = ast.literal_eval(current)
+    filtered = [b for b in bindings if '/rcmd_' not in b]
+    for b in filtered:
+        print(b)
+except Exception:
+    pass
+" 2>/dev/null)
+    fi
+
     local new_bindings=()
+    for b in "${existing[@]}"; do
+        [ -n "$b" ] && new_bindings+=("'$b'")
+    done
+
     for letter in {a..z}; do
         local key_id="rcmd_${letter}"
         local custom_path="${path_prefix}/${key_id}/"
@@ -174,6 +194,9 @@ sync_gnome() {
 
     # Enable GNOME Shell user extensions and add rcmd-shell
     gsettings set org.gnome.shell disable-user-extensions false 2>/dev/null || :
+    if command -v gnome-extensions >/dev/null 2>&1; then
+        gnome-extensions enable rcmd-shell@arturonavax.dev 2>/dev/null || :
+    fi
     if command -v python3 >/dev/null 2>&1; then
         python3 -c "
 import subprocess, ast

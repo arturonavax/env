@@ -33,14 +33,16 @@ const RCMD_IFACE_XML = `
 
 function getCandidateNames(win) {
     const names = [];
-    const wmClass = win.get_wm_class ? (win.get_wm_class() || '') : '';
-    const wmInstance = win.get_wm_class_instance ? (win.get_wm_class_instance() || '') : '';
+    if (!win) return names;
 
-    if (wmClass) names.push(wmClass);
-    if (wmInstance && wmInstance !== wmClass) names.push(wmInstance);
+    const wmClass = (typeof win.get_wm_class === 'function') ? (win.get_wm_class() || '') : '';
+    const wmInstance = (typeof win.get_wm_class_instance === 'function') ? (win.get_wm_class_instance() || '') : '';
+    const gtkAppId = (typeof win.get_gtk_application_id === 'function') ? (win.get_gtk_application_id() || '') : '';
+    const sandboxedAppId = (typeof win.get_sandboxed_app_id === 'function') ? (win.get_sandboxed_app_id() || '') : '';
 
-    for (const name of [wmClass, wmInstance]) {
+    for (const name of [wmClass, wmInstance, gtkAppId, sandboxedAppId]) {
         if (!name) continue;
+        names.push(name);
         const parts = name.split('.');
         const lastPart = parts[parts.length - 1];
         if (lastPart && lastPart !== name) names.push(lastPart);
@@ -52,7 +54,7 @@ function getCandidateNames(win) {
         if (cleanedLast && cleanedLast !== lastPart) names.push(cleanedLast);
     }
 
-    const pid = win.get_pid ? win.get_pid() : 0;
+    const pid = (typeof win.get_pid === 'function') ? win.get_pid() : 0;
     if (pid && pid > 0) {
         try {
             const [ok, comm] = GLib.file_get_contents(`/proc/${pid}/comm`);
@@ -66,7 +68,7 @@ function getCandidateNames(win) {
         } catch (_) {}
     }
 
-    const title = win.get_title ? (win.get_title() || '') : '';
+    const title = (typeof win.get_title === 'function') ? (win.get_title() || '') : '';
     if (title) {
         const sepMatch = title.match(/[\s—\-]+([^\s—\-]+)$/);
         if (sepMatch && sepMatch[1]) {
@@ -80,17 +82,20 @@ function getCandidateNames(win) {
 }
 
 function isMatch(win, pattern, mode) {
-    if (!pattern) return false;
+    if (!win || !pattern) return false;
     const patLower = pattern.toLowerCase();
 
     if (mode === 'title') {
-        const title = win.get_title ? (win.get_title() || '').toLowerCase() : '';
+        const title = (typeof win.get_title === 'function') ? (win.get_title() || '').toLowerCase() : '';
         return title.includes(patLower);
     }
 
-    const wmClass = win.get_wm_class ? (win.get_wm_class() || '').toLowerCase() : '';
-    const wmInstance = win.get_wm_class_instance ? (win.get_wm_class_instance() || '').toLowerCase() : '';
-    if (wmClass.includes(patLower) || wmInstance.includes(patLower)) {
+    const wmClass = (typeof win.get_wm_class === 'function') ? (win.get_wm_class() || '').toLowerCase() : '';
+    const wmInstance = (typeof win.get_wm_class_instance === 'function') ? (win.get_wm_class_instance() || '').toLowerCase() : '';
+    const gtkAppId = (typeof win.get_gtk_application_id === 'function') ? (win.get_gtk_application_id() || '').toLowerCase() : '';
+    const sandboxedAppId = (typeof win.get_sandboxed_app_id === 'function') ? (win.get_sandboxed_app_id() || '').toLowerCase() : '';
+
+    if (wmClass.includes(patLower) || wmInstance.includes(patLower) || gtkAppId.includes(patLower) || sandboxedAppId.includes(patLower)) {
         return true;
     }
 
@@ -102,18 +107,22 @@ function launchApp(command) {
     if (!command) return;
     try {
         const appSys = Shell.AppSystem.get_default();
+        const firstWord = command.trim().split(/\s+/)[0];
         const app = appSys.lookup_app(command) ||
                     appSys.lookup_app(`${command}.desktop`) ||
-                    appSys.lookup_app(`org.gnome.${command}.desktop`);
-        if (app) {
+                    appSys.lookup_app(firstWord) ||
+                    appSys.lookup_app(`${firstWord}.desktop`) ||
+                    appSys.lookup_app(`com.mitchellh.${firstWord}.desktop`) ||
+                    appSys.lookup_app(`org.gnome.${firstWord}.desktop`);
+        if (app && (command.trim() === firstWord)) {
             app.activate();
             return;
         }
     } catch (_) {}
 
     try {
-        const [, argv] = GLib.shell_parse_argv(command);
-        Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
+        // Run via bash -c to ensure user PATH (~/.local/bin) and argument parsing work
+        Gio.Subprocess.new(['/usr/bin/env', 'bash', '-c', command], Gio.SubprocessFlags.NONE);
     } catch (e) {
         console.error(`[rcmd-shell] Failed to launch command "${command}": ${e.message}`);
     }
@@ -164,19 +173,24 @@ export default class RcmdExtension extends Extension {
     }
 
     getWindows() {
-        const windows = (global.display && global.display.get_tab_list)
-            ? global.display.get_tab_list(0, null)
+        const tabListMode = (Meta.TabList && Meta.TabList.NORMAL_ALL !== undefined)
+            ? Meta.TabList.NORMAL_ALL
+            : 3;
+        const windows = (global.display && typeof global.display.get_tab_list === 'function')
+            ? global.display.get_tab_list(tabListMode, null)
             : [];
         return windows.filter(w => {
-            if (!w || w.is_override_redirect()) return false;
-            const type = w.get_window_type();
+            if (!w || (typeof w.is_override_redirect === 'function' && w.is_override_redirect())) return false;
+            const type = (typeof w.get_window_type === 'function') ? w.get_window_type() : Meta.WindowType.NORMAL;
             return type === Meta.WindowType.NORMAL || type === Meta.WindowType.DIALOG;
         });
     }
 
     Trigger(key, command, pattern, mode) {
         const windows = this.getWindows();
-        const focused = (global.display && global.display.focus_window) ? global.display.focus_window : null;
+        const focused = (global.display && typeof global.display.get_focus_window === 'function')
+            ? global.display.get_focus_window()
+            : (global.display ? global.display.focus_window : null);
 
         // 1. Configured mode (command or pattern provided)
         if (pattern || command) {
@@ -197,6 +211,14 @@ export default class RcmdExtension extends Extension {
                 const nextIndex = (activeIndex + 1) % matching.length;
                 Main.activateWindow(matching[nextIndex]);
             } else {
+                // Coming from another app: raise sister windows behind target (macOS style)
+                for (let i = matching.length - 1; i > 0; i--) {
+                    try {
+                        if (typeof matching[i].raise === 'function') {
+                            matching[i].raise();
+                        }
+                    } catch (_) {}
+                }
                 Main.activateWindow(matching[0]);
             }
             return true;
@@ -211,8 +233,17 @@ export default class RcmdExtension extends Extension {
             const candidates = getCandidateNames(win);
             const matches = candidates.some(cand => cand.toLowerCase().startsWith(targetKey));
             if (matches) {
-                const appClass = (win.get_wm_class() || '').toLowerCase();
-                targetAppWindows = windows.filter(w => (w.get_wm_class() || '').toLowerCase() === appClass);
+                const wmClass = (typeof win.get_wm_class === 'function') ? (win.get_wm_class() || '') : '';
+                const gtkAppId = (typeof win.get_gtk_application_id === 'function') ? (win.get_gtk_application_id() || '') : '';
+                const appIdentifier = (wmClass || gtkAppId).toLowerCase();
+
+                if (appIdentifier) {
+                    targetAppWindows = windows.filter(w => {
+                        const c = (typeof w.get_wm_class === 'function' ? (w.get_wm_class() || '') : '').toLowerCase();
+                        const a = (typeof w.get_gtk_application_id === 'function' ? (w.get_gtk_application_id() || '') : '').toLowerCase();
+                        return c === appIdentifier || a === appIdentifier;
+                    });
+                }
                 if (targetAppWindows.length === 0) targetAppWindows = [win];
                 break;
             }
@@ -227,6 +258,14 @@ export default class RcmdExtension extends Extension {
             const nextIndex = (activeIndex + 1) % targetAppWindows.length;
             Main.activateWindow(targetAppWindows[nextIndex]);
         } else {
+            // Raise sister windows behind target
+            for (let i = targetAppWindows.length - 1; i > 0; i--) {
+                try {
+                    if (typeof targetAppWindows[i].raise === 'function') {
+                        targetAppWindows[i].raise();
+                    }
+                } catch (_) {}
+            }
             Main.activateWindow(targetAppWindows[0]);
         }
         return true;

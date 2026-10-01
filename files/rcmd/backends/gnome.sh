@@ -17,38 +17,53 @@ rcmd_backend_gnome() {
     local match_mode="${4:-class}"
 
     # --------------------------------------------------------------------------
-    # 1. Primary: rcmd-shell Extension (dev.arturonavax.rcmd)
+    # 1. Primary: rcmd-shell Extension (dev.arturonavax.rcmd / org.gnome.Shell)
     # --------------------------------------------------------------------------
-    if command -v busctl >/dev/null 2>&1; then
-        # Try well-known bus name
-        if busctl --user call dev.arturonavax.rcmd \
-            /dev/arturonavax/rcmd \
-            dev.arturonavax.rcmd \
-            Trigger ssss "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
-            return 0
+    local dbus_ok=0
+    for attempt in 1 2; do
+        if command -v busctl >/dev/null 2>&1; then
+            if busctl --user call dev.arturonavax.rcmd \
+                /dev/arturonavax/rcmd \
+                dev.arturonavax.rcmd \
+                Trigger ssss "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
+                dbus_ok=1
+                break
+            fi
+
+            if busctl --user call org.gnome.Shell \
+                /dev/arturonavax/rcmd \
+                dev.arturonavax.rcmd \
+                Trigger ssss "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
+                dbus_ok=1
+                break
+            fi
+        elif command -v gdbus >/dev/null 2>&1; then
+            if gdbus call --session \
+                --dest dev.arturonavax.rcmd \
+                --object-path /dev/arturonavax/rcmd \
+                --method dev.arturonavax.rcmd.Trigger "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
+                dbus_ok=1
+                break
+            fi
+
+            if gdbus call --session \
+                --dest org.gnome.Shell \
+                --object-path /dev/arturonavax/rcmd \
+                --method dev.arturonavax.rcmd.Trigger "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
+                dbus_ok=1
+                break
+            fi
         fi
 
-        # Also try on org.gnome.Shell connection
-        if busctl --user call org.gnome.Shell \
-            /dev/arturonavax/rcmd \
-            dev.arturonavax.rcmd \
-            Trigger ssss "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
-            return 0
+        # If first attempt failed, ensure extension is enabled and retry once
+        if [ "$attempt" -eq 1 ] && command -v gnome-extensions >/dev/null 2>&1; then
+            gnome-extensions enable rcmd-shell@arturonavax.dev >/dev/null 2>&1 || :
+            sleep 0.1
         fi
-    elif command -v gdbus >/dev/null 2>&1; then
-        if gdbus call --session \
-            --dest dev.arturonavax.rcmd \
-            --object-path /dev/arturonavax/rcmd \
-            --method dev.arturonavax.rcmd.Trigger "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
-            return 0
-        fi
+    done
 
-        if gdbus call --session \
-            --dest org.gnome.Shell \
-            --object-path /dev/arturonavax/rcmd \
-            --method dev.arturonavax.rcmd.Trigger "$key" "$cmd" "$pattern" "$match_mode" >/dev/null 2>&1; then
-            return 0
-        fi
+    if [ "$dbus_ok" -eq 1 ]; then
+        return 0
     fi
 
     # --------------------------------------------------------------------------

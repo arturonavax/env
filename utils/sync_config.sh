@@ -202,7 +202,7 @@ if [[ "$sync_osconfig" == 1 ]]; then
 
 	if [[ "$(uname -s)" == "Linux" ]]; then
 		mkdir -p ~/.config/rcmd/ ~/.local/lib/rcmd/backends/ ~/.local/bin/ ~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev/
-		if [[ -f ./files/rcmd/rcmd.conf && ! -f ~/.config/rcmd/rcmd.conf ]]; then
+		if [[ -f ./files/rcmd/rcmd.conf && ! -s ~/.config/rcmd/rcmd.conf && ! -s ~/.config/rcmd.conf ]]; then
 			cp ./files/rcmd/rcmd.conf ~/.config/rcmd/.
 		fi
 		cp ./files/rcmd/backends/*.sh ~/.local/lib/rcmd/backends/. 2>/dev/null || :

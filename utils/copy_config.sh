@@ -89,8 +89,10 @@ cp ~/.sql-formatter.json ./files/sql-formatter/.
 
 # Copy rcmd files
 mkdir -p ./files/rcmd/
-if [[ -f ~/.config/rcmd/rcmd.conf ]]; then
+if [[ -s ~/.config/rcmd/rcmd.conf ]]; then
 	cp ~/.config/rcmd/rcmd.conf ./files/rcmd/.
+elif [[ -s ~/.config/rcmd.conf ]]; then
+	cp ~/.config/rcmd.conf ./files/rcmd/rcmd.conf
 fi
 
 # Copy RTK files

@@ -6,6 +6,7 @@ bindkey -e
 # PATH Basics
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+[[ -d "$HOME/.fzf/bin" && ":$PATH:" != *":$HOME/.fzf/bin:"* ]] && export PATH="$HOME/.fzf/bin:$PATH"
 [[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin:$PATH"
 
 # Linux - GTK Renderer (Estabilidad y prevención de fugas de texturas en GTK 4.14 / Wayland)
@@ -31,6 +32,9 @@ elif [[ "$(command -v vim)" != "" ]]; then
   export EDITOR=vim
   export VISUAL=vim
 fi
+
+# load zsh-completions before compinit if present
+[[ -d ~/.zsh/zsh-completions/src ]] && fpath=(~/.zsh/zsh-completions/src $fpath)
 
 # load zsh-completions with cached compdump
 autoload -Uz compinit
@@ -88,24 +92,72 @@ fi
 ## Atuin (SQLite-backed ultra-fast shell history replacing Ctrl-R)
 if [[ "$(command -v atuin)" != "" ]]; then
     eval "$(atuin init zsh)"
+
+    # Auto-import persistente y asíncrono: sincroniza ~/.zsh_history a SQLite sin demoras ni bloqueos
+    local _atuin_mark="${XDG_DATA_HOME:-$HOME/.local/share}/atuin/.last_import"
+    if [[ ! -f "$_atuin_mark" || "$HISTFILE" -nt "$_atuin_mark" ]]; then
+        (touch "$_atuin_mark" && atuin import auto >/dev/null 2>&1 &)
+    fi
 fi
 
-## zsh plugins
-[[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
-[[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
-
-export fpath=(~/.zsh/zsh-completions/src $fpath)
-zstyle ":completion:*" list-colors ${(s.:.)LS_COLORS}
+## zsh completion styles
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' menu select
+zstyle ':completion:*' insert-tab false
 
 # Better SSH/Rsync/SCP Autocomplete
 zstyle ':completion:*:(scp|rsync):*' tag-order ' hosts:-ipaddr:ip\ address hosts:-host:host files'
 zstyle ':completion:*:(ssh|scp|rsync):*:hosts-host' ignored-patterns '*(.|:)*' loopback ip6-loopback localhost ip6-localhost broadcasthost
 zstyle ':completion:*:(ssh|scp|rsync):*:hosts-ipaddr' ignored-patterns '^(<->.<->.<->.<->|(|::)([[:xdigit:].]##:(#c,2))##(|%*))' '127.0.0.<->' '255.255.255.255' '::1' 'fe80::*'
 
-# Allow for autocomplete to be case insensitive
-zstyle ':completion:*' matcher-list '' 'm:{[:lower:][:upper:]-_}={[:upper:][:lower:]_-}' \
-    '+l:|?=** r:|?=**'
+# Allow for autocomplete to be case insensitive and fuzzy
+zstyle ':completion:*' matcher-list 'm:{[:lower:][:upper:]-_}={[:upper:][:lower:]_-}' 'r:|=*' 'l:|=* r:|=*'
+
+## zsh plugins
+[[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
+
+# fzf-tab: interactive Tab completion search with fzf and rich contextual previews
+if [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh && "$(command -v fzf)" != "" ]]; then
+    source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
+
+    # Opciones visuales de fzf durante el autocompletado
+    zstyle ':fzf-tab:*' fzf-flags \
+      --height=45% \
+      --layout=reverse \
+      --border=rounded \
+      --prompt='❯ ' \
+      --bind='tab:accept'
+
+    # Navegación continua en carpetas (crucial para ../../):
+    zstyle ':fzf-tab:*' continuous-trigger '/'
+
+    # Mantener colores nativos de la terminal para descripciones
+    zstyle ':fzf-tab:*' default-color ''
+
+    # Previews contextuales (eza con iconos para rutas, bat para código)
+    zstyle ':fzf-tab:complete:*:*' fzf-preview \
+      'if [ -d "$realpath" ]; then
+         eza -1 --icons=always --color=always --group-directories-first "$realpath"
+       elif [ -f "$realpath" ]; then
+         bat --style=numbers --color=always --line-range :200 "$realpath" 2>/dev/null || cat "$realpath"
+       fi'
+
+    # Previews para comandos, alias, subcomandos y variables de entorno
+    zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' \
+      fzf-preview 'echo ${(P)word}'
+
+    # Preview detallado para comandos específicos (e.g., git add / git diff)
+    zstyle ':fzf-tab:complete:git-(add|diff|restore):*' fzf-preview \
+      'git diff $word | head -200'
+
+    # Preview para procesos en kill/pkill
+    zstyle ':fzf-tab:complete:(kill|pkill):*' fzf-preview \
+      'ps --pid=$word -o cmd --no-headers -w -w'
+fi
+
+[[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
 
 # prompt starship
 [[ "$(command -v starship)" != "" ]] && eval "$(starship init zsh)"
@@ -394,12 +446,12 @@ fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
 if [[ "$(command -v eza)" != "" ]]; then
-    alias l='eza --icons --classify'
-    alias ll='eza --icons --classify -lh'
-    alias la='eza --icons --classify -lha'
-    alias lt='eza --icons --classify --tree'
-    alias llt='eza --icons --classify --tree -lh'
-    alias ls='eza --icons --classify'
+    alias l='eza --icons --classify=always'
+    alias ll='eza --icons --classify=always -lh'
+    alias la='eza --icons --classify=always -lha'
+    alias lt='eza --icons --classify=always --tree'
+    alias llt='eza --icons --classify=always --tree -lh'
+    alias ls='eza --icons --classify=always'
 else
     alias ls='ls --color=auto'
     alias ll='ls --color=auto -l'
