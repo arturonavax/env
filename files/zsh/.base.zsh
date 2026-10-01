@@ -33,24 +33,6 @@ elif [[ "$(command -v vim)" != "" ]]; then
   export VISUAL=vim
 fi
 
-# load zsh-completions before compinit if present
-[[ -d ~/.zsh/zsh-completions/src ]] && fpath=(~/.zsh/zsh-completions/src $fpath)
-
-# load zsh-completions with cached compdump
-autoload -Uz compinit
-if [[ -n "${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24)" ]]; then
-    compinit
-    zcompile -R "${ZDOTDIR:-$HOME}/.zcompdump" 2>/dev/null || :
-else
-    compinit -C
-fi
-
-# enable zsh comments
-setopt interactivecomments
-
-# zsh ask for confirmation with !!
-setopt histverify
-
 ## ls colors
 [[ -f ~/.lscolors.sh ]] && source ~/.lscolors.sh
 
@@ -74,93 +56,208 @@ export \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8
 
-# Integración nativa de fzf con Zsh (atajos Ctrl+R, Ctrl+T, Alt+C y completion)
-if [[ "$(command -v fzf)" != "" ]]; then
+# ==============================================================================
+# 1. MOTOR DE COMPLETION (COMPINIT OPTIMIZADO)
+# ==============================================================================
+autoload -Uz compinit
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
+    compinit
+else
+    compinit -C
+fi
+
+# ==============================================================================
+# 2. OPCIONES ZLE Y ESTILOS NATIVOS DE ZSH
+# ==============================================================================
+setopt AUTO_MENU
+setopt COMPLETE_IN_WORD
+setopt ALWAYS_TO_END
+setopt EXTENDED_GLOB
+setopt GLOB_COMPLETE
+setopt LIST_AMBIGUOUS
+unsetopt MENU_COMPLETE
+
+# Estilos de completion nativos
+zstyle ':completion:*' menu no
+zstyle ':completion:*' insert-tab false
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' matcher-list 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+
+# Permitir navegación relativa hacia atrás con '..'
+zstyle ':completion:*' special-dirs ..
+
+# Redes
+zstyle ':completion:*:(scp|rsync):*' tag-order 'hosts:-ipaddr:ip\ address hosts:-host:host files'
+zstyle ':completion:*:(ssh|scp|rsync):*:hosts-host' ignored-patterns '*(.|:)*' loopback ip6-loopback localhost ip6-localhost broadcasthost
+zstyle ':completion:*:(ssh|scp|rsync):*:hosts-ipaddr' ignored-patterns '^(<->.<->.<->.<->|(|::)([[:xdigit:].]##:(#c,2))##(|%*))' '127.0.0.<->' '255.255.255.255' '::1' 'fe80::*'
+
+# ==============================================================================
+# 3. FZF CORE Y GENERADORES RECURSIVOS (FD)
+# ==============================================================================
+if (( $+commands[fzf] )); then
     eval "$(fzf --zsh)"
 
-    # Usar fd en lugar de find clásico (ignora .git, respeta .gitignore y sigue symlinks)
+    # Desacoplar fzf de Tab estándar para dar control total a fzf-tab
+    bindkey '^I' expand-or-complete
+
     export FZF_DEFAULT_COMMAND='fd --type f --strip-cwd-prefix --hidden --follow --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fd --type d --strip-cwd-prefix --hidden --follow --exclude .git'
 
-    # Previews asíncronos y ligeros (ocultos por defecto con :hidden para evitar overhead de I/O, toggle con Ctrl+/)
-    export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info --preview 'if [ -d {} ]; then eza --tree --level=2 --color=always {} 2>/dev/null | head -200; else bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}; fi' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
-    export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
-    export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons --color=always {} 2>/dev/null' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
+    export FZF_DEFAULT_OPTS="--height 45% --layout=reverse --border=rounded --inline-info --cycle \
+        --preview 'if [ -d {} ]; then eza --tree --level=2 --color=always {} 2>/dev/null | head -200; else bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}; fi' \
+        --preview-window right:60%:wrap --bind 'ctrl-/:toggle-preview'"
+    export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}' --preview-window right:60%:wrap --bind 'ctrl-/:toggle-preview'"
+    export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons --color=always {} 2>/dev/null' --preview-window right:60%:wrap --bind 'ctrl-/:toggle-preview'"
+
+    _fzf_compgen_path() { fd --type f --hidden --follow --exclude .git . "$1"; }
+    _fzf_compgen_dir()  { fd --type d --hidden --follow --exclude .git . "$1"; }
 fi
 
-## Atuin (SQLite-backed ultra-fast shell history replacing Ctrl-R)
-if [[ "$(command -v atuin)" != "" ]]; then
-    eval "$(atuin init zsh)"
-
-    # Auto-import persistente y asíncrono: sincroniza ~/.zsh_history a SQLite sin demoras ni bloqueos
-    local _atuin_mark="${XDG_DATA_HOME:-$HOME/.local/share}/atuin/.last_import"
-    if [[ ! -f "$_atuin_mark" || "$HISTFILE" -nt "$_atuin_mark" ]]; then
-        (touch "$_atuin_mark" && atuin import auto >/dev/null 2>&1 &)
-    fi
-fi
-
-## zsh completion styles
-zstyle ':completion:*:descriptions' format '[%d]'
-zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' menu select
-zstyle ':completion:*' insert-tab false
-
-# Better SSH/Rsync/SCP Autocomplete
-zstyle ':completion:*:(scp|rsync):*' tag-order ' hosts:-ipaddr:ip\ address hosts:-host:host files'
-zstyle ':completion:*:(ssh|scp|rsync):*:hosts-host' ignored-patterns '*(.|:)*' loopback ip6-loopback localhost ip6-localhost broadcasthost
-zstyle ':completion:*:(ssh|scp|rsync):*:hosts-ipaddr' ignored-patterns '^(<->.<->.<->.<->|(|::)([[:xdigit:].]##:(#c,2))##(|%*))' '127.0.0.<->' '255.255.255.255' '::1' 'fe80::*'
-
-# Allow for autocomplete to be case insensitive and fuzzy
-zstyle ':completion:*' matcher-list 'm:{[:lower:][:upper:]-_}={[:upper:][:lower:]_-}' 'r:|=*' 'l:|=* r:|=*'
-
-## zsh plugins
-[[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
-
-# fzf-tab: interactive Tab completion search with fzf and rich contextual previews
-if [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh && "$(command -v fzf)" != "" ]]; then
+# ==============================================================================
+# 4. FZF-TAB (SINCRONIZACIÓN DE COLOR TOTAL + RESPONSIVE)
+# ==============================================================================
+if [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh ]] && (( $+commands[fzf] )); then
     source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 
-    # Opciones visuales de fzf durante el autocompletado
-    zstyle ':fzf-tab:*' fzf-flags \
-      --height=45% \
-      --layout=reverse \
-      --border=rounded \
-      --prompt='❯ ' \
-      --bind='tab:accept'
+    # Paleta canónica sincronizada (10 slots deterministas para grupos)
+    local -a ftb_group_palette=(
+        $'\033[38;5;75m'   # 1: Azul celeste (Main porcelain)
+        $'\033[38;5;221m'  # 2: Amarillo cálido (Ancillary manipulator)
+        $'\033[38;5;176m'  # 3: Púrpura / Magenta (Ancillary interrogator)
+        $'\033[38;5;81m'   # 4: Cyan (Plumbing manipulator)
+        $'\033[38;5;204m'  # 5: Coral / Rojo (Plumbing interrogator)
+        $'\033[38;5;114m'  # 6: Verde suave (Plumbing sync)
+        $'\033[38;5;209m'  # 7: Naranja / Durazno (Plumbing sync helper / ancillary)
+        $'\033[38;5;141m'  # 8: Lavanda / Violeta (Foreign / interacting)
+        $'\033[38;5;43m'   # 9: Turquesa
+        $'\033[38;5;211m'  # 10: Rosa
+    )
 
-    # Navegación continua en carpetas (crucial para ../../):
-    zstyle ':fzf-tab:*' continuous-trigger '/'
+    # Inyectar la paleta en fzf-tab para que coloree los resultados de la izquierda
+    zstyle ':fzf-tab:*' group-colors $ftb_group_palette
 
-    # Mantener colores nativos de la terminal para descripciones
+    # Supresión de cabeceras invasivas y prefijos artificiales
+    zstyle ':fzf-tab:*' show-group none
+    zstyle ':fzf-tab:*' single-group none
+    zstyle ':fzf-tab:*' prefix ''
     zstyle ':fzf-tab:*' default-color ''
 
-    # Previews contextuales (eza con iconos para rutas, bat para código)
+    # Desvincular '/' para escribir rutas relativas (../) en el buscador.
+    # Para descender a una carpeta o subir a '..' sin salir del modal, usa 'Ctrl+Espacio'.
+    zstyle ':fzf-tab:*' continuous-trigger 'ctrl-space'
+
+    # Flags FZF adaptativos y delimitador rígido
+    zstyle ':fzf-tab:*' fzf-flags \
+        '--height=~65%' \
+        '--min-height=12' \
+        '--layout=reverse' \
+        '--border=rounded' \
+        '--prompt=❯ ' \
+        '--info=inline-right' \
+        '--cycle' \
+        '--bind=tab:down,btab:up' \
+        '--preview-window=right,50%,wrap,border-left,<95(down,40%,wrap,border-top),<55(hidden),<18(hidden)' \
+        '--bind=ctrl-/:toggle-preview' \
+        '--delimiter= +-- +' \
+        '--with-nth=1' \
+        '--nth=1..'
+
+    # Previews específicos por comando
+    zstyle ':fzf-tab:complete:(kill|pkill):*' fzf-preview 'ps --pid=$word -o cmd --no-headers -w -w'
+    zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview 'echo ${(P)word}'
+
+    # Previsualizador contextual con sincronización cromática exacta
     zstyle ':fzf-tab:complete:*:*' fzf-preview \
-      'if [ -d "$realpath" ]; then
-         eza -1 --icons=always --color=always --group-directories-first "$realpath"
-       elif [ -f "$realpath" ]; then
-         bat --style=numbers --color=always --line-range :200 "$realpath" 2>/dev/null || cat "$realpath"
-       fi'
+        'if [[ -n "$realpath" && -e "$realpath" && "$word" != -* ]]; then
+            if [[ -d "$realpath" ]]; then
+                eza -1 --icons=always --color=always --group-directories-first "$realpath"
+            elif [[ -f "$realpath" ]]; then
+                if git rev-parse --is-inside-work-tree &>/dev/null && ! git diff --quiet -- "$realpath" 2>/dev/null; then
+                    git diff --color=always -- "$realpath" 2>/dev/null | head -200
+                else
+                    bat --style=numbers --color=always --line-range :200 "$realpath" 2>/dev/null || cat "$realpath"
+                fi
+            fi
+         else
+            local clean_desc="${desc#* -- }"
+            local cat_name=""
+            local cat_color="\033[1;36m"
+            local g_idx="${group#__hide__}"
 
-    # Previews para comandos, alias, subcomandos y variables de entorno
-    zstyle ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' \
-      fzf-preview 'echo ${(P)word}'
+            # Extraer el color EXACTO que fzf-tab asignó al resultado en la izquierda
+            if [[ "$g_idx" =~ ^[0-9]+$ ]]; then
+                local -a palette=(
+                    $"\033[38;5;75m"
+                    $"\033[38;5;221m"
+                    $"\033[38;5;176m"
+                    $"\033[38;5;81m"
+                    $"\033[38;5;204m"
+                    $"\033[38;5;114m"
+                    $"\033[38;5;209m"
+                    $"\033[38;5;141m"
+                    $"\033[38;5;43m"
+                    $"\033[38;5;211m"
+                )
+                cat_color="${palette[(( (g_idx - 1) % 10 + 1 ))]}"
+            fi
 
-    # Preview detallado para comandos específicos (e.g., git add / git diff)
-    zstyle ':fzf-tab:complete:git-(add|diff|restore):*' fzf-preview \
-      'git diff $word | head -200'
+            # Resolver el nombre de la categoría del subcomando en memoria (0 forks)
+            case "$word" in
+                add|am|archive|bisect|branch|bundle|checkout|cherry-pick|citool|clean|clone|commit|diff|fetch|format-patch|gc|gitk|grep|gui|init|log|maintenance|merge|mv|notes|pull|push|range-diff|rebase|reset|restore|revert|rm|scalar|shortlog|show|sparse-checkout|stash|status|submodule|switch|tag|worktree)
+                    cat_name="Main Porcelain" ;;
+                config|fast-export|fast-import|filter-branch|mergetool|pack-refs|prune|reflog|remote|repack|replace)
+                    cat_name="Ancillary Manipulator" ;;
+                annotate|blame|bugreport|count-objects|diagnose|fsck|fsmonitor--daemon|help|instaweb|interpret-trailers|merge-tree|rerere|show-branch|verify-commit|verify-tag|version|whatchanged)
+                    cat_name="Ancillary Interrogator" ;;
+                apply|checkout-index|commit-graph|commit-tree|hash-object|index-pack|merge-file|merge-index|mktag|mktree|multi-pack-index|pack-objects|prune-packed|read-tree|symbolic-ref|unpack-objects|update-index|update-ref|write-tree)
+                    cat_name="Plumbing Manipulator" ;;
+                cat-file|check-attr|check-ignore|check-mailmap|check-ref-format|diff-files|diff-index|diff-tree|for-each-ref|for-each-repo|get-tar-commit-id|ls-files|ls-remote|ls-tree|merge-base|name-rev|pack-redundant|rev-list|rev-parse|show-index|show-ref|unpack-file|var|verify-pack)
+                    cat_name="Plumbing Interrogator" ;;
+                column|fmt-merge-msg|mailinfo|mailsplit|patch-id|stripspace)
+                    cat_name="Plumbing Ancillary" ;;
+                daemon|fetch-pack|http-backend|send-pack|update-server-info|http-fetch|http-push|receive-pack|shell|upload-archive|upload-pack)
+                    cat_name="Plumbing Sync" ;;
+                archimport|cvsexportcommit|cvsimport|cvsserver|imap-send|p4|quiltimport|request-pull|send-email|svn)
+                    cat_name="Foreign / Interacting" ;;
+                *)
+                    if [[ -n "$group" && "$group" != *__hide__* && "$group" != \[*\] ]]; then
+                        cat_name="$group"
+                    fi
+                    ;;
+            esac
 
-    # Preview para procesos en kill/pkill
-    zstyle ':fzf-tab:complete:(kill|pkill):*' fzf-preview \
-      'ps --pid=$word -o cmd --no-headers -w -w'
+            local cat_badge=""
+            if [[ -n "$cat_name" ]]; then
+                cat_badge="${cat_color}[${cat_name}]\033[0m"
+            fi
+
+            if [[ -n "$clean_desc" && "$clean_desc" != "$word" ]]; then
+                if [[ -n "$cat_badge" ]]; then
+                    printf "\033[1;36m❯ %s\033[0m  %b\n\n\033[0;37m%s\033[0m\n" "$word" "$cat_badge" "$clean_desc"
+                else
+                    printf "\033[1;36m❯ %s\033[0m\n\n\033[0;37m%s\033[0m\n" "$word" "$clean_desc"
+                fi
+            elif [[ -n "$cat_badge" ]]; then
+                printf "\033[1;36m❯ %s\033[0m  %b\n" "$word" "$cat_badge"
+            fi
+         fi'
 fi
 
+# ==============================================================================
+# 5. ATUIN, PLUGINS WRAPPERS Y PROMPT (ORDEN FINAL ESTRICTO)
+# ==============================================================================
+if (( $+commands[atuin] )); then
+    eval "$(atuin init zsh)"
+fi
+
+[[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
 [[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 [[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
 
-# prompt starship
-[[ "$(command -v starship)" != "" ]] && eval "$(starship init zsh)"
+# Starship Prompt (Invocación única)
+(( $+commands[starship] )) && eval "$(starship init zsh)"
 
 # Load alias
 [[ -f ~/.alias ]] && source ~/.alias
@@ -172,7 +269,7 @@ function transparent() {
     if [[ -f "$HOME/.config/ghostty/config" ]]; then
         local ghostty_conf="$HOME/.config/ghostty/config"
         if grep -q "^background-opacity = 1" "$ghostty_conf"; then
-            sed -i 's/^background-opacity = 1.*/background-opacity = 0.88/' "$ghostty_conf"
+            sed -i 's/^background-opacity = 2.*/background-opacity = 0.88/' "$ghostty_conf"
             echo "Ghostty transparency enabled (opacity: 0.88)"
         else
             sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$ghostty_conf"
