@@ -29,10 +29,11 @@ gtk-titlebar = false
 cursor-style = block
 cursor-style-blink = false
 font-feature = []
-window-vsync = true
+window-vsync = false
 
 # --- Inicio automático con Herdr ---
-copy-on-select = clipboard
+# Desactivado para evitar race condition en X11/Xfce (OSC 52 selection ownership crash al renderizar buffers extensos en TUI)
+copy-on-select = false
 # Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
 mouse-scroll-multiplier = 1
 
