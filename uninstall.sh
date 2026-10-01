@@ -33,7 +33,7 @@ function uninstall() {
 	fi
 
 	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - Uninstalling ghostty, tmux, and neovim..."
+	echo "[Uninstaller]: - Uninstalling ghostty, herdr, and neovim..."
 
 	echo -en "$fgcolor_yellow_bold"
 
@@ -59,7 +59,9 @@ function uninstall() {
 		sudo snap remove --purge tmux &>/dev/null || :
 		sudo snap remove --purge nvim &>/dev/null || :
 		sudo rm -rf /opt/nvim-linux-* /opt/zig-* /usr/local/bin/zig /usr/local/bin/nvim "$HOME/.local/bin/nvim" \
-			/usr/local/bin/tmux /usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
+			/usr/local/bin/tmux /usr/local/bin/herdr "$HOME/.local/bin/herdr" \
+			/usr/local/bin/atuin "$HOME/.local/bin/atuin" "$HOME/.cargo/bin/atuin" \
+			/usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
 			/usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* \
 			/usr/include/ghostty* /usr/include/gtk4-layer-shell* \
 			/usr/share/applications/*ghostty*.desktop /usr/share/applications/nvim.desktop /usr/share/applications/lvim.desktop \
@@ -92,6 +94,8 @@ function uninstall() {
 	echo
 	echo "[Uninstaller]: - Deleting configuration files and caches..."
 	rm -rf ~/.config/ghostty &>/dev/null || :
+	rm -rf ~/.config/herdr &>/dev/null || :
+	rm -rf ~/.config/atuin ~/.local/share/atuin &>/dev/null || :
 	rm -rf ~/.config/nvim &>/dev/null || :
 	rm -rf ~/.local/share/nvim &>/dev/null || :
 	rm -rf ~/.local/state/nvim &>/dev/null || :

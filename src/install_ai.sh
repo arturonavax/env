@@ -39,6 +39,9 @@ function install_ai() {
 	# 4. Prompting, Rules & System Instructions
 	bash ./src/ai/setup_prompts.sh
 
+	# 5. Rust Token Killer (RTK)
+	bash ./src/ai/install_rtk.sh
+
 	echo
 	echo -e "${fgcolor_white_bold}[AI Installer]: ${fgcolor_green_bold}✔️ AI environment successfully installed and configured!${fgcolor_reset}"
 	echo -en "$fgcolor_reset"

@@ -125,33 +125,75 @@ function install_editor() {
 		export PATH="$PATH:$GOPATH/bin"
 	fi
 
+	mkdir -p "$HOME/.local/bin"
+
+	# 1. lazygit (official precompiled release binary prioritized)
+	if [[ "$(command -v lazygit)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install lazygit 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Editor Installer]: Downloading pre-built lazygit binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			lg_arch="x86_64"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && lg_arch="arm64"
+			curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION#v}_linux_${lg_arch}.tar.gz" | tar -xz -C "$HOME/.local/bin/" lazygit 2>/dev/null && chmod +x "$HOME/.local/bin/lazygit" || {
+				if [[ "$(command -v go)" != "" ]]; then
+					go install -ldflags="-s -w" github.com/jesseduffield/lazygit@"${LAZYGIT_VERSION}" || :
+				fi
+			}
+		fi
+	fi
+
+	# 2. shfmt (official precompiled release binary prioritized)
+	if [[ "$(command -v shfmt)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install shfmt 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Editor Installer]: Downloading pre-built shfmt binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			shfmt_arch="amd64"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && shfmt_arch="arm64"
+			curl -fsSL "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_${shfmt_arch}" -o "$HOME/.local/bin/shfmt" 2>/dev/null && chmod +x "$HOME/.local/bin/shfmt" || {
+				if [[ "$(command -v go)" != "" ]]; then
+					go install -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@"${SHFMT_VERSION}" || :
+				fi
+			}
+		fi
+	fi
+
+	# 3. actionlint (official precompiled release binary prioritized)
+	if [[ "$(command -v actionlint)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install actionlint 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Editor Installer]: Downloading pre-built actionlint binary...${fgcolor_reset}"
+			bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) "$HOME/.local/bin" 2>/dev/null || {
+				if [[ "$(command -v go)" != "" ]]; then
+					go install -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@"${ACTIONLINT_VERSION}" || :
+				fi
+			}
+		fi
+	fi
+
 	if [[ "$(command -v go)" != "" ]]; then
-		# Compiling tools locally from source with stripped symbols for maximum performance
-		go install -ldflags="-s -w" github.com/jesseduffield/lazygit@${LAZYGIT_VERSION}
-		go install -ldflags="-s -w" golang.org/x/tools/gopls@${GOPLS_VERSION}
-		go install -ldflags="-s -w" github.com/mgechev/revive@latest
-		go install -ldflags="-s -w" mvdan.cc/gofumpt@${GOFUMPT_VERSION}
-		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@${DLV_VERSION}
-		go install -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}
-		go install -ldflags="-s -w" github.com/bufbuild/buf-language-server/cmd/bufls@latest
-		go install -ldflags="-s -w" github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}
-		go install -ldflags="-s -w" github.com/checkmake/checkmake/cmd/checkmake@${CHECKMAKE_VERSION}
-		go install -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION}
-		go install -ldflags="-s -w" github.com/sonatype-nexus-community/nancy@latest
-		go install -ldflags="-s -w" golang.org/x/vuln/cmd/govulncheck@latest
+		# Go language servers and development tools
+		go install -ldflags="-s -w" golang.org/x/tools/gopls@"${GOPLS_VERSION}" || :
+		go install -ldflags="-s -w" github.com/mgechev/revive@latest || :
+		go install -ldflags="-s -w" mvdan.cc/gofumpt@"${GOFUMPT_VERSION}" || :
+		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@"${DLV_VERSION}" || :
+		go install -ldflags="-s -w" github.com/bufbuild/buf-language-server/cmd/bufls@latest || :
+		go install -ldflags="-s -w" github.com/bufbuild/buf/cmd/buf@"${BUF_VERSION}" || :
+		go install -ldflags="-s -w" github.com/checkmake/checkmake/cmd/checkmake@"${CHECKMAKE_VERSION}" || :
+		go install -ldflags="-s -w" github.com/sonatype-nexus-community/nancy@latest || :
+		go install -ldflags="-s -w" golang.org/x/vuln/cmd/govulncheck@latest || :
 
 		curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin "${GOSEC_VERSION}"
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOSEC_VERSION}" || :
 
 		curl -sSfL https://golangci-lint.run/install.sh |
-			sh -s -- -b "$(go env GOPATH)"/bin "${GOLANGCI_LINT_VERSION}"
+			sh -s -- -b "$(go env GOPATH)"/bin "${GOLANGCI_LINT_VERSION}" || :
 
 		golangci-lint cache clean || :
-
-	else
-		echo -e "${fgcolor_yellow_bold}[Editor Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tlazygit, gopls, revive, gofumpt, dlv, actionlint, bufls, buf, checkmake, shfmt, nancy, govulncheck, gosec, golangci-lint${fgcolor_reset}"
-		echo
 	fi
 
 	if [[ "$(command -v pipx)" != "" ]]; then
@@ -166,18 +208,49 @@ function install_editor() {
 		python_binary_installer cmakelang || :
 	fi
 
-	# Compiling Rust tools locally with native CPU optimizations
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || cargo install tree-sitter-cli || :
-		RUSTFLAGS="-C target-cpu=native" cargo install --locked stylua --version "${STYLUA_VERSION}" || cargo install stylua || :
-		RUSTFLAGS="-C target-cpu=native" cargo install --locked shellharden --version "${SHELLHARDEN_VERSION}" || cargo install shellharden || :
+	# 4. stylua (official precompiled release binary prioritized)
+	if [[ "$(command -v stylua)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install stylua 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Editor Installer]: Downloading pre-built stylua binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			stylua_zip="stylua-linux-x86_64.zip"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && stylua_zip="stylua-linux-aarch64.zip"
+			curl -fsSL "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/${stylua_zip}" -o /tmp/stylua.zip 2>/dev/null && \
+				unzip -o /tmp/stylua.zip -d "$HOME/.local/bin/" 2>/dev/null && \
+				chmod +x "$HOME/.local/bin/stylua" && rm -f /tmp/stylua.zip || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					RUSTFLAGS="-C target-cpu=native" cargo install --locked stylua --version "${STYLUA_VERSION}" || :
+				fi
+			}
+		fi
+	fi
 
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || brew install tree-sitter || :
-		brew install shellharden stylua || :
+	# 5. tree-sitter CLI (official precompiled release binary prioritized)
+	if [[ "$(command -v tree-sitter)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install tree-sitter 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Editor Installer]: Downloading pre-built tree-sitter binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			ts_bin="tree-sitter-linux-x64.gz"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && ts_bin="tree-sitter-linux-arm64.gz"
+			curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/${ts_bin}" | gunzip -c > "$HOME/.local/bin/tree-sitter" 2>/dev/null && chmod +x "$HOME/.local/bin/tree-sitter" || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || :
+				fi
+			}
+		fi
+	fi
 
-	else
-		echo "The operating system is not compatible with this installation." && exit 1
+	# 6. shellharden
+	if [[ "$(command -v shellharden)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install shellharden 2>/dev/null || :
+		elif [[ "$(command -v cargo)" != "" ]]; then
+			RUSTFLAGS="-C target-cpu=native" cargo install --locked shellharden --version "${SHELLHARDEN_VERSION}" || :
+		fi
 	fi
 
 	# Clean stale tree-sitter locks and ensure native binary takes precedence in ~/.local/bin

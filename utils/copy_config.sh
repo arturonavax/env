@@ -22,7 +22,11 @@ mkdir -p ./files/ghostty/auto/
 [[ -f ~/.config/ghostty/config ]] && cp ~/.config/ghostty/config ./files/ghostty/.
 [[ -f ~/.config/ghostty/auto/theme.ghostty ]] && cp ~/.config/ghostty/auto/theme.ghostty ./files/ghostty/auto/.
 
-cp ~/.tmux.conf ./files/tmux/.
+mkdir -p ./files/herdr/
+[[ -f ~/.config/herdr/config.toml ]] && cp ~/.config/herdr/config.toml ./files/herdr/.
+
+mkdir -p ./files/atuin/
+[[ -f ~/.config/atuin/config.toml ]] && cp ~/.config/atuin/config.toml ./files/atuin/.
 
 cp ~/.config/starship.toml ./files/starship/.
 
@@ -87,6 +91,12 @@ cp ~/.sql-formatter.json ./files/sql-formatter/.
 mkdir -p ./files/rcmd/
 if [[ -f ~/.config/rcmd/rcmd.conf ]]; then
 	cp ~/.config/rcmd/rcmd.conf ./files/rcmd/.
+fi
+
+# Copy RTK files
+mkdir -p ./files/ai/rtk/
+if [[ -f ~/.config/rtk/config.toml ]]; then
+	cp ~/.config/rtk/config.toml ./files/ai/rtk/.
 fi
 
 echo "Configuration files successfully copied to repository!"

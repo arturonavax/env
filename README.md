@@ -30,7 +30,7 @@ List of installation parameters:
   `npm`, `pnpm` and `go`
 
 - `fonts` / `f`: Install patched mono fonts.
-- `terminal` / `t`: Install the terminal, shell, prompt, tmux and terminal tools.
+- `terminal` / `t`: Install the terminal, shell, prompt, Herdr and terminal tools.
 - `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
 - `ai`: Install AI tooling (CLI assistants, MCP environment, harnesses and prompt files).
 - `osconfig` / `o`: Configure the operationg system with personal preferences.
@@ -118,9 +118,7 @@ _Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
 
 ### Terminal :computer: ([`ghostty`](https://ghostty.org/))
 
-- [`tmux`](https://github.com/tmux/tmux)
-
-  - [Colorscheme](https://github.com/arturonavax/tmux-theme)
+- [`herdr`](https://herdr.dev/)
 
 - [`zsh`](https://github.com/zsh-users/zsh)
 
@@ -175,7 +173,7 @@ without having to perform the complete installation.
 
 List of synchronization parameters:
 
-- `terminal` / `t`: Synchronize the Terminal settings (Ghostty, tmux, zsh, starship).
+- `terminal` / `t`: Synchronize the Terminal settings (Ghostty, Herdr, zsh, starship).
 - `editor` / `e`: Synchronize Editor (nvim - LazyVim) settings.
 - `osconfig` / `o`: Configure the operating system with personal preferences.
 - `plugins` / `p`: Restore/synchronize Editor (nvim - LazyVim) plugins from lockfile.

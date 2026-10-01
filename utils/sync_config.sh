@@ -17,9 +17,7 @@ while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	fi
 done
 
-fcr='\033[0m'
-fcwb='\033[1;37m'
-fcgreenb='\033[1;32m'
+source ./src/remotes/_vars_colors.sh
 
 editor="nvim"
 
@@ -27,7 +25,7 @@ function usage() {
 	echo -e "$(
 		cat <<EOF
 [Sync Config]: List of Sync:
-  ${fcwb}terminal ${fcr}/ ${fcwb}t       ${fcr}- Synchronize the Terminal settings (Ghostty, tmux, starship, zsh).
+  ${fcwb}terminal ${fcr}/ ${fcwb}t       ${fcr}- Synchronize the Terminal settings (Ghostty, Herdr, starship, zsh).
   ${fcwb}editor ${fcr}/ ${fcwb}e         ${fcr}- Synchronize Editor ($editor - LazyVim) settings.
   ${fcwb}osconfig ${fcr}/ ${fcwb}o       ${fcr}- Configure the operating system with personal preferences.
   ${fcwb}plugins ${fcr}/ ${fcwb}p        ${fcr}- Restore/synchronize Editor ($editor - LazyVim) plugins from lockfile.
@@ -84,13 +82,26 @@ if [[ "$sync_terminal" == 1 ]]; then
 	cp ./files/ghostty/config ~/.config/ghostty/.
 	[[ -f ./files/ghostty/auto/theme.ghostty ]] && cp ./files/ghostty/auto/theme.ghostty ~/.config/ghostty/auto/.
 
-	cp ./files/tmux/.tmux.conf ~/.
+	if [[ -f ./files/herdr/config.toml ]]; then
+		mkdir -p ~/.config/herdr/
+		cp ./files/herdr/config.toml ~/.config/herdr/.
+	fi
+
+	if [[ -f ./files/atuin/config.toml ]]; then
+		mkdir -p ~/.config/atuin/
+		cp ./files/atuin/config.toml ~/.config/atuin/.
+	fi
 
 	cp ./files/starship/starship.toml ~/.config/.
 
+	cp ./files/zsh/.zshrc ~/.
 	cp ./files/zsh/.lscolors.sh ~/.
 	cp ./files/zsh/.base.zsh ~/.
 	cp ./files/zsh/.tools.sh ~/.
+
+	if command -v zsh &>/dev/null; then
+		zsh -c 'for f in ~/.zshrc ~/.base.zsh ~/.tools.sh ~/.lscolors.sh; do [[ -f "$f" ]] && zcompile "$f" 2>/dev/null || :; done' 2>/dev/null || :
+	fi
 
 	echo -e "${fcgreenb}Synchronized Terminal configuration files!${fcr}"
 fi
@@ -151,6 +162,10 @@ if [[ "$sync_devtools" == 1 ]]; then
 	cp ./files/prettier/.prettierrc.json ~/.
 	cp ./files/stylelint/.stylelintrc.json ~/.
 	cp ./files/sql-formatter/.sql-formatter.json ~/.
+	if [[ -f ./files/ai/rtk/config.toml ]]; then
+		mkdir -p ~/.config/rtk/
+		cp ./files/ai/rtk/config.toml ~/.config/rtk/.
+	fi
 
 	echo -e "${fcgreenb}Synchronized Devtools configuration files!${fcr}"
 fi

@@ -6,6 +6,7 @@ bindkey -e
 # PATH Basics
 [[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+[[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin:$PATH"
 
 # Linux - GTK Renderer (Estabilidad y prevención de fugas de texturas en GTK 4.14 / Wayland)
 if [[ "$(uname -s)" == "Linux" ]]; then
@@ -31,8 +32,14 @@ elif [[ "$(command -v vim)" != "" ]]; then
   export VISUAL=vim
 fi
 
-# load zsh-completions
-autoload -Uz compinit && compinit
+# load zsh-completions with cached compdump
+autoload -Uz compinit
+if [[ -n "${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24)" ]]; then
+    compinit
+    zcompile -R "${ZDOTDIR:-$HOME}/.zcompdump" 2>/dev/null || :
+else
+    compinit -C
+fi
 
 # enable zsh comments
 setopt interactivecomments
@@ -63,24 +70,33 @@ export \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8
 
-# fzf
-[[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
+# Integración nativa de fzf con Zsh (atajos Ctrl+R, Ctrl+T, Alt+C y completion)
+if [[ "$(command -v fzf)" != "" ]]; then
+    eval "$(fzf --zsh)"
+
+    # Usar fd en lugar de find clásico (ignora .git, respeta .gitignore y sigue symlinks)
+    export FZF_DEFAULT_COMMAND='fd --type f --strip-cwd-prefix --hidden --follow --exclude .git'
+    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    export FZF_ALT_C_COMMAND='fd --type d --strip-cwd-prefix --hidden --follow --exclude .git'
+
+    # Previews asíncronos y ligeros (ocultos por defecto con :hidden para evitar overhead de I/O, toggle con Ctrl+/)
+    export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info --preview 'if [ -d {} ]; then eza --tree --level=2 --color=always {} 2>/dev/null | head -200; else bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}; fi' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
+    export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :300 {} 2>/dev/null || cat {}' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
+    export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons --color=always {} 2>/dev/null' --preview-window right:60%:hidden:wrap --bind 'ctrl-/:toggle-preview'"
+fi
+
+## Atuin (SQLite-backed ultra-fast shell history replacing Ctrl-R)
+if [[ "$(command -v atuin)" != "" ]]; then
+    eval "$(atuin init zsh)"
+fi
 
 ## zsh plugins
 [[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
-[[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh ]] && source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 [[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 [[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
 
-export \
-    fpath=(~/.zsh/zsh-completions/src $fpath) \
-    FZF_DEFAULT_COMMAND="rg --color=always --files --no-ignore --hidden --follow" \
-    FZF_DEFAULT_OPTS="--reverse --prompt '❯ ' --pointer ''" \
-    FZF_CTRL_R_OPTS="--no-info --color prompt:italic --prompt '  History ❯ '"
-
+export fpath=(~/.zsh/zsh-completions/src $fpath)
 zstyle ":completion:*" list-colors ${(s.:.)LS_COLORS}
-zstyle ":fzf-tab:*" fzf-command ftb-tmux-popup
-zstyle ":fzf-tab:*" fzf-flags "--no-info" "--prompt=❯ " "--pointer="
 
 # Better SSH/Rsync/SCP Autocomplete
 zstyle ':completion:*:(scp|rsync):*' tag-order ' hosts:-ipaddr:ip\ address hosts:-host:host files'
@@ -261,11 +277,6 @@ function lighttheme() {
     echo "light" > ~/.theme_mode
     export THEME_MODE=light
 
-    tmux setenv THEME_MODE light &>/dev/null
-
-    [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
-    [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
-
     if [[ -f ~/.config/ghostty/auto/theme.ghostty ]]; then
         echo "theme = TokyoNight Day" > ~/.config/ghostty/auto/theme.ghostty
     fi
@@ -287,10 +298,6 @@ function darktheme() {
 
     echo "dark" > ~/.theme_mode
     export THEME_MODE=dark
-    tmux setenv THEME_MODE dark &>/dev/null
-
-    [[ -f ~/.tmux/plugins/tmux-theme/tmux-theme.tmux ]] && bash ~/.tmux/plugins/tmux-theme/tmux-theme.tmux &>/dev/null
-    [[ -f ~/.tmux/plugins/tmux-battery/battery.tmux ]] && bash ~/.tmux/plugins/tmux-battery/battery.tmux &>/dev/null
 
     if [[ -f ~/.config/ghostty/auto/theme.ghostty ]]; then
         echo "theme = TokyoNight Night" > ~/.config/ghostty/auto/theme.ghostty
@@ -367,31 +374,36 @@ alias clear="printf '\33c\e[3J'"
 alias path='echo "${PATH//:/\n}" | sort'
 
 # Set tools
-## Ripgrep
-[[ "$(command -v rg)" != "" ]] && alias grep='rg --hidden'
+## Ripgrep (Preservar grep POSIX nativo; atajo ergonomico para busqueda oculta)
+[[ "$(command -v rg)" != "" ]] && alias rgh='rg --hidden'
 
-## Fd
-if fd -q &>/dev/null; then
-    alias fdfind='fd'
-    alias find='fdfind --hidden'
+## Fd (Normalizar nombre de paquete en Debian/Ubuntu sin romper GNU find)
+if [[ "$(command -v fdfind)" != "" && "$(command -v fd)" == "" ]]; then
+    alias fd='fdfind'
 fi
+[[ "$(command -v fd)" != "" || "$(command -v fdfind)" != "" ]] && alias fdh='fd --hidden'
 
-## Eza
+## Bat (Normalizar nombre en Debian/Ubuntu sin secuestrar cat o less nativos)
+if [[ "$(command -v batcat)" != "" && "$(command -v bat)" == "" ]]; then
+    alias bat='batcat'
+fi
+[[ "$(command -v bat)" != "" || "$(command -v batcat)" != "" ]] && alias preview='bat'
+
+## Difftastic (Diff estructural AST basado en Tree-sitter)
+[[ "$(command -v difft)" != "" ]] && alias dft='difft'
+
+## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
 if [[ "$(command -v eza)" != "" ]]; then
-    alias ls='eza --icons --classify'
+    alias l='eza --icons --classify'
     alias ll='eza --icons --classify -lh'
-    alias llt='eza --icons --classify --tree'
-
+    alias la='eza --icons --classify -lha'
+    alias lt='eza --icons --classify --tree'
+    alias llt='eza --icons --classify --tree -lh'
+    alias ls='eza --icons --classify'
 else
-    alias ls='ls --color'
-    alias ll='ls --color -l'
-fi
-
-## Bat
-if [[ "$(command -v batcat)" != "" || "$(command -v bat)" != "" ]]; then
-    [[ "$(command -v bat)" != "" ]] && alias batcat='bat'
-    alias cat='batcat -P -p'
-    alias less='batcat'
+    alias ls='ls --color=auto'
+    alias ll='ls --color=auto -l'
+    alias la='ls --color=auto -la'
 fi
 
 ## zoxide
@@ -413,69 +425,17 @@ if [[ "$(command -v cursor)" == "" && -d "$HOME/Applications" ]]; then
     [[ -n "$cursor_appimage" ]] && alias cursor="$cursor_appimage --no-sandbox"
 fi
 
-## Notificaciones automáticas en segundo plano (Zsh + tmux)
-zmodload zsh/datetime 2>/dev/null || :
-autoload -Uz add-zsh-hook 2>/dev/null || :
-
-export NOTIFY_THRESHOLD=3
-
-__notify_preexec() {
-    __cmd_start=$EPOCHSECONDS
-    __cmd_name="$1"
-}
-
-__notify_precmd() {
-    local exit_code=$?
-
-    if [[ -n "$__cmd_start" ]]; then
-        local elapsed=$(( EPOCHSECONDS - __cmd_start ))
-        local cmd="$__cmd_name"
-
-        unset __cmd_start __cmd_name
-
-        if (( elapsed >= ${NOTIFY_THRESHOLD:-3} )); then
-            local should_notify=0
-
-            if [[ -n "$TMUX" ]]; then
-                local pane_target="${TMUX_PANE:-}"
-                local is_pane_focused
-                if [[ -n "$pane_target" ]]; then
-                    is_pane_focused=$(tmux display-message -p -t "$pane_target" '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
-                else
-                    is_pane_focused=$(tmux display-message -p '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
-                fi
-
-                # Si no es exactamente '1', el panel exacto no está enfocado (otro panel, otra ventana, otra sesión o terminal en segundo plano)
-                if [[ "$is_pane_focused" != "1" ]]; then
-                    should_notify=1
-                fi
-            else
-                # Fuera de tmux: verificar foco de ventana en X11 si xdotool está disponible
-                if command -v xdotool &>/dev/null && [[ -n "$WINDOWID" ]]; then
-                    local active_win=$(xdotool getactivewindow 2>/dev/null)
-                    if [[ -n "$active_win" && "$active_win" != "$WINDOWID" ]]; then
-                        should_notify=1
-                    fi
-                fi
-            fi
-
-            if (( should_notify )); then
-                local title="Comando finalizado (${elapsed}s)"
-                local urgency="normal"
-
-                if (( exit_code != 0 )); then
-                    title="Comando fallido (código $exit_code) (${elapsed}s)"
-                    urgency="critical"
-                fi
-
-                notify-send -u "$urgency" -i utilities-terminal "$title" "$cmd" >/dev/null 2>&1
+## Compile Zsh startup files to word-code (.zwc) for ultra-fast startup
+zcompile-all() {
+    local file
+    for file in "${ZDOTDIR:-$HOME}"/.zshrc "${ZDOTDIR:-$HOME}"/.base.zsh "${ZDOTDIR:-$HOME}"/.tools.sh "${ZDOTDIR:-$HOME}"/.lscolors.sh; do
+        if [[ -f "$file" ]]; then
+            if [[ ! -f "${file}.zwc" || "$file" -nt "${file}.zwc" ]]; then
+                zcompile "$file" && echo "Compiled: ${file}.zwc"
             fi
         fi
-    fi
+    done
 }
-
-add-zsh-hook preexec __notify_preexec 2>/dev/null || :
-add-zsh-hook precmd __notify_precmd 2>/dev/null || :
 
 
 ## Bun completions

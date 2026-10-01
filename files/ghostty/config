@@ -10,7 +10,7 @@ font-size = 13
 # --- Apariencia ---
 theme = "light:TokyoNight Day,dark:TokyoNight Night"
 
-background-opacity = 1.0
+background-opacity = 0.97
 background-blur-radius = 0
 
 window-decoration = true
@@ -31,12 +31,12 @@ cursor-style-blink = false
 font-feature = []
 window-vsync = true
 
-# --- Inicio automático con tmux ---
+# --- Inicio automático con Herdr ---
 copy-on-select = clipboard
 # Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
 mouse-scroll-multiplier = 1
 
-command = sh -c "cd && (tmux new-session -s main -c ~ 2>/dev/null || tmux new-session -t main \\; set-option destroy-unattached on)"
+command = zsh -ic "herdr"
 
 desktop-notifications = true
 notify-on-command-finish = unfocused

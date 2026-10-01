@@ -109,7 +109,7 @@ function install_terminal() {
 
 			# Tools
 			sudo apt install -y clang-format rar mtr exiftool git-flow tree eza bat ripgrep xclip xsel tor \
-				shellcheck nmap arp-scan aircrack-ng sqlmap direnv
+				shellcheck nmap arp-scan aircrack-ng sqlmap direnv git-delta tealdeer 2>/dev/null || :
 
 			sudo apt install -y wireshark tshark
 
@@ -187,11 +187,10 @@ function install_terminal() {
 		brew install netcat openssh
 
 		# Tools
-		brew install clang-format rar mtr exiftool git-flow tmux tree eza bat ripgrep xclip xsel tor \
-			shellcheck nmap arp-scan aircrack-ng sqlmap direnv
+		brew install clang-format rar mtr exiftool git-flow tree eza bat ripgrep xclip xsel tor \
+			shellcheck nmap arp-scan aircrack-ng sqlmap direnv difftastic git-delta tealdeer xo/xo/usql atuin
 
 		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh || :
-		sudo ln -s /opt/homebrew/bin/tmux /usr/local/bin/tmux || :
 
 		brew install --cask wireshark # includes tshark
 
@@ -213,12 +212,12 @@ function install_terminal() {
 		# install yarn
 		node_package_module install -g yarn
 
-		# install serve and tldr
-		node_package_module install -g serve tldr
+		# install serve
+		node_package_module install -g serve
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'node package module' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tyarn, serve, tldr${fgcolor_reset}"
+        \tyarn, serve${fgcolor_reset}"
 	fi
 
 	# check exists goenv
@@ -232,9 +231,6 @@ function install_terminal() {
 	fi
 
 	if [[ "$(command -v go)" != "" ]]; then
-		# install fx (JSON Viewer) - compiled locally
-		go install -ldflags="-s -w" github.com/antonmedv/fx@${FX_VERSION}
-
 		# install protobuf golang plugins - compiled locally
 		go install -ldflags="-s -w" google.golang.org/protobuf/cmd/protoc-gen-go@latest
 		go install -ldflags="-s -w" google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
@@ -254,26 +250,161 @@ function install_terminal() {
 			sh -s -- -b "$(go env GOPATH)"/bin "${GOLANGCI_LINT_VERSION}"
 
 		# install delve - compiled locally
-		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@${DLV_VERSION}
+		go install -ldflags="-s -w" github.com/go-delve/delve/cmd/dlv@"${DLV_VERSION}"
 
 		golangci-lint cache clean || :
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'go' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tfx, protoc-gen-go, protoc-gen-go-grpc, nancy, govulncheck, gosec, air, golangci-lint, delve${fgcolor_reset}"
+        \tprotoc-gen-go, protoc-gen-go-grpc, nancy, govulncheck, gosec, air, golangci-lint, delve${fgcolor_reset}"
 		echo
 	fi
 
 	if [[ "$(command -v python_binary_installer)" != "" ]]; then
 		python_binary_installer speedtest-cli
-		# python_binary_installer pgcli
-		python_binary_installer litecli
 
 	else
 		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'python binary installer' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tspeedtest-cli, litecli${fgcolor_reset}"
+        \tspeedtest-cli${fgcolor_reset}"
 		echo
 	fi
+
+	# ---
+	# Install Modern CLI Tools (difftastic, git-delta, tealdeer, usql, fx, atuin)
+	# ALWAYS prioritizes official pre-compiled static binaries (instant, zero libc overhead), falling back to native brew or optimized cargo/go install
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing modern CLI tools (difftastic, git-delta, tealdeer, usql, fx, atuin)...${fgcolor_reset}"
+	mkdir -p "$HOME/.local/bin" "$HOME/.cargo/bin"
+
+	# 1. difftastic (difft) - AST structural diff (official precompiled static binary)
+	if [[ "$(command -v difft)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing difftastic via Homebrew...${fgcolor_reset}"
+			brew install difftastic 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built difftastic binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			difft_arch="x86_64-unknown-linux-gnu"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && difft_arch="aarch64-unknown-linux-gnu"
+			curl -fsSL "https://github.com/Wilfred/difftastic/releases/download/${DIFFTASTIC_VERSION}/difft-${DIFFTASTIC_VERSION}-${difft_arch}.tar.gz" | tar -xz -C "$HOME/.local/bin/" 2>/dev/null && chmod +x "$HOME/.local/bin/difft" || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Download failed, compiling difftastic via cargo...${fgcolor_reset}"
+					cargo install --locked difftastic || :
+				fi
+			}
+		fi
+	fi
+
+	# 2. git-delta (delta) - syntax-highlighting git/diff pager (official precompiled musl static binary)
+	if [[ "$(command -v delta)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing git-delta via Homebrew...${fgcolor_reset}"
+			brew install git-delta 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built git-delta musl binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			delta_arch="x86_64-unknown-linux-musl"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && delta_arch="aarch64-unknown-linux-musl"
+			curl -fsSL "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${delta_arch}.tar.gz" | tar -xz -C /tmp/ 2>/dev/null && \
+				mv "/tmp/delta-${DELTA_VERSION}-${delta_arch}/delta" "$HOME/.local/bin/" && \
+				chmod +x "$HOME/.local/bin/delta" && \
+				rm -rf "/tmp/delta-${DELTA_VERSION}-${delta_arch}" || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Download failed, compiling git-delta via cargo...${fgcolor_reset}"
+					cargo install --locked git-delta || :
+				fi
+			}
+		fi
+	fi
+
+	# 3. tealdeer (tldr) - ultra-fast tldr client in Rust (official precompiled musl static binary)
+	if [[ "$(command -v tldr)" == "" && "$(command -v tealdeer)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing tealdeer via Homebrew...${fgcolor_reset}"
+			brew install tealdeer 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built tealdeer musl binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			tldr_arch="x86_64-musl"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && tldr_arch="arm-musleabihf"
+			curl -fsSL "https://github.com/dbrgn/tealdeer/releases/download/v${TEALDEER_VERSION}/tealdeer-linux-${tldr_arch}" -o "$HOME/.local/bin/tldr" && chmod +x "$HOME/.local/bin/tldr" || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Download failed, compiling tealdeer via cargo...${fgcolor_reset}"
+					cargo install --locked tealdeer || :
+				fi
+			}
+		fi
+	fi
+	if [[ "$(command -v tldr)" != "" ]]; then
+		tldr --update 2>/dev/null || :
+	fi
+
+	# 4. usql - Universal SQL CLI in Go (official precompiled static binary)
+	if [[ "$(command -v usql)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			brew install xo/xo/usql 2>/dev/null || :
+		else
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built usql binary...${fgcolor_reset}"
+			arch="$(uname -m)"
+			usql_arch="linux-amd64"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && usql_arch="linux-arm64"
+			curl -fsSL "https://github.com/xo/usql/releases/download/v${USQL_VERSION}/usql-${USQL_VERSION}-${usql_arch}.tar.bz2" | tar -xj -C "$HOME/.local/bin/" 2>/dev/null && chmod +x "$HOME/.local/bin/usql" || {
+				if [[ "$(command -v go)" != "" ]]; then
+					echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Download failed, compiling usql via go...${fgcolor_reset}"
+					go install -ldflags="-s -w" github.com/xo/usql@latest || :
+				fi
+			}
+		fi
+	fi
+
+	# 5. fx - JSON Viewer in Go (official precompiled binary)
+	if [[ "$(command -v fx)" == "" ]]; then
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built fx binary...${fgcolor_reset}"
+		arch="$(uname -m)"
+		fx_bin="fx_linux_amd64"
+		[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && fx_bin="fx_linux_arm64"
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			fx_bin="fx_darwin_amd64"
+			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && fx_bin="fx_darwin_arm64"
+		fi
+		curl -fsSL "https://github.com/antonmedv/fx/releases/download/${FX_VERSION}/${fx_bin}" -o "$HOME/.local/bin/fx" && chmod +x "$HOME/.local/bin/fx" || {
+			if [[ "$(command -v go)" != "" ]]; then
+				go install -ldflags="-s -w" github.com/antonmedv/fx@"${FX_VERSION}" || :
+			fi
+		}
+	fi
+
+	# 6. atuin - SQLite-backed ultra-fast shell history (official precompiled static binary)
+	if [[ "$(command -v atuin)" == "" ]]; then
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Installing atuin via Homebrew...${fgcolor_reset}"
+			brew install atuin 2>/dev/null || :
+		fi
+		if [[ "$(command -v atuin)" == "" ]]; then
+			echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading official pre-built atuin binary...${fgcolor_reset}"
+			curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive || {
+				if [[ "$(command -v cargo)" != "" ]]; then
+					echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Download failed, compiling atuin via cargo...${fgcolor_reset}"
+					cargo install atuin --locked || :
+				fi
+			}
+		fi
+	fi
+
+	# 7. Normalize binary symlinks across ~/.local/bin and /usr/local/bin
+	for bin_name in difft delta tldr tealdeer usql fx herdr rtk atuin; do
+		if [[ -f "$HOME/.atuin/bin/$bin_name" && ! -f "$HOME/.local/bin/$bin_name" ]]; then
+			ln -sf "$HOME/.atuin/bin/$bin_name" "$HOME/.local/bin/$bin_name" 2>/dev/null || :
+		fi
+		if [[ -f "$HOME/.cargo/bin/$bin_name" && ! -f "$HOME/.local/bin/$bin_name" ]]; then
+			ln -sf "$HOME/.cargo/bin/$bin_name" "$HOME/.local/bin/$bin_name" 2>/dev/null || :
+		fi
+		if [[ -f "$HOME/go/bin/$bin_name" && ! -f "$HOME/.local/bin/$bin_name" ]]; then
+			ln -sf "$HOME/go/bin/$bin_name" "$HOME/.local/bin/$bin_name" 2>/dev/null || :
+		fi
+		if [[ -f "$HOME/.local/bin/$bin_name" && ! -f "/usr/local/bin/$bin_name" ]]; then
+			sudo ln -sf "$HOME/.local/bin/$bin_name" "/usr/local/bin/$bin_name" 2>/dev/null || :
+		fi
+	done
 
 	# install just
 	if [[ "$(uname -s)" == "Linux" ]]; then
@@ -469,18 +600,16 @@ function install_terminal() {
 			fi
 		fi
 
-		# Fallback to snap or distribution package manager
+		# Fallback to distribution package manager
 		if [[ "$ghostty_installed" == false ]]; then
-			echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Ghostty source compilation failed or was skipped. Falling back to snap / package manager...${fgcolor_reset}"
-			if [[ "$(command -v snap)" != "" ]]; then
-				sudo snap install ghostty --classic || sudo snap refresh ghostty --classic
-			elif [[ "$ID" == *"fedora"* ]]; then
+			echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Ghostty source compilation failed or was skipped. Checking package managers...${fgcolor_reset}"
+			if [[ "$ID" == *"fedora"* ]]; then
 				sudo dnf copr enable -y pgdev/ghostty || :
 				sudo dnf install -y ghostty || :
 			elif [[ "$(command -v pacman)" != "" ]]; then
 				sudo pacman -S --noconfirm ghostty || :
 			else
-				echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Please install Ghostty manually or via snap: sudo snap install ghostty --classic${fgcolor_reset}"
+				echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Please install Ghostty using official release packages or source compilation.${fgcolor_reset}"
 			fi
 		fi
 
@@ -622,52 +751,20 @@ function install_terminal() {
 	echo
 
 	# ---
-	# Install Tmux (Compiled from source for native CPU performance)
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing/Compiling Tmux (${TMUX_VERSION}) from source...${fgcolor_reset}"
-
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		if [[ "$(tmux -V 2>/dev/null)" == "tmux ${TMUX_VERSION}" && -x /usr/local/bin/tmux ]]; then
-			echo -e "${fgcolor_green_bold}[Terminal Installer]: Tmux ${TMUX_VERSION} is already compiled and installed at /usr/local/bin/tmux.${fgcolor_reset}"
-		else
-			cd ./downloads/
-			if curl -sSfL "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" -o "tmux-${TMUX_VERSION}.tar.gz"; then
-				rm -rf "tmux-${TMUX_VERSION}"
-				tar -xzf "tmux-${TMUX_VERSION}.tar.gz"
-				cd "tmux-${TMUX_VERSION}"
-				CFLAGS="-O3 -march=native" ./configure --prefix=/usr/local
-				make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
-				sudo make install
-				cd ..
-			else
-				echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Fallback installing tmux from package manager...${fgcolor_reset}"
-				if [[ "$(command -v snap)" != "" ]]; then
-					sudo snap install tmux --classic || sudo snap refresh tmux --classic || :
-				elif [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-					sudo apt install -y tmux
-				elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-					sudo dnf install -y tmux
-				fi
-			fi
-			cd .. # exit downloads/
-		fi
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install tmux || brew upgrade tmux || :
+	# Install Herdr (Agent Multiplexer & Workspace Manager)
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Herdr (Agent Multiplexer)...${fgcolor_reset}"
+	if [[ "$(command -v herdr)" != "" ]]; then
+		echo -e "${fgcolor_green_bold}[Terminal Installer]: Herdr is already installed ($(herdr --version 2>/dev/null || echo "installed")).${fgcolor_reset}"
+	else
+		echo -e "${fgcolor_white_bold}[Terminal Installer]: Downloading and installing Herdr...${fgcolor_reset}"
+		curl -fsSL https://herdr.dev/install.sh | sh || :
+	fi
+	if [[ -f "$HOME/.local/bin/herdr" && ! -f /usr/local/bin/herdr ]]; then
+		sudo ln -sf "$HOME/.local/bin/herdr" /usr/local/bin/herdr 2>/dev/null || :
 	fi
 
 	echo
 
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tmux-256color info...${fgcolor_reset}"
-
-	cd ./downloads/
-	if curl -fsSL -o terminfo.src.gz https://invisible-island.net/datafiles/current/terminfo.src.gz 2>/dev/null; then
-		gunzip -f terminfo.src.gz 2>/dev/null && sudo tic -xe tmux-256color terminfo.src 2>/dev/null || :
-	fi
-	cd .. # exit downloads/
-
-	echo
 
 	# ---
 
@@ -697,8 +794,7 @@ function install_terminal() {
 	for plugin_spec in \
 		"https://github.com/zsh-users/zsh-autosuggestions $HOME/.zsh/zsh-autosuggestions" \
 		"https://github.com/zdharma-continuum/fast-syntax-highlighting $HOME/.zsh/fast-syntax-highlighting" \
-		"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions" \
-		"https://github.com/Aloxaf/fzf-tab $HOME/.zsh/fzf-tab"; do
+		"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions"; do
 		plugin_url="${plugin_spec% *}"
 		plugin_dest="${plugin_spec#* }"
 		if [[ -d "$plugin_dest/.git" ]]; then
@@ -708,21 +804,10 @@ function install_terminal() {
 			git clone --quiet "$plugin_url" "$plugin_dest" || :
 		fi
 	done
-	rm -f ~/.zcompdump
+	rm -f ~/.zcompdump*
 	if [[ "$(command -v compinit)" != "" ]]; then
-		compinit || :
-	fi
-
-	echo
-
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Downloading Tmux Plugin Manager...${fgcolor_reset}"
-	if [[ ! -d ~/.tmux/plugins/tpm/.git ]]; then
-		mkdir -p ~/.tmux/plugins
-		git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-	else
-		git -C ~/.tmux/plugins/tpm pull --quiet || :
+		compinit -d ~/.zcompdump || :
+		zcompile ~/.zcompdump 2>/dev/null || :
 	fi
 
 	echo
@@ -731,20 +816,6 @@ function install_terminal() {
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Synchronizing configuration...${fgcolor_reset}"
 	bash ./utils/sync_config.sh terminal
-
-	echo
-
-	# ---
-
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Tmux Plugins...${fgcolor_reset}"
-	if [[ -f ~/.tmux/plugins/tpm/scripts/install_plugins.sh ]]; then
-		tmux start-server 2>/dev/null || :
-		tmux set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/" 2>/dev/null || :
-		tmux source-file ~/.tmux.conf 2>/dev/null || :
-		bash ~/.tmux/plugins/tpm/scripts/install_plugins.sh || :
-	fi
-
-	echo
 
 	# ---
 

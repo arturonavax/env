@@ -18,10 +18,24 @@ if [[ -d ~/.config/ghostty ]]; then
 	cp -r ~/.config/ghostty/* "$backup_folder/ghostty/." 2>/dev/null || :
 fi
 
-cp ~/.tmux.conf "$backup_folder/." 2>/dev/null || :
+if [[ -f ~/.config/herdr/config.toml ]]; then
+	mkdir -p "$backup_folder/herdr/"
+	cp ~/.config/herdr/config.toml "$backup_folder/herdr/." 2>/dev/null || :
+fi
+
+if [[ -f ~/.config/rtk/config.toml ]]; then
+	mkdir -p "$backup_folder/rtk/"
+	cp ~/.config/rtk/config.toml "$backup_folder/rtk/." 2>/dev/null || :
+fi
+
+if [[ -f ~/.config/atuin/config.toml ]]; then
+	mkdir -p "$backup_folder/atuin/"
+	cp ~/.config/atuin/config.toml "$backup_folder/atuin/." 2>/dev/null || :
+fi
 
 cp ~/.config/starship.toml "$backup_folder/." 2>/dev/null || :
 
+cp ~/.zshrc "$backup_folder/." 2>/dev/null || :
 cp ~/.lscolors.sh "$backup_folder/." 2>/dev/null || :
 cp ~/.base.zsh "$backup_folder/." 2>/dev/null || :
 cp ~/.tools.sh "$backup_folder/." 2>/dev/null || :

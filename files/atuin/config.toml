@@ -1,0 +1,20 @@
+# Atuin configuration (~/.config/atuin/config.toml)
+# https://docs.atuin.sh/configuration/config/
+
+# Modo de búsqueda fuzzy ultra rápido
+search_mode = "fuzzy"
+
+# Filtrar por defecto solo los comandos ejecutados en el directorio actual
+filter_mode = "directory"
+
+# Desactivar sincronización remota (100% local y offline)
+auto_sync = false
+update_check = false
+
+# Estilo de interfaz compacto
+style = "compact"
+inline_height = 15
+
+# Teclas de atajo y navegación rápida
+enter_accept = true
+show_preview = true

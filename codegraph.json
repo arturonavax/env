@@ -1,0 +1,7 @@
+{
+  "exclude": [
+    "docs/**",
+    "files/cursor/keybindings.json",
+    "files/vscode/keybindings.json"
+  ]
+}

@@ -13,21 +13,11 @@ url_webscraping="https://go.dev/dl/"
 installation_dirpath="/usr/local/"
 bootstrap_dirpath="${installation_dirpath}go-bootstrap/"
 
-# Reset Text Color
-fgcolor_reset='\033[0m'
-
-# Regular Text Colors
-fgcolor_green='\033[0;32m'
-fgcolor_red='\033[0;31m'
-fgcolor_yellow='\033[0;33m'
-fgcolor_cyan='\033[0;36m'
-
-# Bold Text Colors
-fgcolor_white_bold='\033[1;37m'
-fgcolor_yellow_bold='\033[1;33m'
-fgcolor_cyan_bold='\033[1;36m'
-fgcolor_red_bold='\033[1;31m'
-fgcolor_green_bold='\033[1;32m'
+if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	source ./src/remotes/_vars_colors.sh
+elif [[ -f "$(dirname "$0")/_vars_colors.sh" ]]; then
+	source "$(dirname "$0")/_vars_colors.sh"
+fi
 
 function exit-error-message() {
 	echo

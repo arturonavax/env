@@ -7,6 +7,7 @@
 [[ -d /usr/local/go/bin/ ]] && export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 # rust
+[[ -d "$HOME/.cargo/bin" && ":$PATH:" != *":$HOME/.cargo/bin:"* ]] && export PATH="$HOME/.cargo/bin:$PATH"
 [[ -f ~/.cargo/env ]] && source "$HOME/.cargo/env"
 
 # python - pyenv
@@ -36,6 +37,11 @@ elif [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 [[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
+[[ -d "$PNPM_HOME/bin" ]] && export PATH="$PNPM_HOME/bin:$PATH"
+
+# atuin
+[[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin:$PATH"
+[[ -f "$HOME/.atuin/bin/env" ]] && source "$HOME/.atuin/bin/env"
 
 # bun
 if [[ -d "$HOME/.bun" ]]; then

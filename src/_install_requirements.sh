@@ -46,7 +46,7 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 			liblzma-dev libxml2-dev libxslt1-dev libxcb-xinerama0 libxcb-cursor0
 
 		# tools
-		sudo apt install -y curl wget git unzip zstd make gcc fontconfig snapd wmctrl xdotool x11-utils
+		sudo apt install -y curl wget git unzip zstd make gcc fontconfig wmctrl xdotool x11-utils
 
 	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
 		sudo dnf update -y

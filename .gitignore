@@ -8,3 +8,7 @@ lv-settings.lua
 *.local
 .env*
 !.env.example
+# Local AI & MCP runtime state
+.atl/
+.codegraph/
+.engram/

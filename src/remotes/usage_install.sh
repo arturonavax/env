@@ -1,9 +1,11 @@
 #!/bin/bash
 # Check if the arguments are valid for the installation.
 #
-# Run: bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@"
-fcwb='\033[1;37m'
-fcr='\033[0m'
+if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	source ./src/remotes/_vars_colors.sh
+elif [[ -f "$(dirname "$0")/_vars_colors.sh" ]]; then
+	source "$(dirname "$0")/_vars_colors.sh"
+fi
 
 editor="nvim (LazyVim)"
 
@@ -13,7 +15,7 @@ function usage() {
 [Installer]: List of installations:
   ${fcwb}requirements ${fcr}/ ${fcwb}r ${fcr}- Install the necessary tools, languages and dependencies.
   ${fcwb}fonts ${fcr}/ ${fcwb}f        ${fcr}- Install patched mono fonts.
-  ${fcwb}terminal ${fcr}/ ${fcwb}t     ${fcr}- Install the terminal, shell, prompt, tmux and terminal tools.
+  ${fcwb}terminal ${fcr}/ ${fcwb}t     ${fcr}- Install the terminal, shell, prompt, Herdr and terminal tools.
   ${fcwb}editor ${fcr}/ ${fcwb}e       ${fcr}- Install the editor ($editor) and development tools.
   ${fcwb}ai ${fcr}              - Install AI tooling (CLI assistants, MCP environment, harnesses).
   ${fcwb}osconfig ${fcr}/ ${fcwb}o     ${fcr}- Configure the operating system with personal preferences.

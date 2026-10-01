@@ -1,0 +1,14 @@
+onboarding = false
+
+[ui.toast]
+delivery = "system"
+
+[ui.sound]
+enabled = true
+
+[ui]
+status_indicators = "dots"
+
+[theme]
+name = "tokyo-night"
+auto_switch = false

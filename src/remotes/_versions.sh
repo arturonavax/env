@@ -7,7 +7,6 @@
 export GHOSTTY_VERSION="${GHOSTTY_VERSION:-1.3.1}"
 export ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
 export NVIM_VERSION="${NVIM_VERSION:-v0.12.5}"
-export TMUX_VERSION="${TMUX_VERSION:-3.7c}"
 
 # Node & Package Managers
 export PNPM_VERSION="${PNPM_VERSION:-12.4.2}"
@@ -26,10 +25,15 @@ export GOSEC_VERSION="${GOSEC_VERSION:-v2.29.0}"
 export CHECKMAKE_VERSION="${CHECKMAKE_VERSION:-v0.3.2}"
 export BUF_VERSION="${BUF_VERSION:-v1.73.0}"
 
-# Rust Tools (compiled locally with native CPU flags)
+# Rust & Modern CLI Tools (Official Precompiled Static Binaries prioritized)
 export TREE_SITTER_VERSION="${TREE_SITTER_VERSION:-0.27.0}"
 export STYLUA_VERSION="${STYLUA_VERSION:-2.5.2}"
 export SHELLHARDEN_VERSION="${SHELLHARDEN_VERSION:-4.3.2}"
+export DIFFTASTIC_VERSION="${DIFFTASTIC_VERSION:-0.71.0}"
+export DELTA_VERSION="${DELTA_VERSION:-0.19.2}"
+export TEALDEER_VERSION="${TEALDEER_VERSION:-1.7.2}"
+export USQL_VERSION="${USQL_VERSION:-0.19.3}"
+export ATUIN_VERSION="${ATUIN_VERSION:-18.23.0}"
 
 # Fonts
 export NERD_FONTS_VERSION="${NERD_FONTS_VERSION:-v3.5.1}"
