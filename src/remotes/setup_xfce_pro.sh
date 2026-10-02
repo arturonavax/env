@@ -45,6 +45,7 @@ sudo apt install -y \
     dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
     xwallpaper libxcb-xrm0 \
     picom libchipmunk7 libgif7 libpng16-16t64 libxcomposite1 libxdamage1 libxft2 libxinerama1 libjpeg62 \
+    nemo nemo-fileroller \
     curl wget git jq unzip
 
 echo "==> 3. Instalando Vicinae..."
@@ -562,7 +563,52 @@ chmod +x "$HOME/.local/bin/toggle-layout.sh"
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" -n -t string -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || true
 
-echo "==> 10. Configurando Panel Xfce y Notificaciones..."
+echo "==> 10. Integrando Nemo como gestor de archivos predeterminado..."
+# 1. Asociar tipos MIME de carpetas y búsquedas en el sistema
+xdg-mime default nemo.desktop inode/directory
+xdg-mime default nemo.desktop application/x-gnome-saved-search
+gio mime inode/directory nemo.desktop 2>/dev/null || true
+gio mime application/x-gnome-saved-search nemo.desktop 2>/dev/null || true
+
+# 2. Configurar manejador en ~/.config/mimeapps.list
+mkdir -p "$HOME/.config"
+touch "$HOME/.config/mimeapps.list"
+if ! grep -q "^inode/directory=nemo.desktop" "$HOME/.config/mimeapps.list"; then
+    if grep -q "\[Default Applications\]" "$HOME/.config/mimeapps.list"; then
+        sed -i '/\[Default Applications\]/a inode/directory=nemo.desktop\napplication/x-gnome-saved-search=nemo.desktop' "$HOME/.config/mimeapps.list"
+    else
+        echo -e "[Default Applications]\ninode/directory=nemo.desktop\napplication/x-gnome-saved-search=nemo.desktop" >> "$HOME/.config/mimeapps.list"
+    fi
+fi
+
+# 3. Integrar Nemo como Preferred Application en el subsistema Xfce (exo-open)
+mkdir -p "$HOME/.local/share/xfce4/helpers"
+cat <<'EOF' > "$HOME/.local/share/xfce4/helpers/nemo.desktop"
+[Desktop Entry]
+Version=1.0
+Icon=system-file-manager
+Type=X-XFCE-Helper
+Name=Nemo
+StartupNotify=true
+X-XFCE-Binaries=nemo;
+X-XFCE-Category=FileManager
+X-XFCE-Commands=%B;
+X-XFCE-CommandsWithParameter=%B "%s";
+EOF
+
+mkdir -p "$HOME/.config/xfce4"
+touch "$HOME/.config/xfce4/helpers.rc"
+if grep -q "^FileManager=" "$HOME/.config/xfce4/helpers.rc"; then
+    sed -i 's/^FileManager=.*/FileManager=nemo/' "$HOME/.config/xfce4/helpers.rc"
+else
+    echo "FileManager=nemo" >> "$HOME/.config/xfce4/helpers.rc"
+fi
+
+# 4. Desactivar gestión de escritorio en Nemo (evita interferencias con xwallpaper)
+gsettings set org.nemo.desktop show-desktop-icons false 2>/dev/null || true
+gsettings set org.nemo.preferences show-image-thumbnails 'always' 2>/dev/null || true
+
+echo "==> 11. Configurando Panel Xfce y Notificaciones..."
 mkdir -p "$HOME/.themes/Orchis-Dark/xfce-notify-4.0"
 cat <<'EOF' > "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css"
 #XfceNotifyWindow {
@@ -606,7 +652,7 @@ xfconf-query -c xfce4-panel -p /panels -a -t int -s 1 2>/dev/null || true
 xfconf-query -c xfce4-panel -p /panels/panel-2 -r -R 2>/dev/null || true
 xfce4-panel -r 2>/dev/null || true
 
-echo "==> 11. Optimizaciones genéricas de red en arranque..."
+echo "==> 12. Optimizaciones genéricas de red en arranque..."
 sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
 
 echo "==> Configuración completada. Reinicia el entorno para aplicar los cambios de sesión con: sudo reboot"
