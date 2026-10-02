@@ -27,7 +27,7 @@ sudo apt install -y \
     tumbler ffmpegthumbnailer poppler-data tumbler-plugins-extra webp-pixbuf-loader \
     gvfs-backends gvfs-fuse policykit-1-gnome \
     fonts-inter fonts-jetbrains-mono \
-    plank picom dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
+    plank dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
     curl wget git jq unzip
 
 echo "==> Removiendo Remmina (paquetes, applet de inicio y accesos en dock)..."
@@ -103,66 +103,25 @@ Section \"InputClass\"
     Driver \"libinput\"
     Option \"Tapping\" \"on\"
     Option \"NaturalScrolling\" \"true\"
-    Option \"ClickMethod\" \"clickfinger\"
+    Option \"ClickMethod\" \"buttonareas\"
     Option \"DisableWhileTyping\" \"true\"
 EndSection
 EOF"
 
 systemctl --user enable --now pipewire pipewire-pulse wireplumber 2>/dev/null || true
 
-mkdir -p ~/.config/picom ~/.config/autostart
-cat <<'EOF' > ~/.config/picom/picom.conf
-backend = "glx";
-vsync = true;
-corner-radius = 10;
-rounded-corners-exclude = [
-  "window_type = 'dock'",
-  "window_type = 'desktop'",
-  "class_g = 'xfce4-panel'",
-  "class_g = 'Plank'"
-];
-shadow = true;
-shadow-radius = 14;
-shadow-opacity = 0.35;
-shadow-offset-x = -12;
-shadow-offset-y = -12;
-shadow-exclude = [
-  "name = 'Notification'",
-  "class_g = 'Plank'",
-  "class_g = 'xfce4-screenshooter'",
-  "_GTK_FRAME_EXTENTS@:c"
-];
-fading = true;
-fade-in-step = 0.05;
-fade-out-step = 0.05;
-blur: {
-  method = "dual_kawase";
-  strength = 5;
-  background = true;
-  background-frame = false;
-  background-fixed = false;
-}
-blur-background-exclude = [
-  "window_type = 'dock'",
-  "window_type = 'desktop'",
-  "class_g = 'Plank'",
-  "_GTK_FRAME_EXTENTS@:c"
-];
-EOF
+# Configurar compositor nativo de xfwm4 con directivas visuales completas estándar
+xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/use_compositing -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/show_frame_shadow -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/show_frame_shadow -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/show_popup_shadow -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/show_popup_shadow -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/show_dock_shadow -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/show_dock_shadow -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/cycle_preview -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/cycle_preview -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/cycle_tabwin_mode -n -t int -s 1 2>/dev/null || xfconf-query -c xfwm4 -p /general/cycle_tabwin_mode -s 1 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/vblank_mode -n -t string -s "auto" 2>/dev/null || xfconf-query -c xfwm4 -p /general/vblank_mode -s "auto" 2>/dev/null || true
 
-# Desactivar compositor integrado de xfwm4 para usar picom
-xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
-
-# Autostart: Picom
-cat <<'EOF' > ~/.config/autostart/picom.desktop
-[Desktop Entry]
-Type=Application
-Exec=picom -b
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=Picom
-EOF
+# Asegurar que picom no interfiera con el compositor de xfwm4
+rm -f ~/.config/autostart/picom.desktop 2>/dev/null || true
+killall picom 2>/dev/null || true
 
 # Autostart: Plank
 cat <<'EOF' > ~/.config/autostart/plank.desktop
@@ -188,20 +147,21 @@ X-GNOME-Autostart-enabled=true
 Name=PolicyKit Authentication Agent
 EOF
 
-# Autostart: Xcape (mapea tecla Windows / Super a Whisker Menu vía Alt+F1)
+# Autostart: Xcape (mapea tecla Windows / Super a Whisker Menu vía Alt+F1 sin colisiones)
 cat <<'EOF' > ~/.config/autostart/xcape.desktop
 [Desktop Entry]
 Type=Application
-Exec=xcape -e 'Super_L=Alt_L|F1;Super_R=Alt_L|F1'
+Exec=sh -c "killall xcape 2>/dev/null; sleep 1; xcape -e 'Super_L=Alt_L|F1;Super_R=Alt_L|F1'"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 Name=Xcape Super Key Mapper
+Comment=Mapea la tecla Windows / Super al menu Whisker
 EOF
 
 # Iniciar xcape de inmediato si estamos en sesión gráfica
 killall xcape 2>/dev/null || true
-xcape -e 'Super_L=Alt_L|F1;Super_R=Alt_L|F1' 2>/dev/null || true
+(xcape -e 'Super_L=Alt_L|F1;Super_R=Alt_L|F1' >/dev/null 2>&1 &) || true
 
 echo "==> 5. Aplicando estilos del entorno y atajos de teclado..."
 xfconf-query -c xsettings -p /Net/ThemeName -s "Orchis-Dark" 2>/dev/null || true
@@ -219,11 +179,9 @@ xfconf-query -c xfwm4 -p /general/borderless_maximize -s true 2>/dev/null || tru
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>F1" -n -t string -s "xfce4-popup-whiskermenu" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>F1" -s "xfce4-popup-whiskermenu" 2>/dev/null || true
 
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_L" -n -t string -s "xfce4-popup-whiskermenu" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_L" -s "xfce4-popup-whiskermenu" 2>/dev/null || true
-
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_R" -n -t string -s "xfce4-popup-whiskermenu" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_R" -s "xfce4-popup-whiskermenu" 2>/dev/null || true
+# Limpiar bindings directos de Super_L y Super_R en custom shortcuts para que xcape traduzca el tap sin doble disparo
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_L" -r 2>/dev/null || true
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Super_R" -r 2>/dev/null || true
 
 echo "==> 6. Configurando Xfce Panel (Whisker Menu, Reloj AM/PM con segundos)..."
 
