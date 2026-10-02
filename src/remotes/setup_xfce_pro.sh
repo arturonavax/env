@@ -408,6 +408,37 @@ miwMouse4 = keysNext
 miwMouse5 = keysPrev
 EOF
 
+# Wrapper universal con normalización de DISPLAY y symlinks de compatibilidad FIFO
+mkdir -p "$HOME/.local/bin"
+cat <<'EOF' > "$HOME/.local/bin/skippy-xd"
+#!/bin/sh
+export LD_LIBRARY_PATH="$HOME/.local/lib/skippy-xd:${LD_LIBRARY_PATH:-}"
+
+# Normalizar DISPLAY para garantizar correspondencia entre daemon y cliente (:0.0 <-> :0)
+if [ -n "$DISPLAY" ]; then
+    export DISPLAY="${DISPLAY%.0}"
+fi
+
+# Asegurar symlinks bidireccionales en el pipe FIFO de /tmp
+DISP_BASE="${DISPLAY:-:0}"
+DISP_BASE="${DISP_BASE%.0}"
+if [ -e "/tmp/skippy-xd-fifo${DISP_BASE}" ] && [ ! -e "/tmp/skippy-xd-fifo${DISP_BASE}.0" ]; then
+    ln -sf "/tmp/skippy-xd-fifo${DISP_BASE}" "/tmp/skippy-xd-fifo${DISP_BASE}.0" 2>/dev/null || true
+elif [ -e "/tmp/skippy-xd-fifo${DISP_BASE}.0" ] && [ ! -e "/tmp/skippy-xd-fifo${DISP_BASE}" ]; then
+    ln -sf "/tmp/skippy-xd-fifo${DISP_BASE}.0" "/tmp/skippy-xd-fifo${DISP_BASE}" 2>/dev/null || true
+fi
+
+if [ -x "$HOME/.local/bin/skippy-xd.bin" ]; then
+    exec "$HOME/.local/bin/skippy-xd.bin" "$@"
+elif [ -x "/usr/bin/skippy-xd" ]; then
+    exec /usr/bin/skippy-xd "$@"
+else
+    exec skippy-xd "$@"
+fi
+EOF
+chmod +x "$HOME/.local/bin/skippy-xd"
+sudo ln -sf "$HOME/.local/bin/skippy-xd" /usr/local/bin/skippy-xd 2>/dev/null || true
+
 cat <<'EOF' > "$HOME/.config/systemd/user/skippy-xd.service"
 [Unit]
 Description=Skippy-XD Window Switcher Daemon
