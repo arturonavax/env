@@ -574,6 +574,134 @@ if [[ "$(command -v cursor)" == "" && -d "$HOME/Applications" ]]; then
     [[ -n "$cursor_appimage" ]] && alias cursor="$cursor_appimage --no-sandbox"
 fi
 
+## Notificaciones automáticas de comandos largos (> 4s) en segundo plano (Ghostty, Herdr, Xfce, tmux)
+zmodload zsh/datetime 2>/dev/null || :
+autoload -Uz add-zsh-hook 2>/dev/null || :
+
+export NOTIFY_THRESHOLD=4
+
+__is_interactive_cmd() {
+    local raw_cmd="$1"
+    local first_cmd="${raw_cmd%% *}"
+    first_cmd="${first_cmd##*/}"
+
+    # Desenvolver invocaciones a través de sudo, doas, env o nohup
+    if [[ "$first_cmd" == "sudo" || "$first_cmd" == "doas" || "$first_cmd" == "env" || "$first_cmd" == "nohup" ]]; then
+        local rest="${raw_cmd#* }"
+        first_cmd="${rest%% *}"
+        first_cmd="${first_cmd##*/}"
+    fi
+
+    # Editores, paginadores, visores interactivos y multiplexores
+    case "$first_cmd" in
+        nvim|vim|vi|nano|emacs|helix|hx|pico|joe|micro|kak) return 0 ;;
+        less|more|most|bat|batcat|man|info) return 0 ;;
+        top|htop|btop|glances|nvtop|gotop|iftop|iotop) return 0 ;;
+        lazygit|tig|gitui) return 0 ;;
+        ssh|mosh|telnet|ftp|sftp) return 0 ;;
+        ranger|vifm|yazi|nnn|mc) return 0 ;;
+        herdr|tmux|screen|zellij) return 0 ;;
+        fzf|peco|fzy) return 0 ;;
+        agy|claude|chatgpt) return 0 ;;
+    esac
+
+    # Subcomandos interactivos de git
+    if [[ "$first_cmd" == "git" ]]; then
+        local sub="${raw_cmd#*git }"
+        sub="${sub%% *}"
+        case "$sub" in
+            commit|log|diff|show|rebase) return 0 ;;
+        esac
+    fi
+
+    return 1
+}
+
+__notify_preexec() {
+    __cmd_start=$EPOCHSECONDS
+    __cmd_name="$1"
+}
+
+__notify_precmd() {
+    local exit_code=$?
+
+    if [[ -n "$__cmd_start" ]]; then
+        local elapsed=$(( EPOCHSECONDS - __cmd_start ))
+        local cmd="$__cmd_name"
+
+        unset __cmd_start __cmd_name
+
+        # Omitir editores y herramientas interactivas
+        if __is_interactive_cmd "$cmd"; then
+            return
+        fi
+
+        if (( elapsed >= ${NOTIFY_THRESHOLD:-4} )); then
+            local should_notify=0
+            local is_focused=1
+
+            # 1. Comprobar foco del pane en Herdr si se está dentro de herdr
+            if [[ -n "$HERDR_PANE_ID" ]] && command -v herdr &>/dev/null; then
+                if ! herdr pane get "$HERDR_PANE_ID" 2>/dev/null | grep -q '"focused":true'; then
+                    is_focused=0
+                fi
+            fi
+
+            # 2. Comprobar foco del pane en Tmux si se está dentro de tmux
+            if [[ -n "$TMUX" ]] && command -v tmux &>/dev/null; then
+                local pane_target="${TMUX_PANE:-}"
+                local tmux_focused
+                if [[ -n "$pane_target" ]]; then
+                    tmux_focused=$(tmux display-message -p -t "$pane_target" '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
+                else
+                    tmux_focused=$(tmux display-message -p '#{&&:#{session_attached},#{&&:#{m:*focused*,#{client_flags}},#{&&:#{pane_active},#{window_active}}}}' 2>/dev/null)
+                fi
+                [[ "$tmux_focused" != "1" ]] && is_focused=0
+            fi
+
+            # 3. Comprobar foco de ventana a nivel de escritorio X11
+            if command -v xdotool &>/dev/null; then
+                local active_win
+                active_win=$(xdotool getactivewindow 2>/dev/null)
+                if [[ -n "$active_win" ]]; then
+                    if [[ -n "$WINDOWID" ]]; then
+                        [[ "$active_win" != "$WINDOWID" ]] && is_focused=0
+                    else
+                        local active_class
+                        active_class=$(xprop -id "$active_win" WM_CLASS 2>/dev/null)
+                        [[ "$active_class" != *"ghostty"* && "$active_class" != *"terminal"* ]] && is_focused=0
+                    fi
+                fi
+            fi
+
+            # Notificar si la ventana o el panel están en segundo plano (o si se fuerza siempre)
+            if [[ "${NOTIFY_UNFOCUSED_ONLY:-1}" == "0" ]] || (( ! is_focused )); then
+                should_notify=1
+            fi
+
+            if (( should_notify )) && command -v notify-send &>/dev/null; then
+                local title="Comando finalizado (${elapsed}s)"
+                local urgency="normal"
+
+                if (( exit_code != 0 )); then
+                    title="Comando fallido (código $exit_code) (${elapsed}s)"
+                    urgency="critical"
+                fi
+
+                # Truncar comandos extensos para evitar desbordes visuales
+                if (( ${#cmd} > 80 )); then
+                    cmd="${cmd[1,77]}..."
+                fi
+
+                notify-send -u "$urgency" -i utilities-terminal -a "Terminal" "$title" "$cmd" >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+}
+
+add-zsh-hook preexec __notify_preexec 2>/dev/null || :
+add-zsh-hook precmd __notify_precmd 2>/dev/null || :
+
 ## Compile Zsh startup files to word-code (.zwc) for ultra-fast startup
 zcompile-all() {
     local file
