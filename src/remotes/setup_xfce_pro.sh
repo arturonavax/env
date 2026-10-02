@@ -192,19 +192,27 @@ xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_frame_shadow -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_popup_shadow -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_dock_shadow -s false 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/raise_on_focus -s true 2>/dev/null || true
 
-# Configuración de Picom (GLX backend, vsync, aceleración por hardware)
+# Configuración de Picom (GLX backend, vsync, aceleración por hardware y bordes redondeados limpios)
 mkdir -p "$HOME/.config/picom"
 cat <<'EOF' > "$HOME/.config/picom/picom.conf"
 backend = "glx";
 vsync = true;
-glx-no-stencil = true;
-glx-no-rebind-pixmap = true;
 use-damage = true;
 unredir-if-possible = false;
 
 shadow = false;
 fading = false;
+
+corner-radius = 10;
+rounded-corners-exclude = [
+    "window_type = 'dock'",
+    "window_type = 'desktop'",
+    "class_g = 'Xfce4-panel'",
+    "class_g = 'skippy-xd'",
+    "fullscreen"
+];
 
 detect-rounded-corners = true;
 detect-client-opacity = true;
@@ -213,7 +221,7 @@ use-ewmh-active-win = true;
 
 shadow-exclude = [
     "class_g = 'skippy-xd'",
-    "class_g = 'Vicinae'",
+    "class_g = 'vicinae'",
     "name = 'Notification'",
     "_NET_WM_STATE *= '_NET_WM_STATE_HIDDEN'"
 ];
@@ -271,8 +279,8 @@ verticalPanelAlignment = mid
 [layout]
 switchLayout = compactrect
 exposeLayout = cosmos
-switchWaitDuration = 20
-switchCycleDuringWait = true
+switchWaitDuration = 50
+switchCycleDuringWait = false
 switchCycleDesktops = false
 exposeCycleDesktops = false
 distance = 32
