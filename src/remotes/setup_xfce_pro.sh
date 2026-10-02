@@ -44,7 +44,7 @@ sudo apt install -y \
     fonts-inter fonts-jetbrains-mono \
     dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
     xwallpaper libxcb-xrm0 \
-    picom libchipmunk7 libgif7 libpng16-16t64 libxcomposite1 libxdamage1 libxft2 libxinerama1 \
+    picom libchipmunk7 libgif7 libpng16-16t64 libxcomposite1 libxdamage1 libxft2 libxinerama1 libjpeg62 \
     curl wget git jq unzip
 
 echo "==> 3. Instalando Vicinae..."
@@ -209,6 +209,12 @@ corner-radius = 10;
 rounded-corners-exclude = [
     "window_type = 'dock'",
     "window_type = 'desktop'",
+    "window_type = 'toolbar'",
+    "window_type = 'menu'",
+    "window_type = 'dropdown_menu'",
+    "window_type = 'popup_menu'",
+    "window_type = 'tooltip'",
+    "window_type = 'utility'",
     "class_g = 'Xfce4-panel'",
     "class_g = 'skippy-xd'",
     "fullscreen"
@@ -229,19 +235,52 @@ shadow-exclude = [
 focus-exclude = [
     "class_g = 'skippy-xd'"
 ];
+
+wintypes:
+{
+  tooltip = { fade = false; shadow = false; opacity = 1.0; focus = true; full-shadow = false; };
+  dock = { shadow = false; clip-shadow-above = true; };
+  dnd = { shadow = false; };
+  popup_menu = { opacity = 1.0; shadow = false; };
+  dropdown_menu = { opacity = 1.0; shadow = false; };
+};
+EOF
+
+# Servicio systemd de usuario para Picom (persistencia resiliente a reinicios)
+mkdir -p "$HOME/.config/systemd/user"
+cat <<'EOF' > "$HOME/.config/systemd/user/picom.service"
+[Unit]
+Description=Picom X11 Compositor
+Documentation=man:picom(1)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/picom
+Restart=always
+RestartSec=3
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=graphical-session.target default.target
 EOF
 
 mkdir -p "$HOME/.config/autostart"
 cat <<'EOF' > "$HOME/.config/autostart/picom.desktop"
 [Desktop Entry]
 Type=Application
-Exec=picom -b --config ~/.config/picom/picom.conf
+Exec=sh -c "systemctl --user is-active --quiet picom || picom -b"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 Name=Picom
 Comment=Lightweight X11 Compositor
 EOF
+
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user enable picom.service 2>/dev/null || true
+systemctl --user restart picom.service 2>/dev/null || true
 
 # Instalación de Skippy-XD mediante APT (con resolución de dependencias universales)
 if ! command -v skippy-xd >/dev/null 2>&1 || ! dpkg -l skippy-xd 2>/dev/null | grep -q "^ii"; then
@@ -254,6 +293,7 @@ if ! command -v skippy-xd >/dev/null 2>&1 || ! dpkg -l skippy-xd 2>/dev/null | g
         # Ajustar control para compatibilidad universal con Debian y Ubuntu
         sed -i 's/libjpeg62-turbo/libjpeg62 | libjpeg62-turbo | libjpeg-turbo8/g' "$TEMP_SKIPPY/pkg/DEBIAN/control"
         dpkg-deb -b "$TEMP_SKIPPY/pkg" "$TEMP_SKIPPY/skippy-xd-compatible.deb" >/dev/null 2>&1
+        sudo apt install -y libjpeg62 2>/dev/null || true
         sudo apt install -y "$TEMP_SKIPPY/skippy-xd-compatible.deb" 2>/dev/null || \
             (sudo dpkg -i "$TEMP_SKIPPY/skippy-xd-compatible.deb" 2>/dev/null && sudo apt install -f -y 2>/dev/null) || true
     fi
@@ -367,16 +407,39 @@ miwMouse4 = keysNext
 miwMouse5 = keysPrev
 EOF
 
+cat <<'EOF' > "$HOME/.config/systemd/user/skippy-xd.service"
+[Unit]
+Description=Skippy-XD Window Switcher Daemon
+Documentation=man:skippy-xd(1)
+After=graphical-session.target picom.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=skippy-xd --start-daemon
+Restart=always
+RestartSec=3
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=graphical-session.target default.target
+EOF
+
 cat <<'EOF' > "$HOME/.config/autostart/skippy-xd.desktop"
 [Desktop Entry]
 Type=Application
-Exec=skippy-xd --start-daemon
+Exec=sh -c "systemctl --user is-active --quiet skippy-xd || skippy-xd --start-daemon"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 Name=Skippy-XD Daemon
 Comment=Window Switcher with Live Thumbnails
 EOF
+
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user enable skippy-xd.service 2>/dev/null || true
+systemctl --user restart skippy-xd.service 2>/dev/null || true
 
 # Desvincular switcher nativo de xfwm4 para ceder el control completo a Skippy-XD
 xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt>Tab" -n -t string -s "none" 2>/dev/null || \
@@ -439,7 +502,7 @@ Comment=Lightweight desktop wallpaper loader via xwallpaper
 EOF
 
 # Desacoplar xfdesktop de las aplicaciones de arranque de xfce4-session
-xfconf-query -c xfce4-session -p /sessions/Failsafe/Client4_Command -r -R 2>/dev/null || true
+xfconf-query -c xfce4-session -p /sessions/Failsafe/Client4_Command -s "/bin/true" -t string 2>/dev/null || true
 xfconf-query -c xfce4-session -p /sessions/Failsafe/Count -s 4 2>/dev/null || true
 
 echo "==> 9. Configurando atajos de teclado globales y comportamiento de ventanas..."
