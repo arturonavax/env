@@ -99,6 +99,23 @@ if [[ "$sync_terminal" == 1 ]]; then
 	cp ./files/zsh/.base.zsh ~/.
 	cp ./files/zsh/.tools.sh ~/.
 
+	# Ensure fzf-tab is installed and up to date
+	fzf_tab_dir="$HOME/.zsh/fzf-tab"
+	if [[ -d "$fzf_tab_dir/.git" ]]; then
+		current_commit="$(git -C "$fzf_tab_dir" rev-parse --short HEAD 2>/dev/null || :)"
+		upstream_commit="$(git -C "$fzf_tab_dir" ls-remote origin -h refs/heads/master 2>/dev/null | awk '{print substr($1,1,7)}' || :)"
+		if [[ -z "$current_commit" || -z "$upstream_commit" || "$current_commit" != "$upstream_commit" ]]; then
+			echo -e "${fcwb}Updating fzf-tab ($current_commit -> ${upstream_commit:-latest})...${fcr}"
+			if ! git -C "$fzf_tab_dir" pull --rebase --quiet 2>/dev/null; then
+				git -C "$fzf_tab_dir" remote prune origin 2>/dev/null || :
+				git -C "$fzf_tab_dir" pull --rebase --quiet 2>/dev/null || :
+			fi
+		fi
+	elif [[ ! -d "$fzf_tab_dir" ]]; then
+		mkdir -p "$HOME/.zsh"
+		git clone --quiet "https://github.com/Aloxaf/fzf-tab" "$fzf_tab_dir" 2>/dev/null || :
+	fi
+
 	# Clean compiled byte-code (ZWC) and completion dumps
 	rm -f ~/.base.zsh.zwc ~/.zshrc.zwc ~/.tools.sh.zwc ~/.lscolors.sh.zwc ~/.alias.zwc 2>/dev/null
 	rm -f "${ZDOTDIR:-$HOME}"/.zcompdump* 2>/dev/null

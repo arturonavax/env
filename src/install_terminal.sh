@@ -799,7 +799,10 @@ function install_terminal() {
 		plugin_url="${plugin_spec% *}"
 		plugin_dest="${plugin_spec#* }"
 		if [[ -d "$plugin_dest/.git" ]]; then
-			git -C "$plugin_dest" pull --quiet || :
+			if ! git -C "$plugin_dest" pull --rebase --quiet 2>/dev/null; then
+				git -C "$plugin_dest" remote prune origin 2>/dev/null || :
+				git -C "$plugin_dest" pull --rebase --quiet 2>/dev/null || :
+			fi
 		else
 			rm -rf "$plugin_dest"
 			git clone --quiet "$plugin_url" "$plugin_dest" || :
