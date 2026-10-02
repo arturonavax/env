@@ -270,6 +270,7 @@ configuration {
     display-run: " 󰌆  Run ";
     display-window: " 󰕰  Window ";
     display-clipboard: " 󱉥  Clipboard ";
+    kb-cancel: "Escape,Control+g,Control+bracketleft,Alt+F1,Super_L,Super_R";
 }
 
 * {
@@ -347,15 +348,65 @@ EOF
 
 cat <<'EOF' > "$HOME/.local/bin/rofi-clipboard"
 #!/bin/bash
+TIMESTAMP_FILE="/tmp/rofi_toggle_time"
+NOW=$(date +%s%3N)
+
+if pgrep -x rofi >/dev/null 2>&1; then
+    killall -q rofi 2>/dev/null || true
+    echo "$NOW" > "$TIMESTAMP_FILE"
+    exit 0
+fi
+
+if [ -f "$TIMESTAMP_FILE" ]; then
+    LAST_TIME=$(cat "$TIMESTAMP_FILE" 2>/dev/null || echo 0)
+    DIFF=$(( NOW - LAST_TIME ))
+    if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 450 ]; then
+        exit 0
+    fi
+fi
+
 rofi -modi "clipboard:greenclip print" -show clipboard -run-command '{cmd}'
+echo "$(date +%s%3N)" > "$TIMESTAMP_FILE"
 EOF
 chmod +x "$HOME/.local/bin/rofi-clipboard"
 
 cat <<'EOF' > "$HOME/.local/bin/rofi-launcher"
 #!/bin/bash
+TIMESTAMP_FILE="/tmp/rofi_toggle_time"
+NOW=$(date +%s%3N)
+
+if pgrep -x rofi >/dev/null 2>&1; then
+    killall -q rofi 2>/dev/null || true
+    echo "$NOW" > "$TIMESTAMP_FILE"
+    exit 0
+fi
+
+if [ -f "$TIMESTAMP_FILE" ]; then
+    LAST_TIME=$(cat "$TIMESTAMP_FILE" 2>/dev/null || echo 0)
+    DIFF=$(( NOW - LAST_TIME ))
+    if [ "$DIFF" -ge 0 ] && [ "$DIFF" -lt 450 ]; then
+        exit 0
+    fi
+fi
+
 rofi -show drun -show-icons
+echo "$(date +%s%3N)" > "$TIMESTAMP_FILE"
 EOF
 chmod +x "$HOME/.local/bin/rofi-launcher"
+
+cat <<'EOF' > "$HOME/.local/bin/toggle-layout.sh"
+#!/bin/bash
+CURRENT=$(setxkbmap -query 2>/dev/null | awk '/layout:/ {print $2}' | cut -d',' -f1)
+
+if [ "$CURRENT" = "us" ]; then
+    setxkbmap -layout es
+    notify-send -t 1200 -i input-keyboard -h string:synchronous:keyboard-layout "Distribución de Teclado" "Español (ES)"
+else
+    setxkbmap -layout us
+    notify-send -t 1200 -i input-keyboard -h string:synchronous:keyboard-layout "Distribución de Teclado" "Inglés (US)"
+fi
+EOF
+chmod +x "$HOME/.local/bin/toggle-layout.sh"
 
 echo "==> Configurando xfce4-notifyd (con historial, barra visual y tema Orchis-Dark)..."
 # Desactivar Dunst si existiese
@@ -549,8 +600,15 @@ xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/xfce4-popup-whiske
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>v" -n -t string -s "$HOME/.local/bin/rofi-clipboard" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>v" -s "$HOME/.local/bin/rofi-clipboard" 2>/dev/null || true
 
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>space" -n -t string -s "$HOME/.local/bin/rofi-launcher" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>space" -s "$HOME/.local/bin/rofi-launcher" 2>/dev/null || true
+# Alternar distribución de teclado con Win + Space (US / ES)
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>space" -n -t string -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>space" -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || true
+
+# Configuración de layouts en el canal keyboards de Xfce
+xfconf-query -c keyboards -p /Default/XkbLayout -n -t string -s "us,es" 2>/dev/null || \
+xfconf-query -c keyboards -p /Default/XkbLayout -s "us,es" 2>/dev/null || true
+xfconf-query -c keyboards -p /Default/XkbVariant -n -t string -s "," 2>/dev/null || \
+xfconf-query -c keyboards -p /Default/XkbVariant -s "," 2>/dev/null || true
 
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>l" -n -t string -s "$HOME/.local/bin/screenlock" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>l" -s "$HOME/.local/bin/screenlock" 2>/dev/null || true
