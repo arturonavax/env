@@ -20,7 +20,7 @@ echo "==> 1. Instalando dependencias de Xfce Pro, herramientas y compatibilidad.
 sudo apt update
 sudo apt install -y \
     lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings \
-    xfce4-goodies xfce4-power-manager xfce4-screenshooter \
+    xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter \
     xcape xdotool brightnessctl pavucontrol network-manager-gnome \
     pipewire pipewire-pulse wireplumber \
     xdg-desktop-portal xdg-desktop-portal-gtk \
@@ -28,7 +28,7 @@ sudo apt install -y \
     gvfs-backends gvfs-fuse policykit-1-gnome \
     fonts-inter fonts-jetbrains-mono \
     plank dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
-    picom rofi dunst feh imagemagick bc libxcb-xrm0 \
+    picom rofi feh imagemagick bc libxcb-xrm0 \
     curl wget git jq unzip
 
 echo "==> Instalando utilidades Pro (Greenclip, i3lock-color, Betterlockscreen)..."
@@ -58,10 +58,10 @@ if [ ! -f "/usr/local/bin/betterlockscreen" ]; then
 fi
 ln -sf /usr/local/bin/betterlockscreen "$HOME/.local/bin/betterlockscreen" 2>/dev/null || true
 
-echo "==> Limpiando paquetes y herramientas obsoletas o reemplazadas..."
+echo "==> Limpiando paquetes y herramientas obsoletas..."
 sudo apt purge -y \
     remmina remmina-plugin-rdp remmina-plugin-vnc remmina-plugin-secret remmina-common \
-    xfce4-whiskermenu-plugin xfce4-notifyd 2>/dev/null || true
+    2>/dev/null || true
 sudo apt autoremove -y 2>/dev/null || true
 rm -f ~/.config/autostart/remmina*.desktop 2>/dev/null || true
 rm -f ~/.config/plank/dock1/launchers/remmina*.dockitem 2>/dev/null || true
@@ -122,7 +122,7 @@ else
     echo "    Temas Orchis-Dark y Tela-circle-dark ya instalados."
 fi
 
-echo "==> 4. Configurando compatibilidad (Touchpad, Picom, PipeWire, Polkit, Xcape)..."
+echo "==> 4. Configurando compatibilidad (Touchpad, Compositor xfwm4 GLX, PipeWire, Polkit, Xcape)..."
 sudo mkdir -p /etc/X11/xorg.conf.d
 sudo bash -c "cat <<'EOF' > /etc/X11/xorg.conf.d/40-libinput.conf
 Section \"InputClass\"
@@ -164,69 +164,29 @@ EOF
 
 systemctl --user enable --now pipewire pipewire-pulse wireplumber 2>/dev/null || true
 
-# Configuración óptima y ultra ligera de Picom (GLX + vsync + unredir + sin blur pesado ni sombras)
-mkdir -p "$HOME/.config/picom"
-cat <<'EOF' > "$HOME/.config/picom/picom.conf"
-# ==============================================================================
-# Picom Configuration - Optimized, High-Performance, Tear-Free
-# ==============================================================================
-backend = "glx";
-vsync = true;
+# Configuración del compositor acelerado GLX de xfwm4 para soporte nativo de miniaturas en Alt-Tab sin tearing
+xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/use_compositing -s true 2>/dev/null || true
 
-# Evita procesar aplicaciones a pantalla completa (juegos, video)
-unredir-if-possible = true;
+xfconf-query -c xfwm4 -p /general/vblank_mode -n -t string -s "glx" 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/vblank_mode -s "glx" 2>/dev/null || true
 
-# Desactivar sombras pesadas para maximo rendimiento y evitar artefactos
-shadow = false;
+# Configuración de previsualización en vivo en Alt-Tab (Grid Thumbnails)
+xfconf-query -c xfwm4 -p /general/cycle_tabwin_mode -n -t int -s 1 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/cycle_tabwin_mode -s 1 2>/dev/null || true
 
-# Fading ligero y suave
-fading = true;
-fade-in-step = 0.08;
-fade-out-step = 0.08;
-fade-delta = 10;
+xfconf-query -c xfwm4 -p /general/cycle_preview -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/cycle_preview -s true 2>/dev/null || true
 
-# Desactivar blur pesado
-blur-background = false;
+xfconf-query -c xfwm4 -p /general/cycle_draw_frame -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/cycle_draw_frame -s true 2>/dev/null || true
 
-# Bordes redondeados sutiles (sin lag)
-corner-radius = 8;
-rounded-corners-exclude = [
-  "window_type = 'dock'",
-  "window_type = 'desktop'",
-  "class_g = 'xfce4-panel'",
-  "class_g = 'Plank'"
-];
+xfconf-query -c xfwm4 -p /general/cycle_minimum -n -t bool -s false 2>/dev/null || \
+xfconf-query -c xfwm4 -p /general/cycle_minimum -s false 2>/dev/null || true
 
-# Optimizaciones de renderizado y sincronizacion
-mark-wmwin-focused = true;
-mark-ovredir-focused = true;
-detect-rounded-corners = true;
-detect-client-opacity = true;
-detect-transient = true;
-use-damage = true;
-glx-no-stencil = true;
-glx-no-rebind-pixmap = true;
-EOF
-
-# Desactivar compositor integrado de xfwm4 para cederle el control exclusivo a Picom
-xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s false 2>/dev/null || \
-xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
-
-# Autostart: Picom
-cat <<EOF > "$HOME/.config/autostart/picom.desktop"
-[Desktop Entry]
-Type=Application
-Exec=picom -b --config $HOME/.config/picom/picom.conf
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=Picom Compositor
-Comment=Optimized X11 OpenGL compositor
-EOF
-
-# Iniciar Picom en caliente si estamos en sesión gráfica
+# Desactivar autostart de Picom para que no colisione con el compositor GLX de xfwm4
+rm -f "$HOME/.config/autostart/picom.desktop" 2>/dev/null || true
 killall picom 2>/dev/null || true
-(picom -b --config "$HOME/.config/picom/picom.conf" >/dev/null 2>&1 &) || true
 
 # Autostart: Plank
 cat <<'EOF' > "$HOME/.config/autostart/plank.desktop"
@@ -397,105 +357,92 @@ rofi -show drun -show-icons
 EOF
 chmod +x "$HOME/.local/bin/rofi-launcher"
 
-echo "==> Configurando Dunst (reemplazo ultra-ligero de xfce4-notifyd)..."
-mkdir -p "$HOME/.config/dunst" "$HOME/.local/share/dbus-1/services"
-cat <<'EOF' > "$HOME/.config/dunst/dunstrc"
-[global]
-    monitor = 0
-    follow = mouse
-    width = (300, 480)
-    height = (50, 160)
-    origin = top-right
-    offset = (20, 48)
-    scale = 0
-    notification_limit = 5
-    progress_bar = true
-    progress_bar_height = 8
-    progress_bar_frame_width = 1
-    progress_bar_min_width = 150
-    progress_bar_max_width = 320
-    progress_bar_corner_radius = 4
-    indicate_hidden = yes
-    transparency = 10
-    separator_height = 2
-    padding = 12
-    horizontal_padding = 14
-    text_icon_padding = 12
-    frame_width = 2
-    frame_color = "#383f4a"
-    gap_size = 6
-    separator_color = frame
-    sort = yes
-    font = Inter 10
-    line_height = 0
-    markup = full
-    format = "<b>%s</b>\n%b"
-    alignment = left
-    vertical_alignment = center
-    show_age_threshold = 60
-    ellipsize = middle
-    ignore_newline = no
-    stack_duplicates = true
-    hide_duplicate_count = false
-    show_indicators = yes
-    enable_recursive_icon_lookup = true
-    icon_theme = "Tela-circle-dark, elementary-xfce-dark, Adwaita"
-    icon_position = left
-    min_icon_size = 24
-    max_icon_size = 48
-    sticky_history = yes
-    history_length = 20
-    browser = /usr/bin/xdg-open
-    always_run_script = true
-    title = Dunst
-    class = Dunst
-    corner_radius = 8
-    ignore_dbusclose = false
-    mouse_left_click = close_current
-    mouse_middle_click = do_action, close_current
-    mouse_right_click = close_all
-
-[urgency_low]
-    background = "#1e1e2e"
-    foreground = "#cdd6f4"
-    frame_color = "#313244"
-    timeout = 4
-
-[urgency_normal]
-    background = "#1e1e2e"
-    foreground = "#cdd6f4"
-    frame_color = "#89b4fa"
-    timeout = 6
-
-[urgency_critical]
-    background = "#1e1e2e"
-    foreground = "#f38ba8"
-    frame_color = "#f38ba8"
-    timeout = 0
-EOF
-
-cat <<'EOF' > "$HOME/.local/share/dbus-1/services/org.freedesktop.Notifications.service"
-[D-BUS Service]
-Name=org.freedesktop.Notifications
-Exec=/usr/bin/dunst
-EOF
-
-cat <<'EOF' > "$HOME/.config/autostart/dunst.desktop"
-[Desktop Entry]
-Type=Application
-Exec=dunst
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=Dunst
-Comment=Lightweight notification daemon
-EOF
-
-killall xfce4-notifyd 2>/dev/null || true
-systemctl --user mask xfce4-notifyd.service 2>/dev/null || true
-systemctl --user stop xfce4-notifyd.service 2>/dev/null || true
+echo "==> Configurando xfce4-notifyd (con historial, barra visual y tema Orchis-Dark)..."
+# Desactivar Dunst si existiese
 killall dunst 2>/dev/null || true
-(dunst >/dev/null 2>&1 &) || true
+rm -f "$HOME/.config/autostart/dunst.desktop" 2>/dev/null || true
+rm -f "$HOME/.local/share/dbus-1/services/org.freedesktop.Notifications.service" 2>/dev/null || true
+
+# Tema visual moderno para xfce4-notifyd acorde a Orchis-Dark
+mkdir -p "$HOME/.themes/Orchis-Dark/xfce-notify-4.0"
+cat <<'EOF' > "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css"
+#XfceNotifyWindow {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    border: 2px solid #45475a;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+#XfceNotifyWindow button {
+    background-image: none;
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+#XfceNotifyWindow button:hover {
+    background-color: #89b4fa;
+    color: #11111b;
+}
+
+#XfceNotifyWindow label#summary {
+    font-weight: bold;
+    color: #89b4fa;
+    font-size: 11pt;
+}
+
+#XfceNotifyWindow label#body {
+    color: #cdd6f4;
+}
+
+#XfceNotifyWindow progressbar {
+    min-height: 8px;
+    border-radius: 4px;
+}
+
+#XfceNotifyWindow progressbar progress {
+    background-image: none;
+    background-color: #89b4fa;
+    border: none;
+    border-radius: 4px;
+}
+
+#XfceNotifyWindow progressbar trough {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+}
+EOF
+
+# Asegurar servicio systemd activo para xfce4-notifyd
+systemctl --user unmask xfce4-notifyd.service 2>/dev/null || true
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user start xfce4-notifyd.service 2>/dev/null || true
+
+# Configuración de propiedades en xfconf
+xfconf-query -c xfce4-notifyd -p /theme -n -t string -s "Orchis-Dark" 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /theme -s "Orchis-Dark" 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /notify-location -n -t string -s "top-right" 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /notify-location -s "top-right" 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /initial-opacity -n -t double -s 0.95 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /initial-opacity -s 0.95 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /do-fadeout -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /do-fadeout -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /notification-log -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /notification-log -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /log-max-size -n -t int -s 100 2>/dev/null || \
+xfconf-query -c xfce4-notifyd -p /log-max-size -s 100 2>/dev/null || true
 
 echo "==> Configurando Betterlockscreen..."
 mkdir -p "$HOME/.config/betterlockscreen"
@@ -611,24 +558,31 @@ xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>l" -s "$HOM
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>l" -n -t string -s "$HOME/.local/bin/screenlock" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>l" -s "$HOME/.local/bin/screenlock" 2>/dev/null || true
 
-echo "==> 6. Configurando Xfce Panel (Reloj AM/PM con segundos, limpieza de menús)..."
+echo "==> 6. Configurando Xfce Panel (Whisker Menu sobrio, Notificaciones, Reloj AM/PM)..."
 
-# Remover cualquier plugin de menú (whiskermenu, applicationsmenu) para una barra limpia y moderna
-for p in $(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$'); do
-    pname=$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)
-    if [ "$pname" = "whiskermenu" ] || [ "$pname" = "applicationsmenu" ]; then
-        pid=$(echo "$p" | sed 's|/plugins/plugin-||')
-        current_ids=$(xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids 2>/dev/null | grep -E '^[0-9]+$' | grep -v "^$pid$" || true)
-        if [ -n "$current_ids" ]; then
-            cmd="xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids"
-            for id in $current_ids; do
-                cmd="$cmd -t int -s $id"
-            done
-            eval "$cmd" 2>/dev/null || true
-        fi
-        xfconf-query -c xfce4-panel -p "$p" -r -R 2>/dev/null || true
-    fi
-done
+# Configurar plugin-1 como Whisker Menu con icono sobrio y moderno (rejilla 9-dot minimalista, sin animales)
+xfconf-query -c xfce4-panel -p /plugins/plugin-1 -n -t string -s "whiskermenu" 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-1 -s "whiskermenu" 2>/dev/null || true
+
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-icon -n -t string -s "view-app-grid-symbolic" 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-icon -s "view-app-grid-symbolic" 2>/dev/null || true
+
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-title -n -t string -s "" 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-title -s "" 2>/dev/null || true
+
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/show-button-icon -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/show-button-icon -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/show-button-title -n -t bool -s false 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-1/show-button-title -s false 2>/dev/null || true
+
+# Configurar plugin-6 como notification-plugin para historial visual de notificaciones y no-molestar
+xfconf-query -c xfce4-panel -p /plugins/plugin-6 -n -t string -s "notification-plugin" 2>/dev/null || \
+xfconf-query -c xfce4-panel -p /plugins/plugin-6 -s "notification-plugin" 2>/dev/null || true
+
+# Configurar la lista canónica de plugins en panel-1
+xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -a \
+    -t int -s 1 -t int -s 2 -t int -s 3 -t int -s 4 -t int -s 5 -t int -s 6 -t int -s 7 -t int -s 8 -t int -s 9 -t int -s 10 2>/dev/null || true
 
 # Configurar reloj en formato Digital, 12 horas AM/PM con segundos
 CLOCK_PLUGIN=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
@@ -699,15 +653,55 @@ fi
 killall plank 2>/dev/null || true
 (plank >/dev/null 2>&1 &)
 
+echo "==> 8. Optimizando el arranque del sistema (mitigación de hardware, red y bases de datos a demanda)..."
+# 1. Hardware TPM inaccesible (elimina timeout crítico de 90s en Dell XPS 13)
+sudo systemctl mask tpm2.target 2>/dev/null || true
+sudo mkdir -p /etc/modprobe.d
+echo "blacklist tpm_crb" | sudo tee /etc/modprobe.d/blacklist-tpm.conf >/dev/null
+
+# 2. NetworkManager-wait-online (elimina bloqueo de ~10s esperando conectividad)
+sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+
+# 3. Bases de datos: Configuración bajo demanda (ahorro de RAM y ~9s de tiempo de inicio)
+# PostgreSQL: Desactivar inicio automático global
+sudo systemctl disable postgresql.service 2>/dev/null || true
+if command -v pg_lsclusters >/dev/null 2>&1; then
+    LATEST_PG=$(pg_lsclusters -h 2>/dev/null | awk '{print $1}' | sort -V | tail -n 1)
+    for ver in $(pg_lsclusters -h 2>/dev/null | awk '{print $1}'); do
+        if [ "$ver" = "$LATEST_PG" ]; then
+            # Mantener última versión en inicio manual (a demanda con: pg_ctlcluster 18 main start o systemctl start postgresql@18-main)
+            if [ -f "/etc/postgresql/$ver/main/start.conf" ]; then
+                echo "manual" | sudo tee "/etc/postgresql/$ver/main/start.conf" >/dev/null
+            fi
+            sudo pg_ctlcluster "$ver" main stop 2>/dev/null || true
+            sudo systemctl stop "postgresql@$ver-main" 2>/dev/null || true
+            sudo systemctl disable "postgresql@$ver-main" 2>/dev/null || true
+        else
+            # Detener y deshabilitar versiones obsoletas
+            if [ -f "/etc/postgresql/$ver/main/start.conf" ]; then
+                echo "manual" | sudo tee "/etc/postgresql/$ver/main/start.conf" >/dev/null
+            fi
+            sudo pg_ctlcluster "$ver" main stop 2>/dev/null || true
+            sudo systemctl stop "postgresql@$ver-main" 2>/dev/null || true
+            sudo systemctl disable "postgresql@$ver-main" 2>/dev/null || true
+        fi
+    done
+fi
+
+# MySQL / MariaDB (arranque manual si existiesen)
+sudo systemctl disable mysql.service mariadb.service 2>/dev/null || true
+sudo systemctl stop mysql.service mariadb.service 2>/dev/null || true
+
 echo "==> Configuración de Xfce Pro completada exitosamente."
 echo "    - LightDM integrado como gestor de sesión inicial por defecto."
-echo "    - Rofi como lanzador principal asignado a la tecla Windows / Super (tap sin colisiones)."
-echo "    - Picom optimizado con backend GLX, vsync y bypass fullscreen activo (sin sombras pesadas)."
+echo "    - Whisker Menu integrado en panel superior izquierdo con icono sobrio 'view-app-grid-symbolic'."
+echo "    - xfce4-notifyd activo con tema Orchis-Dark, barra visual de progreso y widget de historial en el panel."
+echo "    - Rofi como lanzador rápido asignado a la tecla Windows / Super (tap sin colisiones)."
+echo "    - Selector Alt-Tab con previsualización en vivo (Grid Thumbnails) vía compositor GLX nativo de xfwm4."
 echo "    - Greenclip + Rofi configurado: Super+V para portapapeles searchable, Super+Space para Rofi."
-echo "    - Dunst configurado como daemon de notificaciones moderno y ligero (reemplazando a xfce4-notifyd)."
 echo "    - Betterlockscreen e i3lock-color listos: Super+L para bloqueo con efecto dimblur."
 echo "    - xfdesktop desacoplado: fondos de pantalla aplicados al vuelo en milisegundos con Feh."
 echo "    - Touchpad con botón derecho físico funcional (método buttonareas)."
 echo "    - Reloj configurado en formato 12 horas (AM/PM) con segundos."
-echo "    - Remmina, Whisker Menu y xfce4-notifyd purgados del sistema."
+echo "    - Optimización de arranque: tpm2.target enmascarado (ahorro 90s), wait-online apagado, bases de datos a demanda."
 echo "    Para aplicar todos los cambios de sesión y display manager por completo, reinicia con: sudo reboot"
