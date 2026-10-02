@@ -285,5 +285,53 @@ else
     warn "Gestión de iconos de escritorio en Nemo no está desactivada (actual: '$NEMO_DESKTOP_ICONS')"
 fi
 
+# ==============================================================================
+# 8. SISTEMA DE NOTIFICACIONES (xfce4-notifyd y notification-plugin)
+# ==============================================================================
+header "8. Sistema de Notificaciones e Historial (Campanita)"
+echo -n "  • Fuente de xfce4-notifyd: "
+inspect_binary "xfce4-notifyd-config"
+echo -n "  • Fuente de notify-send: "
+inspect_binary "notify-send"
+
+NOTIFY_THEME=$(xfconf-query -c xfce4-notifyd -p /theme 2>/dev/null || echo "none")
+if [ "$NOTIFY_THEME" = "Orchis-Dark" ]; then
+    pass "Tema de notificaciones configurado en: $NOTIFY_THEME"
+else
+    fail "Tema de notificaciones no es Orchis-Dark (actual: '$NOTIFY_THEME')"
+fi
+
+NOTIFY_LOG=$(xfconf-query -c xfce4-notifyd -p /notification-log 2>/dev/null || echo "false")
+NOTIFY_LOG_LVL=$(xfconf-query -c xfce4-notifyd -p /log-level 2>/dev/null || echo "none")
+NOTIFY_LOG_APPS=$(xfconf-query -c xfce4-notifyd -p /log-level-apps 2>/dev/null || echo "none")
+if [ "$NOTIFY_LOG" = "true" ] && [ "$NOTIFY_LOG_LVL" = "always" ] && [ "$NOTIFY_LOG_APPS" = "all" ]; then
+    pass "Historial y log de notificaciones activo y registrando todas las aplicaciones (always/all)"
+else
+    fail "Historial de notificaciones no configurado de forma óptima (log: $NOTIFY_LOG, nivel: $NOTIFY_LOG_LVL, apps: $NOTIFY_LOG_APPS)"
+fi
+
+if [ -f "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css" ]; then
+    pass "Estilos Catppuccin Mocha para notificaciones presentes en ~/.themes"
+else
+    fail "Estilos de notificación en ~/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css no encontrados"
+fi
+
+NOTIFY_PLUGIN_FOUND=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
+    [ "$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)" = "notification-plugin" ] && echo "$p" && break
+done)
+
+if [ -n "$NOTIFY_PLUGIN_FOUND" ]; then
+    pass "Plugin de notificaciones (campanita) presente en el panel ($NOTIFY_PLUGIN_FOUND)"
+    SHOW_MENU=$(xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN_FOUND/show-in-menu" 2>/dev/null || echo "none")
+    if [ "$SHOW_MENU" = "show-all" ]; then
+        pass "Historial en la campanita configurado para mostrar todas las notificaciones (show-all)"
+    else
+        warn "show-in-menu en campanita no está en 'show-all' (actual: '$SHOW_MENU')"
+    fi
+else
+    fail "Plugin de notificaciones (campanita) NO encontrado en el panel de Xfce"
+fi
+
 echo ""
+
 

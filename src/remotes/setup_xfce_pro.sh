@@ -233,6 +233,9 @@ use-ewmh-active-win = true;
 shadow-exclude = [
     "class_g = 'skippy-xd'",
     "class_g = 'vicinae'",
+    "class_g = 'Xfce4-notifyd'",
+    "class_g = 'xfce4-notifyd'",
+    "window_type = 'notification'",
     "name = 'Notification'",
     "_NET_WM_STATE *= '_NET_WM_STATE_HIDDEN'"
 ];
@@ -248,6 +251,7 @@ wintypes:
   dnd = { shadow = false; };
   popup_menu = { opacity = 1.0; shadow = false; };
   dropdown_menu = { opacity = 1.0; shadow = false; };
+  notification = { shadow = false; };
 };
 EOF
 
@@ -701,17 +705,75 @@ cat <<'EOF' > "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css"
 #XfceNotifyWindow label#body {
     color: #cdd6f4;
 }
+#XfceNotifyWindow button {
+    background-image: none;
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+#XfceNotifyWindow button:hover {
+    background-color: #45475a;
+    color: #ffffff;
+}
+#XfceNotifyWindow progressbar {
+    min-height: 6px;
+    border-radius: 4px;
+}
+#XfceNotifyWindow progressbar progress {
+    background-image: none;
+    background-color: #89b4fa;
+    border: none;
+    border-radius: 4px;
+}
+#XfceNotifyWindow progressbar trough {
+    background-image: none;
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+}
 EOF
 
-xfconf-query -c xfce4-notifyd -p /theme -s "Orchis-Dark" 2>/dev/null || true
-xfconf-query -c xfce4-notifyd -p /notify-location -s "top-right" 2>/dev/null || true
-xfconf-query -c xfce4-notifyd -p /notification-log -s true 2>/dev/null || true
+# Sincronizar estilo en el directorio del tema a nivel del sistema
+if [ -d "/usr/share/themes/Orchis-Dark" ]; then
+    sudo mkdir -p /usr/share/themes/Orchis-Dark/xfce-notify-4.0 2>/dev/null || true
+    sudo cp "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css" /usr/share/themes/Orchis-Dark/xfce-notify-4.0/gtk.css 2>/dev/null || true
+fi
+
+xfconf-query -c xfce4-notifyd -p /theme -s "Orchis-Dark" 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /theme -n -t string -s "Orchis-Dark" 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /notify-location -s "top-right" 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /notify-location -s 2 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /notify-location -n -t string -s "top-right" 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /initial-opacity -s 0.95 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /initial-opacity -n -t double -s 0.95 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /do-fadeout -s true 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /do-fadeout -n -t bool -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /do-not-disturb -s false 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /do-not-disturb -n -t bool -s false 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /notification-log -s true 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /notification-log -n -t bool -s true 2>/dev/null || true
+
 xfconf-query -c xfce4-notifyd -p /log-level -s "always" 2>/dev/null || \
     xfconf-query -c xfce4-notifyd -p /log-level -n -t string -s "always" 2>/dev/null || true
+
 xfconf-query -c xfce4-notifyd -p /log-level-apps -s "all" 2>/dev/null || \
     xfconf-query -c xfce4-notifyd -p /log-level-apps -n -t string -s "all" 2>/dev/null || true
-xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -s true 2>/dev/null || true
-xfconf-query -c xfce4-notifyd -p /log-max-size -s 500 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -s true 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -n -t bool -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /log-max-size -s 500 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /log-max-size -n -t int -s 500 2>/dev/null || true
+
+xfconf-query -c xfce4-notifyd -p /date-time-custom-format -s "%a %H:%M:%S" 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /date-time-custom-format -n -t string -s "%a %H:%M:%S" 2>/dev/null || true
 
 xfconf-query -c xfce4-panel -p /plugins/plugin-1 -s "whiskermenu" 2>/dev/null || true
 xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-icon -s "view-app-grid-symbolic" 2>/dev/null || true
@@ -733,20 +795,36 @@ NOTIFY_PLUGIN=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E
     [ "$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)" = "notification-plugin" ] && echo "$p" && break
 done)
 
-if [ -n "$NOTIFY_PLUGIN" ]; then
-    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -n -t string -s "show-all" 2>/dev/null || \
-        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -s "show-all" 2>/dev/null || true
-    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -n -t bool -s false 2>/dev/null || \
-        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -s false 2>/dev/null || true
-    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -n -t bool -s false 2>/dev/null || \
-        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -s false 2>/dev/null || true
-    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -n -t int -s 25 2>/dev/null || \
-        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -s 25 2>/dev/null || true
+# Si el plugin no existe en el panel, crearlo e incorporarlo a panel-1
+if [ -z "$NOTIFY_PLUGIN" ]; then
+    MAX_ID=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1 || echo 0)
+    NEW_ID=$(( MAX_ID + 1 ))
+    NOTIFY_PLUGIN="/plugins/plugin-$NEW_ID"
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN" -n -t string -s "notification-plugin" 2>/dev/null || true
+
+    EXISTING_IDS=$(xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids 2>/dev/null | grep -E '^[0-9]+$' || true)
+    PANEL_ARGS=()
+    for id in $EXISTING_IDS; do
+        PANEL_ARGS+=(-t int -s "$id")
+    done
+    PANEL_ARGS+=(-t int -s "$NEW_ID")
+    xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -n -a "${PANEL_ARGS[@]}" 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -a "${PANEL_ARGS[@]}" 2>/dev/null || true
 fi
+
+xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -n -t string -s "show-all" 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -s "show-all" 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -n -t bool -s false 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -s false 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -n -t bool -s false 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -s false 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -n -t int -s 25 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -s 25 2>/dev/null || true
 
 xfconf-query -c xfce4-panel -p /panels -a -t int -s 1 2>/dev/null || true
 xfconf-query -c xfce4-panel -p /panels/panel-2 -r -R 2>/dev/null || true
 xfce4-panel -r 2>/dev/null || true
+killall -q xfce4-notifyd 2>/dev/null || true
 
 echo "==> 12. Optimizaciones genéricas de red en arranque..."
 sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
