@@ -10,5 +10,55 @@ enabled = true
 status_indicators = "dots"
 
 [theme]
-name = "tokyo-night"
-auto_switch = false
+name = "tokyo night"
+auto_switch = true
+
+[keys]
+prefix = ["ctrl+space", "ctrl+b"]
+toggle_sidebar = "prefix+e"
+focus_pane_up = "prefix+k"
+focus_pane_down = "prefix+j"
+focus_pane_right = "prefix+l"
+focus_pane_left = "prefix+h"
+resize_mode = "prefix+r"
+zoom = "prefix+z"
+detach = "prefix+q"
+help = "prefix+?"
+reload_config = "prefix+shift+r"
+copy_mode = "prefix+["
+open_notification_target = "prefix+o"
+remote_image_paste = "ctrl-v"
+
+goto = "prefix+/"
+
+split_horizontal = "prefix+-"
+split_vertical = "prefix+|"
+
+swap_pane_left = "prefix+left"
+swap_pane_right = "prefix+right"
+swap_pane_down = "prefix+down"
+swap_pane_up = "prefix+up"
+rename_pane = "prefix+shift+,"
+
+new_tab = "prefix+c"
+close_pane = "prefix+x"
+close_tab = "prefix+shift+x"
+next_tab = "prefix+shift+l"
+previous_tab = "prefix+shift+h"
+switch_tab = "prefix+1..9"
+rename_tab = "prefix+,"
+move_tab_previous = "prefix+ctrl+h"
+move_tab_next = "prefix+ctrl+l"
+
+new_workspace = "prefix+ctrl+c"
+next_workspace = "prefix+ctrl+n"
+previous_workspace = "prefix+ctrl+p"
+rename_workspace = "prefix+ctrl+,"
+close_workspace = "prefix+ctrl+x"
+
+next_agent = "prefix+shift+n"
+previous_agent = "prefix+shift+p"
+focus_agent = "prefix+shift+1..9"
+
+[experimental]
+allow_nested = true
