@@ -27,7 +27,7 @@ help = "prefix+?"
 reload_config = "prefix+shift+r"
 copy_mode = "prefix+["
 open_notification_target = "prefix+o"
-remote_image_paste = "ctrl-v"
+# remote_image_paste = "ctrl-v"
 
 goto = "prefix+/"
 
