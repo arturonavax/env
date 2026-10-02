@@ -662,6 +662,12 @@ EOF
 xfconf-query -c xfce4-notifyd -p /theme -s "Orchis-Dark" 2>/dev/null || true
 xfconf-query -c xfce4-notifyd -p /notify-location -s "top-right" 2>/dev/null || true
 xfconf-query -c xfce4-notifyd -p /notification-log -s true 2>/dev/null || true
+xfconf-query -c xfce4-notifyd -p /log-level -s "always" 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /log-level -n -t string -s "always" 2>/dev/null || true
+xfconf-query -c xfce4-notifyd -p /log-level-apps -s "all" 2>/dev/null || \
+    xfconf-query -c xfce4-notifyd -p /log-level-apps -n -t string -s "all" 2>/dev/null || true
+xfconf-query -c xfce4-notifyd -p /log-max-size-enabled -s true 2>/dev/null || true
+xfconf-query -c xfce4-notifyd -p /log-max-size -s 500 2>/dev/null || true
 
 xfconf-query -c xfce4-panel -p /plugins/plugin-1 -s "whiskermenu" 2>/dev/null || true
 xfconf-query -c xfce4-panel -p /plugins/plugin-1/button-icon -s "view-app-grid-symbolic" 2>/dev/null || true
@@ -677,6 +683,21 @@ if [ -n "$CLOCK_PLUGIN" ]; then
     xfconf-query -c xfce4-panel -p "$CLOCK_PLUGIN/digital-layout" -s 3 2>/dev/null || true
     xfconf-query -c xfce4-panel -p "$CLOCK_PLUGIN/digital-time-format" -s "%I:%M:%S %p" 2>/dev/null || true
     xfconf-query -c xfce4-panel -p "$CLOCK_PLUGIN/show-seconds" -s true 2>/dev/null || true
+fi
+
+NOTIFY_PLUGIN=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
+    [ "$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)" = "notification-plugin" ] && echo "$p" && break
+done)
+
+if [ -n "$NOTIFY_PLUGIN" ]; then
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -n -t string -s "show-all" 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-in-menu" -s "show-all" 2>/dev/null || true
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -n -t bool -s false 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/hide-on-read" -s false 2>/dev/null || true
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -n -t bool -s false 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -s false 2>/dev/null || true
+    xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -n -t int -s 25 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -s 25 2>/dev/null || true
 fi
 
 xfconf-query -c xfce4-panel -p /panels -a -t int -s 1 2>/dev/null || true
