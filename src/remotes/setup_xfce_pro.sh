@@ -16,6 +16,9 @@ trap 'kill "$SUDO_PID" 2>/dev/null || true' EXIT
 pgrep -x xfce4-panel >/dev/null || (xfce4-panel >/dev/null 2>&1 & sleep 1)
 
 echo "==> 1. Purgando dependencias obsoletas (xfdesktop, rofi, plank, betterlockscreen, alttab)..."
+# Proteger componentes esenciales de Xfce para que no sean eliminados por autoremove
+sudo apt-mark manual xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
+
 sudo apt purge -y \
     xfdesktop4 plank rofi feh imagemagick xcape \
     remmina remmina-plugin-rdp remmina-plugin-vnc remmina-plugin-secret remmina-common \
@@ -35,6 +38,7 @@ echo "==> 2. Instalando stack base, Picom y dependencias de sistema..."
 sudo apt update
 sudo apt install -y \
     lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings light-locker \
+    xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder mugshot \
     xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter \
     xdotool brightnessctl pavucontrol network-manager-gnome \
     pipewire pipewire-pulse wireplumber \
@@ -503,24 +507,64 @@ sleep 1
 echo "==> 8. Configurando xwallpaper y desacoplando xfdesktop de la sesión..."
 cat <<'EOF' > "$HOME/.local/bin/wallpaper.sh"
 #!/bin/bash
+set -e
+
+CONFIG_FILE="$HOME/.config/wallpaper"
+
+is_valid_image() {
+    local f="$1"
+    [ -f "$f" ] || return 1
+    local mime
+    mime=$(file -b -L --mime-type "$f" 2>/dev/null || true)
+    [[ "$mime" =~ ^image/(png|jpeg) ]]
+}
+
 WALLPAPER=""
-for w in \
-    "/usr/share/xfce4/backdrops/xubuntu-wallpaper.png" \
-    "/usr/share/xfce4/backdrops/xubuntu-plucky.png" \
-    $(ls -1 /usr/share/xfce4/backdrops/*.png 2>/dev/null) \
-    $(ls -1 /usr/share/backgrounds/*.{png,jpg} 2>/dev/null) \
-    "/usr/share/images/desktop-base/default"; do
-    if [ -f "$w" ]; then
-        WALLPAPER="$w"
-        break
+
+# 1. Si se pasa un argumento, verificarlo y guardarlo como wallpaper preferido
+if [ -n "${1:-}" ] && is_valid_image "$1"; then
+    WALLPAPER="$(realpath "$1")"
+    echo "$WALLPAPER" > "$CONFIG_FILE"
+fi
+
+# 2. Si hay wallpaper guardado previamente, usarlo
+if [ -z "$WALLPAPER" ] && [ -f "$CONFIG_FILE" ]; then
+    SAVED=$(cat "$CONFIG_FILE" 2>/dev/null || true)
+    if is_valid_image "$SAVED"; then
+        WALLPAPER="$SAVED"
     fi
-done
+fi
+
+# 3. Buscar en fondos estándar del sistema si aún no hay wallpaper
+if [ -z "$WALLPAPER" ]; then
+    CANDIDATES=(
+        "$HOME/Pictures/Wallpapers"/*
+        "/usr/share/backgrounds/Resolute_Raccoon_Wallpaper_Dimmed_3840x2160.png"
+        "/usr/share/backgrounds/warty-final-ubuntu.png"
+        "/usr/share/backgrounds/cnusr25-Simple_Raccoon_Dark.png"
+        "/usr/share/backgrounds/endycal-Flying_Boxes_Dark.png"
+        "/usr/share/backgrounds/ezspain-Ubuntu_Coffee_Mug_Dark.png"
+        "/usr/share/backgrounds"/*.png
+        "/usr/share/backgrounds"/*.jpg
+        "/usr/share/xfce4/backdrops"/*.png
+        "/usr/share/xfce4/backdrops"/*.jpg
+    )
+    for w in "${CANDIDATES[@]}"; do
+        if is_valid_image "$w"; then
+            WALLPAPER="$w"
+            echo "$WALLPAPER" > "$CONFIG_FILE"
+            break
+        fi
+    done
+fi
 
 if command -v xwallpaper >/dev/null 2>&1 && [ -n "$WALLPAPER" ]; then
-    xwallpaper --zoom "$WALLPAPER"
+    killall -q xwallpaper 2>/dev/null || true
+    xwallpaper --daemon --zoom "$WALLPAPER"
 fi
 EOF
 chmod +x "$HOME/.local/bin/wallpaper.sh"
+("$HOME/.local/bin/wallpaper.sh" >/dev/null 2>&1 &) || true
 
 cat <<EOF > "$HOME/.config/autostart/wallpaper.desktop"
 [Desktop Entry]
