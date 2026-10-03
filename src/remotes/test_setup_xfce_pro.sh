@@ -93,39 +93,59 @@ else
 fi
 
 # ==============================================================================
-# 2. SELECTOR DE VENTANAS (Skippy-XD y Atajos)
+# 2. SELECTOR DE VENTANAS (Rofi y Atajos)
 # ==============================================================================
-header "2. Gestor Alt-Tab (Skippy-XD)"
-echo -n "  • Fuente de skippy-xd: "
-inspect_binary "skippy-xd"
+header "2. Gestor de Ventanas y Selector (Rofi)"
+echo -n "  • Fuente de rofi: "
+inspect_binary "rofi"
 
-if pgrep -f "skippy-xd.*daemon" >/dev/null; then
-    pass "Daemon de Skippy-XD activo en segundo plano[cite: 1]"
+if command -v rofi >/dev/null 2>&1; then
+    ROFI_VER=$(rofi -v 2>&1 | head -n1)
+    pass "Binario de Rofi disponible y funcional ($ROFI_VER)"
 else
-    fail "Daemon de Skippy-XD NO se está ejecutando (revisa ~/.config/autostart/skippy-xd.desktop)[cite: 1]"
+    fail "Rofi NO está instalado o no se encuentra en \$PATH"
+fi
+
+if [ -x "$HOME/.local/bin/rofi-window" ]; then
+    pass "Wrapper ~/.local/bin/rofi-window presente y ejecutable"
+else
+    fail "Wrapper ~/.local/bin/rofi-window no existe o no tiene permisos de ejecución"
 fi
 
 # Atajos nativos de xfwm4 desacoplados
 XFWM_ALTTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt>Tab" 2>/dev/null || echo "none")
 if [ "$XFWM_ALTTAB" = "none" ] || [ -z "$XFWM_ALTTAB" ]; then
-    pass "Atajo nativo xfwm4 <Alt>Tab anulado correctamente[cite: 1]"
+    pass "Atajo nativo xfwm4 <Alt>Tab anulado correctamente"
 else
     fail "Atajo nativo xfwm4 <Alt>Tab activo con acción: '$XFWM_ALTTAB'"
 fi
 
-# Atajos personalizados hacia Skippy-XD
+# Atajos personalizados hacia Rofi
 CMD_ALTTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" 2>/dev/null || echo "none")
-if [[ "$CMD_ALTTAB" == *"skippy-xd"* ]]; then
-    pass "<Alt>Tab asignado a: $CMD_ALTTAB[cite: 1]"
+if [[ "$CMD_ALTTAB" == *"rofi"* ]]; then
+    pass "<Alt>Tab asignado a: $CMD_ALTTAB"
 else
-    fail "<Alt>Tab no apunta a skippy-xd (actual: '$CMD_ALTTAB')"
+    fail "<Alt>Tab no apunta a rofi (actual: '$CMD_ALTTAB')"
 fi
 
 CMD_SUPERTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>Tab" 2>/dev/null || echo "none")
-if [[ "$CMD_SUPERTAB" == *"skippy-xd"* ]]; then
-    pass "<Super>Tab asignado a: $CMD_SUPERTAB[cite: 1]"
+if [[ "$CMD_SUPERTAB" == *"rofi"* ]]; then
+    pass "<Super>Tab asignado a: $CMD_SUPERTAB"
 else
-    warn "<Super>Tab no apunta a skippy-xd (actual: '$CMD_SUPERTAB')"
+    warn "<Super>Tab no apunta a rofi (actual: '$CMD_SUPERTAB')"
+fi
+
+if [ -x "$HOME/.local/bin/rofi-alt-tab-watcher" ]; then
+    pass "Watcher C X11 (~/.local/bin/rofi-alt-tab-watcher) compilado y ejecutable"
+else
+    fail "Watcher C X11 (~/.local/bin/rofi-alt-tab-watcher) no existe o no tiene permisos de ejecución"
+fi
+
+CMD_ALTSLASH=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" 2>/dev/null || echo "none")
+if [[ "$CMD_ALTSLASH" == *"rofi-window --search"* ]]; then
+    pass "<Alt>slash asignado a modo búsqueda modal ($CMD_ALTSLASH)"
+else
+    warn "<Alt>slash no apunta a rofi-window --search (actual: '$CMD_ALTSLASH')"
 fi
 
 # ==============================================================================
@@ -204,7 +224,7 @@ fi
 # ==============================================================================
 header "6. Auditoría de Eliminación de Componentes Antiguos"
 
-OBSOLETE_PKGS=("xfdesktop4" "plank" "rofi" "feh" "imagemagick" "xcape" "alttab" "betterlockscreen")
+OBSOLETE_PKGS=("xfdesktop4" "plank" "feh" "xcape" "alttab" "betterlockscreen" "skippy-xd")
 RESIDUAL_PACKAGES=()
 
 for pkg in "${OBSOLETE_PKGS[@]}"; do
@@ -225,13 +245,17 @@ RESIDUAL_PATHS=(
     "/usr/local/bin/i3lock-color"
     "/usr/local/bin/betterlockscreen"
     "/usr/local/bin/alttab"
+    "/usr/local/bin/skippy-xd"
     "$HOME/.local/bin/greenclip"
     "$HOME/.local/bin/alttab"
-    "$HOME/.config/rofi"
+    "$HOME/.local/bin/skippy-xd"
     "$HOME/.config/betterlockscreen"
     "$HOME/.config/plank"
+    "$HOME/.config/skippy-xd"
     "$HOME/.config/autostart/alttab.desktop"
     "$HOME/.config/autostart/plank.desktop"
+    "$HOME/.config/autostart/skippy-xd.desktop"
+    "$HOME/.local/bin/toggle-layout.sh"
 )
 
 FOUND_ORPHANS=()
@@ -330,6 +354,144 @@ if [ -n "$NOTIFY_PLUGIN_FOUND" ]; then
     fi
 else
     fail "Plugin de notificaciones (campanita) NO encontrado en el panel de Xfce"
+fi
+
+# ==============================================================================
+# 9. DISTRIBUCIÓN DE TECLADO Y PANEL (XKB & Alt+Shift)
+# ==============================================================================
+header "9. Distribución de Teclado (XKB & Panel)"
+if dpkg -l xfce4-xkb-plugin 2>/dev/null | grep -q "^ii"; then
+    pass "Paquete xfce4-xkb-plugin instalado vía APT"
+else
+    fail "Paquete xfce4-xkb-plugin no está instalado"
+fi
+
+XKB_LAYOUTS=$(xfconf-query -c keyboard-layout -p /Default/XkbLayout 2>/dev/null || echo "none")
+XKB_GRP=$(xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group 2>/dev/null || echo "none")
+if [[ "$XKB_LAYOUTS" == *"us"* ]] && [[ "$XKB_LAYOUTS" == *"es"* ]] && [ "$XKB_GRP" = "grp:alt_shift_toggle" ]; then
+    pass "Distribución XKB configurada en: $XKB_LAYOUTS con atajo Alt+Shift ($XKB_GRP)"
+else
+    fail "Configuración XKB no óptima (layouts: '$XKB_LAYOUTS', options: '$XKB_GRP')"
+fi
+
+XKB_PLUGIN_FOUND=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
+    [ "$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)" = "xkb" ] && echo "$p" && break
+done)
+
+if [ -n "$XKB_PLUGIN_FOUND" ]; then
+    pass "Item Keyboard Layout (xkb) presente en el panel de Xfce ($XKB_PLUGIN_FOUND)"
+else
+    fail "Plugin xkb no encontrado en xfce4-panel"
+fi
+
+SUPER_ALT_SPACE=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" 2>/dev/null || echo "none")
+if [ "$SUPER_ALT_SPACE" = "none" ] || [ -z "$SUPER_ALT_SPACE" ]; then
+    pass "Atajo legacy <Super><Alt>space eliminado correctamente"
+else
+    fail "Atajo legacy <Super><Alt>space sigue activo: $SUPER_ALT_SPACE"
+fi
+
+# ==============================================================================
+# 10. CAPTURAS DE PANTALLA Y OCR (Flameshot & Tesseract)
+# ==============================================================================
+header "10. Capturas de Pantalla y OCR (Flameshot & Tesseract)"
+echo -n "  • Fuente de flameshot: "
+inspect_binary "flameshot"
+echo -n "  • Fuente de tesseract: "
+inspect_binary "tesseract"
+echo -n "  • Fuente de xclip: "
+inspect_binary "xclip"
+echo -n "  • Fuente de xwininfo: "
+inspect_binary "xwininfo"
+
+if command -v flameshot >/dev/null 2>&1; then
+    FLAMESHOT_VER=$(flameshot --version 2>&1 | grep -i flameshot | head -n1)
+    pass "Flameshot disponible y funcional ($FLAMESHOT_VER)"
+else
+    fail "Flameshot no está disponible en \$PATH"
+fi
+
+if command -v tesseract >/dev/null 2>&1; then
+    TESS_LANGS=$(tesseract --list-langs 2>/dev/null | grep -E "(spa|eng)" | tr '\n' ' ' || echo "none")
+    pass "Tesseract OCR disponible con lenguajes: $TESS_LANGS"
+else
+    fail "Tesseract OCR no está disponible"
+fi
+
+# Verificación de exclusión en Picom para evitar artefactos
+if [ -f "$HOME/.config/picom/picom.conf" ]; then
+    if grep -q "class_g = 'flameshot'" "$HOME/.config/picom/picom.conf" && \
+       grep -q "blur-background-exclude" "$HOME/.config/picom/picom.conf"; then
+        pass "Reglas de exclusión para Flameshot presentes en picom.conf (sin sombras ni desenfoque)"
+    else
+        fail "Faltan reglas de exclusión para Flameshot en picom.conf"
+    fi
+else
+    fail "Archivo de configuración picom.conf no encontrado"
+fi
+
+# Verificación de configuración de Flameshot (desactivar indicador de tamaño y lupa)
+if [ -f "$HOME/.config/flameshot/flameshot.ini" ]; then
+    GEOM=$(grep -E '^showSelectionGeometry=' "$HOME/.config/flameshot/flameshot.ini" 2>/dev/null | cut -d'=' -f2 || echo "none")
+    MAGN=$(grep -E '^showMagnifier=' "$HOME/.config/flameshot/flameshot.ini" 2>/dev/null | cut -d'=' -f2 || echo "none")
+    if [ "$GEOM" = "0" ] && [ "$MAGN" = "false" ]; then
+        pass "Configuración de Flameshot óptima (indicador de geometría desactivado y lupa desactivada)"
+    else
+        warn "Flameshot no tiene geometría desactivada o lupa desactivada (geom: $GEOM, lupa: $MAGN)"
+    fi
+else
+    fail "Archivo ~/.config/flameshot/flameshot.ini no encontrado"
+fi
+
+# Verificación de scripts ejecutables en ~/.local/bin/
+CAP_SCRIPTS=("cap-area" "cap-repeat" "cap-window" "cap-fullscreen" "cap-ocr")
+ALL_SCRIPTS_OK=true
+for scr in "${CAP_SCRIPTS[@]}"; do
+    if [ ! -x "$HOME/.local/bin/$scr" ]; then
+        fail "Script ~/.local/bin/$scr no existe o no es ejecutable"
+        ALL_SCRIPTS_OK=false
+    fi
+done
+if [ "$ALL_SCRIPTS_OK" = true ]; then
+    pass "Todos los scripts cap-* presentes y ejecutables en ~/.local/bin"
+fi
+
+# Verificación de atajos de teclado en Xfce
+SHORTCUTS=(
+    "/commands/custom/<Primary><Alt><Super>1:cap-area"
+    "/commands/custom/<Primary><Alt><Super>2:cap-repeat"
+    "/commands/custom/<Primary><Alt><Super>3:cap-window"
+    "/commands/custom/<Primary><Alt><Super>4:cap-fullscreen"
+    "/commands/custom/<Primary><Alt><Super>0:cap-ocr"
+)
+ALL_SHORTCUTS_OK=true
+for sc in "${SHORTCUTS[@]}"; do
+    prop="${sc%%:*}"
+    expected="${sc##*:}"
+    val=$(xfconf-query -c xfce4-keyboard-shortcuts -p "$prop" 2>/dev/null || echo "none")
+    if [[ "$val" == *"$expected"* ]]; then
+        pass "Atajo $prop -> $val"
+    else
+        fail "Atajo $prop incorrecto o no configurado (actual: '$val', esperado: '$expected')"
+        ALL_SHORTCUTS_OK=false
+    fi
+done
+
+# Prueba de tubería Tesseract OCR
+OCR_TEST_TXT=$(echo "ANTIGRAVITY_OCR_OK" | convert -background white -fill black -pointsize 20 label:@- png:- 2>/dev/null | tesseract stdin stdout -l eng --psm 6 2>/dev/null || echo "")
+if [[ "$OCR_TEST_TXT" == *"ANTIGRAVITY_OCR_OK"* ]]; then
+    pass "Prueba de tubería Tesseract OCR procesada exitosamente"
+else
+    # Fallback sin convert label:@-
+    TMP_T_PNG=$(mktemp --suffix=.png)
+    convert -background white -fill black -pointsize 20 label:"ANTIGRAVITY_OCR_OK" "$TMP_T_PNG" 2>/dev/null || true
+    OCR_TEST_TXT=$(tesseract "$TMP_T_PNG" stdout -l eng --psm 6 2>/dev/null || echo "")
+    rm -f "$TMP_T_PNG"
+    if [[ "$OCR_TEST_TXT" == *"ANTIGRAVITY_OCR_OK"* ]]; then
+        pass "Prueba de tubería Tesseract OCR procesada exitosamente"
+    else
+        warn "Prueba de tubería Tesseract OCR no pudo ser confirmada automáticamente (salida: '$OCR_TEST_TXT')"
+    fi
 fi
 
 echo ""

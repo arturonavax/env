@@ -15,31 +15,32 @@ trap 'kill "$SUDO_PID" 2>/dev/null || true' EXIT
 # Asegurar panel activo para evitar fallos de D-Bus / Xfconf
 pgrep -x xfce4-panel >/dev/null || (xfce4-panel >/dev/null 2>&1 & sleep 1)
 
-echo "==> 1. Purgando dependencias obsoletas (xfdesktop, rofi, plank, betterlockscreen, alttab)..."
+echo "==> 1. Purgando dependencias obsoletas (xfdesktop, plank, betterlockscreen, alttab, skippy-xd)..."
 # Proteger componentes esenciales de Xfce para que no sean eliminados por autoremove
 sudo apt-mark manual xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
 
 sudo apt purge -y \
-    xfdesktop4 plank rofi feh imagemagick xcape \
+    xfdesktop4 plank feh xcape \
     remmina remmina-plugin-rdp remmina-plugin-vnc remmina-plugin-secret remmina-common \
-    alttab \
+    alttab skippy-xd \
     2>/dev/null || true
 sudo apt autoremove -y 2>/dev/null || true
 
 # Limpieza de binarios manuales anteriores y configs huérfanas
-sudo rm -f /usr/local/bin/greenclip /usr/local/bin/i3lock-color /usr/local/bin/betterlockscreen /usr/local/bin/alttab
-rm -f "$HOME/.local/bin/greenclip" "$HOME/.local/bin/i3lock-color" "$HOME/.local/bin/betterlockscreen" "$HOME/.local/bin/alttab" "$HOME/.local/bin/alttab-daemon.sh"
-rm -rf "$HOME/.config/rofi" "$HOME/.config/betterlockscreen" "$HOME/.config/plank" "$HOME/.cache/greenclip.history"
+sudo rm -f /usr/local/bin/greenclip /usr/local/bin/i3lock-color /usr/local/bin/betterlockscreen /usr/local/bin/alttab /usr/local/bin/skippy-xd
+rm -f "$HOME/.local/bin/greenclip" "$HOME/.local/bin/i3lock-color" "$HOME/.local/bin/betterlockscreen" "$HOME/.local/bin/alttab" "$HOME/.local/bin/alttab-daemon.sh" "$HOME/.local/bin/skippy-xd" "$HOME/.local/bin/skippy-xd.bin"
+rm -rf "$HOME/.config/betterlockscreen" "$HOME/.config/plank" "$HOME/.config/skippy-xd" "$HOME/.cache/greenclip.history"
 rm -f "$HOME/.config/autostart/plank.desktop" "$HOME/.config/autostart/xcape.desktop" \
       "$HOME/.config/autostart/greenclip.desktop" "$HOME/.config/autostart/touchpad-setup.desktop" \
-      "$HOME/.config/autostart/alttab.desktop"
+      "$HOME/.config/autostart/alttab.desktop" "$HOME/.config/autostart/skippy-xd.desktop" "$HOME/.config/autostart/xfdashboard.desktop" \
+      "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/systemd/user/xfdashboard.service"
 
-echo "==> 2. Instalando stack base, Picom y dependencias de sistema..."
+echo "==> 2. Instalando stack base, Picom, Rofi y dependencias de sistema..."
 sudo apt update
 sudo apt install -y \
     lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings light-locker \
     xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder mugshot \
-    xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter \
+    xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter xfce4-xkb-plugin \
     xdotool brightnessctl pavucontrol network-manager-gnome \
     pipewire pipewire-pulse wireplumber \
     xdg-desktop-portal xdg-desktop-portal-gtk \
@@ -49,6 +50,8 @@ sudo apt install -y \
     dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
     xwallpaper libxcb-xrm0 \
     picom libchipmunk7 libgif7 libpng16-16t64 libxcomposite1 libxdamage1 libxft2 libxinerama1 libjpeg62 \
+    rofi \
+    flameshot tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng xclip x11-utils imagemagick \
     nemo nemo-fileroller \
     curl wget git jq unzip
 
@@ -185,7 +188,7 @@ X-GNOME-Autostart-enabled=true
 Name=PolicyKit Authentication Agent
 EOF
 
-echo "==> 7. Configurando Picom como compositor único y Skippy-XD para selector Alt-Tab..."
+echo "==> 7. Configurando Picom como compositor único y Rofi como selector de ventanas (Alt-Tab)..."
 # Asegurar que alttab no interfiera
 killall -q alttab 2>/dev/null || true
 rm -f "$HOME/.config/autostart/alttab.desktop" "$HOME/.local/bin/alttab-daemon.sh" 2>/dev/null || true
@@ -221,7 +224,9 @@ rounded-corners-exclude = [
     "window_type = 'tooltip'",
     "window_type = 'utility'",
     "class_g = 'Xfce4-panel'",
-    "class_g = 'skippy-xd'",
+    "class_g = 'Rofi'",
+    "class_g = 'flameshot'",
+    "class_g = 'Flameshot'",
     "fullscreen"
 ];
 
@@ -231,7 +236,9 @@ detect-transient = true;
 use-ewmh-active-win = true;
 
 shadow-exclude = [
-    "class_g = 'skippy-xd'",
+    "class_g = 'flameshot'",
+    "class_g = 'Flameshot'",
+    "name = 'flameshot'",
     "class_g = 'vicinae'",
     "class_g = 'Xfce4-notifyd'",
     "class_g = 'xfce4-notifyd'",
@@ -240,9 +247,14 @@ shadow-exclude = [
     "_NET_WM_STATE *= '_NET_WM_STATE_HIDDEN'"
 ];
 
-focus-exclude = [
-    "class_g = 'skippy-xd'"
+blur-background-exclude = [
+    "class_g = 'flameshot'",
+    "class_g = 'Flameshot'",
+    "window_type = 'dock'",
+    "window_type = 'desktop'"
 ];
+
+focus-exclude = [];
 
 wintypes:
 {
@@ -291,197 +303,279 @@ systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable picom.service 2>/dev/null || true
 systemctl --user restart picom.service 2>/dev/null || true
 
-# Instalación de Skippy-XD mediante APT (con resolución de dependencias universales)
-if ! command -v skippy-xd >/dev/null 2>&1 || ! dpkg -l skippy-xd 2>/dev/null | grep -q "^ii"; then
-    echo "==> Instalando paquete Skippy-XD mediante APT..."
-    TEMP_SKIPPY=$(mktemp -d)
-    ARCH=$(dpkg --print-architecture 2>/dev/null || echo "amd64")
-    SKIPPY_URL="https://github.com/felixfung/skippy-xd/releases/download/v2026.09.26/skippy-xd_2026.09.26-1_${ARCH}.deb"
-    if curl -fsSL "$SKIPPY_URL" -o "$TEMP_SKIPPY/skippy-xd.deb"; then
-        dpkg-deb -R "$TEMP_SKIPPY/skippy-xd.deb" "$TEMP_SKIPPY/pkg"
-        # Ajustar control para compatibilidad universal con Debian y Ubuntu
-        sed -i 's/libjpeg62-turbo/libjpeg62 | libjpeg62-turbo | libjpeg-turbo8/g' "$TEMP_SKIPPY/pkg/DEBIAN/control"
-        dpkg-deb -b "$TEMP_SKIPPY/pkg" "$TEMP_SKIPPY/skippy-xd-compatible.deb" >/dev/null 2>&1
-        sudo apt install -y libjpeg62 2>/dev/null || true
-        sudo apt install -y "$TEMP_SKIPPY/skippy-xd-compatible.deb" 2>/dev/null || \
-            (sudo dpkg -i "$TEMP_SKIPPY/skippy-xd-compatible.deb" 2>/dev/null && sudo apt install -f -y 2>/dev/null) || true
-    fi
-    rm -rf "$TEMP_SKIPPY"
-fi
+# Limpiar servicios residuales de Skippy-XD y Xfdashboard
+systemctl --user stop xfdashboard.service skippy-xd.service 2>/dev/null || true
+systemctl --user disable xfdashboard.service skippy-xd.service 2>/dev/null || true
+rm -f "$HOME/.config/systemd/user/xfdashboard.service" "$HOME/.config/autostart/xfdashboard.desktop" \
+      "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/autostart/skippy-xd.desktop" 2>/dev/null || true
+killall -q xfdashboard xfdashboard.bin skippy-xd skippy-xd.bin 2>/dev/null || true
 
-# Configuración de Skippy-XD (Exposé / Alt-Tab switcher con miniaturas en vivo)
-mkdir -p "$HOME/.config/skippy-xd"
-cat <<'EOF' > "$HOME/.config/skippy-xd/skippy-xd.rc"
-# Skippy-XD Configuration for Xfce + Picom
-[system]
-daemonPath = /tmp/skippy-xd-fifo
-clientPath = /tmp/skippy-xd-fofi
-clientList = _NET_CLIENT_LIST
-pseudoTrans = false
+# Configuración de tema Rofi (Catppuccin Mocha / Orchis-Dark consistente con el sistema)
+mkdir -p "$HOME/.config/rofi"
+cat <<'EOF' > "$HOME/.config/rofi/config.rasi"
+configuration {
+    modes: "window,drun,run";
+    font: "Inter 10";
+    show-icons: true;
+    icon-theme: "Tela-circle-dark";
+    terminal: "ghostty";
+    disable-history: false;
+    display-window: " 󰕰  Ventanas ";
+    display-drun: " 󰀻  Apps ";
+    display-run: " 󰌆  Run ";
+}
 
-[multimonitor]
-showOnlyCurrentMonitor = false
-showOnlyCurrentScreen = true
-horizontalPanelAlignment = mid
-verticalPanelAlignment = mid
+* {
+    bg: #1e1e2e;
+    bg-alt: #313244;
+    fg: #cdd6f4;
+    fg-alt: #a6adc8;
+    accent: #89b4fa;
+    border-col: #45475a;
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
 
-[layout]
-switchLayout = compactrect
-exposeLayout = cosmos
-switchWaitDuration = 50
-switchCycleDuringWait = false
-switchCycleDesktops = false
-exposeCycleDesktops = false
-distance = 32
-upscaleWindows = false
+window {
+    background-color: @bg;
+    border: 2px;
+    border-color: @border-col;
+    border-radius: 10px;
+    width: 700px;
+    padding: 12px;
+}
 
-[appearance]
-animationDuration = 120
-animationRefresh = 60
-background = #1e1e2eb0
-preservePages = true
-includeFrame = true
-leftFrameBorder = 0
-topFrameBorder = 0
-cornerRadius = 10
+mainbox {
+    children: [inputbar, listview];
+    spacing: 8px;
+}
 
-[filler]
-opacity = 200
-color = #1e1e2e
-iconPlace = top left
-iconSize = 48
+inputbar {
+    children: [prompt, entry];
+    background-color: @bg-alt;
+    border-radius: 8px;
+    padding: 8px 12px;
+    spacing: 8px;
+}
 
-[livepreview]
-opacity = 255
-icon = true
-iconPlace = top left
-iconSize = 48
+prompt {
+    text-color: @accent;
+}
 
-[highlight]
-tint = #89b4fa
-tintOpacity = 96
-tintWindow = true
-tintBorder = 4
+entry {
+    placeholder: "Filtrar ventanas...";
+    placeholder-color: @fg-alt;
+}
 
-[multiselect]
-tint = #a6e3a1
-tintOpacity = 160
+listview {
+    lines: 8;
+    columns: 1;
+    fixed-height: false;
+    scrollbar: false;
+}
 
-[panel]
-show = true
-backgroundTinting = true
-reserveSpace = true
+element {
+    padding: 8px 12px;
+    border-radius: 6px;
+    spacing: 10px;
+}
 
-[desktop]
-show = false
-backgroundTinting = false
+element selected {
+    background-color: @accent;
+    text-color: #11111b;
+}
 
-[label]
-show = true
-option = windowTitle
-offsetX = 0
-offsetY = -8
-width = 0.85
-border = #313244
-background = #181825
-backgroundHighlight = #89b4fa
-opacity = 230
-text = #cdd6f4
-textOutline = #11111b
-font = Inter 10:weight=bold
+element-icon {
+    size: 24px;
+}
 
-[bindings]
-enforceFocus = true
-pivotLockingTime = 0
-moveMouse = false
-
-keysUp = Up
-keysDown = Down
-keysLeft = Left
-keysRight = Right
-
-keysSelect = Return space
-keysCancel = Escape
-keysNext = Tab n
-keysPrev = ISO_Left_Tab p
-
-keysIconify = 1
-keysShade = 2
-keysClose = 3
-
-miwMouse1 = focus
-miwMouse2 = close-ewmh
-miwMouse3 = iconify
-miwMouse4 = keysNext
-miwMouse5 = keysPrev
+element-text {
+    vertical-align: 0.5;
+    text-color: inherit;
+}
 EOF
 
-# Wrapper universal con normalización de DISPLAY y symlinks de compatibilidad FIFO
+# Compilar watcher para liberar Alt y modo búsqueda ('/')
+mkdir -p "$HOME/.local/src" "$HOME/.local/bin"
+cat <<'EOF' > "$HOME/.local/src/rofi-alt-tab-watcher.c"
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <signal.h>
+
+extern int XTestFakeKeyEvent(Display *dpy, unsigned int keycode, Bool is_press, unsigned long delay);
+
+static int ignore_x_errors(Display *d, XErrorEvent *e) {
+    (void)d; (void)e;
+    return 0;
+}
+
+static int is_key_down(const char *keys, KeyCode code) {
+    if (code == 0) return 0;
+    return (keys[code / 8] & (1 << (code % 8))) != 0;
+}
+
+static Window find_rofi_window(Display *dpy, Window root) {
+    Window parent, *children;
+    unsigned int nchildren;
+    Window result = 0;
+    if (XQueryTree(dpy, root, &root, &parent, &children, &nchildren) == 0 || !children) {
+        return 0;
+    }
+    for (unsigned int i = 0; i < nchildren; i++) {
+        XClassHint hint;
+        if (XGetClassHint(dpy, children[i], &hint)) {
+            if ((hint.res_name && strcasecmp(hint.res_name, "rofi") == 0) ||
+                (hint.res_class && strcasecmp(hint.res_class, "rofi") == 0)) {
+                result = children[i];
+                if (hint.res_name) XFree(hint.res_name);
+                if (hint.res_class) XFree(hint.res_class);
+                break;
+            }
+            if (hint.res_name) XFree(hint.res_name);
+            if (hint.res_class) XFree(hint.res_class);
+        }
+    }
+    if (children) XFree(children);
+    return result;
+}
+
+static void send_return(Display *dpy, KeyCode ret_code) {
+    XTestFakeKeyEvent(dpy, ret_code, True, CurrentTime);
+    XTestFakeKeyEvent(dpy, ret_code, False, CurrentTime);
+    XFlush(dpy);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) return 1;
+    pid_t target_pid = (pid_t)atoi(argv[1]);
+
+    Display *dpy = XOpenDisplay(NULL);
+    if (!dpy) return 1;
+
+    XSetErrorHandler(ignore_x_errors);
+
+    Window root = DefaultRootWindow(dpy);
+    KeyCode alt_l = XKeysymToKeycode(dpy, XK_Alt_L);
+    KeyCode alt_r = XKeysymToKeycode(dpy, XK_Alt_R);
+    KeyCode slash = XKeysymToKeycode(dpy, XK_slash);
+    KeyCode question = XKeysymToKeycode(dpy, XK_question);
+    KeyCode ret_code = XKeysymToKeycode(dpy, XK_Return);
+
+    char keys[32];
+
+    // 1. Esperar a que la ventana de Rofi se mapee
+    Window rofi_win = 0;
+    for (int i = 0; i < 300; i++) {
+        if (kill(target_pid, 0) != 0) {
+            XCloseDisplay(dpy);
+            return 0;
+        }
+
+        XQueryKeymap(dpy, keys);
+        if (is_key_down(keys, slash) || is_key_down(keys, question)) {
+            // Modo búsqueda solicitado explícitamente con '/'
+            XCloseDisplay(dpy);
+            return 0;
+        }
+
+        rofi_win = find_rofi_window(dpy, root);
+        if (rofi_win != 0) {
+            break;
+        }
+        usleep(5000);
+    }
+
+    if (!rofi_win) {
+        XCloseDisplay(dpy);
+        return 0;
+    }
+
+    usleep(10000);
+
+    // 2. Monitorear liberación de Alt o tecla '/'
+    for (int i = 0; i < 4000; i++) {
+        if (kill(target_pid, 0) != 0 || find_rofi_window(dpy, root) == 0) {
+            break;
+        }
+
+        XQueryKeymap(dpy, keys);
+
+        // Si se presiona '/' o '?', quedarse permanentemente en modo búsqueda
+        if (is_key_down(keys, slash) || is_key_down(keys, question)) {
+            break;
+        }
+
+        int alt_down = is_key_down(keys, alt_l) || is_key_down(keys, alt_r);
+        if (!alt_down) {
+            for (int p = 0; p < 4; p++) {
+                if (kill(target_pid, 0) != 0 || find_rofi_window(dpy, root) == 0) {
+                    break;
+                }
+                send_return(dpy, ret_code);
+                usleep(20000);
+            }
+            break;
+        }
+
+        usleep(5000);
+    }
+
+    XCloseDisplay(dpy);
+    return 0;
+}
+EOF
+gcc -O2 "$HOME/.local/src/rofi-alt-tab-watcher.c" -lX11 -l:libXtst.so.6 -o "$HOME/.local/bin/rofi-alt-tab-watcher" 2>/dev/null || true
+chmod +x "$HOME/.local/bin/rofi-alt-tab-watcher" 2>/dev/null || true
+
+# Wrapper ejecutable para el selector de ventanas Rofi
 mkdir -p "$HOME/.local/bin"
-cat <<'EOF' > "$HOME/.local/bin/skippy-xd"
+cat <<'EOF' > "$HOME/.local/bin/rofi-window"
 #!/bin/sh
-export LD_LIBRARY_PATH="$HOME/.local/lib/skippy-xd:${LD_LIBRARY_PATH:-}"
-
-# Normalizar DISPLAY para garantizar correspondencia entre daemon y cliente (:0.0 <-> :0)
-if [ -n "$DISPLAY" ]; then
-    export DISPLAY="${DISPLAY%.0}"
+# Si se invoca con --search, -s o '/', permanece abierto en modo búsqueda difusa interactiva
+if [ "${1:-}" = "--search" ] || [ "${1:-}" = "-s" ] || [ "${1:-}" = "/" ]; then
+    shift
+    exec rofi -show window \
+        -matching fuzzy \
+        -window-format "{w} · {c} · {t}" \
+        -show-icons "$@"
 fi
 
-# Asegurar symlinks bidireccionales en el pipe FIFO de /tmp
-DISP_BASE="${DISPLAY:-:0}"
-DISP_BASE="${DISP_BASE%.0}"
-if [ -e "/tmp/skippy-xd-fifo${DISP_BASE}" ] && [ ! -e "/tmp/skippy-xd-fifo${DISP_BASE}.0" ]; then
-    ln -sf "/tmp/skippy-xd-fifo${DISP_BASE}" "/tmp/skippy-xd-fifo${DISP_BASE}.0" 2>/dev/null || true
-elif [ -e "/tmp/skippy-xd-fifo${DISP_BASE}.0" ] && [ ! -e "/tmp/skippy-xd-fifo${DISP_BASE}" ]; then
-    ln -sf "/tmp/skippy-xd-fifo${DISP_BASE}.0" "/tmp/skippy-xd-fifo${DISP_BASE}" 2>/dev/null || true
+# Prevenir procesos residuales de watcher anteriores
+killall -q rofi-alt-tab-watcher 2>/dev/null || true
+
+# Lanzar selector de ventanas con fila 1 (MRU previa) preseleccionada
+rofi -show window \
+    -selected-row 1 \
+    -matching fuzzy \
+    -window-format "{w} · {c} · {t}" \
+    -show-icons \
+    -kb-element-next "Tab,Alt+Tab" \
+    -kb-element-prev "ISO_Left_Tab,Alt+ISO_Left_Tab" "$@" &
+ROFI_PID=$!
+
+# Monitorear liberación de Alt o tecla '/' en segundo plano
+if [ -x "$HOME/.local/bin/rofi-alt-tab-watcher" ]; then
+    "$HOME/.local/bin/rofi-alt-tab-watcher" "$ROFI_PID" &
 fi
 
-if [ -x "$HOME/.local/bin/skippy-xd.bin" ]; then
-    exec "$HOME/.local/bin/skippy-xd.bin" "$@"
-elif [ -x "/usr/bin/skippy-xd" ]; then
-    exec /usr/bin/skippy-xd "$@"
-else
-    exec skippy-xd "$@"
-fi
+wait "$ROFI_PID" 2>/dev/null || true
 EOF
-chmod +x "$HOME/.local/bin/skippy-xd"
-sudo ln -sf "$HOME/.local/bin/skippy-xd" /usr/local/bin/skippy-xd 2>/dev/null || true
+chmod +x "$HOME/.local/bin/rofi-window"
+sudo ln -sf "$HOME/.local/bin/rofi-window" /usr/local/bin/rofi-window 2>/dev/null || true
 
-cat <<'EOF' > "$HOME/.config/systemd/user/skippy-xd.service"
-[Unit]
-Description=Skippy-XD Window Switcher Daemon
-Documentation=man:skippy-xd(1)
-After=graphical-session.target picom.service
-PartOf=graphical-session.target
+# Comando estándar para Rofi Window Switcher
+ROFI_WINDOW_CMD="$HOME/.local/bin/rofi-window"
 
-[Service]
-Type=simple
-Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=skippy-xd --start-daemon
-Restart=always
-RestartSec=3
-Environment=DISPLAY=:0
-
-[Install]
-WantedBy=graphical-session.target default.target
-EOF
-
-cat <<'EOF' > "$HOME/.config/autostart/skippy-xd.desktop"
-[Desktop Entry]
-Type=Application
-Exec=sh -c "systemctl --user is-active --quiet skippy-xd || skippy-xd --start-daemon"
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=Skippy-XD Daemon
-Comment=Window Switcher with Live Thumbnails
-EOF
-
-systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable skippy-xd.service 2>/dev/null || true
-systemctl --user restart skippy-xd.service 2>/dev/null || true
-
-# Desvincular switcher nativo de xfwm4 para ceder el control completo a Skippy-XD
+# Desvincular switcher nativo de xfwm4 para ceder el control completo a Rofi
 xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt>Tab" -n -t string -s "none" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt>Tab" -s "none" 2>/dev/null || true
 
@@ -491,22 +585,24 @@ xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt><Shift>Tab" -s "
 xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Super>Tab" -n -t string -s "none" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Super>Tab" -s "none" 2>/dev/null || true
 
-# Configurar Skippy-XD en atajos de teclado globales
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" -n -t string -s "skippy-xd --switch --next" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" -s "skippy-xd --switch --next" 2>/dev/null || true
+# Configurar Rofi en atajos de teclado globales
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" -n -t string -s "$ROFI_WINDOW_CMD" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" -s "$ROFI_WINDOW_CMD" 2>/dev/null || true
 
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt><Shift>Tab" -n -t string -s "skippy-xd --switch --prev" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt><Shift>Tab" -s "skippy-xd --switch --prev" 2>/dev/null || true
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt><Shift>Tab" -n -t string -s "$ROFI_WINDOW_CMD" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt><Shift>Tab" -s "$ROFI_WINDOW_CMD" 2>/dev/null || true
 
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>Tab" -n -t string -s "skippy-xd --expose" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>Tab" -s "skippy-xd --expose" 2>/dev/null || true
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>Tab" -n -t string -s "$ROFI_WINDOW_CMD" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>Tab" -s "$ROFI_WINDOW_CMD" 2>/dev/null || true
 
-# Iniciar o reiniciar daemons en sesión activa
-killall -q picom skippy-xd skippy-xd.bin 2>/dev/null || true
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" -n -t string -s "$ROFI_WINDOW_CMD --search" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" -s "$ROFI_WINDOW_CMD --search" 2>/dev/null || true
+
+# Iniciar o reiniciar compositor en sesión activa
+killall -q picom 2>/dev/null || true
 xfwm4 --replace >/dev/null 2>&1 &
 sleep 1
 (picom -b --config "$HOME/.config/picom/picom.conf" >/dev/null 2>&1 &) || true
-(nohup skippy-xd --start-daemon >/dev/null 2>&1 &) || true
 
 echo "==> 8. Configurando xwallpaper y desacoplando xfdesktop de la sesión..."
 cat <<'EOF' > "$HOME/.local/bin/wallpaper.sh"
@@ -625,24 +721,153 @@ xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>l" -s "$HOM
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>l" -n -t string -s "$HOME/.local/bin/screenlock" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>l" -s "$HOME/.local/bin/screenlock" 2>/dev/null || true
 
-# Alternancia de teclado en Super + Alt + Espacio
-cat <<'EOF' > "$HOME/.local/bin/toggle-layout.sh"
-#!/bin/bash
-CURRENT=$(setxkbmap -query 2>/dev/null | awk '/layout:/ {print $2}' | cut -d',' -f1)
-if [ "$CURRENT" = "us" ]; then
-    setxkbmap -layout es
-    notify-send -t 1200 -i input-keyboard -h string:synchronous:keyboard-layout "Distribución de Teclado" "Español (ES)"
+# Distribución de teclado nativa (XKB: US/ES) y alternancia con Alt+Shift
+xfconf-query -c keyboard-layout -p /Default/XkbDisable -n -t bool -s false 2>/dev/null || \
+xfconf-query -c keyboard-layout -p /Default/XkbDisable -s false 2>/dev/null || true
+
+xfconf-query -c keyboard-layout -p /Default/XkbLayout -n -t string -s "us,es" 2>/dev/null || \
+xfconf-query -c keyboard-layout -p /Default/XkbLayout -s "us,es" 2>/dev/null || true
+
+xfconf-query -c keyboard-layout -p /Default/XkbVariant -n -t string -s "," 2>/dev/null || \
+xfconf-query -c keyboard-layout -p /Default/XkbVariant -s "," 2>/dev/null || true
+
+xfconf-query -c keyboard-layout -p "/Default/XkbOptions/Group" -n -t string -s "grp:alt_shift_toggle" 2>/dev/null || \
+xfconf-query -c keyboard-layout -p "/Default/XkbOptions/Group" -s "grp:alt_shift_toggle" 2>/dev/null || true
+
+setxkbmap -layout "us,es" -variant "," -option "grp:alt_shift_toggle" 2>/dev/null || true
+
+# Eliminar script residual previo de alternancia y atajo no estándar
+rm -f "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || true
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" -r 2>/dev/null || true
+
+echo "==> 10. Integrando captura de pantalla (Flameshot) y OCR (Tesseract)..."
+mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.config/flameshot"
+
+# Configuración de Flameshot: desactivar indicador de tamaño/geometría y lupa
+# para evitar que tapen selecciones pequeñas de texto durante OCR
+cat <<'EOF' > "$HOME/.config/flameshot/flameshot.ini"
+[General]
+showSelectionGeometry=0
+showSelectionGeometryHideTime=0
+showMagnifier=false
+showHelp=false
+showSidePanelButton=false
+disabledTrayIcon=true
+autoCloseIdleDaemon=true
+contrastUiColor=#89b4fa
+uiColor=#1e1e2e
+drawColor=#89b4fa
+EOF
+
+killall -q flameshot 2>/dev/null || true
+
+cat <<'EOF' > "$HOME/.local/bin/cap-area"
+#!/usr/bin/env bash
+set -euo pipefail
+flameshot gui
+EOF
+
+cat <<'EOF' > "$HOME/.local/bin/cap-repeat"
+#!/usr/bin/env bash
+set -euo pipefail
+flameshot gui --last-region -c 2>/dev/null || true
+notify-send -t 1500 -i camera-photo "Captura de Pantalla" "Última región copiada al portapapeles" 2>/dev/null || true
+EOF
+
+cat <<'EOF' > "$HOME/.local/bin/cap-window"
+#!/usr/bin/env bash
+set -euo pipefail
+
+INFO=$(xwininfo -frame 2>/dev/null || true)
+if [ -z "$INFO" ]; then
+    exit 0
+fi
+
+X=$(echo "$INFO" | awk '/Absolute upper-left X:/ {print $4}')
+Y=$(echo "$INFO" | awk '/Absolute upper-left Y:/ {print $4}')
+W=$(echo "$INFO" | awk '/Width:/ {print $2}')
+H=$(echo "$INFO" | awk '/Height:/ {print $2}')
+
+if [ -z "$W" ] || [ -z "$H" ] || [ -z "$X" ] || [ -z "$Y" ]; then
+    exit 0
+fi
+
+REGION="${W}x${H}+${X}+${Y}"
+flameshot screen --region "$REGION" --raw 2>/dev/null | xclip -selection clipboard -t image/png || \
+    flameshot screen --region "$REGION" -c 2>/dev/null || true
+notify-send -t 1500 -i camera-photo "Captura de Ventana" "Ventana copiada al portapapeles (${REGION})" 2>/dev/null || true
+EOF
+
+cat <<'EOF' > "$HOME/.local/bin/cap-fullscreen"
+#!/usr/bin/env bash
+set -euo pipefail
+flameshot full --raw 2>/dev/null | xclip -selection clipboard -t image/png || flameshot full -c 2>/dev/null || true
+notify-send -t 1500 -i camera-photo "Captura Completa" "Pantalla completa copiada al portapapeles" 2>/dev/null || true
+EOF
+
+cat <<'EOF' > "$HOME/.local/bin/cap-ocr"
+#!/usr/bin/env bash
+set -uo pipefail
+
+TMP_IMG=$(mktemp --suffix=.png)
+trap 'rm -f "$TMP_IMG"' EXIT
+
+if ! flameshot gui --raw > "$TMP_IMG" 2>/dev/null; then
+    exit 0
+fi
+
+if [ ! -s "$TMP_IMG" ]; then
+    exit 0
+fi
+
+if command -v magick >/dev/null 2>&1; then
+    magick "$TMP_IMG" -colorspace Gray -sharpen 0x1 -contrast-stretch 0.15%x0.05% "$TMP_IMG" 2>/dev/null || true
+elif command -v convert >/dev/null 2>&1; then
+    convert "$TMP_IMG" -colorspace Gray -sharpen 0x1 -contrast-stretch 0.15%x0.05% "$TMP_IMG" 2>/dev/null || true
+fi
+
+TEXT=$(tesseract "$TMP_IMG" stdout -l spa+eng --psm 6 2>/dev/null || true)
+CLEAN_TEXT=$(echo "$TEXT" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+if [ -n "$CLEAN_TEXT" ]; then
+    printf "%s" "$CLEAN_TEXT" | xclip -selection clipboard
+    PREVIEW=$(echo "$CLEAN_TEXT" | tr '\n' ' ' | head -c 120)
+    notify-send -t 3000 -i accessories-character-map "OCR Copiado al Portapapeles" "$PREVIEW"
 else
-    setxkbmap -layout us
-    notify-send -t 1200 -i input-keyboard -h string:synchronous:keyboard-layout "Distribución de Teclado" "Inglés (US)"
+    notify-send -t 2000 -i dialog-warning "OCR" "No se detectó texto en la selección"
 fi
 EOF
-chmod +x "$HOME/.local/bin/toggle-layout.sh"
 
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" -n -t string -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || \
-xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super><Alt>space" -s "$HOME/.local/bin/toggle-layout.sh" 2>/dev/null || true
+chmod +x "$HOME/.local/bin/cap-area" \
+         "$HOME/.local/bin/cap-repeat" \
+         "$HOME/.local/bin/cap-window" \
+         "$HOME/.local/bin/cap-fullscreen" \
+         "$HOME/.local/bin/cap-ocr"
 
-echo "==> 10. Integrando Nemo como gestor de archivos predeterminado..."
+sudo ln -sf "$HOME/.local/bin/cap-area" /usr/local/bin/cap-area 2>/dev/null || true
+sudo ln -sf "$HOME/.local/bin/cap-repeat" /usr/local/bin/cap-repeat 2>/dev/null || true
+sudo ln -sf "$HOME/.local/bin/cap-window" /usr/local/bin/cap-window 2>/dev/null || true
+sudo ln -sf "$HOME/.local/bin/cap-fullscreen" /usr/local/bin/cap-fullscreen 2>/dev/null || true
+sudo ln -sf "$HOME/.local/bin/cap-ocr" /usr/local/bin/cap-ocr 2>/dev/null || true
+
+# Configurar atajos de captura y OCR en Xfce
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>1" -n -t string -s "$HOME/.local/bin/cap-area" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>1" -s "$HOME/.local/bin/cap-area" 2>/dev/null || true
+
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>2" -n -t string -s "$HOME/.local/bin/cap-repeat" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>2" -s "$HOME/.local/bin/cap-repeat" 2>/dev/null || true
+
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>3" -n -t string -s "$HOME/.local/bin/cap-window" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>3" -s "$HOME/.local/bin/cap-window" 2>/dev/null || true
+
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>4" -n -t string -s "$HOME/.local/bin/cap-fullscreen" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>4" -s "$HOME/.local/bin/cap-fullscreen" 2>/dev/null || true
+
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>0" -n -t string -s "$HOME/.local/bin/cap-ocr" 2>/dev/null || \
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt><Super>0" -s "$HOME/.local/bin/cap-ocr" 2>/dev/null || true
+
+echo "==> 11. Integrando Nemo como gestor de archivos predeterminado..."
 # 1. Asociar tipos MIME de carpetas y búsquedas en el sistema
 xdg-mime default nemo.desktop inode/directory
 xdg-mime default nemo.desktop application/x-gnome-saved-search
@@ -687,7 +912,7 @@ fi
 gsettings set org.nemo.desktop show-desktop-icons false 2>/dev/null || true
 gsettings set org.nemo.preferences show-image-thumbnails 'always' 2>/dev/null || true
 
-echo "==> 11. Configurando Panel Xfce y Notificaciones..."
+echo "==> 12. Configurando Panel Xfce y Notificaciones..."
 mkdir -p "$HOME/.themes/Orchis-Dark/xfce-notify-4.0"
 cat <<'EOF' > "$HOME/.themes/Orchis-Dark/xfce-notify-4.0/gtk.css"
 #XfceNotifyWindow {
@@ -821,12 +1046,42 @@ xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/show-only-today" -n -t bool -s fa
 xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -n -t int -s 25 2>/dev/null || \
     xfconf-query -c xfce4-panel -p "$NOTIFY_PLUGIN/log-display-limit" -s 25 2>/dev/null || true
 
+# Plugin de distribución de teclado (Keyboard Layout - xkb) en panel-1
+XKB_PLUGIN=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
+    [ "$(xfconf-query -c xfce4-panel -p "$p" 2>/dev/null || true)" = "xkb" ] && echo "$p" && break
+done)
+
+if [ -z "$XKB_PLUGIN" ]; then
+    MAX_ID=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1 || echo 0)
+    NEW_ID=$(( MAX_ID + 1 ))
+    XKB_PLUGIN="/plugins/plugin-$NEW_ID"
+    xfconf-query -c xfce4-panel -p "$XKB_PLUGIN" -n -t string -s "xkb" 2>/dev/null || true
+
+    EXISTING_IDS=$(xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids 2>/dev/null | grep -E '^[0-9]+$' || true)
+    PANEL_ARGS=()
+    for id in $EXISTING_IDS; do
+        PANEL_ARGS+=(-t int -s "$id")
+    done
+    PANEL_ARGS+=(-t int -s "$NEW_ID")
+    xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -n -a "${PANEL_ARGS[@]}" 2>/dev/null || \
+        xfconf-query -c xfce4-panel -p /panels/panel-1/plugin-ids -a "${PANEL_ARGS[@]}" 2>/dev/null || true
+fi
+
+xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-type" -n -t int -s 0 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-type" -s 0 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-name" -n -t int -s 0 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-name" -s 0 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-scale" -n -t int -s 100 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-scale" -s 100 2>/dev/null || true
+xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/show-notifications" -n -t bool -s false 2>/dev/null || \
+    xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/show-notifications" -s false 2>/dev/null || true
+
 xfconf-query -c xfce4-panel -p /panels -a -t int -s 1 2>/dev/null || true
 xfconf-query -c xfce4-panel -p /panels/panel-2 -r -R 2>/dev/null || true
 xfce4-panel -r 2>/dev/null || true
 killall -q xfce4-notifyd 2>/dev/null || true
 
-echo "==> 12. Optimizaciones genéricas de red en arranque..."
+echo "==> 13. Optimizaciones genéricas de red en arranque..."
 sudo systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
 
 echo "==> Configuración completada. Reinicia el entorno para aplicar los cambios de sesión con: sudo reboot"
