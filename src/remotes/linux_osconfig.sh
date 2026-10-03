@@ -93,9 +93,31 @@ fi
 # ------------------------------------------------------------------------------
 # 4. keyd Configuration (Right Alt -> rcmd layer)
 # ------------------------------------------------------------------------------
-if [[ -d "/etc/keyd" && -n "$repo_root" && -f "$repo_root/files/keyd/default.conf" ]]; then
-	if sudo -n true 2>/dev/null; then
-		sudo cp "$repo_root/files/keyd/default.conf" "/etc/keyd/default.conf" 2>/dev/null || :
-		sudo keyd reload 2>/dev/null || :
+if sudo -n true 2>/dev/null; then
+	if ! command -v keyd >/dev/null 2>&1 && ! command -v keyd.rvaiya >/dev/null 2>&1; then
+		if command -v apt >/dev/null 2>&1; then
+			sudo apt update -y && sudo apt install -y keyd 2>/dev/null || :
+		elif command -v dnf >/dev/null 2>&1; then
+			sudo dnf install -y keyd 2>/dev/null || :
+		elif command -v pacman >/dev/null 2>&1; then
+			sudo pacman -S --noconfirm keyd 2>/dev/null || :
+		fi
+	fi
+	# Link keyd.rvaiya to keyd if needed (Debian/Ubuntu package naming conflict)
+	if command -v keyd.rvaiya >/dev/null 2>&1 && ! command -v keyd >/dev/null 2>&1; then
+		sudo ln -sf "$(command -v keyd.rvaiya)" /usr/local/bin/keyd 2>/dev/null || :
+		mkdir -p "$HOME/.local/bin"
+		ln -sf "$(command -v keyd.rvaiya)" "$HOME/.local/bin/keyd" 2>/dev/null || :
+	fi
+	if command -v keyd >/dev/null 2>&1 || command -v keyd.rvaiya >/dev/null 2>&1; then
+		sudo mkdir -p /etc/keyd
+		if [[ -n "$repo_root" && -f "$repo_root/files/keyd/default.conf" ]]; then
+			sudo cp "$repo_root/files/keyd/default.conf" "/etc/keyd/default.conf" 2>/dev/null || :
+		else
+			"$HOME/.local/bin/rcmd" --show-keyd 2>/dev/null | sudo tee /etc/keyd/default.conf >/dev/null || :
+		fi
+		sudo systemctl enable --now keyd 2>/dev/null || :
+		sudo keyd reload 2>/dev/null || sudo keyd.rvaiya reload 2>/dev/null || :
 	fi
 fi
+

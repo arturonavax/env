@@ -258,7 +258,40 @@ w = C-M-S-w
 x = C-M-S-x
 y = C-M-S-y
 z = C-M-S-z
+
+# Numbers
+0 = C-M-S-0
+1 = C-M-S-1
+2 = C-M-S-2
+3 = C-M-S-3
+4 = C-M-S-4
+5 = C-M-S-5
+6 = C-M-S-6
+7 = C-M-S-7
+8 = C-M-S-8
+9 = C-M-S-9
 EOF
+}
+
+sync_keyd() {
+    local keyd_cmd
+    keyd_cmd="$(command -v keyd || command -v keyd.rvaiya || echo "")"
+    if [ -z "$keyd_cmd" ]; then
+        echo "Error: 'keyd' is not installed." >&2
+        echo "Please install it with: sudo apt install keyd (or your distro's package manager)." >&2
+        exit 1
+    fi
+    if [ "$(basename "$keyd_cmd")" = "keyd.rvaiya" ] && ! command -v keyd >/dev/null 2>&1; then
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$keyd_cmd" "$HOME/.local/bin/keyd"
+        sudo ln -sf "$keyd_cmd" /usr/local/bin/keyd 2>/dev/null || :
+    fi
+    echo "Configuring keyd for rcmd (/etc/keyd/default.conf)..."
+    sudo mkdir -p /etc/keyd
+    show_keyd | sudo tee /etc/keyd/default.conf >/dev/null
+    sudo systemctl enable --now keyd 2>/dev/null || :
+    sudo keyd reload 2>/dev/null || sudo keyd.rvaiya reload 2>/dev/null || :
+    echo "Done! keyd service enabled and reloaded."
 }
 
 show_hyprland() {
@@ -312,11 +345,25 @@ list_mappings() {
 show_status() {
     local backend
     backend="$(detect_backend)"
+    local keyd_status="Not installed (required for Right Alt shortcut mapping)"
+    if command -v keyd >/dev/null 2>&1 || command -v keyd.rvaiya >/dev/null 2>&1; then
+        if systemctl is-active --quiet keyd 2>/dev/null; then
+            if [ -f /etc/keyd/default.conf ] && [ -s /etc/keyd/default.conf ]; then
+                keyd_status="Active (running with configuration)"
+            else
+                keyd_status="Active (running, but /etc/keyd/default.conf is missing - run: rcmd --sync-keyd)"
+            fi
+        else
+            keyd_status="Installed (inactive - run: sudo systemctl enable --now keyd)"
+        fi
+    fi
+
     echo "rcmd System Status"
     echo "--------------------------------------------------------"
     echo "Active Backend    : $backend"
     echo "Session Type      : ${XDG_SESSION_TYPE:-unknown}"
     echo "Current Desktop   : ${XDG_CURRENT_DESKTOP:-unknown}"
+    echo "keyd Daemon       : $keyd_status"
     echo "Config File       : ${CONFIG_FILE:-Not found (using dynamic fallback only)}"
     echo "Installed Binary  : $(command -v rcmd || echo "$SCRIPT_DIR/rcmd")"
     echo "--------------------------------------------------------"
@@ -339,6 +386,7 @@ Arguments:
 Options:
   --sync-xfce         Register all a-z shortcuts in Xfce via xfconf-query
   --sync-gnome        Register all a-z shortcuts in GNOME via gsettings
+  --sync-keyd         Configure /etc/keyd/default.conf and enable/reload keyd
   --show-keyd         Display recommended /etc/keyd/default.conf snippet
   --show-hyprland     Display Hyprland keybindings configuration
   --show-sway         Display Sway/i3 keybindings configuration
@@ -375,6 +423,10 @@ main() {
             ;;
         --sync-gnome)
             sync_gnome
+            exit 0
+            ;;
+        --sync-keyd)
+            sync_keyd
             exit 0
             ;;
         --show-keyd)
