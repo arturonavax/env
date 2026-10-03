@@ -1,9 +1,9 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
-command_timeout = 1000
+command_timeout = 2000
 add_newline = true
 
-# Layout de dos líneas limpio
+# Layout de dos líneas estructurado
 format = """┌─ $directory\
 $git_branch\
 $git_status\
@@ -12,12 +12,13 @@ $golang\
 $rust\
 $python\
 $docker_context\
+$jobs\
 $cmd_duration\
+$status\
 $custom\
 $line_break\
 └─$sudo$character"""
 
-# Línea de entrada simple (rojo si el comando anterior falló)
 [character]
 success_symbol = "[❯](bold green)"
 error_symbol = "[❯](bold red)"
@@ -28,7 +29,7 @@ symbol = ' 🦊 '
 format = '[$symbol]($style)'
 
 [directory]
-truncation_length = 6
+truncation_length = 3
 truncation_symbol = '.../'
 truncate_to_repo = true
 style = "bold cyan"
@@ -37,18 +38,23 @@ style = "bold cyan"
 symbol = "󰘬 "
 style = "bold purple"
 
+# Fix de renderizado y conteo de commits
 [git_status]
-format = '([\[$all_status$ahead_behind\]](bold bright-black) )'
+format = '([\[](bold bright-black)$all_status$ahead_behind[\]](bold bright-black) )'
 conflicted = "[=](bold red)"
-ahead = "[⇡](bold cyan)"
-behind = "[⇣](bold red)"
-diverged = "[⇕](bold yellow)"
+ahead = "[⇡${count}](bold cyan)"
+behind = "[⇣${count}](bold red)"
+diverged = "[⇕⇡${ahead_count}⇣${behind_count}](bold yellow)"
 untracked = "[?](bold blue)"
 stashed = "[$](bold cyan)"
 modified = "[!](bold yellow)"
 staged = "[+](bold green)"
 renamed = "[»](bold purple)"
 deleted = "[✘](bold red)"
+
+[git_state]
+format = '[\($state( $progress_current/$progress_total)\)](bold yellow) '
+style = "bold yellow"
 
 [golang]
 symbol = " "
@@ -65,18 +71,47 @@ symbol = " "
 format = '[${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
 style = "yellow"
 
-[cmd_duration]
-min_time = 2_000
-show_milliseconds = true
-format = '[took](italic) [$duration]($style) '
-style = "bold yellow"
-
 [docker_context]
 format = "via [$symbol$context]($style) "
 symbol = " "
 only_with_files = true
 
-# Desactivar módulos lentos o ruidosos por defecto
+# Visibilidad de procesos en segundo plano (agentes, daemons, builds)
+[jobs]
+symbol = "✦ "
+format = "[$symbol$number]($style) "
+style = "bold white"
+number_threshold = 1
+
+# Diagnóstico de fallos sin depender solo del color del prompt
+[status]
+disabled = false
+format = '[$symbol$status]($style) '
+symbol = "✖ "
+style = "bold red"
+
+[cmd_duration]
+min_time = 2_000
+show_milliseconds = false
+format = '[took](italic) [$duration]($style) '
+style = "bold yellow"
+
+# Detección integral de contexto para agentes de IA
+[custom.agent_workspace]
+description = "Alerta si el repo actual tiene directivas de contexto para agentes de IA"
+command = "echo 'AGENTS'"
+when = """
+test -f AGENTS.md || \
+test -f CLAUDE.md || \
+test -f .cursorrules || \
+test -d .cursor || \
+test -d .agents || \
+test -f .github/copilot-instructions.md
+"""
+format = "via [🤖 $output]($style) "
+style = "bold cyan"
+
+# Desactivar módulos lentos
 [package]
 disabled = true
 
@@ -85,10 +120,3 @@ disabled = true
 
 [gcloud]
 disabled = true
-
-[custom.agent_workspace]
-description = "Alerta si el repo actual tiene directivas de contexto para agentes de IA"
-command = "echo 'AGENTS'"
-when = "test -f AGENTS.md || test -d .agents"
-format = "via [🤖 $output]($style) "
-style = "bold cyan"
