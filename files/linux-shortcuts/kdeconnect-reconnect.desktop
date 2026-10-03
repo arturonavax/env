@@ -1,0 +1,10 @@
+# ~/.local/share/applications/.
+[Desktop Entry]
+Type=Application
+Name=KDE - Reconnect
+Comment=Reconecta dispositivos vía KDE Connect
+Exec=bash -c '"$HOME"/.local/bin/kdc-reconnect.sh'
+Icon=kdeconnect
+Terminal=false
+Categories=Utility;
+
