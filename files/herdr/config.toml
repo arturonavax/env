@@ -12,6 +12,7 @@ status_indicators = "dots"
 [theme]
 name = "tokyo night"
 auto_switch = true
+custom.accent = "red"
 
 [keys]
 prefix = ["ctrl+space", "ctrl+b"]
