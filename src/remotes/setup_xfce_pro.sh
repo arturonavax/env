@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+    echo "ERROR: No ejecutes este script con 'source' o '.'. Ejecútalo con: bash $0 o ./${0##*/}" >&2
+    return 1 2>/dev/null || exit 1
+fi
+
 if [ "$EUID" -eq 0 ]; then
-    echo "Ejecuta este script como usuario normal (solicitará sudo cuando sea necesario)."
+    echo "Ejecuta este script como usuario normal (solicitará sudo cuando sea necesario)." >&2
     exit 1
 fi
 
@@ -10,37 +15,55 @@ echo "==> Solicitando credenciales sudo..."
 sudo -v
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_PID=$!
-trap 'kill "$SUDO_PID" 2>/dev/null || true' EXIT
+
+TMP_VIC=""
+cleanup() {
+    [ -n "${SUDO_PID:-}" ] && kill "$SUDO_PID" 2>/dev/null || true
+    [ -n "${TMP_VIC:-}" ] && rm -rf "$TMP_VIC" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 pgrep -x xfce4-panel >/dev/null || (xfce4-panel >/dev/null 2>&1 & sleep 1)
 
-echo "==> 1. Purgando dependencias obsoletas y scripts huérfanos..."
-sudo apt-mark manual xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
+echo "==> 1. Asegurando repositorios (Universe) y protegiendo stack Xfce..."
+sudo apt update
+sudo apt install -y software-properties-common
+sudo add-apt-repository -y universe
+sudo apt update
+
+sudo apt-mark manual \
+    xfce4-session xfwm4 xfce4-panel xfce4-terminal xfce4-settings \
+    xfce4-power-manager xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
 
 sudo apt purge -y \
-    xfdesktop4 plank feh xcape \
+    xfce4-screensaver xscreensaver xscreensaver-data xscreensaver-gl \
+    xfdesktop4 plank xcape xwallpaper \
     remmina remmina-plugin-rdp remmina-plugin-vnc remmina-plugin-secret remmina-common \
     alttab skippy-xd \
     2>/dev/null || true
 sudo apt autoremove -y 2>/dev/null || true
 
 sudo rm -f /usr/local/bin/greenclip /usr/local/bin/i3lock-color /usr/local/bin/betterlockscreen \
-           /usr/local/bin/alttab /usr/local/bin/skippy-xd /usr/local/bin/rofi-window
+           /usr/local/bin/alttab /usr/local/bin/skippy-xd /usr/local/bin/rofi-window \
+           /usr/local/bin/wallpaper.sh
 rm -f "$HOME/.local/bin/greenclip" "$HOME/.local/bin/i3lock-color" "$HOME/.local/bin/betterlockscreen" \
       "$HOME/.local/bin/alttab" "$HOME/.local/bin/alttab-daemon.sh" "$HOME/.local/bin/skippy-xd" \
       "$HOME/.local/bin/skippy-xd.bin" "$HOME/.local/bin/rofi-window" "$HOME/.local/bin/rofi-alt-tab-watcher" \
-      "$HOME/.local/src/rofi-alt-tab-watcher.c" "$HOME/.local/bin/toggle-layout.sh"
+      "$HOME/.local/src/rofi-alt-tab-watcher.c" "$HOME/.local/bin/toggle-layout.sh" \
+      "$HOME/.local/bin/wallpaper.sh" "$HOME/.config/wallpaper"
 rm -rf "$HOME/.config/betterlockscreen" "$HOME/.config/plank" "$HOME/.config/skippy-xd" "$HOME/.cache/greenclip.history"
 rm -f "$HOME/.config/autostart/plank.desktop" "$HOME/.config/autostart/xcape.desktop" \
       "$HOME/.config/autostart/greenclip.desktop" "$HOME/.config/autostart/touchpad-setup.desktop" \
       "$HOME/.config/autostart/alttab.desktop" "$HOME/.config/autostart/skippy-xd.desktop" \
-      "$HOME/.config/autostart/xfdashboard.desktop" \
-      "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/systemd/user/xfdashboard.service"
+      "$HOME/.config/autostart/xfdashboard.desktop" "$HOME/.config/autostart/wallpaper.desktop" \
+      "$HOME/.config/autostart/nitrogen.desktop" \
+      "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/systemd/user/xfdashboard.service" \
+      "$HOME/.config/systemd/user/picom.service"
 
-echo "==> 2. Instalando stack base, Picom, Rofi y dependencias..."
-sudo apt update
+echo "==> 2. Instalando stack base, Feh, Zenity, Picom, Rofi y utilidades..."
 sudo apt install -y \
     lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings light-locker \
+    feh zenity \
     xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder mugshot \
     xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter xfce4-xkb-plugin \
     xdotool brightnessctl pavucontrol network-manager-gnome \
@@ -50,7 +73,7 @@ sudo apt install -y \
     gvfs-backends gvfs-fuse policykit-1-gnome \
     fonts-inter fonts-jetbrains-mono \
     dconf-cli libglib2.0-bin libglib2.0-dev-bin libnotify-bin \
-    xwallpaper libxcb-xrm0 \
+    libxcb-xrm0 \
     picom libchipmunk7 libgif7 libpng16-16t64 libxcomposite1 libxdamage1 libxft2 libxinerama1 libjpeg62 \
     rofi \
     flameshot tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng xclip x11-utils imagemagick \
@@ -71,8 +94,7 @@ if [ ! -d "/usr/share/themes/Orchis-Dark" ] || [ ! -d "/usr/share/icons/Tela-cir
     rm -rf "$TEMP_DIR"
 fi
 
-echo "==> 4. Configurando Vicinae con icono oficial transparente y persistente..."
-# 1. Asegurar binario de Vicinae
+echo "==> 4. Configurando Vicinae e iconos de forma idempotente..."
 if ! command -v vicinae >/dev/null 2>&1; then
     curl -fsSL --connect-timeout 5 -m 30 https://vicinae.com/install | bash -s -- --prefix "$HOME/.local"
 fi
@@ -81,7 +103,6 @@ if [ -f "$HOME/.local/bin/vicinae" ]; then
     sudo ln -sf "$HOME/.local/bin/vicinae" /usr/local/bin/vicinae 2>/dev/null || true
 fi
 
-# 2. Desactivar permanentemente daemons de indicadores de Ubuntu que bloquean el StatusNotifierWatcher
 systemctl --user stop ayatana-indicator-application.service indicator-application.service 2>/dev/null || true
 systemctl --user mask ayatana-indicator-application.service indicator-application.service 2>/dev/null || true
 
@@ -97,7 +118,6 @@ X-GNOME-Autostart-enabled=false
 EOF
 done
 
-# 3. Purgar cualquier copia residual del SVG sintético generado anteriormente
 find /usr/share/icons /usr/share/pixmaps "$HOME/.local/share/icons" \
      -type f \( -name "*vicinae*.svg" -o -name "*vicinae*.png" \) 2>/dev/null | while read -r f; do
     if grep -q "vicinae-grad" "$f" 2>/dev/null; then
@@ -105,13 +125,9 @@ find /usr/share/icons /usr/share/pixmaps "$HOME/.local/share/icons" \
     fi
 done
 
-# 4. Obtener el asset oficial auténtico de forma no bloqueante
 TMP_VIC=$(mktemp -d /tmp/vic_official.XXXXXX)
-trap 'rm -rf "$TMP_VIC"' EXIT
-
 OFFICIAL_ICON=""
 
-# Comprobar primero en disco si ya existe un SVG oficial libre de gradientes sintéticos
 for local_p in "/usr/share/icons/hicolor/scalable/apps/vicinae.svg" \
                "/usr/share/pixmaps/vicinae.svg" \
                "$HOME/.local/share/icons/hicolor/scalable/apps/vicinae.svg" \
@@ -122,7 +138,6 @@ for local_p in "/usr/share/icons/hicolor/scalable/apps/vicinae.svg" \
     fi
 done
 
-# Si no está en disco, descargar directamente el SVG oficial de los repositorios sin ejecutar scripts externos
 if [ -z "$OFFICIAL_ICON" ]; then
     CANDIDATE_URLS=(
         "https://raw.githubusercontent.com/vicinaehq/vicinae/main/crates/vicinae/assets/icon.svg"
@@ -132,18 +147,32 @@ if [ -z "$OFFICIAL_ICON" ]; then
         "https://vicinae.com/logo.svg"
     )
     for url in "${CANDIDATE_URLS[@]}"; do
-        if curl -fsSL --connect-timeout 4 -m 8 "$url" -o "$TMP_VIC/vicinae.svg" 2>/dev/null; then
-            if [ -s "$TMP_VIC/vicinae.svg" ] && ! grep -qi "404" "$TMP_VIC/vicinae.svg"; then
-                OFFICIAL_ICON="$TMP_VIC/vicinae.svg"
+        if curl -fsSL --connect-timeout 4 -m 8 "$url" -o "$TMP_VIC/downloaded.svg" 2>/dev/null; then
+            if [ -s "$TMP_VIC/downloaded.svg" ] && ! grep -qi "404" "$TMP_VIC/downloaded.svg"; then
+                OFFICIAL_ICON="$TMP_VIC/downloaded.svg"
                 break
             fi
         fi
     done
 fi
 
-# 5. Desplegar vectoriales y rasterizados en el sistema
+copy_safe() {
+    local src="$1"
+    local dst="$2"
+    if [ -f "$dst" ] && [ "$src" -ef "$dst" ]; then
+        return 0
+    fi
+    sudo cp -f "$src" "$dst"
+}
+
 if [ -n "$OFFICIAL_ICON" ] && [ -f "$OFFICIAL_ICON" ]; then
     EXT="${OFFICIAL_ICON##*.}"
+    MASTER_ICON="$TMP_VIC/master.${EXT}"
+
+    if [ ! "$OFFICIAL_ICON" -ef "$MASTER_ICON" ]; then
+        cp -f "$OFFICIAL_ICON" "$MASTER_ICON"
+    fi
+
     sudo mkdir -p /usr/share/pixmaps \
                   /usr/share/icons/hicolor/scalable/apps \
                   /usr/share/icons/hicolor/scalable/status \
@@ -151,11 +180,11 @@ if [ -n "$OFFICIAL_ICON" ] && [ -f "$OFFICIAL_ICON" ]; then
                   /usr/share/icons/Tela-circle-dark/scalable/panel
 
     for name in vicinae vicinae-tray vicinae-indicator vicinae-status com.vicinae.Vicinae; do
-        sudo cp -f "$OFFICIAL_ICON" "/usr/share/pixmaps/${name}.${EXT}"
-        sudo cp -f "$OFFICIAL_ICON" "/usr/share/icons/hicolor/scalable/apps/${name}.${EXT}"
-        sudo cp -f "$OFFICIAL_ICON" "/usr/share/icons/hicolor/scalable/status/${name}.${EXT}"
-        sudo cp -f "$OFFICIAL_ICON" "/usr/share/icons/Tela-circle-dark/scalable/apps/${name}.${EXT}"
-        sudo cp -f "$OFFICIAL_ICON" "/usr/share/icons/Tela-circle-dark/scalable/panel/${name}.${EXT}"
+        copy_safe "$MASTER_ICON" "/usr/share/pixmaps/${name}.${EXT}"
+        copy_safe "$MASTER_ICON" "/usr/share/icons/hicolor/scalable/apps/${name}.${EXT}"
+        copy_safe "$MASTER_ICON" "/usr/share/icons/hicolor/scalable/status/${name}.${EXT}"
+        copy_safe "$MASTER_ICON" "/usr/share/icons/Tela-circle-dark/scalable/apps/${name}.${EXT}"
+        copy_safe "$MASTER_ICON" "/usr/share/icons/Tela-circle-dark/scalable/panel/${name}.${EXT}"
     done
 
     CONVERT_BIN=""
@@ -169,14 +198,14 @@ if [ -n "$OFFICIAL_ICON" ] && [ -f "$OFFICIAL_ICON" ]; then
                           "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/panel" \
                           "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/apps"
 
-            $CONVERT_BIN "$OFFICIAL_ICON" -background none -resize "${sz}x${sz}" "$TMP_VIC/icon_${sz}.png"
+            $CONVERT_BIN "$MASTER_ICON" -background none -resize "${sz}x${sz}" "$TMP_VIC/icon_${sz}.png"
 
             for name in vicinae vicinae-tray vicinae-indicator vicinae-status com.vicinae.Vicinae; do
-                sudo cp -f "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/hicolor/${sz}x${sz}/status/${name}.png"
-                sudo cp -f "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/hicolor/${sz}x${sz}/apps/${name}.png"
-                sudo cp -f "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/panel/${name}.png"
-                sudo cp -f "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/apps/${name}.png"
-                [ "$sz" -eq 22 ] && sudo cp -f "$TMP_VIC/icon_${sz}.png" "/usr/share/pixmaps/${name}.png"
+                copy_safe "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/hicolor/${sz}x${sz}/status/${name}.png"
+                copy_safe "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/hicolor/${sz}x${sz}/apps/${name}.png"
+                copy_safe "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/panel/${name}.png"
+                copy_safe "$TMP_VIC/icon_${sz}.png" "/usr/share/icons/Tela-circle-dark/${sz}x${sz}/apps/${name}.png"
+                [ "$sz" -eq 22 ] && copy_safe "$TMP_VIC/icon_${sz}.png" "/usr/share/pixmaps/${name}.png"
             done
         done
     fi
@@ -185,9 +214,10 @@ if [ -n "$OFFICIAL_ICON" ] && [ -f "$OFFICIAL_ICON" ]; then
     sudo gtk-update-icon-cache -f -q /usr/share/icons/Tela-circle-dark 2>/dev/null || true
     gtk-update-icon-cache -f -q "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 fi
-rm -rf "$TMP_VIC"
 
-# 6. Autostart con retardo sincronizado (evita la caída a XEmbed al reiniciar el sistema)
+rm -rf "$TMP_VIC"
+TMP_VIC=""
+
 cat <<'EOF' > "$HOME/.config/autostart/vicinae.desktop"
 [Desktop Entry]
 Type=Application
@@ -202,7 +232,6 @@ X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Delay=3
 EOF
 
-# Reiniciar procesos y levantar en segundo plano de forma desasociada
 killall -9 vicinae vicinae-server 2>/dev/null || true
 killall -q ayatana-indicator-application-service indicator-application-service 2>/dev/null || true
 (sleep 1 && /usr/local/bin/vicinae server >/dev/null 2>&1 &)
@@ -236,10 +265,25 @@ default-user-image = #avatar-default
 screensaver-timeout = 60
 EOF"
 
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -n -t bool -s false 2>/dev/null || \
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -s false 2>/dev/null || true
+
+cat <<'EOF' > "$HOME/.config/autostart/light-locker.desktop"
+[Desktop Entry]
+Type=Application
+Name=Screen Locker
+Comment=Light-locker daemon
+Exec=light-locker --lock-on-suspend --no-late-locking
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+
 mkdir -p "$HOME/.local/bin"
 cat <<'EOF' > "$HOME/.local/bin/screenlock"
-#!/bin/bash
-if command -v light-locker-command >/dev/null 2>&1; then
+#!/usr/bin/env bash
+set -euo pipefail
+if command -v light-locker-command >/dev/null 2>&1 && pgrep -x light-locker >/dev/null; then
     light-locker-command -l
 elif command -v dm-tool >/dev/null 2>&1; then
     dm-tool lock
@@ -248,6 +292,10 @@ else
 fi
 EOF
 chmod +x "$HOME/.local/bin/screenlock"
+
+if ! pgrep -x light-locker >/dev/null; then
+    (light-locker --lock-on-suspend --no-late-locking >/dev/null 2>&1 &)
+fi
 
 echo "==> 6. Configuración de hardware (Touchpad, PipeWire, Polkit)..."
 sudo mkdir -p /etc/X11/xorg.conf.d
@@ -278,15 +326,17 @@ X-GNOME-Autostart-enabled=true
 Name=PolicyKit Authentication Agent
 EOF
 
-echo "==> 7. Configurando Picom, temas Rofi y Switchers de ventana..."
+echo "==> 7. Configurando Picom, foco de Xfwm4 y Rofi..."
 xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_frame_shadow -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_popup_shadow -s false 2>/dev/null || true
 xfconf-query -c xfwm4 -p /general/show_dock_shadow -s false 2>/dev/null || true
-xfconf-query -c xfwm4 -p /general/raise_on_focus -s true 2>/dev/null || true
-
-xfconf-query -c xfwm4 -p /general/prevent_focus_stealing -s false 2>/dev/null || true
-xfconf-query -c xfwm4 -p /general/focus_new -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/raise_on_focus -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/raise_on_focus -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/activate_action -n -t string -s "bring" 2>/dev/null || xfconf-query -c xfwm4 -p /general/activate_action -s "bring" 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/focus_hint -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/focus_hint -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/click_to_focus -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/click_to_focus -s true 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/prevent_focus_stealing -n -t bool -s false 2>/dev/null || xfconf-query -c xfwm4 -p /general/prevent_focus_stealing -s false 2>/dev/null || true
+xfconf-query -c xfwm4 -p /general/focus_new -n -t bool -s true 2>/dev/null || xfconf-query -c xfwm4 -p /general/focus_new -s true 2>/dev/null || true
 
 mkdir -p "$HOME/.config/picom"
 cat <<'EOF' > "$HOME/.config/picom/picom.conf"
@@ -294,6 +344,10 @@ backend = "glx";
 vsync = true;
 use-damage = true;
 unredir-if-possible = false;
+
+xrender-sync-fence = true;
+glx-no-stencil = true;
+glx-no-rebind-pixmap = true;
 
 shadow = false;
 fading = false;
@@ -349,30 +403,15 @@ wintypes:
 };
 EOF
 
-mkdir -p "$HOME/.config/systemd/user"
-cat <<'EOF' > "$HOME/.config/systemd/user/picom.service"
-[Unit]
-Description=Picom X11 Compositor
-Documentation=man:picom(1)
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/picom
-Restart=always
-RestartSec=3
-Environment=DISPLAY=:0
-
-[Install]
-WantedBy=graphical-session.target default.target
-EOF
+systemctl --user stop picom.service 2>/dev/null || true
+systemctl --user disable picom.service 2>/dev/null || true
+rm -f "$HOME/.config/systemd/user/picom.service"
 
 mkdir -p "$HOME/.config/autostart"
 cat <<'EOF' > "$HOME/.config/autostart/picom.desktop"
 [Desktop Entry]
 Type=Application
-Exec=sh -c "systemctl --user is-active --quiet picom || picom -b"
+Exec=sh -c "killall -q picom; exec picom -b --config $HOME/.config/picom/picom.conf"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
@@ -380,9 +419,6 @@ Name=Picom
 Comment=Lightweight X11 Compositor
 EOF
 
-systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable picom.service 2>/dev/null || true
-systemctl --user restart picom.service 2>/dev/null || true
 killall -q picom 2>/dev/null || true
 (picom -b --config "$HOME/.config/picom/picom.conf" >/dev/null 2>&1 &) || true
 
@@ -491,80 +527,77 @@ xfconf-query -c xfwm4 -p /general/cycle_hidden -s true 2>/dev/null || true
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" -n -t string -s "rofi -show window" 2>/dev/null || \
 xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" -s "rofi -show window" 2>/dev/null || true
 
-echo "==> 8. Configurando xwallpaper..."
-cat <<'EOF' > "$HOME/.local/bin/wallpaper.sh"
-#!/bin/bash
-set -e
+echo "==> 8. Configurando motor Feh y selector gráfico de Wallpapers..."
+mkdir -p "$HOME/Pictures"
 
-CONFIG_FILE="$HOME/.config/wallpaper"
+# 1. Crear el selector gráfico (Zenity GTK nativo)
+sudo bash -c 'cat <<'"'"'EOF'"'"' > /usr/local/bin/wallpaper-picker
+#!/usr/bin/env bash
+set -euo pipefail
 
-is_valid_image() {
-    local f="$1"
-    [ -f "$f" ] || return 1
-    local mime
-    mime=$(file -b -L --mime-type "$f" 2>/dev/null || true)
-    [[ "$mime" =~ ^image/(png|jpeg) ]]
-}
+INITIAL_DIR="$HOME/Pictures"
+[ ! -d "$INITIAL_DIR" ] && INITIAL_DIR="/usr/share/backgrounds"
 
-WALLPAPER=""
+FILE=$(zenity --file-selection \
+    --title="Seleccionar Fondo de Pantalla" \
+    --filename="${INITIAL_DIR}/" \
+    --file-filter="Imágenes (*.png, *.jpg, *.jpeg, *.webp) | *.png *.jpg *.jpeg *.webp *.PNG *.JPG *.JPEG *.WEBP" \
+    --file-filter="Todos los archivos | *" 2>/dev/null || true)
 
-if [ -n "${1:-}" ] && is_valid_image "$1"; then
-    WALLPAPER="$(realpath "$1")"
-    echo "$WALLPAPER" > "$CONFIG_FILE"
+if [ -n "$FILE" ] && [ -f "$FILE" ]; then
+    feh --bg-fill "$FILE"
+    notify-send -t 2000 -i preferences-desktop-wallpaper "Fondo de Pantalla" "Fondo actualizado correctamente" 2>/dev/null || true
 fi
+EOF'
+sudo chmod +x /usr/local/bin/wallpaper-picker
 
-if [ -z "$WALLPAPER" ] && [ -f "$CONFIG_FILE" ]; then
-    SAVED=$(cat "$CONFIG_FILE" 2>/dev/null || true)
-    if is_valid_image "$SAVED"; then
-        WALLPAPER="$SAVED"
-    fi
-fi
+# 2. Registrar el selector en el menú de aplicaciones del sistema
+mkdir -p "$HOME/.local/share/applications"
+cat <<'EOF' > "$HOME/.local/share/applications/wallpaper-picker.desktop"
+[Desktop Entry]
+Type=Application
+Name=Change Background
+Comment=Selector gráfico y ligero de fondos de pantalla
+Exec=/usr/local/bin/wallpaper-picker
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=Settings;DesktopSettings;
+EOF
 
-if [ -z "$WALLPAPER" ]; then
-    CANDIDATES=(
-        "$HOME/Pictures/Wallpapers"/*
-        "/usr/share/backgrounds/Resolute_Raccoon_Wallpaper_Dimmed_3840x2160.png"
-        "/usr/share/backgrounds/warty-final-ubuntu.png"
-        "/usr/share/backgrounds/cnusr25-Simple_Raccoon_Dark.png"
-        "/usr/share/backgrounds/endycal-Flying_Boxes_Dark.png"
-        "/usr/share/backgrounds/ezspain-Ubuntu_Coffee_Mug_Dark.png"
-        "/usr/share/backgrounds"/*.png
-        "/usr/share/backgrounds"/*.jpg
-        "/usr/share/xfce4/backdrops"/*.png
-        "/usr/share/xfce4/backdrops"/*.jpg
-    )
-    for w in "${CANDIDATES[@]}"; do
-        if is_valid_image "$w"; then
-            WALLPAPER="$w"
-            echo "$WALLPAPER" > "$CONFIG_FILE"
+# 3. Inicializar ~/.fehbg sólo si el usuario no tiene ninguno guardado
+if [ ! -f "$HOME/.fehbg" ]; then
+    FALLBACK_IMG=""
+    for cand in /usr/share/backgrounds/*.png /usr/share/backgrounds/*.jpg /usr/share/xfce4/backdrops/*.png; do
+        if [ -f "$cand" ]; then
+            FALLBACK_IMG="$cand"
             break
         fi
     done
+
+    if [ -n "$FALLBACK_IMG" ]; then
+        feh --bg-fill "$FALLBACK_IMG" 2>/dev/null || true
+    fi
+else
+    # Restaurar el que ya existía sin modificarlo
+    sh "$HOME/.fehbg" 2>/dev/null || true
 fi
 
-if command -v xwallpaper >/dev/null 2>&1 && [ -n "$WALLPAPER" ]; then
-    killall -q xwallpaper 2>/dev/null || true
-    xwallpaper --daemon --zoom "$WALLPAPER"
-fi
-EOF
-chmod +x "$HOME/.local/bin/wallpaper.sh"
-("$HOME/.local/bin/wallpaper.sh" >/dev/null 2>&1 &) || true
-
-cat <<EOF > "$HOME/.config/autostart/wallpaper.desktop"
+# 4. Autostart de restauración: ejecuta el script generado y no deja procesos en RAM
+cat <<'EOF' > "$HOME/.config/autostart/wallpaper-restore.desktop"
 [Desktop Entry]
 Type=Application
-Exec=$HOME/.local/bin/wallpaper.sh
+Exec=sh -c "test -f $HOME/.fehbg && exec $HOME/.fehbg"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
-Name=Wallpaper Setter
-Comment=Lightweight desktop wallpaper loader via xwallpaper
+Name=Wallpaper Restore
+Comment=Restaura el fondo de pantalla guardado usando feh
 EOF
 
 xfconf-query -c xfce4-session -p /sessions/Failsafe/Client4_Command -s "/bin/true" -t string 2>/dev/null || true
 xfconf-query -c xfce4-session -p /sessions/Failsafe/Count -s 4 2>/dev/null || true
 
-echo "==> 9. Configurando atajos globales y XKB nativo (desactivando IBus)..."
+echo "==> 9. Configurando atajos globales y XKB nativo..."
 xfconf-query -c xsettings -p /Net/ThemeName -s "Orchis-Dark" 2>/dev/null || true
 xfconf-query -c xsettings -p /Net/IconThemeName -s "Tela-circle-dark" 2>/dev/null || true
 xfconf-query -c xsettings -p /Gtk/FontName -s "Inter 10" 2>/dev/null || true
