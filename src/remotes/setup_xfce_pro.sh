@@ -35,8 +35,9 @@ sudo apt-mark manual \
     xfce4-session xfwm4 xfce4-panel xfce4-terminal xfce4-settings \
     xfce4-power-manager xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
 
+# Purgar definitivamente light-locker (causa de los bloqueos de VT) y dependencias residuales
 sudo apt purge -y \
-    xfce4-screensaver xscreensaver xscreensaver-data xscreensaver-gl \
+    light-locker xscreensaver xscreensaver-data xscreensaver-gl \
     xfdesktop4 plank xcape xwallpaper \
     remmina remmina-plugin-rdp remmina-plugin-vnc remmina-plugin-secret remmina-common \
     alttab skippy-xd \
@@ -56,13 +57,14 @@ rm -f "$HOME/.config/autostart/plank.desktop" "$HOME/.config/autostart/xcape.des
       "$HOME/.config/autostart/greenclip.desktop" "$HOME/.config/autostart/touchpad-setup.desktop" \
       "$HOME/.config/autostart/alttab.desktop" "$HOME/.config/autostart/skippy-xd.desktop" \
       "$HOME/.config/autostart/xfdashboard.desktop" "$HOME/.config/autostart/wallpaper.desktop" \
-      "$HOME/.config/autostart/nitrogen.desktop" \
+      "$HOME/.config/autostart/nitrogen.desktop" "$HOME/.config/autostart/light-locker.desktop" \
       "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/systemd/user/xfdashboard.service" \
       "$HOME/.config/systemd/user/picom.service"
 
-echo "==> 2. Instalando stack base, Feh, Zenity, Picom, Rofi y utilidades..."
+echo "==> 2. Instalando stack base, xfce4-screensaver, Feh, Zenity, Picom, Rofi y utilidades..."
 sudo apt install -y \
-    lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings light-locker \
+    lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings \
+    xfce4-screensaver \
     feh zenity \
     xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder mugshot \
     xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter xfce4-xkb-plugin \
@@ -236,7 +238,7 @@ killall -9 vicinae vicinae-server 2>/dev/null || true
 killall -q ayatana-indicator-application-service indicator-application-service 2>/dev/null || true
 (sleep 1 && /usr/local/bin/vicinae server >/dev/null 2>&1 &)
 
-echo "==> 5. Configurando LightDM y Light-Locker..."
+echo "==> 5. Configurando LightDM (Inicio) y xfce4-screensaver (Bloqueo en sesión sin VT Switch)..."
 echo "lightdm shared/default-x-display-manager select lightdm" | sudo debconf-set-selections
 echo "/usr/sbin/lightdm" | sudo tee /etc/X11/default-display-manager >/dev/null
 sudo systemctl disable gdm3 gdm 2>/dev/null || true
@@ -265,15 +267,26 @@ default-user-image = #avatar-default
 screensaver-timeout = 60
 EOF"
 
-xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -n -t bool -s false 2>/dev/null || \
-xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -s false 2>/dev/null || true
+# Configurar xfce4-screensaver de forma óptima: pantalla negra sin efectos (0% CPU/GPU) y bloqueo instantáneo
+xfconf-query -c xfce4-screensaver -p /saver/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /saver/enabled -s true 2>/dev/null || true
+xfconf-query -c xfce4-screensaver -p /saver/mode -n -t int -s 0 2>/dev/null || xfconf-query -c xfce4-screensaver -p /saver/mode -s 0 2>/dev/null || true
+xfconf-query -c xfce4-screensaver -p /lock/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/enabled -s true 2>/dev/null || true
+xfconf-query -c xfce4-screensaver -p /lock/saver-activation/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/saver-activation/enabled -s true 2>/dev/null || true
+xfconf-query -c xfce4-screensaver -p /lock/saver-activation/delay -n -t int -s 0 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/saver-activation/delay -s 0 2>/dev/null || true
 
-cat <<'EOF' > "$HOME/.config/autostart/light-locker.desktop"
+# Integrar el bloqueo en suspensión directamente con el gestor de energía nativo
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -n -t bool -s true 2>/dev/null || \
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -s true 2>/dev/null || true
+
+# Asegurar que el autostart nativo esté habilitado
+mkdir -p "$HOME/.config/autostart"
+cat <<'EOF' > "$HOME/.config/autostart/xfce4-screensaver.desktop"
 [Desktop Entry]
 Type=Application
-Name=Screen Locker
-Comment=Light-locker daemon
-Exec=light-locker --lock-on-suspend --no-late-locking
+Name=Xfce Screensaver
+Comment=Launch Screensaver and Locker
+Exec=xfce4-screensaver
+Icon=preferences-desktop-screensaver
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
@@ -283,19 +296,16 @@ mkdir -p "$HOME/.local/bin"
 cat <<'EOF' > "$HOME/.local/bin/screenlock"
 #!/usr/bin/env bash
 set -euo pipefail
-if command -v light-locker-command >/dev/null 2>&1 && pgrep -x light-locker >/dev/null; then
-    light-locker-command -l
-elif command -v dm-tool >/dev/null 2>&1; then
-    dm-tool lock
+if command -v xfce4-screensaver-command >/dev/null 2>&1; then
+    xfce4-screensaver-command --lock
 else
     xflock4
 fi
 EOF
 chmod +x "$HOME/.local/bin/screenlock"
 
-if ! pgrep -x light-locker >/dev/null; then
-    (light-locker --lock-on-suspend --no-late-locking >/dev/null 2>&1 &)
-fi
+# Iniciar el daemon inmediatamente si no está en ejecución
+pgrep -x xfce4-screensaver >/dev/null || (xfce4-screensaver >/dev/null 2>&1 &)
 
 echo "==> 6. Configuración de hardware (Touchpad, PipeWire, Polkit)..."
 sudo mkdir -p /etc/X11/xorg.conf.d
@@ -366,6 +376,8 @@ rounded-corners-exclude = [
     "class_g = 'Rofi'",
     "class_g = 'flameshot'",
     "class_g = 'Flameshot'",
+    "class_g = 'xfce4-screensaver'",
+    "class_g = 'Xfce4-screensaver'",
     "fullscreen"
 ];
 
@@ -379,6 +391,8 @@ shadow-exclude = [
     "class_g = 'Flameshot'",
     "class_g = 'vicinae'",
     "class_g = 'Xfce4-notifyd'",
+    "class_g = 'xfce4-screensaver'",
+    "class_g = 'Xfce4-screensaver'",
     "window_type = 'notification'",
     "_NET_WM_STATE *= '_NET_WM_STATE_HIDDEN'"
 ];
@@ -386,11 +400,16 @@ shadow-exclude = [
 blur-background-exclude = [
     "class_g = 'flameshot'",
     "class_g = 'Flameshot'",
+    "class_g = 'xfce4-screensaver'",
+    "class_g = 'Xfce4-screensaver'",
     "window_type = 'dock'",
     "window_type = 'desktop'"
 ];
 
-focus-exclude = [];
+focus-exclude = [
+    "class_g = 'xfce4-screensaver'",
+    "class_g = 'Xfce4-screensaver'"
+];
 
 wintypes:
 {
@@ -530,7 +549,6 @@ xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" -s "ro
 echo "==> 8. Configurando motor Feh y selector gráfico de Wallpapers..."
 mkdir -p "$HOME/Pictures"
 
-# 1. Crear el selector gráfico (Zenity GTK nativo)
 sudo bash -c 'cat <<'"'"'EOF'"'"' > /usr/local/bin/wallpaper-picker
 #!/usr/bin/env bash
 set -euo pipefail
@@ -551,7 +569,6 @@ fi
 EOF'
 sudo chmod +x /usr/local/bin/wallpaper-picker
 
-# 2. Registrar el selector en el menú de aplicaciones del sistema
 mkdir -p "$HOME/.local/share/applications"
 cat <<'EOF' > "$HOME/.local/share/applications/wallpaper-picker.desktop"
 [Desktop Entry]
@@ -564,7 +581,6 @@ Terminal=false
 Categories=Settings;DesktopSettings;
 EOF
 
-# 3. Inicializar ~/.fehbg sólo si el usuario no tiene ninguno guardado
 if [ ! -f "$HOME/.fehbg" ]; then
     FALLBACK_IMG=""
     for cand in /usr/share/backgrounds/*.png /usr/share/backgrounds/*.jpg /usr/share/xfce4/backdrops/*.png; do
@@ -578,11 +594,9 @@ if [ ! -f "$HOME/.fehbg" ]; then
         feh --bg-fill "$FALLBACK_IMG" 2>/dev/null || true
     fi
 else
-    # Restaurar el que ya existía sin modificarlo
     sh "$HOME/.fehbg" 2>/dev/null || true
 fi
 
-# 4. Autostart de restauración: ejecuta el script generado y no deja procesos en RAM
 cat <<'EOF' > "$HOME/.config/autostart/wallpaper-restore.desktop"
 [Desktop Entry]
 Type=Application

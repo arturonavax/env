@@ -20,7 +20,7 @@ sudo apt-mark manual \
     xfce4-power-manager xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
 
 echo "==> 2. Deteniendo procesos y daemons conflictivos..."
-killall -q picom light-locker xfce4-screensaver xscreensaver xwallpaper ibus-daemon 2>/dev/null || true
+killall -q picom light-locker xscreensaver xwallpaper ibus-daemon 2>/dev/null || true
 
 echo "==> 3. Purgando servicios systemd de usuario residuales..."
 systemctl --user stop picom.service skippy-xd.service xfdashboard.service 2>/dev/null || true
@@ -30,11 +30,11 @@ rm -f "$HOME/.config/systemd/user/picom.service" \
       "$HOME/.config/systemd/user/xfdashboard.service"
 systemctl --user daemon-reload 2>/dev/null || true
 
-echo "==> 4. Limpiando autostarts obsoletos..."
-rm -f "$HOME/.config/autostart/wallpaper.desktop" \
+echo "==> 4. Limpiando autostarts obsoletos y problemáticos..."
+rm -f "$HOME/.config/autostart/light-locker.desktop" \
+      "$HOME/.config/autostart/wallpaper.desktop" \
       "$HOME/.config/autostart/xwallpaper.desktop" \
       "$HOME/.config/autostart/nitrogen.desktop" \
-      "$HOME/.config/autostart/xfce4-screensaver.desktop" \
       "$HOME/.config/autostart/xscreensaver.desktop" \
       "$HOME/.config/autostart/plank.desktop" \
       "$HOME/.config/autostart/xcape.desktop" \
@@ -43,24 +43,22 @@ rm -f "$HOME/.config/autostart/wallpaper.desktop" \
       "$HOME/.config/autostart/skippy-xd.desktop" \
       "$HOME/.config/autostart/xfdashboard.desktop"
 
-echo "==> 5. Purgando paquetes obsoletos..."
+echo "==> 5. Purgando light-locker y paquetes obsoletos del sistema..."
 sudo apt purge -y \
-    xfce4-screensaver xscreensaver xscreensaver-data xscreensaver-gl \
+    light-locker xscreensaver xscreensaver-data xscreensaver-gl \
     xwallpaper xfdesktop4 plank xcape alttab skippy-xd \
     2>/dev/null || true
+sudo apt autoremove -y 2>/dev/null || true
 
-echo "==> 6. Eliminando scripts y configuraciones residuales..."
+echo "==> 6. Eliminando scripts y residuos..."
 sudo rm -f /usr/local/bin/greenclip /usr/local/bin/i3lock-color /usr/local/bin/betterlockscreen \
            /usr/local/bin/alttab /usr/local/bin/skippy-xd /usr/local/bin/rofi-window \
-           /usr/local/bin/wallpaper.sh /usr/local/bin/wallpaper-picker
+           /usr/local/bin/wallpaper.sh
 rm -f "$HOME/.local/bin/greenclip" "$HOME/.local/bin/i3lock-color" "$HOME/.local/bin/betterlockscreen" \
       "$HOME/.local/bin/alttab" "$HOME/.local/bin/alttab-daemon.sh" "$HOME/.local/bin/skippy-xd" \
       "$HOME/.local/bin/skippy-xd.bin" "$HOME/.local/bin/rofi-window" "$HOME/.local/bin/rofi-alt-tab-watcher" \
       "$HOME/.local/src/rofi-alt-tab-watcher.c" "$HOME/.local/bin/toggle-layout.sh" \
       "$HOME/.local/bin/wallpaper.sh" "$HOME/.config/wallpaper"
 rm -rf "$HOME/.config/nitrogen"
-
-echo "==> 7. Restableciendo flags de energía..."
-xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -s false 2>/dev/null || true
 
 echo "==> Sanitización completada."
