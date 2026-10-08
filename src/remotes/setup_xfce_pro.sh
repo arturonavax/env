@@ -35,7 +35,7 @@ sudo apt-mark manual \
     xfce4-session xfwm4 xfce4-panel xfce4-terminal xfce4-settings \
     xfce4-power-manager xfce4-pulseaudio-plugin xfce4-appfinder libgarcon-gtk3-1-0 2>/dev/null || true
 
-# Purgar definitivamente light-locker (causa de los bloqueos de VT) y dependencias residuales
+# Purgar light-locker y servicios obsoletos que causan congelamientos de VT
 sudo apt purge -y \
     light-locker xscreensaver xscreensaver-data xscreensaver-gl \
     xfdesktop4 plank xcape xwallpaper \
@@ -61,10 +61,11 @@ rm -f "$HOME/.config/autostart/plank.desktop" "$HOME/.config/autostart/xcape.des
       "$HOME/.config/systemd/user/skippy-xd.service" "$HOME/.config/systemd/user/xfdashboard.service" \
       "$HOME/.config/systemd/user/picom.service"
 
-echo "==> 2. Instalando stack base, xfce4-screensaver, Feh, Zenity, Picom, Rofi y utilidades..."
+echo "==> 2. Instalando stack base, Redshift, xfce4-screensaver, Feh, Zenity, Picom y Rofi..."
 sudo apt install -y \
     lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings \
     xfce4-screensaver \
+    redshift \
     feh zenity \
     xfce4-panel xfce4-pulseaudio-plugin xfce4-appfinder mugshot \
     xfce4-goodies xfce4-whiskermenu-plugin xfce4-notifyd xfce4-power-manager xfce4-screenshooter xfce4-xkb-plugin \
@@ -96,7 +97,7 @@ if [ ! -d "/usr/share/themes/Orchis-Dark" ] || [ ! -d "/usr/share/icons/Tela-cir
     rm -rf "$TEMP_DIR"
 fi
 
-echo "==> 4. Configurando Vicinae e iconos de forma idempotente..."
+echo "==> 4. Configurando Vicinae e iconos..."
 if ! command -v vicinae >/dev/null 2>&1; then
     curl -fsSL --connect-timeout 5 -m 30 https://vicinae.com/install | bash -s -- --prefix "$HOME/.local"
 fi
@@ -238,7 +239,7 @@ killall -9 vicinae vicinae-server 2>/dev/null || true
 killall -q ayatana-indicator-application-service indicator-application-service 2>/dev/null || true
 (sleep 1 && /usr/local/bin/vicinae server >/dev/null 2>&1 &)
 
-echo "==> 5. Configurando LightDM (Inicio) y xfce4-screensaver (Bloqueo en sesión sin VT Switch)..."
+echo "==> 5. Configurando LightDM (Inicio) y xfce4-screensaver (Sin VT Switch)..."
 echo "lightdm shared/default-x-display-manager select lightdm" | sudo debconf-set-selections
 echo "/usr/sbin/lightdm" | sudo tee /etc/X11/default-display-manager >/dev/null
 sudo systemctl disable gdm3 gdm 2>/dev/null || true
@@ -267,18 +268,16 @@ default-user-image = #avatar-default
 screensaver-timeout = 60
 EOF"
 
-# Configurar xfce4-screensaver de forma óptima: pantalla negra sin efectos (0% CPU/GPU) y bloqueo instantáneo
+# Configuración óptima de xfce4-screensaver (pantalla negra, 0% CPU y sin cambio de VT)
 xfconf-query -c xfce4-screensaver -p /saver/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /saver/enabled -s true 2>/dev/null || true
 xfconf-query -c xfce4-screensaver -p /saver/mode -n -t int -s 0 2>/dev/null || xfconf-query -c xfce4-screensaver -p /saver/mode -s 0 2>/dev/null || true
 xfconf-query -c xfce4-screensaver -p /lock/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/enabled -s true 2>/dev/null || true
 xfconf-query -c xfce4-screensaver -p /lock/saver-activation/enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/saver-activation/enabled -s true 2>/dev/null || true
 xfconf-query -c xfce4-screensaver -p /lock/saver-activation/delay -n -t int -s 0 2>/dev/null || xfconf-query -c xfce4-screensaver -p /lock/saver-activation/delay -s 0 2>/dev/null || true
 
-# Integrar el bloqueo en suspensión directamente con el gestor de energía nativo
 xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -n -t bool -s true 2>/dev/null || \
 xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/lock-screen-suspend-hibernate -s true 2>/dev/null || true
 
-# Asegurar que el autostart nativo esté habilitado
 mkdir -p "$HOME/.config/autostart"
 cat <<'EOF' > "$HOME/.config/autostart/xfce4-screensaver.desktop"
 [Desktop Entry]
@@ -304,7 +303,6 @@ fi
 EOF
 chmod +x "$HOME/.local/bin/screenlock"
 
-# Iniciar el daemon inmediatamente si no está en ejecución
 pgrep -x xfce4-screensaver >/dev/null || (xfce4-screensaver >/dev/null 2>&1 &)
 
 echo "==> 6. Configuración de hardware (Touchpad, PipeWire, Polkit)..."
@@ -573,7 +571,7 @@ mkdir -p "$HOME/.local/share/applications"
 cat <<'EOF' > "$HOME/.local/share/applications/wallpaper-picker.desktop"
 [Desktop Entry]
 Type=Application
-Name=Change Background
+Name=Cambiar Fondo de Pantalla
 Comment=Selector gráfico y ligero de fondos de pantalla
 Exec=/usr/local/bin/wallpaper-picker
 Icon=preferences-desktop-wallpaper
@@ -835,5 +833,80 @@ xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-type" -n -t int -s 0 2>/dev/
 xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-type" -s 0 2>/dev/null || true
 
 xfce4-panel -r 2>/dev/null || true
+
+echo "==> 13. Configurando Redshift (Máxima Protección y acceso para Vicinae)..."
+mkdir -p "$HOME/.config/redshift"
+
+# 1. Detección automática de ubicación vía red con fallback exacto a Bogotá
+LAT="4.7110"
+LON="-74.0721"
+LOC_DATA=$(curl -fsSL --connect-timeout 3 -m 5 https://ipinfo.io/loc 2>/dev/null || true)
+if [[ "$LOC_DATA" =~ ^-?[0-9]+\.[0-9]+,-?[0-9]+\.[0-9]+$ ]]; then
+    LAT="${LOC_DATA%,*}"
+    LON="${LOC_DATA#*,}"
+fi
+
+# 2. Configurar perfil de Redshift: 2500K nocturno (máxima filtración) y gamma 0.85
+cat <<EOF > "$HOME/.config/redshift/redshift.conf"
+[redshift]
+temp-day=6500
+temp-night=2500
+transition=1
+gamma=0.85
+adjustment-method=randr
+location-provider=manual
+
+[manual]
+lat=${LAT}
+lon=${LON}
+EOF
+
+# 3. Crear script de toggle para alternar entre el filtro y modo neutral
+sudo bash -c 'cat <<'"'"'EOF'"'"' > /usr/local/bin/toggle-redshift
+#!/usr/bin/env bash
+set -euo pipefail
+
+if pgrep -x redshift >/dev/null; then
+    killall -q redshift 2>/dev/null || true
+    redshift -x 2>/dev/null || true
+    notify-send -t 1500 -i display "Luz Nocturna" "Filtro desactivado (6500K)" 2>/dev/null || true
+else
+    (redshift >/dev/null 2>&1 &)
+    notify-send -t 1500 -i display "Luz Nocturna" "Filtro activado (Protección Máxima 2500K)" 2>/dev/null || true
+fi
+EOF'
+sudo chmod +x /usr/local/bin/toggle-redshift
+
+# 4. Registrar acceso de escritorio (.desktop) para indexación inmediata en Vicinae
+mkdir -p "$HOME/.local/share/applications"
+cat <<'EOF' > "$HOME/.local/share/applications/toggle-redshift.desktop"
+[Desktop Entry]
+Type=Application
+Name=Luz Nocturna (Night Shift)
+GenericName=Filtro de Luz Azul
+Comment=Alternar filtro de luz azul y protección de pantalla
+Exec=/usr/local/bin/toggle-redshift
+Icon=display
+Terminal=false
+Categories=Settings;Utility;
+Keywords=night;shift;redshift;blue;light;filtro;luz;nocturna;
+EOF
+
+# 5. Configurar inicio automático del daemon
+cat <<'EOF' > "$HOME/.config/autostart/redshift.desktop"
+[Desktop Entry]
+Type=Application
+Name=Redshift
+Comment=Filtro automático de luz azul
+Exec=redshift
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+# Reiniciar instancia activa de redshift de forma desasociada
+killall -q redshift 2>/dev/null || true
+redshift -x 2>/dev/null || true
+(redshift >/dev/null 2>&1 &) || true
 
 echo "==> Configuración completada exitosamente."
