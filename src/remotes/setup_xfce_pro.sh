@@ -806,6 +806,8 @@ xfconf-query -c keyboard-layout -p "/Default/XkbOptions/Group" -s "grp:alt_shift
 
 setxkbmap -layout "us,es" -variant "," -option "grp:alt_shift_toggle" 2>/dev/null || true
 
+xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>n" -n -t string -s "/usr/local/bin/toggle-redshift" 2>/dev/null || xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>n" -s "/usr/local/bin/toggle-redshift" 2>/dev/null || true
+
 echo "==> 10. Integrando capturas de pantalla (Flameshot) y OCR..."
 mkdir -p "$HOME/.local/bin" "$HOME/.config/flameshot"
 cat <<'EOF' > "$HOME/.config/flameshot/flameshot.ini"
@@ -996,12 +998,22 @@ fi
 # 2. Configurar perfil de Redshift: 2500K nocturno (máxima filtración) y gamma 0.85
 cat <<EOF > "$HOME/.config/redshift/redshift.conf"
 [redshift]
-temp-day=6500
-temp-night=2500
+; Temperatura de día y noche (2400K para máxima protección visual)
+temp-day=5800
+temp-night=2400
 transition=1
 gamma=0.85
 adjustment-method=randr
 location-provider=manual
+
+; Curva de elevación agresiva para máxima protección al atardecer:
+; A 6° (antes del ocaso) comienza a bajar, y a 0° (en el horizonte ~17:50) ya está al 100% de protección nocturna
+elevation-high=6
+elevation-low=0
+
+; Horarios definidos de transición adaptados a Bogotá
+dawn-time=05:45-06:15
+dusk-time=17:20-17:55
 
 [manual]
 lat=${LAT}
@@ -1011,15 +1023,48 @@ EOF
 # 3. Crear script de toggle para alternar entre el filtro y modo neutral
 sudo bash -c 'cat <<'"'"'EOF'"'"' > /usr/local/bin/toggle-redshift
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
-if pgrep -x redshift >/dev/null; then
-    killall -q redshift 2>/dev/null || true
-    redshift -x 2>/dev/null || true
-    notify-send -t 1500 -i display "Luz Nocturna" "Filtro desactivado (6500K)" 2>/dev/null || true
+# Asegurar entorno X11 y D-Bus para ejecución sin fallos desde Vicinae, atajos o scripts
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -f "/run/user/$(id -u)/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+fi
+
+# Archivo de estado en /tmp: se limpia en cada reinicio para evitar estados desfasados
+STATE_FILE="/tmp/redshift_${USER}_manual_state"
+
+# Detección inteligente del estado visual actual:
+# Está activo si el archivo de estado dice "on" O si el demonio redshift está en ejecución
+IS_ACTIVE=0
+if [ -f "$STATE_FILE" ]; then
+    [ "$(cat "$STATE_FILE" 2>/dev/null || true)" = "on" ] && IS_ACTIVE=1
+elif pgrep -x redshift >/dev/null 2>&1; then
+    IS_ACTIVE=1
+fi
+
+# Función para liberar de forma limpia y garantizada el control de gamma
+stop_redshift_cleanly() {
+    pkill -x redshift 2>/dev/null || true
+    for i in 1 2 3 4; do
+        pgrep -x redshift >/dev/null 2>&1 || break
+        sleep 0.05
+    done
+}
+
+if [ "$IS_ACTIVE" -eq 1 ]; then
+    # DESACTIVAR: Limpiar procesos y restablecer calibración neutral inmediata (6500K)
+    stop_redshift_cleanly
+    redshift -m randr -x 2>/dev/null || true
+    echo "off" > "$STATE_FILE"
+    notify-send -t 1500 -i display "Luz Nocturna" "Filtro desactivado (Luz neutral 6500K)" 2>/dev/null || true
 else
-    (redshift >/dev/null 2>&1 &)
-    notify-send -t 1500 -i display "Luz Nocturna" "Filtro activado (Protección Máxima 2500K)" 2>/dev/null || true
+    # ACTIVAR: Detener procesos previos y forzar Protección Máxima (2400K - Gamma 0.85) inmediata
+    stop_redshift_cleanly
+    redshift -m randr -P -O 2400 -g 0.85 2>/dev/null || true
+    echo "on" > "$STATE_FILE"
+    notify-send -t 1500 -i display "Luz Nocturna" "Protección Máxima activada (2400K - Gamma 0.85)" 2>/dev/null || true
 fi
 EOF'
 sudo chmod +x /usr/local/bin/toggle-redshift
@@ -1045,15 +1090,20 @@ cat <<'EOF' > "$HOME/.config/autostart/redshift.desktop"
 Type=Application
 Name=Redshift
 Comment=Filtro automático de luz azul
-Exec=redshift
+Exec=sh -c "sleep 3 && pkill -x redshift 2>/dev/null; exec redshift -m randr"
+Icon=display
+Terminal=false
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=3
 EOF
 
-# Reiniciar instancia activa de redshift de forma desasociada
-killall -q redshift 2>/dev/null || true
-redshift -x 2>/dev/null || true
-(redshift >/dev/null 2>&1 &) || true
+# Reiniciar instancia activa de redshift de forma limpia y desasociada
+pkill -x redshift 2>/dev/null || true
+sleep 0.1
+redshift -m randr -x 2>/dev/null || true
+sleep 0.1
+(redshift -m randr >/dev/null 2>&1 &) || true
 
 echo "==> Configuración completada exitosamente."
