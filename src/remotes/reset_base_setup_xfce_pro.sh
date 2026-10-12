@@ -30,6 +30,16 @@ rm -f "$HOME/.config/systemd/user/picom.service" \
       "$HOME/.config/systemd/user/xfdashboard.service"
 systemctl --user daemon-reload 2>/dev/null || true
 
+
+echo "==> Limpiando configuraciones de rendimiento, udev y servicios..."
+pkill -f xfce-unlock-fixer 2>/dev/null || true 2>/dev/null || true
+sudo rm -f /etc/tlp.d/99-performance.conf            /etc/systemd/system-sleep/99-performance-resume.sh            /etc/udev/rules.d/50-bluetooth-power.rules            /usr/local/bin/xfce-unlock-fixer
+rm -f "$HOME/.local/bin/xfce-unlock-fixer"       "$HOME/.config/autostart/xfce-unlock-fixer.desktop"
+
+# Desbloquear thermald si estaba enmascarado
+sudo systemctl unmask thermald 2>/dev/null || true
+sudo udevadm control --reload-rules 2>/dev/null || true
+
 echo "==> 4. Limpiando autostarts obsoletos y problemáticos..."
 rm -f "$HOME/.config/autostart/light-locker.desktop" \
       "$HOME/.config/autostart/wallpaper.desktop" \

@@ -303,7 +303,60 @@ fi
 EOF
 chmod +x "$HOME/.local/bin/screenlock"
 
-pgrep -x xfce4-screensaver >/dev/null || (xfce4-screensaver >/dev/null 2>&1 &)
+# Solución definitiva al bug de pérdida de foco en X11/Xfwm4 tras desbloquear xfce4-screensaver
+cat <<'EOF_FIXER' > "$HOME/.local/bin/xfce-unlock-fixer"
+#!/usr/bin/env bash
+# xfce-unlock-fixer: Monitorea D-Bus y restaura el foco X11 al instante tras desbloquear la sesión
+set -uo pipefail
+
+dbus-monitor --session "type='signal',interface='org.xfce.ScreenSaver',member='ActiveChanged'"                        "type='signal',interface='org.freedesktop.ScreenSaver',member='ActiveChanged'" 2>/dev/null | while read -r line; do
+    if echo "$line" | grep -q "boolean false"; then
+        # Pausa mínima para permitir que la ventana del diálogo de bloqueo se retire de X11
+        sleep 0.12
+        # Obtener ventana activa registrada en X11
+        ACTIVE_WIN=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | awk '{print $5}')
+        if [ -n "$ACTIVE_WIN" ] && [ "$ACTIVE_WIN" != "0x0" ]; then
+            xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || true
+            xdotool windowfocus "$ACTIVE_WIN" 2>/dev/null || true
+        else
+            # Respaldo: Activar la última ventana mapeada visible
+            FALLBACK_WIN=$(xdotool search --onlyvisible --class ".*" 2>/dev/null | tail -n 1 || true)
+            [ -n "$FALLBACK_WIN" ] && xdotool windowactivate "$FALLBACK_WIN" 2>/dev/null || true
+        fi
+        # Señal limpia a Picom para re-sincronizar el buffer gráfico sin parpadeos
+        pkill -USR1 picom 2>/dev/null || true
+    fi
+done
+EOF_FIXER
+chmod +x "$HOME/.local/bin/xfce-unlock-fixer"
+sudo ln -sf "$HOME/.local/bin/xfce-unlock-fixer" /usr/local/bin/xfce-unlock-fixer 2>/dev/null || true
+
+cat <<'EOF_FIXER_DESKTOP' > "$HOME/.config/autostart/xfce-unlock-fixer.desktop"
+[Desktop Entry]
+Type=Application
+Name=Xfce Unlock Focus Fixer
+Comment=Restaura automáticamente el foco del teclado y ratón al desbloquear
+Exec=sh -c "pkill -f xfce-unlock-fixer; exec $HOME/.local/bin/xfce-unlock-fixer"
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF_FIXER_DESKTOP
+
+pkill -f xfce-unlock-fixer 2>/dev/null || true
+("$HOME/.local/bin/xfce-unlock-fixer" >/dev/null 2>&1 &) || true
+
+
+
+# Ajuste de DPMS en xfce4-power-manager para evitar apagados prematuros y pérdida de teclas
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-enabled -n -t bool -s true 2>/dev/null || xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-enabled -s true 2>/dev/null || true
+
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-ac -n -t int -s 0 2>/dev/null || xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-ac -s 0 2>/dev/null || true
+
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-sleep -n -t int -s 20 2>/dev/null || xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-sleep -s 20 2>/dev/null || true
+
+xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-off -n -t int -s 30 2>/dev/null || xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-off -s 30 2>/dev/null || true
+
+pgrep -f xfce4-screensaver >/dev/null || (xfce4-screensaver >/dev/null 2>&1 &)
 
 echo "==> 6. Configuración de hardware (Touchpad, PipeWire, Polkit)..."
 sudo mkdir -p /etc/X11/xorg.conf.d
@@ -321,6 +374,100 @@ EndSection
 EOF"
 
 systemctl --user enable --now pipewire pipewire-pulse wireplumber 2>/dev/null || true
+
+echo "==> 6.1. Optimizando rendimiento de CPU y eliminando estrangulamiento (TLP + Thermald)..."
+# Desactivar thermald para evitar el bug crítico de Haswell/Dell que traba la CPU en 800MHz tras suspensión
+if systemctl is-enabled thermald >/dev/null 2>&1 || systemctl is-active thermald >/dev/null 2>&1; then
+    sudo systemctl stop thermald 2>/dev/null || true
+    sudo systemctl disable thermald 2>/dev/null || true
+    sudo systemctl mask thermald 2>/dev/null || true
+fi
+
+# Configuración de alto rendimiento en TLP para garantizar máximo clock en AC y batería
+sudo mkdir -p /etc/tlp.d
+sudo bash -c "cat <<'EOF_TLP' > /etc/tlp.d/99-performance.conf
+# Perfil forzado de máximo rendimiento sin reducción de potencia
+CPU_SCALING_GOVERNOR_ON_AC=performance
+CPU_SCALING_GOVERNOR_ON_BAT=performance
+CPU_ENERGY_PERF_POLICY_ON_AC=performance
+CPU_ENERGY_PERF_POLICY_ON_BAT=performance
+CPU_MIN_PERF_ON_AC=0
+CPU_MAX_PERF_ON_AC=100
+CPU_MIN_PERF_ON_BAT=0
+CPU_MAX_PERF_ON_BAT=100
+CPU_BOOST_ON_AC=1
+CPU_BOOST_ON_BAT=1
+
+# Desactivar USB autosuspend global y proteger adaptador Intel Bluetooth 8087:07dc
+USB_AUTOSUSPEND=0
+USB_DENYLIST="8087:07dc"
+
+# Mantener PCIe y GPU Nouveau en rendimiento óptimo
+PCIE_ASPM_ON_AC=performance
+PCIE_ASPM_ON_BAT=performance
+RADEON_DPM_PERFLVL_ON_AC=high
+RADEON_DPM_PERFLVL_ON_BAT=high
+EOF_TLP"
+
+if command -v tlp >/dev/null 2>&1; then
+    sudo tlp start 2>/dev/null || true
+fi
+
+# Aplicar gobernador 'performance' inmediatamente a todos los núcleos activos
+for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    [ -f "$gov" ] && echo "performance" | sudo tee "$gov" >/dev/null 2>&1 || true
+done
+for epb in /sys/devices/system/cpu/cpu*/power/energy_perf_bias; do
+    [ -f "$epb" ] && echo "0" | sudo tee "$epb" >/dev/null 2>&1 || true
+done
+
+echo "==> 6.2. Asegurando persistencia de Bluetooth y reactivación sin fallos tras suspensión..."
+# Regla udev para evitar que el kernel ponga en autosuspend el chip Bluetooth USB (8087:07dc)
+sudo bash -c "cat <<'EOF_BT_UDEV' > /etc/udev/rules.d/50-bluetooth-power.rules
+# Desactivar autosuspend para chip Intel Bluetooth (8087:07dc) y controladores btusb
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="07dc", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{bInterfaceClass}=="e0", ATTR{bInterfaceSubClass}=="01", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="bluetooth", ATTR{power/control}="on"
+EOF_BT_UDEV"
+sudo udevadm control --reload-rules 2>/dev/null || true
+sudo udevadm trigger --subsystem-match=usb 2>/dev/null || true
+
+# Configuración de BlueZ para reconexión inmediata y modo siempre activo
+if [ -f /etc/bluetooth/main.conf ]; then
+    sudo sed -i 's/^#*AutoEnable=.*/AutoEnable=true/' /etc/bluetooth/main.conf 2>/dev/null || true
+    sudo sed -i 's/^#*FastConnectable=.*/FastConnectable=true/' /etc/bluetooth/main.conf 2>/dev/null || true
+    grep -q "^AutoEnable=" /etc/bluetooth/main.conf || sudo bash -c 'echo "AutoEnable=true" >> /etc/bluetooth/main.conf'
+    grep -q "^FastConnectable=" /etc/bluetooth/main.conf || sudo bash -c 'echo "FastConnectable=true" >> /etc/bluetooth/main.conf'
+fi
+
+# Hook de sistema systemd-sleep para forzar máximo rendimiento y despertar limpio de Bluetooth y Picom al salir de suspensión
+sudo mkdir -p /etc/systemd/system-sleep
+sudo bash -c "cat <<'EOF_SLEEP' > /etc/systemd/system-sleep/99-performance-resume.sh
+#!/bin/sh
+case "\$1" in
+    post)
+        # 1. Restaurar frecuencia máxima y gobernador de CPU
+        for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+            [ -f "\$g" ] && echo performance > "\$g" 2>/dev/null || true
+        done
+        for p in /sys/devices/system/cpu/cpu*/power/energy_perf_bias; do
+            [ -f "\$p" ] && echo 0 > "\$p" 2>/dev/null || true
+        done
+
+        # 2. Desbloquear rfkill y asegurar que hci0 esté activo
+        rfkill unblock bluetooth 2>/dev/null || true
+        command -v hciconfig >/dev/null 2>&1 && hciconfig hci0 up 2>/dev/null || true
+
+        # 3. Forzar reinicio de TLP para re-aplicar perfiles limpios
+        command -v tlp >/dev/null 2>&1 && tlp start 2>/dev/null || true
+
+        # 4. Señal de refresco al compositor Picom en sesiones X11 activas
+        pkill -USR1 picom 2>/dev/null || true
+        ;;
+esac
+EOF_SLEEP"
+sudo chmod +x /etc/systemd/system-sleep/99-performance-resume.sh
+
 
 POLKIT_BIN="/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1"
 [ -f "/usr/libexec/polkit-gnome-authentication-agent-1" ] && POLKIT_BIN="/usr/libexec/polkit-gnome-authentication-agent-1"
@@ -353,8 +500,8 @@ vsync = true;
 use-damage = true;
 unredir-if-possible = false;
 
-xrender-sync-fence = true;
-glx-no-stencil = true;
+xrender-sync-fence = false;
+glx-no-stencil = false;
 glx-no-rebind-pixmap = true;
 
 shadow = false;
