@@ -38,6 +38,7 @@ rm -f "$HOME/.local/bin/xfce-unlock-fixer"       "$HOME/.config/autostart/xfce-u
 
 # Desbloquear thermald si estaba enmascarado
 sudo systemctl unmask thermald 2>/dev/null || true
+sudo systemctl unmask power-profiles-daemon 2>/dev/null || true
 sudo udevadm control --reload-rules 2>/dev/null || true
 
 echo "==> 4. Limpiando autostarts obsoletos y problemáticos..."

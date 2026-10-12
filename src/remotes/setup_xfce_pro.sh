@@ -44,6 +44,9 @@ sudo apt purge -y \
     2>/dev/null || true
 sudo apt autoremove -y 2>/dev/null || true
 
+sudo rm -f /etc/xdg/autostart/light-locker.desktop 2>/dev/null || true
+killall -9 light-locker 2>/dev/null || true
+pkill -9 -f light-locker 2>/dev/null || true
 sudo rm -f /usr/local/bin/greenclip /usr/local/bin/i3lock-color /usr/local/bin/betterlockscreen \
            /usr/local/bin/alttab /usr/local/bin/skippy-xd /usr/local/bin/rofi-window \
            /usr/local/bin/wallpaper.sh
@@ -306,27 +309,55 @@ chmod +x "$HOME/.local/bin/screenlock"
 # Solución definitiva al bug de pérdida de foco en X11/Xfwm4 tras desbloquear xfce4-screensaver
 cat <<'EOF_FIXER' > "$HOME/.local/bin/xfce-unlock-fixer"
 #!/usr/bin/env bash
-# xfce-unlock-fixer: Monitorea D-Bus y restaura el foco X11 al instante tras desbloquear la sesión
+# xfce-unlock-fixer v3: Monitorea D-Bus (sesión y sistema) para reactivar foco X11 y protocolo WM_TAKE_FOCUS (Ghostty, terminales, apps)
 set -uo pipefail
 
-dbus-monitor --session "type='signal',interface='org.xfce.ScreenSaver',member='ActiveChanged'"                        "type='signal',interface='org.freedesktop.ScreenSaver',member='ActiveChanged'" 2>/dev/null | while read -r line; do
-    if echo "$line" | grep -q "boolean false"; then
-        # Pausa mínima para permitir que la ventana del diálogo de bloqueo se retire de X11
-        sleep 0.12
-        # Obtener ventana activa registrada en X11
-        ACTIVE_WIN=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | awk '{print $5}')
-        if [ -n "$ACTIVE_WIN" ] && [ "$ACTIVE_WIN" != "0x0" ]; then
-            xdotool windowactivate "$ACTIVE_WIN" 2>/dev/null || true
-            xdotool windowfocus "$ACTIVE_WIN" 2>/dev/null || true
-        else
-            # Respaldo: Activar la última ventana mapeada visible
-            FALLBACK_WIN=$(xdotool search --onlyvisible --class ".*" 2>/dev/null | tail -n 1 || true)
-            [ -n "$FALLBACK_WIN" ] && xdotool windowactivate "$FALLBACK_WIN" 2>/dev/null || true
-        fi
-        # Señal limpia a Picom para re-sincronizar el buffer gráfico sin parpadeos
-        pkill -USR1 picom 2>/dev/null || true
+reactivate_window() {
+    # 1. Extraer ID hexadecimal limpio sin caracteres residuales ni comas (ej: 0x5400004)
+    local win_id
+    win_id=$(xprop -root _NET_ACTIVE_WINDOW 2>/dev/null | grep -oE '0x[0-9a-fA-F]+' | head -n 1 || true)
+
+    # 2. Si no hay ventana activa reportada o es 0x0, buscar ventana de Ghostty visible
+    if [ -z "$win_id" ] || [ "$win_id" = "0x0" ]; then
+        win_id=$(xdotool search --onlyvisible --class "ghostty" 2>/dev/null | head -n 1 || true)
     fi
-done
+
+    # 3. Fallback: buscar cualquier ventana visible en la sesión
+    if [ -z "$win_id" ] || [ "$win_id" = "0x0" ]; then
+        win_id=$(xdotool search --onlyvisible --class ".*" 2>/dev/null | tail -n 1 || true)
+    fi
+
+    # 4. Activar y enfocar explícitamente para que Xfwm4 envíe WM_TAKE_FOCUS y FocusIn
+    if [ -n "$win_id" ] && [ "$win_id" != "0x0" ]; then
+        xdotool windowactivate "$win_id" 2>/dev/null || true
+        xdotool windowfocus "$win_id" 2>/dev/null || true
+    fi
+
+    # 5. Señal de refresco al compositor Picom
+    pkill -USR1 picom 2>/dev/null || true
+}
+
+# Subproceso 1: Escuchar desbloqueo de screensaver (bus de sesión)
+(
+    dbus-monitor --session "type='signal',interface='org.xfce.ScreenSaver',member='ActiveChanged'"                            "type='signal',interface='org.freedesktop.ScreenSaver',member='ActiveChanged'" 2>/dev/null |     while read -r line; do
+        if echo "$line" | grep -q "boolean false"; then
+            sleep 0.12
+            reactivate_window
+        fi
+    done
+) &
+
+# Subproceso 2: Escuchar reanudación tras suspensión del sistema (bus del sistema)
+(
+    dbus-monitor --system "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'" 2>/dev/null |     while read -r line; do
+        if echo "$line" | grep -q "boolean false"; then
+            sleep 0.4
+            reactivate_window
+        fi
+    done
+) &
+
+wait
 EOF_FIXER
 chmod +x "$HOME/.local/bin/xfce-unlock-fixer"
 sudo ln -sf "$HOME/.local/bin/xfce-unlock-fixer" /usr/local/bin/xfce-unlock-fixer 2>/dev/null || true
@@ -376,6 +407,14 @@ EOF"
 systemctl --user enable --now pipewire pipewire-pulse wireplumber 2>/dev/null || true
 
 echo "==> 6.1. Optimizando rendimiento de CPU y eliminando estrangulamiento (TLP + Thermald)..."
+# Desactivar power-profiles-daemon para que no entre en conflicto con TLP ni estrangule la CPU
+if systemctl is-active power-profiles-daemon >/dev/null 2>&1 || systemctl is-enabled power-profiles-daemon >/dev/null 2>&1; then
+    sudo systemctl stop power-profiles-daemon 2>/dev/null || true
+    sudo systemctl disable power-profiles-daemon 2>/dev/null || true
+    sudo systemctl mask power-profiles-daemon 2>/dev/null || true
+fi
+sudo systemctl enable --now tlp 2>/dev/null || true
+
 # Desactivar thermald para evitar el bug crítico de Haswell/Dell que traba la CPU en 800MHz tras suspensión
 if systemctl is-enabled thermald >/dev/null 2>&1 || systemctl is-active thermald >/dev/null 2>&1; then
     sudo systemctl stop thermald 2>/dev/null || true
