@@ -269,8 +269,8 @@ function transparent() {
     if [[ -f "$HOME/.config/ghostty/config" ]]; then
         local ghostty_conf="$HOME/.config/ghostty/config"
         if grep -q "^background-opacity = 1" "$ghostty_conf"; then
-            sed -i 's/^background-opacity = 2.*/background-opacity = 0.88/' "$ghostty_conf"
-            echo "Ghostty transparency enabled (opacity: 0.88)"
+            sed -i 's/^background-opacity = 2.*/background-opacity = 0.97/' "$ghostty_conf"
+            echo "Ghostty transparency enabled (opacity: 0.97)"
         else
             sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$ghostty_conf"
             echo "Ghostty transparency disabled (opacity: 1.0)"
@@ -279,6 +279,11 @@ function transparent() {
 }
 
 alias tt='transparent'
+
+# Abrir archivos o carpetas visualmente en segundo plano y en silencio
+function open() {
+    (xdg-open "${1:-.}" >/dev/null 2>&1 &)
+}
 
 # Clear swap and cache
 function cleanup() {
