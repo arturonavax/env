@@ -1,23 +1,48 @@
-# 🦊 env
+# 🦊 arturonavax/env
 
-Terminal-based development environment.
+High-performance, modular dotfiles repository and multi-platform development environment.
 
-_**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
+Designed for software engineers, architects, and AI developers who demand near-instant startup times, rock-solid stability, and ergonomic command-line workflows.
 
 ---
 
-1. **[Installation :sparkles:](#installation-sparkles)**
-2. **[Features :ballot_box_with_check:](#features-ballot_box_with_check)**
-3. **[Requirements](#requirements)**
-4. **[Custom configuration :gear:](#custom-configuration-gear)**
-5. **[More keyboard speed :keyboard:](#more-keyboard-speed-keyboard)**
-6. **[Precaution and Backup :warning:](#precaution-and-backup-warning)**
-7. **[Reminders](#reminders)**
-8. **[Remote Scripts](#remote-scripts)**
+## Table of Contents
 
-## Installation :sparkles:
+1. [Architectural Principles & Philosophy](#1-architectural-principles--philosophy)
+2. [Quick Start & Installation](#2-quick-start--installation)
+   - [Interactive Setup Wizard (Upfront Interview)](#interactive-setup-wizard-upfront-interview)
+   - [Automated Non-Interactive Installation (Headless / CI-CD)](#automated-non-interactive-installation-headless--ci-cd)
+   - [Dry-Run Planning & Manifest Preview](#dry-run-planning--manifest-preview)
+3. [Subsystems & Tooling Stack](#3-subsystems--tooling-stack)
+   - [1. Base Languages & Toolchains (`requirements`)](#1-base-languages--toolchains-requirements)
+   - [2. Modern GPU Terminal & Lean Shell (`terminal`)](#2-modern-gpu-terminal--lean-shell-terminal)
+   - [3. Code Editor Suite (`editor` — Neovim & LazyVim)](#3-code-editor-suite-editor--neovim--lazyvim)
+   - [4. AI Productivity & Automation Suite (`ai` — `aitools`)](#4-ai-productivity--automation-suite-ai--aitools)
+   - [5. OS Desktop Integrations & Window Switcher (`osconfig` — `rcmd`)](#5-os-desktop-integrations--window-switcher-osconfig--rcmd)
+   - [6. Patched Nerd Fonts (`fonts`)](#6-patched-nerd-fonts-fonts)
+4. [Modern CLI Tool Replacements & Non-Destructive Aliases](#4-modern-cli-tool-replacements--non-destructive-aliases)
+5. [Safeguards, Backups & Transactional Rollback](#5-safeguards-backups--transactional-rollback)
+6. [How to Customize to Your Liking](#6-how-to-customize-to-your-liking)
+7. [Synchronization & Day-to-Day Lifecycle](#7-synchronization--day-to-day-lifecycle)
+8. [Quality Assurance & Automated Testing](#8-quality-assurance--automated-testing)
+9. [Supported Platforms](#9-supported-platforms)
 
-### 1. Interactive Setup Wizard (Recommended)
+---
+
+## 1. Architectural Principles & Philosophy
+
+- **Zero-Friction Performance**: Sub-millisecond terminal startup. Startup scripts (`.zshrc`, `.base.zsh`, `.tools.sh`) are compiled into `.zwc` word-code binaries via `zcompile` and memory-mapped by Zsh. Completion caches (`compinit -C`) bypass costly disk audits if validated within 24 hours.
+- **Non-Destructive Alias Architecture**: Standard Unix utilities (`grep`, `find`, `cat`, `less`) **are NEVER hijacked or aliased** to modern tools (`rg`, `fd`, `bat`). POSIX purity and muscle memory for remote SSH production environments are strictly preserved, while dedicated shortcuts (`rgh`, `fdh`, `preview`, `dft`, `l`) provide ergonomic speed.
+- **Smart Preservation Policy (`smart-append-first`)**: Your existing shell configurations (`~/.zshrc`, `~/.bashrc`) and window bindings are never overwritten. Repository loaders are isolated within `# >>> arturonavax/env >>>` marker blocks, preserving 100% of your personal aliases, history, and secrets.
+- **Transactional Execution & LIFO Rollback Engine**: Operates under an audit journal (`src/lib/transaction.sh`). On keyboard interrupt (`Ctrl+C`) or unexpected stage failure, changes are reversed in reverse-chronological order (LIFO), cleanly removing symlinks/files and restoring initial snapshots.
+- **Zero Compilation Overhead**: Strictly avoids slow compilation or bloated package managers. Official standalone pre-compiled release binaries (musl-static Rust, Go) are prioritized for near-instant provisioning.
+- **Offline & Private**: Embedded SQLite shell history (`atuin`) with directory scoping and zero remote sync or telemetry.
+
+---
+
+## 2. Quick Start & Installation
+
+### Interactive Setup Wizard (Upfront Interview)
 
 Run the guided setup wizard directly from the remote subdomain:
 
@@ -25,261 +50,194 @@ Run the guided setup wizard directly from the remote subdomain:
 bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") --wizard
 ```
 
-Or clone and run locally:
+Or clone the repository and run locally:
 
 ```sh
+git clone https://github.com/arturonavax/env.git ~/repos/github.com/arturonavax/env
+cd ~/repos/github.com/arturonavax/env
 ./install.sh --wizard
 ```
 
 The wizard conducts an **upfront parameter interview**—asking for all destination paths, subsystem components, runtime strategies (GVM vs standalone Go, pnpm vs npm), and OS integrations—before starting autonomous execution. It operates under a transactional audit journal with graceful traps (Ctrl-C / errors) and LIFO rollback protection.
 
-### 2. Automated Non-Interactive Installation
+```text
+╭────────────────────────────────────────────────────────────────────╮
+│  arturonavax/env · Master Environment Wizard                      │
+├────────────────────────────────────────────────────────────────────┤
+│  High-performance modular development environment.                 │
+│  Total Stages: 6 stages planned                                    │
+│  Stop anytime with Ctrl+C. Safe idempotent state recovery.         │
+╰────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
+### Automated Non-Interactive Installation (Headless / CI-CD)
+
+For unattended provisioning, scripts, or container builds, use the non-interactive mode:
 
 ```sh
-# Install all components unattended (zero prompts)
+# Complete autonomous installation (all subsystems, zero prompts)
 ./install.sh -y
 
-# Or install specific subsystems with custom flags
-./install.sh -y --components=terminal,editor --rollback-on-error
+# Select specific subsystems with automatic rollback on error
+./install.sh -y --components=terminal,editor,ai --rollback-on-error
 
-# Or pass subsystem names directly
+# Direct subsystem arguments
 ./install.sh terminal editor ai
 ```
 
-List of installation parameters:
+#### CLI Flags & Options
 
-- `wizard` / `-w`: Launch interactive step-by-step installation wizard.
-- `requirements` / `r`: Install the necessary tools, languages and dependencies.
-  Installs basic dependencies (via `apt`, `dnf`, `pacman`, or `brew`), and the
-  following: `pyenv`, `python3`, `pipx`, `cargo`, `rustc`, `fnm`, `node`,
-  `npm`, `pnpm` and `go`.
-- `fonts` / `f`: Install patched mono fonts.
-- `terminal` / `t`: Install the terminal, shell, prompt, Herdr and terminal tools.
-- `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
-- `ai`: Install AI tooling (CLI assistants, MCP environment, harnesses and prompt files).
-- `osconfig` / `o`: Configure the operating system with personal preferences.
-- `all` / `a`: Install and integrate all of the above.
-- `--check`: Run platform discovery and hardware diagnostics without modifying files.
-- `--plan` / `plan` / `--dry-run`: Preview complete installation plan, native package translations, and touched files without modifying the system.
-- `--uninstall-plan`: Preview uninstallation teardown plan, purged binaries, desktop integrations, and caches.
+| Flag | Description | Default |
+| :--- | :--- | :--- |
+| `-w`, `--wizard` | Launch interactive upfront interview wizard | TTY default |
+| `-y`, `--yes`, `--non-interactive` | Run fully unattended non-interactive installation | Headless default |
+| `-c`, `--components=<list>` | Comma-separated list: `requirements`, `terminal`, `editor`, `ai`, `fonts`, `osconfig`, `all` | `all` |
+| `--dest-bin=<path>` | Destination path for user binaries | `~/.local/bin` |
+| `--backup-dir=<path>` | Destination path for configuration backup snapshots | `~/.arturonavax-env-backups` |
+| `--skip-backup` | Bypass initial configuration snapshot creation | Disabled |
+| `--go-manager=<strategy>` | Go manager strategy: `gvm` (recommended), `standalone`, `package` | `gvm` |
+| `--node-manager=<manager>` | Node.js package manager: `pnpm` (recommended), `npm` | `pnpm` |
+| `--rollback-on-error` | Automatically reverse all session mutations if any stage fails | Disabled |
+| `-p`, `--plan`, `--dry-run` | Safe preview of translated packages, binaries, and touched files | - |
+| `--uninstall-plan` | Safe preview of purged files, binaries, desktop files, and caches | - |
+| `--check` | Run platform discovery and hardware diagnostic check | - |
+| `-h`, `--help` | Display usage documentation and flags | - |
 
-### Planning & Dry-Run Preview (Zero Files Modified)
+---
 
-Inspect the full manifest before making any changes to your machine:
+### Dry-Run Planning & Manifest Preview
+
+Inspect the full filesystem interaction manifest before making any changes:
 
 ```sh
-# Preview complete installation plan and touched files
+# Preview complete installation manifest and touched files
 ./install.sh --plan
-# Or via make: make plan
+# Or via make:
+make plan
 
 # Preview scoped subsystem plan (e.g. terminal only)
 ./install.sh plan terminal
 
-# Preview uninstallation teardown plan (purged binaries, desktop files, caches)
+# Preview uninstallation teardown manifest (purged binaries, desktop files, caches)
 ./uninstall.sh --plan
-# Or via make: make uninstall-plan
+# Or via make:
+make uninstall-plan
 ```
-
-### Aggressive New Installation & Rollback
-
-Uninstall main programs, delete configs, and reinstall cleanly:
-
-```sh
-./uninstall.sh && ./install.sh all
-```
-
-To rollback configuration changes at any time:
-
-```sh
-# List available snapshots
-./utils/restore_backup.sh -l
-
-# Restore the most recent snapshot
-./utils/restore_backup.sh -latest
-```
-
-### Testing & Quality Assurance
-
-The environment includes a comprehensive automated test harness with static analysis, syntax verification, and multi-platform unit tests:
-
-```sh
-# Run the complete test suite (syntax, shellcheck, unit, integration)
-make test
-# Or directly: ./tests/run_tests.sh
-
-# Run specific test suites
-make lint              # Syntax check (bash -n) and ShellCheck static analysis
-make test-unit         # Multi-platform unit tests
-make test-integration  # Integration smoke test suite
-```
-
-## Supported Platforms & Requirements
-
-The installer of this environment features a universal package abstraction layer supporting:
-
-- **Debian / Ubuntu / Pop!_OS / Linux Mint** (`apt`)
-- **Fedora / RHEL / CentOS / Rocky Linux / AlmaLinux** (`dnf`)
-- **Arch Linux / EndeavourOS / Manjaro / Garuda** (`pacman`)
-- **openSUSE / SLES** (`zypper`)
-- **Alpine Linux** (`apk`)
-- **macOS** (Apple Silicon arm64 & Intel x86_64) (`brew` + Command Line Tools)
-- **Android (Termux)** (`pkg`, single-user sandbox without root/sudo)
-- **Windows** (WSL 1/2, MSYS2, Git Bash)
-
-### High-Performance Capabilities
-
-1. **Parallel Concurrency Pool**:
-   Downloads modern single-binary CLI tools (`difftastic`, `delta`, `tealdeer`, `usql`, `fx`), clones Zsh plugins, and runs health probes in parallel using CPU-core-bounded background worker pools.
-
-2. **Smart Non-Destructive Preservation (`smart-append-first`)**:
-   Existing shell configurations (`~/.zshrc`, `~/.bashrc`) and user files (`rcmd.conf`) are never destroyed. Environment loaders are encapsulated inside `# >>> arturonavax/env >>>` marker blocks, leaving all your custom aliases, functions, and history 100% intact.
-
-3. **Portable Backup & Rollback Engine**:
-   POSIX-compliant snapshots in `~/.arturonavax-env-backups/` capped at 50MB with instant rollback via `./utils/restore_backup.sh`.
-
-4. **Multi-Tier Toolchain & Fallback Architecture (GVM Primary)**:
-   Installs toolchains using a resilient priority strategy: Pre-compiled static binary -> Native package manager -> Official setup script -> Compile from source. Uses **GVM (Go Version Manager)** as the primary Go manager, backed by the refined standalone installer [`src/remotes/install_golang.sh`](./src/remotes/install_golang.sh).
-
-5. **Pure-Bash Zero-Dependency Wizard Framework**:
-   Portable interactive TUI framework ([`src/lib/wizard_engine.sh`](./src/lib/wizard_engine.sh)) with zero external dependencies (no Python, no Node, no dialog/whiptail). Easily scaffold custom wizards for other projects using [`./utils/create_wizard.sh`](./utils/create_wizard.sh).
-
-If `pnpm` is installed, it will be used instead of `npm`.
-
-If `pipx` is installed, it will be used instead of `python3 -m pip` for some installations.
-
-_[Resolve EACCES permissions when installing packages globally](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally)
-to avoid error when installing packages with npm._
-
-### For `terminal`
-
-- `git`
-
-### For `editor`
-
-- `git`
-- `make`
-- `cargo`
-- `python3`
-
-  - `pip`
-
-- `node` >= _v12.0.0_
-
-  - `npm`
-
-### For `fonts`
-
-- `fc-cache` _(package `fontconfig`)_
-
-### To install the extra tools
-
-`terminal` and `editor` Install extra tools and utilities only if these
-requirements are installed:
-
-- `go` >= _v1.15.0_
-
-- `python3`
-
-  - `pip`
-
-- `node` >= _v12.0.0_
-
-  - `npm`
-
-## Precaution and Backup :warning:
-
-Read [`install.sh`](./install.sh) file before running on your system
-
-This installer replaces configuration files, so it makes an automatic
-backup of all current files that it replaces in `~/.arturonavax-env-backups/`
-
-The backup script is: [`backup_config.sh`](./utils/backup_config.sh)
 
 ---
 
-## Features :star:
+## 3. Subsystems & Tooling Stack
 
-_Screenshots of the environment in [screenshots/](./docs/screenshots/README.md)_
+### 1. Base Languages & Toolchains (`requirements`)
+- **Compilers**: Native build-essential, GCC/Clang, Make, pkg-config, SSL/SQLite development headers.
+- **Go (Golang)**: Multi-tier toolchain featuring **GVM (Go Version Manager)** as primary manager, backed by standalone JSON release installer ([`src/remotes/install_golang.sh`](./src/remotes/install_golang.sh)) and native package manager fallbacks.
+- **Node.js**: Installed via Fast Node Manager (`fnm`), configured with `pnpm` as the primary disk-efficient package manager. Corepack is decoupled to prevent package manager interference.
+- **Rust**: Official `rustup` toolchain with `cargo`.
+- **Python**: Modular Python environment with `pyenv` and `pipx`.
 
-- **True Color** :rainbow:
+### 2. Modern GPU Terminal & Lean Shell (`terminal`)
+- **Terminal Emulator**: [Ghostty](https://ghostty.org/) (GPU-accelerated, native Zig implementation).
+- **Agent Multiplexer**: [Herdr](https://herdr.dev/) (Native agent state detection, workspace management, zero nested-PTY scroll friction; completely replaces Tmux).
+- **Shell**: Lean Zsh with `.zwc` word-code compilation and memory-mapped fast loading (`~/.base.zsh` and `~/.tools.sh`).
+- **Prompt**: [Starship](https://starship.rs/) configured with a compact 2-line layout, sub-millisecond execution, and AI agent workspace detection (`🤖 AGENTS`).
+- **Shell History**: [Atuin](https://atuin.sh/) SQLite history engine with directory scoping (`filter_mode = "directory"`), durations, exit codes, and zero telemetry (`auto_sync = false`).
+- **Tab Completion**: `fzf-tab` interactive search with live contextual previews via `bat` (files), `eza` (directories), `git log` (branches), and `ps` (processes).
 
-- Patched Mono Font: [MonaspiceNe Nerd Font / Cascadia Code](https://github.com/ryanoasis/nerd-fonts)
+### 3. Code Editor Suite (`editor` — Neovim & LazyVim)
+- **Engine**: Neovim v0.12+ built on [LazyVim](https://www.lazyvim.org/).
+- **Exclusions Architecture** ([`files/nvim/lua/config/exclusions.lua`](./files/nvim/lua/config/exclusions.lua)): Centralized single source of truth ignoring `node_modules`, `vendor`, `.git`, `.venv`, `target`, `dist`, `build`, etc. In-memory O(1) hash table with a 1,000-entry memoization cache for sub-millisecond LSP/completion performance.
+- **LSP & Tooling**: Integrated Mason installer, Treesitter AST parsers, `nvim-lint`, and `conform.nvim` formatters.
+- **Git & Productivity**: `lazygit`, `grug-far.nvim` AST project search, `snacks.nvim`, and AI assistants (`Avante`, `CodeCompanion`).
 
-### Terminal :computer: ([`ghostty`](https://ghostty.org/))
+### 4. AI Productivity & Automation Suite (`ai` — `aitools`)
+- **`aitools` CLI** ([`files/ai/aitools/`](./files/ai/aitools/)):
+  - **Live Quota Telemetry (`aitools quota` / `aitools watch`)**: Inspects rolling quota windows, percentages, and reset countdowns across Google Gemini (`gemini-5h`), Claude/GPT (`3p-5h`), Codex, OpenCode, Pi, and LLM.
+  - **Selective Idempotent Wakeup (`aitools wake`)**: Automatically skips sending wake probes if the rolling 5-hour window is already ticking, preserving 100% of unused tokens. Sends low-effort 1-token probes only when expired.
+  - **Hardware RTC Auto-Wake & Auto-Resuspend (`aitools daemon`)**: Wakes the machine at 04:00 AM via motherboard RTC alarm (`rtcwake`), verifies network, primes expired models, schedules next day's alarm, and suspends back to sleep in 12s. Emits desktop alerts and Telegram notifications.
+  - **AI Conventional Commit Pipeline (`aitools commit` / `gcm`)**: Inspects staged diffs and generates Conventional Commit messages via LLM (`agy`, `claude`, `codex`, `opencode`, `pi`, `llm`) with interactive accept/edit/regenerate.
+- **RTK (Rust Token Killer)**: High-speed proxy compressing LLM command outputs by up to 90%.
+- **MCP Ecosystem**: Configured Model Context Protocol servers and prompt harnesses.
 
-- [`herdr`](https://herdr.dev/)
+### 5. OS Desktop Integrations & Window Switcher (`osconfig` — `rcmd`)
+- **`rcmd` Window Switcher** ([`files/rcmd/`](./files/rcmd/)): Instant application switcher using **Right-Alt** key combinations (e.g. `Right-Alt + C` focuses Google Chrome).
+  - Agnostic multi-backend router: GNOME Shell D-Bus extension ([`rcmd-shell@arturonavax.dev`](./files/gnome/extensions/rcmd-shell@arturonavax.dev/)), Hyprland, Sway, KDE KWin, and X11 fallback (`wmctrl`).
+- **Linux Core Tuning**: Increased file descriptor limits (`limits.conf` to 65,536), inotify watchers, and GTK 4.14 renderer stability (`GSK_RENDERER=gl`).
+- **XFCE Pro Workflow** ([`src/osconfig/xfce/`](./src/osconfig/xfce/)): Instant screen capture, OCR clipboard extraction (`Super + Shift + C`), and hardened session unlock guard.
+- **macOS Developer Tweaks** ([`src/osconfig/macos/`](./src/osconfig/macos/)): Touch ID for terminal `sudo`, Mission Control animation speedup, and Safari Web Inspector tweaks.
 
-- [`zsh`](https://github.com/zsh-users/zsh)
+### 6. Patched Nerd Fonts (`fonts`)
+- Installs patched mono fonts: **MonaspiceNe Nerd Font**, **Cascadia Code**, and **JetBrains Mono**.
 
-  - [Starship Prompt](https://starship.rs/)
+---
 
-  - Syntax highlighting :flashlight::rainbow:
+## 4. Modern CLI Tool Replacements & Non-Destructive Aliases
 
-  - Autosuggestions :thought_balloon:
+Standard Unix utilities (`grep`, `find`, `cat`, `less`) **remain completely untouched POSIX commands** to protect scripts and preserve muscle memory when SSHing into remote servers. Ergonomic shortcuts provide modern speed:
 
-  - [FzF](https://github.com/junegunn/fzf) :mag: (`<Ctrl>r`)
+| Domain | Classic Tool | Modern Replacement | Rationale & Capabilities | Non-Colliding Shortcut |
+| :--- | :--- | :--- | :--- | :--- |
+| **AST Diffing** | `diff` / `wdiff` | **`difftastic` (`difft`)** | Tree-sitter structural diffing; compares syntax trees rather than lines. | `dft` |
+| **Git Pager** | `diff` / `less` | **`git-delta` (`delta`)** | Syntax-highlighting side-by-side terminal diff viewer. | Default Git pager |
+| **Universal SQL** | `litecli` / `pgcli` | **`usql`** | Single Go static binary for Postgres, SQLite, MySQL, Redis, ClickHouse. | `usql` |
+| **Instant Help** | `tldr` (npm/python) | **`tealdeer` (`tldr`)** | Native Rust tldr client with instant sub-millisecond responses. | `tldr` |
+| **JSON Inspection** | `jq` | **`fx`** | Interactive dual TUI and JavaScript/JSON streaming viewer. | `fx` |
+| **Token Killer** | Terminal output | **`rtk`** | Compresses command outputs by up to 90% before sending to LLM context. | `rtk` |
+| **Shell History** | `~/.zsh_history` | **`atuin`** | Embedded SQLite history engine with directory scoping; offline and private. | `Ctrl+R` |
+| **AI Commits** | Manual commit | **`aitools commit`** | AI Conventional Commit generation from git diff. | `gcm` |
+| **File Listing** | `ls` | **`eza`** | Modern file listing with icons, git status, and tree view. | `l`, `ll`, `la`, `lt` |
+| **File Search** | `find` | **`fd`** | Fast directory traversal ignoring `.git`. | `fdh` (`fd --hidden`) |
+| **Code Search** | `grep` | **`ripgrep` (`rg`)** | Ultra-fast recursive regex search ignoring `.git`. | `rgh` (`rg --hidden`) |
+| **File Preview** | `cat` / `less` | **`bat`** | Syntax-highlighted file pager with line numbers. | `preview` |
 
-### Editor :pencil: ([`nvim` - LazyVim](https://www.lazyvim.org/))
+---
 
-- Fast startup time :zap:
+## 5. Safeguards, Backups & Transactional Rollback
 
-- Lazy-load of plugins 🦥
+### Automatic Snapshot Creation & Quota Rotation
+Before modifying any configuration files, the installer automatically creates a timestamped snapshot in:
+`~/.arturonavax-env-backups/YYYY-MM-DD_HH-MM-SS/`
 
-- LSP / Code Completion 🧠:thought_balloon:
+- **50MB Quota Rotation**: Automatically purges the oldest snapshots when the total backup size exceeds 50MB using POSIX-portable commands (`du -k`, `sort`).
+- **Instant Rollback**:
+  ```sh
+  # List all available snapshots
+  ./utils/restore_backup.sh -l
 
-  - Built-in Mason package installer (`:Mason`)
+  # Restore the most recent snapshot
+  ./utils/restore_backup.sh -latest
 
-  - Auto language LSP & Linters / Formatters integration
+  # Restore a specific timestamp
+  ./utils/restore_backup.sh 2026-10-28_12-00-00
+  ```
 
-  - Autocomplete signatures & diagnostics
+### Transactional Audit Journal & Graceful Shutdown (`src/lib/transaction.sh`)
+- Tracks file creation, symlinks, directories, and marker blocks in an audit journal (`~/.arturonavax-env-backups/transactions/`).
+- Arms signal traps for `SIGINT` (Ctrl+C) and `SIGTERM`.
+- Reverses mutations in **LIFO order** (reverse chronological), cleanly deleting newly created files and restoring original configurations.
 
-  - Hover documentation (`K`)
+---
 
-  - Snippets (LuaSnip)
+## 6. How to Customize to Your Liking
 
-- File search :mag::page_facing_up: (`<Space><Space>` or `<Space>ff`)
+This repository is designed to be easily tailored to your personal workflow:
 
-- Word search :mag::abc: (`<Space>/` or `<Space>sg`)
-
-- Linters :flashlight: (nvim-lint)
-
-- Formatters 🛠️ (conform.nvim)
-
-- AI & LLM Assistants (Avante.nvim, CodeCompanion)
-
-- Snacks.nvim & Neo-tree
-
-_**And much more :eyes:**_
-
-## Synchronize with updates
-
-There is a utility script to synchronize with the new configuration files
-without having to perform the complete installation.
+### Custom Shell Aliases & Functions
+Add your personal aliases and functions to `~/.zshrc` (anywhere outside the `# >>> arturonavax/env >>>` marker blocks) or create a file at `~/.alias` or `~/.zsh_alias`. They will be preserved across all installations and updates:
 
 ```sh
-./utils/sync_config.sh help
+# Example ~/.zshrc additions:
+alias myproject="cd ~/repos/myproject && herdr"
+export OPENAI_API_KEY="sk-..."
 ```
 
-List of synchronization parameters:
-
-- `terminal` / `t`: Synchronize the Terminal settings (Ghostty, Herdr, zsh, starship).
-- `editor` / `e`: Synchronize Editor (nvim - LazyVim) settings.
-- `osconfig` / `o`: Configure the operating system with personal preferences.
-- `plugins` / `p`: Restore/synchronize Editor (nvim - LazyVim) plugins from lockfile.
-- `plugins-update` / `up`: Update Editor (nvim - LazyVim) plugins and lockfile.
-- `vscode` / `v`: Synchronize Visual Studio Code settings (explicit argument only).
-- `cursor` / `c`: Synchronize Cursor IDE settings (explicit argument only).
-- `devtools` / `d`: Synchronizes the configuration of development tools.
-- `all` / `a`: Synchronizes all base configurations (excludes GUI IDEs).
-
-## Custom configuration :gear:
-
-To customize LazyVim, edit or add files in `~/.config/nvim/lua/plugins/` and `~/.config/nvim/lua/config/`.
-
-For example, to add custom plugins create a file in `~/.config/nvim/lua/plugins/custom.lua`:
+### Custom Neovim Plugins (LazyVim)
+Add any custom Lua plugin specifications to `~/.config/nvim/lua/plugins/` (e.g. `~/.config/nvim/lua/plugins/my_plugins.lua`):
 
 ```lua
 return {
+  { "tpope/vim-surround" },
   {
     "folke/trouble.nvim",
     cmd = { "TroubleToggle", "Trouble" },
@@ -288,58 +246,120 @@ return {
 }
 ```
 
-## More keyboard speed :keyboard:
+### Custom `rcmd` Window Switcher Shortcuts
+Edit `~/.config/rcmd/rcmd.conf` to bind your favorite applications to **Right-Alt + Key**:
 
-If with `Ctrl-Alt-F3` you go to another terminal without graphic interface and
-use Vim you will notice that the movement speed is higher, this is because our
-graphic server configures the "delay rate" and "repeat rate" of our keyboard
-with "slower" values... these are the values of how much we must wait for a key
-to repeat and how much it repeats
-
-When I noticed this I felt very slow in Vim, you can change the delay and repeat
-rate with the following command:
-
-```sh
-# on linux:
-xset r rate 200 30
+```ini
+c=google-chrome-stable class launch:google-chrome-stable
+e=com.mitchellh.ghostty class launch:ghostty
+v=cursor class launch:cursor
+w=WhatsApp title launch:google-chrome-stable --app=https://web.whatsapp.com
 ```
 
-## Transparency
+### Custom AI Models & Quota Targets
+Edit `~/.config/aitools/config.json` to register new models, accounts, or CLI assistants:
 
-Terminal transparency can be turned on and off using the `transparent` command
-and its alias `tt`
+```json
+{
+  "targets": [
+    {
+      "id": "my-custom-model",
+      "name": "My Custom AI Model",
+      "tool": "claude",
+      "account": "work",
+      "enabled": true,
+      "telemetry_type": "timed_fallback",
+      "wake_command": ["claude", "-p", "Reply with: 1"],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 25
+    }
+  ]
+}
+```
 
-## Dark and Light theme
+---
 
-By executing the command `darktheme` (aka `da`) or `lighttheme` (aka `li`) you
-can activate the different themes
+## 7. Synchronization & Day-to-Day Lifecycle
 
-## Reminders
+To propagate updates from the repository into your active environment without running a full reinstallation:
 
-- The first save (`:w`) in a new project, or a first installation of this
-  environment will be slow, because it is caching.
+```sh
+# Synchronize all components
+./utils/sync_config.sh all
 
-## Remote Scripts
+# Or synchronize specific targets:
+./utils/sync_config.sh terminal     # Ghostty, Herdr, Zsh, Starship, Atuin
+./utils/sync_config.sh editor       # Neovim configs & Lua exclusions
+./utils/sync_config.sh plugins      # Restore LazyVim plugins from lockfile
+./utils/sync_config.sh plugins-update # Update LazyVim plugins and update repo lockfile
+./utils/sync_config.sh devtools     # Formatters, linters, RTK, and aitools
+./utils/sync_config.sh osconfig     # rcmd window switcher and desktop settings
+./utils/sync_config.sh vscode       # VSCode settings & keybindings
+./utils/sync_config.sh cursor       # Cursor IDE settings & keybindings
+```
 
-There are utility scripts that can be executed remotely as they do not depend
-on other local files, these scripts are in the [src/remotes/](./src/remotes/) folder.
+### Clean Teardown & Uninstallation
+To cleanly purge packages, binaries, systemd units, and local configuration files:
 
-Scripts starting with underscore (`_`) are made to be executed with the `source`
-command.
+```sh
+# Preview teardown manifest without touching anything
+./uninstall.sh --plan
 
-The following subdomains redirect to [remote scripts folder](./src/remotes/):
+# Run clean uninstallation
+./uninstall.sh
+```
+
+---
+
+## 8. Quality Assurance & Automated Testing
+
+The repository includes a comprehensive automated test harness ensuring zero regression errors:
+
+```sh
+# Run the complete test harness (syntax, static analysis, unit, integration)
+make test
+# Or directly: ./tests/run_tests.sh
+
+# Run individual test suites:
+make lint              # Syntax validation (bash -n) across 99+ scripts & ShellCheck across 34+ scripts
+make test-unit         # Unit tests (platform, packages, smart_append, backup, concurrency, transaction, aitools)
+make test-integration  # Integration smoke test suite
+make check             # System hardware and platform pre-flight check
+```
+
+---
+
+## 9. Supported Platforms
+
+The universal package matrix ([`src/lib/packages.sh`](./src/lib/packages.sh)) translates package names natively across:
+
+- **Debian / Ubuntu / Linux Mint / Pop!_OS** (`apt`)
+- **Fedora / RHEL / CentOS / Rocky Linux / AlmaLinux** (`dnf`)
+- **Arch Linux / EndeavourOS / Manjaro / Garuda** (`pacman`)
+- **openSUSE / SLES** (`zypper`)
+- **Alpine Linux** (`apk`)
+- **macOS** (Apple Silicon arm64 & Intel x86_64 via `brew`)
+- **Android (Termux)** (`pkg`, single-user sandbox without root)
+- **Windows** (WSL 1/2, MSYS2, Git Bash)
+
+---
+
+## 10. Remote Scripts Subdomain
+
+Autonomous self-contained scripts can be executed directly via `curl`:
 
 - `env.arturonavax.dev`
 - `env.arturonavax.com`
-- `environment.arturonavax.dev`
-- `environment.arturonavax.com`
 
 Examples:
 
 ```sh
-bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh") -i
-```
+# Guided master setup wizard
+bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") --wizard
 
-```sh
-source <(curl -fsSL "https://env.arturonavax.dev/_vars_colors.sh" | cat)
+# Standalone Go runtime installer (API-driven)
+bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh") -i
+
+# Hardware LED Scroll Lock activation
+bash <(curl -fsSL "https://env.arturonavax.dev/activate_scroll_lock.sh")
 ```
