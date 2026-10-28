@@ -39,35 +39,36 @@ function install_terminal() {
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: Starting install_terminal.sh script...${fgcolor_reset}"
 
-	# npm or pnpm
-	if [[ "$(command -v npm)" != "" ]]; then
-		function node_package_module() {
-			npm "$@"
-		}
+	# Load toolchain paths if available
+	if [[ -f ./files/zsh/.tools.sh ]]; then
+		# shellcheck source=/dev/null
+		source ./files/zsh/.tools.sh 2>/dev/null || true
+	elif [[ -f "$HOME/.tools.sh" ]]; then
+		# shellcheck source=/dev/null
+		source "$HOME/.tools.sh" 2>/dev/null || true
 	fi
 
-	if [[ "$(command -v pnpm)" != "" ]]; then
-		echo -e "${fgcolor_white_bold}[Terminal Installer]: - - pnpm is used instead of npm${fgcolor_reset}"
+	# Node Package Installer Helper (pnpm preferred, npm fallback)
+	node_pkg_add() {
+		if command -v pnpm >/dev/null 2>&1; then
+			pnpm add -g "$@"
+		elif command -v npm >/dev/null 2>&1; then
+			npm install -g "$@"
+		else
+			echo -e "${fgcolor_yellow_bold}[Terminal Installer]: Neither pnpm nor npm found; skipping global packages: $*${fgcolor_reset}"
+		fi
+	}
 
-		function node_package_module() {
-			pnpm "$@"
-		}
-	fi
-
-	# python3 -m pip or pipx
-	if python3 -m pip &>/dev/null; then
-		function python_binary_installer() {
+	# Python Binary / CLI Application Installer (pipx preferred, pip user fallback)
+	python_cli_add() {
+		if command -v pipx >/dev/null 2>&1; then
+			for pkg in "$@"; do
+				pipx install "$pkg" 2>/dev/null || pipx upgrade "$pkg" 2>/dev/null || true
+			done
+		elif command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
 			python3 -m pip install --user --upgrade "$@"
-		}
-	fi
-
-	if [[ "$(command -v pipx)" != "" ]]; then
-		echo -e "${fgcolor_white_bold}[Terminal Installer]: - - pipx is used instead of 'python3 -m pip'${fgcolor_reset}"
-
-		function python_binary_installer() {
-			pipx install "$@"
-		}
-	fi
+		fi
+	}
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
@@ -85,17 +86,8 @@ function install_terminal() {
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
-	if [[ "$(command -v node_package_module)" != "" ]]; then
-		# install yarn
-		node_package_module install -g yarn
-
-		# install serve
-		node_package_module install -g serve
-
-	else
-		echo -e "${fgcolor_yellow_bold}[Terminal Installer]: The 'node package module' command was not found, the following tools will not be installed: ${fgcolor_white_bold}
-        \tyarn, serve${fgcolor_reset}"
-	fi
+	# Install global terminal node tools (yarn, serve)
+	node_pkg_add yarn serve
 
 	# check exists goenv
 	export GOENV_ROOT="$HOME/.goenv"

@@ -111,3 +111,14 @@ assert_exit_code() {
 	fi
 	return 0
 }
+
+assert_not_empty() {
+	local val="$1"
+	local msg="${2:-Value is empty}"
+
+	if [[ -z "$val" ]]; then
+		fail "$msg" "Expected non-empty value, got empty string"
+		return 1
+	fi
+	return 0
+}

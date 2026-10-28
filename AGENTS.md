@@ -447,6 +447,7 @@ The repository incorporates an enterprise-grade automated test runner and qualit
   - `test_transaction.sh`: Transaction journal logging, rollback on interrupt/failure, and LIFO reversal.
   - `test_aitools.sh`: AI productivity suite, declarative JSONC pipelines, and daemon management.
   - `test_shell_configs.sh`: Strict idempotency, zero-fork lookups, footprint cleanup, and non-Zsh guards in `.base.zsh` and `.tools.sh`.
+  - `test_runtimes.sh`: Multi-platform Python (pyenv), Node.js (fnm), and pnpm runtime management, version locking, and shell hooks.
 - **Integration Smoke Tests (`tests/integration/`)**:
   - `test_cli_smoke.sh`: CLI flags (`./install.sh --check`, `--help`, `./utils/restore_backup.sh`, `./utils/sync_config.sh`).
 - **Optional Bats Specifications (`tests/bats/`)**: Executed automatically when `bats` is installed in PATH.

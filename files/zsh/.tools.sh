@@ -40,12 +40,15 @@ if [[ -f "$HOME/.cargo/env" ]]; then
 fi
 
 # 4. Python & pyenv
-if [[ -d "$HOME/.pyenv" ]]; then
-	export PYENV_ROOT="$HOME/.pyenv"
+export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
+if [[ -d "$PYENV_ROOT" ]]; then
 	_tools_path_prepend "$PYENV_ROOT/bin"
 	_tools_path_prepend "$PYENV_ROOT/shims"
 	if [[ -z "${PYENV_SHELL:-}" ]] && command -v pyenv >/dev/null 2>&1; then
 		eval "$(pyenv init - 2>/dev/null)"
+	fi
+	if command -v pyenv-virtualenv-init >/dev/null 2>&1; then
+		eval "$(pyenv virtualenv-init - 2>/dev/null)"
 	fi
 fi
 
@@ -56,7 +59,10 @@ else
 	_tools_path_prepend "$HOME/.local/share/fnm"
 fi
 if [[ -z "${FNM_MULTISHELL_PATH:-}" ]] && command -v fnm >/dev/null 2>&1; then
-	eval "$(fnm env --use-on-cd 2>/dev/null || fnm env 2>/dev/null)"
+	_fnm_sh="bash"
+	[[ -n "${ZSH_VERSION:-}" ]] && _fnm_sh="zsh"
+	eval "$(fnm env --use-on-cd --shell "$_fnm_sh" 2>/dev/null || fnm env 2>/dev/null)"
+	unset _fnm_sh
 fi
 
 # 6. pnpm (Fast disk-efficient package manager)

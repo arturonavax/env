@@ -90,6 +90,9 @@ _translate_debian() {
 	python3) echo "python3" ;;
 	python3-pip) echo "python3-pip" ;;
 	python3-venv) echo "python3-venv" ;;
+	pipx) echo "pipx" ;;
+	nodejs) echo "nodejs" ;;
+	npm) echo "npm" ;;
 	screen) echo "screen" ;;
 	watch) echo "watch" ;;
 	locales) echo "locales" ;;
@@ -164,6 +167,9 @@ _translate_fedora() {
 	python3) echo "python3" ;;
 	python3-pip) echo "python3-pip" ;;
 	python3-venv) echo "python3" ;;
+	pipx) echo "pipx" ;;
+	nodejs) echo "nodejs" ;;
+	npm) echo "npm" ;;
 	screen) echo "screen" ;;
 	watch) echo "procps-ng" ;;
 	locales) echo "glibc-locale-source glibc-langpack-en" ;;
@@ -238,6 +244,9 @@ _translate_arch() {
 	python3) echo "python" ;;
 	python3-pip) echo "python-pip" ;;
 	python3-venv) echo "python" ;;
+	pipx) echo "python-pipx" ;;
+	nodejs) echo "nodejs" ;;
+	npm) echo "npm" ;;
 	screen) echo "screen" ;;
 	watch) echo "procps-ng" ;;
 	locales) echo "" ;;
@@ -312,6 +321,9 @@ _translate_darwin() {
 	python3) echo "python@3" ;;
 	python3-pip) echo "" ;; # Handled with python formula
 	python3-venv) echo "" ;;
+	pipx) echo "pipx" ;;
+	nodejs) echo "node" ;;
+	npm) echo "" ;; # Handled with node formula
 	screen) echo "screen" ;;
 	watch) echo "watch" ;;
 	locales) echo "" ;;
@@ -386,6 +398,9 @@ _translate_termux() {
 	python3) echo "python" ;;
 	python3-pip) echo "python-pip" ;;
 	python3-venv) echo "python" ;;
+	pipx) echo "pipx" ;;
+	nodejs) echo "nodejs" ;;
+	npm) echo "" ;;
 	screen) echo "screen" ;;
 	watch) echo "procps" ;;
 	locales) echo "" ;;
@@ -460,6 +475,9 @@ _translate_suse() {
 	python3) echo "python3" ;;
 	python3-pip) echo "python3-pip" ;;
 	python3-venv) echo "python3" ;;
+	pipx) echo "python3-pipx" ;;
+	nodejs) echo "nodejs" ;;
+	npm) echo "npm" ;;
 	screen) echo "screen" ;;
 	watch) echo "procps" ;;
 	locales) echo "glibc-locale" ;;

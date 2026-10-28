@@ -16,6 +16,8 @@ echo "  Running Package Translation Matrix Tests..."
 assert_equals "build-essential" "$(_translate_debian "build-essential")" "Debian build-essential" &&
 	assert_equals "libssl-dev" "$(_translate_debian "ssl-dev")" "Debian ssl-dev" &&
 	assert_equals "libsqlite3-dev" "$(_translate_debian "sqlite-dev")" "Debian sqlite-dev" &&
+	assert_equals "pipx" "$(_translate_debian "pipx")" "Debian pipx" &&
+	assert_equals "nodejs" "$(_translate_debian "nodejs")" "Debian nodejs" &&
 	assert_equals "keyd" "$(_translate_debian "keyd")" "Debian keyd" &&
 	assert_equals "ripgrep" "$(_translate_debian "ripgrep")" "Debian ripgrep" &&
 	pass "Debian/Ubuntu translation matrix verified"
@@ -34,6 +36,8 @@ assert_equals "base-devel" "$(_translate_arch "build-essential")" "Arch build-es
 	assert_equals "sqlite" "$(_translate_arch "sqlite-dev")" "Arch sqlite-dev" &&
 	assert_equals "keyd" "$(_translate_arch "keyd")" "Arch keyd" &&
 	assert_equals "python" "$(_translate_arch "python3")" "Arch python3" &&
+	assert_equals "python-pipx" "$(_translate_arch "pipx")" "Arch pipx" &&
+	assert_equals "nodejs" "$(_translate_arch "nodejs")" "Arch nodejs" &&
 	assert_equals "ripgrep" "$(_translate_arch "ripgrep")" "Arch ripgrep" &&
 	pass "Arch Linux translation matrix verified"
 
@@ -44,6 +48,8 @@ assert_equals "" "$(_translate_darwin "build-essential")" "macOS build-essential
 	assert_equals "" "$(_translate_darwin "keyd")" "macOS keyd (N/A on Darwin)" &&
 	assert_equals "" "$(_translate_darwin "wmctrl")" "macOS wmctrl (N/A on Darwin)" &&
 	assert_equals "python@3" "$(_translate_darwin "python3")" "macOS python3" &&
+	assert_equals "pipx" "$(_translate_darwin "pipx")" "macOS pipx" &&
+	assert_equals "node" "$(_translate_darwin "nodejs")" "macOS nodejs" &&
 	assert_equals "ripgrep" "$(_translate_darwin "ripgrep")" "macOS ripgrep" &&
 	pass "macOS Darwin translation matrix verified (Linux-only skipped cleanly)"
 
@@ -51,6 +57,8 @@ assert_equals "" "$(_translate_darwin "build-essential")" "macOS build-essential
 assert_equals "devel_basis" "$(_translate_suse "build-essential")" "SUSE build-essential" &&
 	assert_equals "libopenssl-devel" "$(_translate_suse "ssl-dev")" "SUSE ssl-dev" &&
 	assert_equals "sqlite3-devel" "$(_translate_suse "sqlite-dev")" "SUSE sqlite-dev" &&
+	assert_equals "python3-pipx" "$(_translate_suse "pipx")" "SUSE pipx" &&
+	assert_equals "nodejs" "$(_translate_suse "nodejs")" "SUSE nodejs" &&
 	assert_equals "keyd" "$(_translate_suse "keyd")" "SUSE keyd" &&
 	assert_equals "ripgrep" "$(_translate_suse "ripgrep")" "SUSE ripgrep" &&
 	pass "openSUSE / SLES translation matrix verified"

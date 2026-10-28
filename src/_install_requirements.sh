@@ -94,28 +94,13 @@ if ! command -v cargo >/dev/null 2>&1; then
 	log_success "Rust toolchain installed."
 fi
 
-# 4. Fast Node Manager (fnm)
-if ! command -v fnm >/dev/null 2>&1; then
-	log_step "Installing Fast Node Manager (fnm)..."
-	curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-	export PATH="$HOME/.local/share/fnm:$PATH"
-	if command -v fnm >/dev/null 2>&1; then
-		eval "$(fnm env --use-on-cd 2>/dev/null || true)"
-	fi
-	log_success "fnm installed."
-fi
+# 4. Node.js & Fast Node Manager (fnm)
+log_step "Configuring Node.js runtime via Toolchain..."
+toolchain_install node
 
 # 5. pnpm (Fast, disk space efficient package manager)
-if ! command -v pnpm >/dev/null 2>&1; then
-	log_step "Installing pnpm (${PNPM_VERSION})..."
-	tmp_shell="${SHELL:-/bin/bash}"
-	export SHELL="bash"
-	curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${PNPM_VERSION}" sh -
-	export SHELL="$tmp_shell"
-	export PNPM_HOME="$HOME/.local/share/pnpm"
-	export PATH="$PNPM_HOME:$PATH"
-	log_success "pnpm installed."
-fi
+log_step "Configuring pnpm package manager via Toolchain..."
+toolchain_install pnpm
 
 # 6. Go (Golang) via Multi-Tier Toolchain (GVM primary, standalone & package fallbacks)
 log_step "Configuring Go language runtime via Toolchain..."
@@ -127,32 +112,13 @@ fi
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 # 7. Python (pyenv / system python)
-log_step "Configuring Python environment..."
-bash ./src/remotes/install_python.sh -i
+log_step "Configuring Python environment via Toolchain..."
+toolchain_install python
 
 # 8. Load Development Tools Paths
 if [[ -f ./files/zsh/.tools.sh ]]; then
 	# shellcheck source=/dev/null
 	source ./files/zsh/.tools.sh || true
-fi
-
-# 9. Node.js via fnm
-if command -v fnm >/dev/null 2>&1; then
-	if ! command -v node >/dev/null 2>&1 || ! command -v node | grep -q "fnm"; then
-		log_step "Installing latest Node.js via fnm..."
-		fnm install --latest
-		latest_node="$(fnm list 2>/dev/null | sort --version-sort | awk '{print $2}' | tail -n 1)"
-		if [[ -n "$latest_node" ]]; then
-			fnm use "$latest_node"
-			fnm default "$latest_node"
-			log_success "Node.js ${latest_node} configured as default."
-		fi
-	fi
-fi
-
-# Decouple and disable Corepack to prevent npm/pnpm interference
-if command -v corepack >/dev/null 2>&1; then
-	corepack disable 2>/dev/null || true
 fi
 
 # 10. Synchronize ~/.tools.sh into user home

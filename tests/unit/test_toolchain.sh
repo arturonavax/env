@@ -38,3 +38,24 @@ assert_exit_code 0 "$go_install_code" "toolchain_install golang exit code" &&
 unknown_output="$(toolchain_install nonexistent_sample_tool 2>&1 || true)"
 assert_contains "$unknown_output" "Unknown toolchain tool" "Reports unknown tool error" &&
 	pass "toolchain_install properly handles unknown tool requests"
+
+# Test 5: Idempotent Tool Installation (Python)
+py_install_output="$(toolchain_install python 2>&1)"
+py_install_code=$?
+assert_exit_code 0 "$py_install_code" "toolchain_install python exit code" &&
+	assert_contains "$py_install_output" "Python is already" "Existing Python detection" &&
+	pass "toolchain_install detected existing Python installation idempotently"
+
+# Test 6: Idempotent Tool Installation (Node.js)
+node_install_output="$(toolchain_install node 2>&1)"
+node_install_code=$?
+assert_exit_code 0 "$node_install_code" "toolchain_install node exit code" &&
+	assert_contains "$node_install_output" "Node.js is already" "Existing Node detection" &&
+	pass "toolchain_install detected existing Node.js installation idempotently"
+
+# Test 7: Idempotent Tool Installation (pnpm)
+pnpm_install_output="$(toolchain_install pnpm 2>&1)"
+pnpm_install_code=$?
+assert_exit_code 0 "$pnpm_install_code" "toolchain_install pnpm exit code" &&
+	assert_contains "$pnpm_install_output" "pnpm is already" "Existing pnpm detection" &&
+	pass "toolchain_install detected existing pnpm installation idempotently"

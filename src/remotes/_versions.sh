@@ -8,8 +8,10 @@ export GHOSTTY_VERSION="${GHOSTTY_VERSION:-1.3.1}"
 export ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
 export NVIM_VERSION="${NVIM_VERSION:-v0.12.5}"
 
-# Node & Package Managers
+# Node & Python Runtimes
+export NODE_VERSION="${NODE_VERSION:-lts}"
 export PNPM_VERSION="${PNPM_VERSION:-12.4.2}"
+export PYTHON_VERSION="${PYTHON_VERSION:-3.12.9}"
 
 # Go Tools (compiled locally)
 export GOLANGCI_LINT_VERSION="${GOLANGCI_LINT_VERSION:-v2.13.2}"

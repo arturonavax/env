@@ -29,6 +29,8 @@ source "${_LIB_DIR}/packages.sh" 2>/dev/null || true
 source "${_LIB_DIR}/download.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "${_LIB_DIR}/remote_env.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
+source "${_LIB_DIR}/../remotes/_versions.sh" 2>/dev/null || true
 
 # Execution Strategy Constants
 export STRATEGY_BINARY="binary"
@@ -192,6 +194,102 @@ _install_neovim_source() {
 	fi
 	rm -rf "$build_dir"
 	return 1
+}
+
+# 6. Python & pyenv Provider
+_install_python_pyenv() {
+	log_step "Installing Python via pyenv (${PYTHON_VERSION:-3.12.9})..."
+	local script_path="${REPO_ROOT}/src/remotes/install_python.sh"
+	if [[ -f "$script_path" ]]; then
+		bash "$script_path" -i || return 1
+	else
+		curl -fsSL "${REMOTE_PRIMARY_URL}/install_python.sh" | bash -s -- -i || return 1
+	fi
+	return 0
+}
+
+_install_python_package() {
+	log_step "Installing Python 3, pip, and pipx via native package manager..."
+	pkg_install python3 python3-pip python3-venv pipx
+}
+
+# 7. Node.js & Fast Node Manager (fnm) Provider
+_install_node_fnm() {
+	log_step "Installing Fast Node Manager (fnm) & Node.js..."
+	if ! command -v fnm >/dev/null 2>&1; then
+		curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell || return 1
+	fi
+
+	local fnm_bin_dir="$HOME/.local/share/fnm"
+	[[ "$(detect_os)" == "darwin" ]] && fnm_bin_dir="$HOME/Library/Application Support/fnm"
+
+	if [[ -f "${fnm_bin_dir}/fnm" ]]; then
+		export PATH="${fnm_bin_dir}:$PATH"
+	fi
+
+	if command -v fnm >/dev/null 2>&1; then
+		local shell_type="bash"
+		[[ -n "${ZSH_VERSION:-}" ]] && shell_type="zsh"
+		eval "$(fnm env --use-on-cd --shell "$shell_type" 2>/dev/null || fnm env 2>/dev/null)"
+
+		local target_node="${NODE_VERSION:-lts}"
+		if [[ "$target_node" == "lts" ]]; then
+			fnm install --lts || return 1
+			fnm default lts-latest 2>/dev/null || true
+			fnm use lts-latest 2>/dev/null || true
+		else
+			fnm install "$target_node" || return 1
+			fnm default "$target_node" 2>/dev/null || true
+			fnm use "$target_node" 2>/dev/null || true
+		fi
+
+		# Disable corepack prompts/interferences
+		if command -v corepack >/dev/null 2>&1; then
+			corepack disable 2>/dev/null || true
+		fi
+		return 0
+	fi
+	return 1
+}
+
+_install_node_package() {
+	log_step "Installing Node.js via native package manager..."
+	pkg_install nodejs npm
+}
+
+# 8. pnpm Provider
+_install_pnpm_script() {
+	local pnpm_ver="${PNPM_VERSION:-12.4.2}"
+	log_step "Installing pnpm (${pnpm_ver}) via official installer..."
+	local tmp_shell="${SHELL:-/bin/bash}"
+	export SHELL="bash"
+	curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${pnpm_ver}" sh - || {
+		export SHELL="$tmp_shell"
+		return 1
+	}
+	export SHELL="$tmp_shell"
+
+	local pnpm_home="$HOME/.local/share/pnpm"
+	[[ "$(detect_os)" == "darwin" ]] && pnpm_home="$HOME/Library/pnpm"
+	export PNPM_HOME="$pnpm_home"
+	export PATH="$PNPM_HOME:$PATH"
+
+	if command -v pnpm >/dev/null 2>&1; then
+		return 0
+	fi
+	return 1
+}
+
+_install_pnpm_npm() {
+	log_step "Installing pnpm via npm fallback..."
+	command -v npm >/dev/null 2>&1 || return 1
+	npm install -g "pnpm@${PNPM_VERSION:-12.4.2}" || return 1
+	return 0
+}
+
+_install_pnpm_package() {
+	log_step "Installing pnpm via native package manager..."
+	pkg_install pnpm
 }
 
 # ------------------------------------------------------------------------------
@@ -365,6 +463,88 @@ toolchain_install() {
 		fi
 
 		log_error "All installation strategies failed for Neovim."
+		return 1
+		;;
+
+	python | pyenv | python3)
+		if ((force == 0)) && (command -v pyenv >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1); then
+			log_info "Python is already configured: $(command -v python3) ($(python3 --version 2>&1))"
+			return 0
+		fi
+
+		log_box "Toolchain: Provisioning Python" \
+			"Primary Strategy: pyenv with Python ${PYTHON_VERSION:-3.12.9} and pipx" \
+			"Fallback: Native distribution package manager"
+
+		if _install_python_pyenv; then
+			log_success "Python provisioned via pyenv."
+			return 0
+		fi
+
+		log_warn "pyenv strategy failed. Falling back to native package manager..."
+		if _install_python_package; then
+			log_success "Python provisioned via native package manager."
+			return 0
+		fi
+
+		log_error "All installation strategies failed for Python."
+		return 1
+		;;
+
+	node | nodejs | fnm)
+		if ((force == 0)) && command -v node >/dev/null 2>&1; then
+			log_info "Node.js is already installed: $(command -v node) ($(node --version 2>&1))"
+			return 0
+		fi
+
+		log_box "Toolchain: Provisioning Node.js" \
+			"Primary Strategy: Fast Node Manager (fnm) with Node ${NODE_VERSION:-LTS}" \
+			"Fallback: Native distribution package manager"
+
+		if _install_node_fnm; then
+			log_success "Node.js provisioned via Fast Node Manager (fnm)."
+			return 0
+		fi
+
+		log_warn "fnm strategy failed. Falling back to native package manager..."
+		if _install_node_package; then
+			log_success "Node.js provisioned via native package manager."
+			return 0
+		fi
+
+		log_error "All installation strategies failed for Node.js."
+		return 1
+		;;
+
+	pnpm)
+		if ((force == 0)) && command -v pnpm >/dev/null 2>&1; then
+			log_info "pnpm is already installed: $(command -v pnpm) ($(pnpm --version 2>&1))"
+			return 0
+		fi
+
+		log_box "Toolchain: Provisioning pnpm" \
+			"Primary Strategy: Official standalone installer (${PNPM_VERSION:-12.4.2})" \
+			"Fallback 1: Global npm install" \
+			"Fallback 2: Native package manager"
+
+		if _install_pnpm_script; then
+			log_success "pnpm provisioned via official standalone script."
+			return 0
+		fi
+
+		log_warn "Standalone pnpm script failed. Falling back to npm..."
+		if _install_pnpm_npm; then
+			log_success "pnpm provisioned via npm."
+			return 0
+		fi
+
+		log_warn "npm fallback failed. Falling back to native package manager..."
+		if _install_pnpm_package; then
+			log_success "pnpm provisioned via native package manager."
+			return 0
+		fi
+
+		log_error "All installation strategies failed for pnpm."
 		return 1
 		;;
 

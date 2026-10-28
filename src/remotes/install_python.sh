@@ -1,230 +1,237 @@
-#!/bin/bash
-# Run: bash <(curl -fsSL "https://env.arturonavax.dev/install_python.sh")
-# Flag to install update available: -i
-set -o errexit
-trap exit-error-message ERR SIGINT
+#!/usr/bin/env bash
+# ==============================================================================
+# src/remotes/install_python.sh
+# Multi-platform Python & pyenv environment provisioner.
+# Can run standalone via curl or integrated within arturonavax/env.
+# ==============================================================================
+set -euo pipefail
 
-if [[ -f ./src/remotes/_vars_colors.sh ]]; then
-	source ./src/remotes/_vars_colors.sh
-elif [[ -f "$(dirname "$0")/_vars_colors.sh" ]]; then
-	source "$(dirname "$0")/_vars_colors.sh"
-fi
-
-function exit-error-message() {
-	echo
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
-
-	exit 1
+# Error trap
+exit_error() {
+	local exit_code=$?
+	local line_no=$1
+	echo -e "\n\033[1;31m[Python Installer Error]:\033[0m Command failed at line ${line_no} (exit code ${exit_code})." >&2
+	exit "${exit_code}"
 }
+trap 'exit_error $LINENO' ERR
 
-if [[ "$(command -v curl)" == "" ]]; then
-	echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}The curl command is needed to execute this script.${fgcolor_reset}"
-
-	exit 1
+# Resolve colors and paths
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT=""
+if [[ -d "${SCRIPT_DIR}/../../files" && -d "${SCRIPT_DIR}/../../src" ]]; then
+	REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 fi
 
-while getopts ':i' flag; do
+# Load versions configuration if present
+if [[ -f "${SCRIPT_DIR}/_versions.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${SCRIPT_DIR}/_versions.sh"
+elif [[ -n "${REPO_ROOT}" && -f "${REPO_ROOT}/src/remotes/_versions.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${REPO_ROOT}/src/remotes/_versions.sh"
+fi
+
+# Load colors if present
+if [[ -f "${SCRIPT_DIR}/_vars_colors.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${SCRIPT_DIR}/_vars_colors.sh"
+elif [[ -n "${REPO_ROOT}" && -f "${REPO_ROOT}/src/lib/colors.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${REPO_ROOT}/src/lib/colors.sh"
+fi
+
+COLOR_RESET="${fgcolor_reset:-\033[0m}"
+COLOR_BOLD="${fgcolor_white_bold:-\033[1;37m}"
+COLOR_GREEN="${fgcolor_green_bold:-\033[1;32m}"
+COLOR_YELLOW="${fgcolor_yellow_bold:-\033[1;33m}"
+COLOR_CYAN="${fgcolor_cyan_bold:-\033[1;36m}"
+COLOR_RED="${fgcolor_red_bold:-\033[1;31m}"
+
+# Default parameters
+INSTALL_MODE=0
+UPDATE_MODE=0
+FORCE_REINSTALL=0
+TARGET_VERSION="${PYTHON_VERSION:-3.12.9}"
+
+# Parse flags
+while getopts ':iufv:h' flag; do
 	case "$flag" in
-	i)
-		install_flag=1
+	i) INSTALL_MODE=1 ;;
+	u) UPDATE_MODE=1; INSTALL_MODE=1 ;;
+	f) FORCE_REINSTALL=1; INSTALL_MODE=1 ;;
+	v) TARGET_VERSION="$OPTARG"; INSTALL_MODE=1 ;;
+	h)
+		echo "Usage: $0 [-i] [-u] [-f] [-v <version>]"
+		echo "  -i             Install target Python version and configure environment"
+		echo "  -u             Update pyenv repo and list available releases"
+		echo "  -f             Force reinstallation even if version exists"
+		echo "  -v <version>   Target specific Python version (default: ${TARGET_VERSION})"
+		exit 0
 		;;
 	*)
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install."
+		echo -e "${COLOR_RED}[Python Installer]: Unknown flag '-${OPTARG}'. Use -h for help.${COLOR_RESET}" >&2
 		exit 1
 		;;
 	esac
 done
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
+echo -e "${COLOR_BOLD}[Python Installer]: 🐍 Target Python version: ${COLOR_CYAN}${TARGET_VERSION}${COLOR_RESET}"
+
+# Ensure curl exists
+if ! command -v curl >/dev/null 2>&1; then
+	echo -e "${COLOR_RED}[Python Installer]: 'curl' is required to execute this script.${COLOR_RESET}" >&2
+	exit 1
+fi
+
+# 1. macOS Command Line Tools & Homebrew bootstrap
+OS="$(uname -s)"
+if [[ "$OS" == "Darwin" ]]; then
 	if [[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
-		# install CommandLineTools (this contains GIT)
-		curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
+		echo -e "${COLOR_BOLD}[Python Installer]: Installing macOS Command Line Tools...${COLOR_RESET}"
+		xcode-select --install 2>/dev/null || true
 	fi
 
-	# Homebrew
-	if [[ "$(command -v brew)" == "" ]]; then
+	if ! command -v brew >/dev/null 2>&1; then
+		echo -e "${COLOR_BOLD}[Python Installer]: Installing Homebrew...${COLOR_RESET}"
 		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-	fi
-
-	brewbin="/usr/local/bin/brew"
-	[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-	[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
-
-	if [[ "$(command -v brew)" == "" ]]; then
-		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}Homebrew installation error occurred." && exit 1
+		brewbin="/opt/homebrew/bin/brew"
+		[[ ! -f "$brewbin" ]] && brewbin="/usr/local/bin/brew"
+		[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
 	fi
 fi
 
-echo -e "${fgcolor_white_bold}[Python Installer]: 🔎 Finding latest version of Python ${fgcolor_yellow_bold}🐍${fgcolor_white_bold}...${fgcolor_reset}"
-
-export PYENV_ROOT="$HOME/.pyenv"
-
+# 2. Environment & PATH Setup for pyenv
+export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
 if [[ ":$PATH:" != *":$PYENV_ROOT/bin:"* ]]; then
 	export PATH="$PYENV_ROOT/bin:$PATH"
 fi
+if [[ ":$PATH:" != *":$PYENV_ROOT/shims:"* ]]; then
+	export PATH="$PYENV_ROOT/shims:$PATH"
+fi
 
-if [[ ! -d ~/.pyenv/ ]]; then
-	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pyenv (python version manager)...${fgcolor_reset}"
-
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		# download pyenv
+# 3. Bootstrap pyenv if missing
+if [[ ! -d "$PYENV_ROOT" ]]; then
+	echo -e "${COLOR_BOLD}[Python Installer]: Installing pyenv (Python Version Manager)...${COLOR_RESET}"
+	if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+		brew install pyenv pyenv-virtualenv || curl -fsSL https://pyenv.run | bash
+	else
 		curl -fsSL https://pyenv.run | bash
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew reinstall pyenv
 	fi
-
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pyenv installation completed...${fgcolor_reset}"
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
+	echo -e "${COLOR_GREEN}[Python Installer]: ✔️ pyenv installed successfully in ${PYENV_ROOT}${COLOR_RESET}"
+elif [[ "$UPDATE_MODE" -eq 1 ]]; then
+	echo -e "${COLOR_BOLD}[Python Installer]: Updating pyenv repository...${COLOR_RESET}"
+	if command -v pyenv >/dev/null 2>&1 && pyenv update >/dev/null 2>&1; then
+		echo -e "${COLOR_GREEN}[Python Installer]: ✔️ pyenv updated successfully.${COLOR_RESET}"
+	elif [[ -d "$PYENV_ROOT/.git" ]]; then
+		git -C "$PYENV_ROOT" pull --quiet --ff-only 2>/dev/null || true
+	fi
 fi
 
-eval "$(pyenv init -)"
-
-if [[ "$(uname -s)" == "Linux" ]]; then
-	pyenv update &>/dev/null
+# Initialize pyenv shims in current session
+if command -v pyenv >/dev/null 2>&1; then
+	eval "$(pyenv init - 2>/dev/null || true)"
 fi
 
-latest_version="$(pyenv install -l | command grep -E -o '^[[:space:]]*[0-9]+(\.[0-9]+){1,2}$' |
-	sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort --version-sort | tail -n 1)"
-#   sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | awk -F. '$1 < 3 || ($1 == 3 && $2 <= 11)' | sort --version-sort | tail -n 1)"
-
-if [[ "$(command -v python3)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red}❌ Python is not installed on this system..${fgcolor_reset}"
-
-else
-	current_version="$(python3 --version | awk '{print $2}')"
-
-	if ! command -v python3 | grep -q ".pyenv"; then
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}⚠️ The installed Python was not installed with pyenv.${fgcolor_reset}"
-	fi
-
-	if [[ "$latest_version" != "$current_version" ]]; then
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}⚠️ The version of Python installed is not the latest one.${fgcolor_reset}"
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_yellow_bold}ℹ️ The latest available version of Python is: $latest_version${fgcolor_reset}"
-
+# 4. Check Current Status
+current_version=""
+if command -v python3 >/dev/null 2>&1; then
+	current_version="$(python3 --version 2>&1 | awk '{print $2}')"
+	if command -v python3 | grep -q ".pyenv"; then
+		echo -e "${COLOR_BOLD}[Python Installer]: Active pyenv Python: ${COLOR_GREEN}${current_version}${COLOR_RESET}"
 	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green}✔️ You have the latest version of Python: $latest_version${fgcolor_reset}"
+		echo -e "${COLOR_YELLOW}[Python Installer]: Active Python (${current_version}) is system-managed, not managed by pyenv.${COLOR_RESET}"
 	fi
 fi
 
-if [[ "$install_flag" == 1 ]]; then
-	echo
-	echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_cyan_bold}⚡ Running installation...${fgcolor_reset}"
+# If install mode wasn't explicitly requested, prompt summary and exit
+if [[ "$INSTALL_MODE" -eq 0 ]]; then
+	echo -e "${COLOR_BOLD}[Python Installer]: Run with ${COLOR_GREEN}'-i'${COLOR_BOLD} to provision Python ${TARGET_VERSION}.${COLOR_RESET}"
+	exit 0
+fi
 
-	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing dependencies...${fgcolor_reset}"
+# 5. Install System Build Dependencies for Compiling Python
+echo -e "${COLOR_BOLD}[Python Installer]: Resolving development headers and compilation dependencies...${COLOR_RESET}"
 
-	# dependencies
-	if [[ "$(uname -s)" == "Linux" ]]; then
+if [[ -n "${REPO_ROOT}" && -f "${REPO_ROOT}/src/lib/packages.sh" ]]; then
+	# Use repository unified package translation matrix
+	# shellcheck source=/dev/null
+	source "${REPO_ROOT}/src/lib/strict.sh" 2>/dev/null || true
+	# shellcheck source=/dev/null
+	source "${REPO_ROOT}/src/lib/packages.sh"
+	pkg_install build-essential ssl-dev zlib-dev bz2-dev readline-dev sqlite-dev ffi-dev ncurses-dev xz-dev tk-dev xml2-dev xslt-dev
+elif [[ "$OS" == "Linux" ]]; then
+	if [[ -f /etc/os-release ]]; then
+		# shellcheck source=/dev/null
 		source /etc/os-release
+		id_like="${ID_LIKE:-${ID:-}}"
 
-		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-			sudo dnf update -y
-			sudo dnf install -y epel-release
+		if [[ "$id_like" == *"debian"* || "$id_like" == *"ubuntu"* ]]; then
+			sudo apt update -y 2>/dev/null || true
+			sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+				libreadline-dev libsqlite3-dev libffi-dev libncursesw5-dev \
+				xz-utils tk-dev libxml2-dev libxslt1-dev curl git
+		elif [[ "$id_like" == *"fedora"* || "$id_like" == *"rhel"* || "$id_like" == *"centos"* ]]; then
+			sudo dnf install -y gcc make git curl zlib-devel bzip2-devel readline-devel \
+				sqlite-devel openssl-devel libffi-devel ncurses-devel xz-devel tk-devel libxml2-devel
+		elif [[ "$id_like" == *"arch"* || "$ID" == "arch" ]]; then
+			sudo pacman -S --needed --noconfirm base-devel openssl zlib bzip2 readline sqlite libffi ncurses xz tk curl git
+		elif [[ "$id_like" == *"suse"* ]]; then
+			sudo zypper in -y -t pattern devel_basis 2>/dev/null || true
+			sudo zypper in -y zlib-devel libbz2-devel readline-devel sqlite3-devel libopenssl-devel libffi-devel ncurses-devel xz-devel tk-devel
 		fi
-
-		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			sudo apt update -y
-
-			sudo apt install -y build-essential gcc llvm make git wget curl findutils libssl-dev zlib1g-dev \
-				libbz2-dev libffi-dev liblzma-dev libxml2 libxml2-dev libxslt1-dev \
-				libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev ncurses-term \
-				libpq-dev xz-utils tk tk-dev python3-dev python3-venv python3-wheel python3-setuptools python3-tabulate python3-tk python3-openssl
-
-		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			sudo dnf update -y
-
-			sudo dnf group install -y "Development Tools"
-			sudo dnf install -y gcc make git wget curl libffi libffi-devel qt5-qtbase-devel bzip2 bzip2-devel findutils \
-				ncurses ncurses-devel ncurses-term sqlite sqlite-devel readline readline-devel zlib zlib-devel openssl openssl-devel \
-				libxml2 libxml2-devel libpq-devel xz xz-devel tk tk-devel python3-devel python3-setuptools python3-tabulate
-
-			if [[ "$ID" == *"fedora"* ]]; then
-				sudo dnf install -y python3-wheel
-			fi
-
-		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
-
-			exit 1
-		fi
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl wget git make gcc ncurses findutils sqlite openssl@3 readline zlib xz tcl-tk python@3.12 python-tk@3.12 python-setuptools python-tabulate
-
-	else
-		echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
-
-		exit 1
 	fi
+elif [[ "$OS" == "Darwin" ]]; then
+	brew install openssl@3 readline sqlite3 xz zlib tcl-tk curl git 2>/dev/null || true
+fi
 
-	echo
-
-	# Install python if the current python is not from pyenv
-	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing Python $latest_version...${fgcolor_reset}"
-
-	if ! command -v python3 | grep -q ".pyenv" || [[ "$latest_version" != "$current_version" ]]; then
-		# install python
-		if [[ "$(uname -s)" == "Linux" ]]; then
-			# env PYTHON_CONFIGURE_OPTS="--enable-shared" \
-			pyenv install -s "$latest_version"
-
-		elif [[ "$(uname -s)" == "Darwin" ]]; then
-			# env \
-			# 	PATH="$(brew --prefix tcl-tk)/bin:$PATH" \
-			# 	LDFLAGS="-L$(brew --prefix tcl-tk)/lib" \
-			# 	CPPFLAGS="-I$(brew --prefix tcl-tk)/include" \
-			# 	PKG_CONFIG_PATH="$(brew --prefix tcl-tk)/lib/pkgconfig" \
-			# 	CFLAGS="-I$(brew --prefix tcl-tk)/include" \
-			# 	PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcltk-includes='-I$(brew --prefix tcl-tk)/include' --with-tcltk-libs='-L$(brew --prefix tcl-tk)/lib -ltcl8.6 -ltk8.6' " \
-
-			# env \
-			# 	LDFLAGS="-L$(brew --prefix openssl@3)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix sqlite)/lib -L$(brew --prefix xz)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix tcl-tk)/lib" \
-			# 	CPPFLAGS="-I$(brew --prefix openssl@3)/include -I$(brew --prefix readline)/include -I$(brew --prefix sqlite)/include -I$(brew --prefix xz)/include -I$(brew --prefix zlib)/include -I$(brew --prefix tcl-tk)/include" \
-			# 	PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix readline)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix xz)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix tcl-tk)/lib/pkgconfig" \
-			pyenv install -s "$latest_version"
-
-		else
-			echo "${fgcolor_white_bold}[Python Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
-
-			exit 1
-		fi
-
-		pyenv global "$latest_version"
-
-		eval "$(pyenv init -)"
-
-		python3 -m pip install --upgrade pip
-		python3 -m pip install --upgrade tk
-		python3 -m pip install --upgrade setuptools
-		python3 -m pip install --upgrade wheel
-		python3 -m pip install --upgrade numpy
-		python3 -m pip install --upgrade pandas
-		python3 -m pip install --upgrade packaging
-		python3 -m pip install --upgrade requests
-		python3 -m pip install --upgrade opt_einsum
-		python3 -m pip install --upgrade keras_preprocessing --no-deps
-
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version installation completed...${fgcolor_reset}"
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add pyenv to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.pyenv/bin:\$PATH\" && eval \"\$(pyenv init -)\"${fgcolor_reset}"
-		echo
-
-	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ Python $latest_version is already installed...${fgcolor_reset}"
-		echo
-	fi
-
-	echo -e "${fgcolor_white_bold}[Python Installer]: - Installing pipx (python binary installer)...${fgcolor_reset}"
-
-	if ! python3 -m pipx --version &>/dev/null && command -v python3 | grep -q ".pyenv"; then
-		# install pipx
-		python3 -m pip install --upgrade pip
-		python3 -m pip install --force --upgrade --user pipx
-		python3 -m pipx ensurepath
-
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pipx installation completed (add ~/.local/bin to PATH)...${fgcolor_reset}"
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_reset}# Add ~/.local/bin to PATH: ${fgcolor_cyan}export PATH=\"\$HOME/.local/bin:\$PATH\"${fgcolor_reset}"
-
-	else
-		echo -e "${fgcolor_white_bold}[Python Installer]: ${fgcolor_green_bold}✔️ pip is already installed...${fgcolor_reset}"
+# 6. Install or Verify Target Python Version in pyenv
+is_installed=0
+if command -v pyenv >/dev/null 2>&1; then
+	if pyenv versions --bare 2>/dev/null | grep -qx "${TARGET_VERSION}"; then
+		is_installed=1
 	fi
 fi
+
+if [[ "$is_installed" -eq 1 && "$FORCE_REINSTALL" -eq 0 ]]; then
+	echo -e "${COLOR_GREEN}[Python Installer]: ✔️ Python ${TARGET_VERSION} is already installed in pyenv.${COLOR_RESET}"
+else
+	echo -e "${COLOR_BOLD}[Python Installer]: Compiling Python ${TARGET_VERSION} via pyenv (this may take 2-4 minutes)...${COLOR_RESET}"
+	install_args=("-s")
+	[[ "$FORCE_REINSTALL" -eq 1 ]] && install_args=("-f")
+
+	# On macOS, export Homebrew library paths for pyenv compilation
+	if [[ "$OS" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+		brew_prefix="$(brew --prefix)"
+		CFLAGS="-I${brew_prefix}/include" \
+		LDFLAGS="-L${brew_prefix}/lib" \
+		pyenv install "${install_args[@]}" "${TARGET_VERSION}"
+	else
+		pyenv install "${install_args[@]}" "${TARGET_VERSION}"
+	fi
+	echo -e "${COLOR_GREEN}[Python Installer]: ✔️ Python ${TARGET_VERSION} compiled successfully.${COLOR_RESET}"
+fi
+
+# Set target version globally and rehash
+pyenv global "${TARGET_VERSION}"
+pyenv rehash
+eval "$(pyenv init - 2>/dev/null || true)"
+
+# 7. Core Python Toolchain & pipx Provisioning
+echo -e "${COLOR_BOLD}[Python Installer]: Upgrading essential build utilities (pip, setuptools, wheel)...${COLOR_RESET}"
+python3 -m pip install --upgrade --no-input pip setuptools wheel 2>/dev/null || true
+
+echo -e "${COLOR_BOLD}[Python Installer]: Ensuring pipx for isolated CLI applications...${COLOR_RESET}"
+if ! command -v pipx >/dev/null 2>&1; then
+	python3 -m pip install --upgrade --no-input --user pipx 2>/dev/null || true
+fi
+
+if command -v pipx >/dev/null 2>&1; then
+	pipx ensurepath 2>/dev/null || true
+fi
+
+echo -e "\n${COLOR_GREEN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}"
+echo -e "  ${COLOR_GREEN}✔ Python ${TARGET_VERSION} & pyenv configured successfully!${COLOR_RESET}"
+echo -e "    Active binary: $(command -v python3 2>/dev/null || echo "$PYENV_ROOT/shims/python3")"
+echo -e "    Python version: $(python3 --version 2>&1)"
+echo -e "    Isolated tools: pipx available ($(command -v pipx 2>/dev/null || echo "in ~/.local/bin/pipx"))"
+echo -e "${COLOR_GREEN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}\n"

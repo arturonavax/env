@@ -42,35 +42,44 @@ function install_editor() {
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: Starting install_editor.sh script...${fgcolor_reset}"
 
-	# npm or pnpm
-	if [[ "$(command -v npm)" != "" ]]; then
-		function node_package_module() {
-			npm "$@"
-		}
+	# Load toolchain paths if available
+	if [[ -f ./files/zsh/.tools.sh ]]; then
+		# shellcheck source=/dev/null
+		source ./files/zsh/.tools.sh 2>/dev/null || true
+	elif [[ -f "$HOME/.tools.sh" ]]; then
+		# shellcheck source=/dev/null
+		source "$HOME/.tools.sh" 2>/dev/null || true
 	fi
 
-	if [[ "$(command -v pnpm)" != "" ]]; then
-		echo -e "${fgcolor_white_bold}[Editor Installer]: - - pnpm is used instead of npm${fgcolor_reset}"
+	# Node Package Installer Helpers (pnpm preferred, npm fallback)
+	node_pkg_add() {
+		if command -v pnpm >/dev/null 2>&1; then
+			pnpm add -g "$@"
+		elif command -v npm >/dev/null 2>&1; then
+			npm install -g "$@"
+		else
+			echo -e "${fgcolor_yellow_bold}[Editor Installer]: Neither pnpm nor npm found; skipping global packages: $*${fgcolor_reset}"
+		fi
+	}
 
-		function node_package_module() {
-			pnpm "$@"
-		}
-	fi
+	node_pkg_remove() {
+		if command -v pnpm >/dev/null 2>&1; then
+			pnpm remove -g "$@" 2>/dev/null || true
+		elif command -v npm >/dev/null 2>&1; then
+			npm uninstall -g "$@" 2>/dev/null || true
+		fi
+	}
 
-	# python3 -m pip or pipx
-	if python3 -m pip &>/dev/null; then
-		function python_binary_installer() {
+	# Python Binary / CLI Application Installer (pipx preferred, pip user fallback)
+	python_cli_add() {
+		if command -v pipx >/dev/null 2>&1; then
+			for pkg in "$@"; do
+				pipx install "$pkg" 2>/dev/null || pipx upgrade "$pkg" 2>/dev/null || true
+			done
+		elif command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
 			python3 -m pip install --user --upgrade "$@"
-		}
-	fi
-
-	if [[ "$(command -v pipx)" != "" ]]; then
-		echo -e "${fgcolor_white_bold}[Editor Installer]: - - pipx is used instead of 'python3 -m pip'${fgcolor_reset}"
-
-		function python_binary_installer() {
-			pipx install "$@"
-		}
-	fi
+		fi
+	}
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
@@ -84,17 +93,11 @@ function install_editor() {
 	fi
 
 	# clean legacy npm/pnpm packages migrated to cargo or go
-	node_package_module uninstall -g tree-sitter-cli @bufbuild/buf 2>/dev/null || :
+	node_pkg_remove tree-sitter-cli @bufbuild/buf
 	rm -f "$HOME/.local/share/pnpm/tree-sitter" "$HOME/.local/share/pnpm/buf" 2>/dev/null || :
 
-	# install yarn
-	node_package_module install -g yarn
-
-	# install eslint and typescript
-	node_package_module install -g eslint typescript
-
 	# install global node tools
-	node_package_module install --global prettier eslint typescript emmet-ls bash-language-server \
+	node_pkg_add yarn eslint typescript prettier emmet-ls bash-language-server \
 		markdownlint-cli nginxbeautifier sql-formatter stylelint
 
 	# check exists goenv
@@ -182,17 +185,8 @@ function install_editor() {
 		golangci-lint cache clean || :
 	fi
 
-	if [[ "$(command -v pipx)" != "" ]]; then
-		pipx install black || :
-		pipx install pylint || :
-		pipx install beautysh || :
-		pipx install cmakelang || :
-	elif [[ "$(command -v python_binary_installer)" != "" ]]; then
-		python_binary_installer black || :
-		python_binary_installer pylint || :
-		python_binary_installer beautysh || :
-		python_binary_installer cmakelang || :
-	fi
+	# Python language server & formatting tools via pipx
+	python_cli_add black pylint beautysh cmakelang
 
 	# 4. stylua (official precompiled release binary prioritized)
 	if [[ "$(command -v stylua)" == "" ]]; then
