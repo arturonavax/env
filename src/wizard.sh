@@ -30,6 +30,7 @@ source ./src/lib/download.sh
 source ./src/lib/concurrency.sh
 source ./src/lib/smart_append.sh
 source ./src/lib/remote_env.sh
+source ./src/lib/plan.sh
 source ./src/remotes/_versions.sh
 
 # Wizard State
@@ -272,6 +273,18 @@ stage_select_components() {
 	if [[ "$DO_EDITOR" == "1" ]]; then say "  ${GREEN}${SYM_CHECK}${RESET} Code Editor Suite"; else say "  ${GRAY}${SYM_CROSS} Code Editor Suite (skipped)${RESET}"; fi
 	if [[ "$DO_AI" == "1" ]]; then say "  ${GREEN}${SYM_CHECK}${RESET} AI Tooling & Ecosystem"; else say "  ${GRAY}${SYM_CROSS} AI Tooling & Ecosystem (skipped)${RESET}"; fi
 	if [[ "$DO_OSCONFIG" == "1" ]]; then say "  ${GREEN}${SYM_CHECK}${RESET} OS Integration & Shortcuts"; else say "  ${GRAY}${SYM_CROSS} OS Integration & Shortcuts (skipped)${RESET}"; fi
+
+	echo
+	if confirm "Preview detailed installation plan & touched files before proceeding?" "n"; then
+		local selected=()
+		[[ "$DO_REQUIREMENTS" == "1" ]] && selected+=("requirements")
+		[[ "$DO_FONTS" == "1" ]] && selected+=("fonts")
+		[[ "$DO_TERMINAL" == "1" ]] && selected+=("terminal")
+		[[ "$DO_EDITOR" == "1" ]] && selected+=("editor")
+		[[ "$DO_AI" == "1" ]] && selected+=("ai")
+		[[ "$DO_OSCONFIG" == "1" ]] && selected+=("osconfig")
+		show_install_plan "${selected[@]}"
+	fi
 
 	pause
 }

@@ -181,6 +181,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"src/lib/concurrency.sh"
 			"src/lib/smart_append.sh"
 			"src/lib/remote_env.sh"
+			"src/lib/plan.sh"
 			"utils/backup_config.sh"
 			"utils/restore_backup.sh"
 			"utils/sync_config.sh"
@@ -191,6 +192,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"tests/unit/test_backup.sh"
 			"tests/unit/test_concurrency.sh"
 			"tests/unit/test_strict.sh"
+			"tests/unit/test_plan.sh"
 			"tests/integration/test_cli_smoke.sh"
 		)
 

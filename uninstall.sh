@@ -22,6 +22,36 @@ source ./src/lib/colors.sh
 source ./src/lib/logging.sh
 source ./src/lib/platform.sh
 source ./src/lib/packages.sh
+source ./src/lib/plan.sh
+
+usage() {
+	cat <<EOF
+Usage: ./uninstall.sh [OPTIONS]
+
+Options:
+  -p, --plan, plan    Display uninstallation plan, purged binaries, and caches without modifying system.
+  --dry-run, preview  Alias for --plan (safe preview).
+  -h, --help          Show this help message.
+
+Examples:
+  ./uninstall.sh --plan     # Preview uninstallation plan (safe dry-run)
+  ./uninstall.sh            # Execute full system uninstallation
+EOF
+}
+
+# Early check for plan or help
+for arg in "$@"; do
+	case "$arg" in
+	-p | --plan | plan | --dry-run | dry-run | --preview | preview)
+		show_uninstall_plan
+		exit 0
+		;;
+	-h | --help | help)
+		usage
+		exit 0
+		;;
+	esac
+done
 
 log_box "arturonavax/env Uninstaller" \
 	"Platform: $(detect_os) ($(detect_distro) - $(detect_arch))" \

@@ -57,6 +57,25 @@ List of installation parameters:
 - `osconfig` / `o`: Configure the operating system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
 - `--check`: Run platform discovery and hardware diagnostics without modifying files.
+- `--plan` / `plan` / `--dry-run`: Preview complete installation plan, native package translations, and touched files without modifying the system.
+- `--uninstall-plan`: Preview uninstallation teardown plan, purged binaries, desktop integrations, and caches.
+
+### Planning & Dry-Run Preview (Zero Files Modified)
+
+Inspect the full manifest before making any changes to your machine:
+
+```sh
+# Preview complete installation plan and touched files
+./install.sh --plan
+# Or via make: make plan
+
+# Preview scoped subsystem plan (e.g. terminal only)
+./install.sh plan terminal
+
+# Preview uninstallation teardown plan (purged binaries, desktop files, caches)
+./uninstall.sh --plan
+# Or via make: make uninstall-plan
+```
 
 ### Aggressive New Installation & Rollback
 

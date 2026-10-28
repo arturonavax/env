@@ -24,6 +24,7 @@ source ./src/lib/logging.sh
 source ./src/lib/platform.sh
 source ./src/lib/packages.sh
 source ./src/lib/backup.sh
+source ./src/lib/plan.sh
 
 usage() {
 	cat <<EOF
@@ -41,20 +42,44 @@ Components:
   osconfig, o         Configure operating system desktop shortcuts, window switcher (rcmd), and tweaks.
   all, a              Install and configure all of the above subsystems.
 
+Planning & Dry Run:
+  -p, --plan, plan    Display complete installation plan, translated packages, and touched files.
+  --dry-run, preview  Alias for --plan (safe preview without modifying the filesystem).
+  --uninstall-plan    Display teardown plan of packages, binaries, and caches purged on uninstall.
+
 Diagnostics & Help:
   --check             Run system diagnostic check and display platform summary without modifying files.
   -h, --help          Show this help message.
 
 Examples:
+  ./install.sh --plan            # Preview full installation manifest and touched files
+  ./install.sh plan terminal     # Preview installation plan for terminal subsystem only
+  ./install.sh --uninstall-plan  # Preview uninstallation plan and purged files
   ./install.sh --wizard          # Interactive guided installation
   ./install.sh all               # Complete non-interactive installation
   ./install.sh terminal editor   # Install only terminal and editor suites
 EOF
 }
 
-# Check for wizard invocation
+# Early check for plan, wizard, check, help
 for arg in "$@"; do
 	case "$arg" in
+	-p | --plan | plan | --dry-run | dry-run | --preview | preview)
+		# Filter out plan flags and pass target components to show_install_plan
+		plan_components=()
+		for item in "$@"; do
+			case "$item" in
+			-p | --plan | plan | --dry-run | dry-run | --preview | preview) ;;
+			*) plan_components+=("$item") ;;
+			esac
+		done
+		show_install_plan "${plan_components[@]}"
+		exit 0
+		;;
+	--uninstall-plan | uninstall-plan)
+		show_uninstall_plan
+		exit 0
+		;;
 	-w | --wizard | wizard)
 		exec ./src/wizard.sh
 		;;

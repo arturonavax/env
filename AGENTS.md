@@ -61,8 +61,11 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - Automatically triggers `backup_create` before mutating files.
   - Interactive mode: `./install.sh --wizard` (or `./src/wizard.sh`) runs an 8-stage guided setup with zero silent failures and stage recovery options.
   - Parameters: `requirements` (`r`), `fonts` (`f`), `terminal` (`t`), `editor` (`e`), `ai`, `osconfig` (`o`), `all` (`a`), `--check`.
+  - Planning / Dry-run: `./install.sh --plan` (or `plan [components]`, `make plan`) displays native package translations, toolchains, binaries, and all touched/preserved files without modifying the system.
+  - Uninstallation plan: `./install.sh --uninstall-plan` previews teardown manifest.
   - Sudo privileges are acquired upfront with an active background keep-alive loop.
-- **`./uninstall.sh`**:
+- **`./uninstall.sh [--plan]`**:
+  - Planning / Dry-run: `./uninstall.sh --plan` (or `plan`, `make uninstall-plan`) previews purged packages, binaries, desktop entries, and configuration directories without touching anything.
   - Two-phase teardown:
     1. Uninstalls packages (apt, dnf, pacman, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries.
     2. Purges configuration directories (`~/.config/nvim`, `~/.config/ghostty`, `~/.config/herdr`), caches (`~/.cache/nvim`), and local states (`~/.local/state/nvim`, `~/.local/share/nvim`).
