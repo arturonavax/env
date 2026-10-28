@@ -36,12 +36,22 @@ Built in zero-dependency Python 3 (standard library only) for sub-millisecond ex
 
 ### 4. AI-Powered Git Conventional Commit Pipeline (`aitools commit` / `gcm`)
 - **Diff Analysis**: Inspects `git diff --cached` (or automatically prompts to stage modified files if unstaged).
-- **Multi-Backend AI Generation**: Queries the selected AI backend (`agy`, `claude`, `codex`, `opencode`, `pi`, or `llm`) with instructions to produce a clean Conventional Commit message without AI fluff or markdown codeblocks.
+- **Multi-Backend AI Generation**: Queries the selected AI backend (`agy`, `claude`, `codex`, `opencode`, `pi`, or `llm`) with instructions to produce a clean Conventional Commit message without AI fluff or markdown codeblocks. Reuses the unified `aitools llm` engine with `mode: "chat"` and `output_format: "text"`.
 - **Interactive Action Loop**:
   - `[a]`: Accept and commit.
   - `[e]`: Edit message in `$EDITOR` before committing.
   - `[r]`: Regenerate with AI.
   - `[c]`: Cancel.
+
+### 5. Unified Non-Interactive LLM CLI Wrapper (`aitools llm` / `ai-llm`)
+- **Multi-Harness Encapsulation**: Dispatches prompt queries across any AI CLI tool (`agy`, `claude`, `codex`, `llm`, `opencode`, `pi`, `ollama`, or custom binary) with automatic I/O protocol normalization (`stdin`, `arg`, `temp_file`, `json`).
+- **Pipeline Stdin Streaming**: Transparently accepts stdin streams (e.g. `cat file | aitools llm "instruction"`) even if the underlying harness lacks stdin pipeline support.
+- **File & Directory Attachments**: Attach files (`-f <path>`) and full directory trees (`-d <path>`) into prompt context, automatically filtering noise directories (`.git`, `node_modules`, `vendor`, etc.) and enforcing size bounds.
+- **Execution Modes (`--mode`)**:
+  - `chat` / `ask`: Single-turn direct response (read-only planning, no tool/agent loops).
+  - `action` / `simple-agent`: Single order-to-action execution.
+  - `agent`: Default full agentic capabilities of the harness.
+- **Output Formats (`--output-format`)**: Cleaned `text` (default), structured `json` envelope, or unmodified `raw` stdout, with optional `--output-file` destination.
 
 ---
 
@@ -55,6 +65,7 @@ Commands:
   watch         Live-updating TUI dashboard for AI quotas and timers
   wake          Evaluate models and trigger wakeup probes for expired/idle quotas
   commit        Generate Conventional Git Commit messages from diff using AI
+  llm           Execute non-interactive prompt queries through any AI CLI harness
   backends      List all available AI CLI harnesses and execution strategies
   setup         Launch interactive setup & configuration wizard
   daemon        Manage background wakeup daemon, RTC alarms, and suspension
@@ -75,6 +86,30 @@ aitools setup
 aitools config --interactive
 # Or launch standalone Pure-Bash wizard:
 ./utils/aitools_wizard.sh
+
+# --- Unified AI CLI Wrapper (aitools llm) ---
+# Direct query using default backend (agy)
+aitools llm "Explain Python GIL and concurrency tradeoffs"
+
+# Stream input via pipeline (works even if harness lacks native stdin support)
+cat error.log | aitools llm "Diagnose root cause and suggest a fix" -b agy
+
+# Combine piped diff with instructions and model override
+git diff | aitools llm "List potential breaking changes" -m gemini-2.5-flash
+
+# Attach files and directory trees into prompt context
+aitools llm "Review code structure" -f Makefile -d files/ai/aitools --mode chat
+
+# Restrict execution mode: 'chat' / 'ask' (single-turn), 'action' (single order), 'agent'
+aitools llm "Draft a migration plan" --mode chat
+
+# Request structured JSON response envelope
+git status | aitools llm "Summarize state" -o json
+
+# Save output directly to file
+aitools llm "Generate API client stub" -f schema.json -O client.py
+
+# --- Git AI Conventional Commits (aitools commit / gcm) ---
 
 # Run declarative custom commands (direct invocation or via run)
 aitools review                     # AI code review on current staged diff

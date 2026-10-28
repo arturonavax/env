@@ -606,6 +606,7 @@ if (( $+commands[aitools] )); then
     alias gcmd='aitools commit --template detailed'
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
+    alias ai-llm='aitools llm'
 fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)

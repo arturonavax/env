@@ -46,6 +46,14 @@
       "output_mode": "stdout"
     }
   },
+  "llm": {
+    "default_backend": "agy",
+    "default_model": null,
+    "default_effort": "low",
+    "default_mode": "agent",
+    "default_output_format": "text",
+    "timeout_sec": 60
+  },
   "commit": {
     "default_backend": "agy",
     "model": null,

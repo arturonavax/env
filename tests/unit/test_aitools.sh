@@ -57,13 +57,13 @@ assert_exit_code 0 "$config_path_code" "aitools config path exit code" &&
 	pass "aitools config path returned expected configuration location"
 
 # Test 6: Subcommand --help flags
-for sub in quota watch wake commit daemon config run commands; do
+for sub in quota watch wake commit llm daemon config run commands; do
 	sub_help="$("$AITOOLS_BIN" "$sub" --help 2>&1)"
 	sub_code=$?
 	assert_exit_code 0 "$sub_code" "aitools $sub --help exit code" &&
 		assert_contains "$sub_help" "usage: aitools $sub" "Subcommand usage string"
 done
-pass "All aitools subcommands (quota, watch, wake, commit, daemon, config, run, commands) expose clean help interfaces"
+pass "All aitools subcommands (quota, watch, wake, commit, llm, daemon, config, run, commands) expose clean help interfaces"
 
 # Test 7: install_aitools.sh script syntax
 bash -n "${REPO_ROOT}/src/ai/install_aitools.sh"
@@ -286,3 +286,69 @@ bash -n "$WIZARD_SCRIPT"
 wiz_syntax_code=$?
 assert_exit_code 0 "$wiz_syntax_code" "aitools_wizard.sh syntax validation" &&
 	pass "utils/aitools_wizard.sh passed bash -n syntax checks with zero errors"
+
+# Test 19: aitools llm piped stdin and prompt assembly
+llm_piped_out="$(echo "Sample stdin diff content" | "$AITOOLS_BIN" llm "Analyze diff" -b "cat" 2>&1)"
+llm_piped_code=$?
+assert_exit_code 0 "$llm_piped_code" "aitools llm piped stdin exit code" &&
+	assert_contains "$llm_piped_out" "=== Standard Input ===" "Piped stdin header present" &&
+	assert_contains "$llm_piped_out" "Sample stdin diff content" "Piped stdin content present" &&
+	assert_contains "$llm_piped_out" "=== Instruction ===" "Instruction header present" &&
+	assert_contains "$llm_piped_out" "Analyze diff" "Instruction text present" &&
+	pass "aitools llm successfully assembled piped stdin and CLI prompt instructions"
+
+# Test 20: aitools llm file (-f) and directory (-d) attachments
+test_file="${TEST_SANDBOX}/test_sample.txt"
+echo "function hello() { return 'world'; }" > "$test_file"
+test_dir="${TEST_SANDBOX}/test_pkg"
+mkdir -p "$test_dir"
+echo "package main" > "${test_dir}/main.go"
+
+llm_attach_out="$("$AITOOLS_BIN" llm "Review package" -f "$test_file" -d "$test_dir" -b "cat" 2>&1)"
+llm_attach_code=$?
+assert_exit_code 0 "$llm_attach_code" "aitools llm attachments exit code" &&
+	assert_contains "$llm_attach_out" "=== Attached File:" "File attachment header present" &&
+	assert_contains "$llm_attach_out" "function hello()" "Attached file content present" &&
+	assert_contains "$llm_attach_out" "=== Directory Tree:" "Directory tree header present" &&
+	assert_contains "$llm_attach_out" "package main" "Directory file content present" &&
+	pass "aitools llm successfully attached files and directory tree context"
+
+# Test 21: aitools llm execution modes and prompt framing
+llm_chat_out="$("$AITOOLS_BIN" llm "Quick question" -b "cat" --mode chat 2>&1)"
+llm_chat_code=$?
+assert_exit_code 0 "$llm_chat_code" "aitools llm --mode chat exit code" &&
+	assert_contains "$llm_chat_out" "[Direct Single-Turn Chat Mode:" "Chat mode framing present" &&
+	assert_contains "$llm_chat_out" "Quick question" "Prompt present" &&
+	pass "aitools llm applied direct chat mode prompt framing"
+
+llm_sys_out="$("$AITOOLS_BIN" llm "Question" -b "cat" -s "System instructions" 2>&1)"
+llm_sys_code=$?
+assert_exit_code 0 "$llm_sys_code" "aitools llm -s/--system exit code" &&
+	assert_contains "$llm_sys_out" "System instructions" "System prompt prepended" &&
+	pass "aitools llm prepended explicit system prompt instructions"
+
+# Test 22: aitools llm output formats (json, output-file) and error handling
+llm_json_out="$("$AITOOLS_BIN" llm "Sample text query" -b "cat" -o json 2>&1)"
+llm_json_code=$?
+assert_exit_code 0 "$llm_json_code" "aitools llm -o json exit code" &&
+	assert_contains "$llm_json_out" '"status": "success"' "JSON success status" &&
+	assert_contains "$llm_json_out" '"backend": "cat"' "JSON backend name" &&
+	pass "aitools llm emitted structured JSON response envelope"
+
+out_dest="${TEST_SANDBOX}/llm_out.txt"
+llm_file_out="$("$AITOOLS_BIN" llm "Output file query" -b "cat" -O "$out_dest" 2>&1)"
+llm_file_code=$?
+assert_exit_code 0 "$llm_file_code" "aitools llm -O output-file exit code" &&
+	assert_contains "$llm_file_out" "Output written to" "Output file confirmation logged" &&
+	[[ -f "$out_dest" ]] && assert_contains "$(<"$out_dest")" "Output file query" "File content written" &&
+	pass "aitools llm routed response directly to specified output file"
+
+# Test 23: aitools llm error exit when no prompt or stdin is supplied
+llm_empty_out="$("$AITOOLS_BIN" llm 2>&1)"
+llm_empty_code=$?
+if [[ "$llm_empty_code" -ne 0 ]]; then
+	assert_contains "$llm_empty_out" "[ERROR] No prompt or input provided" "Empty prompt error message" &&
+		pass "aitools llm gracefully rejected invocation without prompt or input"
+else
+	fail "aitools llm empty prompt" "Expected non-zero exit code but got 0"
+fi

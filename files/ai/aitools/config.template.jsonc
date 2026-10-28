@@ -91,6 +91,32 @@
   },
 
   // ----------------------------------------------------------------------------
+  // Unified Non-Interactive LLM CLI Wrapper (`aitools llm`)
+  // ----------------------------------------------------------------------------
+  "llm": {
+    // Default AI CLI backend harness (agy, claude, codex, llm, opencode, pi, ollama, or custom)
+    "default_backend": "agy",
+
+    // Optional model override
+    "default_model": null,
+
+    // Default reasoning effort (low | medium | high | xhigh | max)
+    "default_effort": "low",
+
+    // Default execution mode:
+    // - "chat" / "ask"          : Single-turn direct response (no agentic loops or file modifications)
+    // - "action" / "simple-agent": Single order-to-action execution
+    // - "agent"                 : Default full agentic capabilities of the harness
+    "default_mode": "agent",
+
+    // Default output format: "text" | "json" | "raw"
+    "default_output_format": "text",
+
+    // Default timeout in seconds for LLM query execution
+    "timeout_sec": 60
+  },
+
+  // ----------------------------------------------------------------------------
   // Git Conventional Commit Generator Configuration (`aitools commit` / `gcm`)
   // ----------------------------------------------------------------------------
   "commit": {
