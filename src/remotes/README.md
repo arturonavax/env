@@ -73,30 +73,29 @@ curl -fsSL "https://env.arturonavax.dev/macos_osconfig.sh" | bash
 curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash
 ```
 
-## AI Quota Primer & RTC Auto-Wake Daemon (Linux / Xfce)
+## aitools · AI Productivity, Quota Management & Automated Workflows Suite
 
-Intelligently primes rolling 5-hour quota windows for Antigravity (Gemini, Claude, GPT) via `agy -p /usage --output-format json` telemetry and manages hardware RTC alarms (04:00 AM) with auto-resuspend.
+Unified AI suite providing rolling quota window monitoring, smart wakeup priming (compatible with `agy`, `claude`, `codex`, `opencode`, `pi`, and `llm`), hardware RTC auto-wake (04:00 AM) with auto-resuspend, and AI-powered Conventional Git Commit generation (`aitools commit` / `gcm`).
 
 ### Installation
 
 ```sh
-curl -fsSL "https://env.arturonavax.dev/install_quota_daemon_xfce.sh" | bash
+curl -fsSL "https://env.arturonavax.dev/install_aitools.sh" | bash
 ```
 
-Or locally:
+Or locally via installer:
 
 ```sh
-./src/remotes/install_quota_daemon_xfce.sh --install
+./src/ai/install_aitools.sh
 ```
 
-### Uninstallation
+### CLI Quick Reference
 
 ```sh
-curl -fsSL "https://env.arturonavax.dev/uninstall_quota_daemon_xfce.sh" | bash
-```
-
-Or with full configuration purge:
-
-```sh
-./src/remotes/uninstall_quota_daemon_xfce.sh --purge
+aitools quota              # View live quota table and reset countdowns
+aitools watch              # Continuous terminal TUI monitor
+aitools wake               # Prime expired or idle rolling quota windows
+aitools commit             # Generate Conventional Git Commit from staged diff
+aitools daemon status      # Check auto-wake and systemd status
+aitools daemon auto-wake on # Enable 04:00 AM RTC hardware auto-wake
 ```

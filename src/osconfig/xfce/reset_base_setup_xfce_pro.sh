@@ -111,7 +111,9 @@ sudo systemctl unmask power-profiles-daemon 2>/dev/null || true
 sudo udevadm control --reload-rules 2>/dev/null || true
 
 # Desactivar auto-wake RTC 04:00 AM si existe
-if [ -x "$HOME/.local/bin/quota-ctl" ]; then
+if command -v aitools >/dev/null 2>&1; then
+    aitools daemon auto-wake off 2>/dev/null || true
+elif [ -x "$HOME/.local/bin/quota-ctl" ]; then
     "$HOME/.local/bin/quota-ctl" auto-4am off 2>/dev/null || true
 fi
 sudo rtcwake -m disable 2>/dev/null || true

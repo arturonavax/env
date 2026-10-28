@@ -546,6 +546,14 @@ fi
 ## Difftastic (Diff estructural AST basado en Tree-sitter)
 [[ "$(command -v difft)" != "" ]] && alias dft='difft'
 
+## aitools (AI Productivity, Quota Management & Automated Workflows Suite)
+if [[ "$(command -v aitools)" != "" ]]; then
+    alias ait='aitools'
+    alias gcm='aitools commit'
+    alias ai-wake='aitools wake'
+    alias ai-quota='aitools quota'
+fi
+
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
 if [[ "$(command -v eza)" != "" ]]; then
     alias l='eza --icons --classify=always'

@@ -198,6 +198,9 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"tests/unit/test_plan.sh"
 			"tests/unit/test_toolchain.sh"
 			"tests/unit/test_wizard_engine.sh"
+			"tests/unit/test_transaction.sh"
+			"tests/unit/test_aitools.sh"
+			"src/ai/install_aitools.sh"
 			"tests/integration/test_cli_smoke.sh"
 		)
 

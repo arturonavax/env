@@ -20,7 +20,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── ghostty/            # Ghostty terminal configurations (launches herdr)
 │   ├── herdr/              # Herdr agent multiplexer configuration (config.toml)
 │   ├── atuin/              # Atuin SQLite shell history configuration (config.toml)
-│   ├── ai/                 # AI prompt templates, MCP harnesses, and RTK configs
+│   ├── ai/                 # AI prompt templates, MCP harnesses, RTK configs, and aitools
 │   ├── zsh/                # Zsh config, plugins, tools, and color definitions
 │   ├── starship/           # Cross-shell Starship prompt configuration
 │   └── [cursor,vscode,...] # IDE configs, settings, and formatters
@@ -45,10 +45,10 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   │   ├── linux_osconfig.sh # Core Linux settings, limits, sysctl, and fonts cache
 │   │   ├── xfce/           # XFCE Pro power-user desktop workflow & keyboard shortcuts
 │   │   └── macos/          # macOS Safari tweaks, spaces animation, and TouchID sudo
-│   ├── hacks/              # Workstation & hardware-specific hacks (quota daemons, scroll lock)
+│   ├── hacks/              # Workstation & hardware-specific hacks (scroll lock, hardware LEDs)
 │   ├── install_terminal.sh # Ghostty, Herdr, zsh, fonts setup
 │   ├── install_editor.sh   # Neovim, Mason dependencies, LazyVim sync
-│   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, prompt configs
+│   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, aitools suite
 │   ├── _install_requirements.sh # Core system packages & package managers (GVM primary)
 │   ├── requirements/       # Pre-flight requirement checks (editor, terminal, ai)
 │   ├── remotes/            # Self-contained remote scripts & compatibility shims executable via curl
@@ -350,24 +350,33 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
   - Configured at `~/.config/rtk/config.toml` (template in `files/ai/rtk/config.toml`).
   - Telemetry is explicitly disabled (`RTK_TELEMETRY_DISABLED=1`, `telemetry.enabled = false`).
 
-### Quota Primer & Auto-Wake Daemon (`quota-ctl`)
+### AI Productivity, Quota Management & Automated Workflows Suite (`aitools`)
 
-`quota-ctl` (`src/remotes/install_quota_daemon_xfce.sh`) is an intelligent rate-limit primer and hardware RTC auto-wake manager designed for rolling quota windows (e.g., Antigravity CLI / Gemini 5-hour limits):
+`aitools` (`files/ai/aitools/aitools`, installed to `~/.local/bin/aitools`) is a zero-dependency Python 3 CLI suite for orchestrating AI coding assistants, monitoring rolling quotas, scheduling hardware auto-wakeups, and automating Git workflows:
 
-- **Structured Quota Telemetry**: Queries `agy -p /usage --output-format json` directly to evaluate exact remaining fractions and UTC reset timestamps across model groups (`gemini-5h`, `3p-5h`, `gemini-argon`).
-- **Selective Idempotency**: If a model's 5-hour rolling window is actively ticking (`reset_time > now`), pings are automatically skipped. Pings only trigger when the window is expired or idle.
-- **Hardware RTC Auto-Wake (04:00 AM) & Auto-Resuspend**:
-  - Automatically arms `/usr/sbin/rtcwake -m no -t <04:00 AM>` before S3 sleep.
-  - Motherboard RTC wakes the laptop at 04:00 AM, waits for Wi-Fi, activates expired models, schedules the next day's alarm, and re-suspends in 12s (`systemctl suspend`) to preserve battery.
-- **Extensible Schema (`~/.config/quota-primer/config.json`)**:
-  - Define custom AI targets, model IDs, CLI commands, and timeout thresholds.
-- **Service & Lifecycle Management**:
-  - **Install**: `./src/remotes/install_quota_daemon_xfce.sh --install`
-  - **Status Dashboard**: `quota-ctl status`
-  - **Manual / Forced Wake**: `quota-ctl wake` / `quota-ctl force-wake [target_id]`
-  - **Toggle Nightly 04:00 AM Wake**: `quota-ctl auto-wake on` / `quota-ctl auto-wake off`
-  - **Uninstall**: `./src/remotes/uninstall_quota_daemon_xfce.sh` (or `./src/remotes/install_quota_daemon_xfce.sh --uninstall`)
-  - **Purge Configs & State**: `./src/remotes/uninstall_quota_daemon_xfce.sh --purge`
+- **Multi-Agent / Multi-Tool / Multi-Account Compatibility**:
+  - Native out-of-the-box adapters for `agy` (Antigravity CLI / Gemini & Claude/GPT), `claude` (Anthropic Claude Code CLI), `codex` (OpenAI Codex CLI), `opencode` (OpenCode CLI), `pi` (Inflection Pi CLI), and `llm` (Datasette LLM CLI).
+  - Declarative configuration at `~/.config/aitools/config.json`.
+- **Structured Quota Telemetry & Live Monitor (`aitools quota` / `aitools watch`)**:
+  - Live table and continuous TUI dashboard inspecting remaining quota percentages, countdowns, and reset timestamps.
+  - Telemetry scrapers for `agy -p /usage --output-format json`, `claude status`, and configurable timed fallbacks for blackbox CLIs.
+- **Selective Idempotent Model Wakeup (`aitools wake`)**:
+  - If a model's rolling quota window is actively ticking (`reset_time > now`), probes are automatically skipped to preserve 100% of tokens.
+  - Pings are triggered only when the rolling window is expired or idle.
+- **Hardware RTC Auto-Wake (04:00 AM) & Auto-Resuspend (`aitools daemon`)**:
+  - Automatically arms motherboard RTC alarm (`rtcwake -m no -t <04:00 AM>`).
+  - Wakes laptop at 04:00 AM, verifies Wi-Fi/Ethernet connectivity, primes expired models, schedules the next day's alarm, and re-suspends in 12s (`systemctl suspend`) to protect battery life.
+  - Sends desktop notifications (`notify-send` / `osascript`) and optional Telegram alerts for model resets.
+- **AI Git Conventional Commit Pipeline (`aitools commit` / `gcm`)**:
+  - Inspects `git diff --cached` (or unstaged changes) and queries the active LLM backend (`agy`, `claude`, `codex`, `llm`, etc.) to produce clean Conventional Commit messages.
+  - Interactive loop: accept `[a]`, edit `[e]`, regenerate `[r]`, cancel `[c]`.
+- **Command Reference**:
+  - `aitools quota`: Display quota status table and reset timestamps.
+  - `aitools watch [--interval SECONDS]`: Continuous terminal TUI monitor.
+  - `aitools wake [--force]`: Prime expired or idle rolling quota windows.
+  - `aitools commit [-a] [--backend=<id>]`: Generate conventional commit from diff.
+  - `aitools daemon auto-wake [on|off]`: Toggle hardware RTC auto-wake.
+  - `aitools status`: Check local presence and paths of all AI CLIs.
 
 ---
 

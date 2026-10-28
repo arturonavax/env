@@ -13,4 +13,7 @@ lv-settings.lua
 .codegraph/
 .engram/
 .claude/
-*.zwc
+# Python byte-code & caches
+__pycache__/
+*.py[cod]
+*$py.class

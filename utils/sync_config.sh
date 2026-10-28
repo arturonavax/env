@@ -207,6 +207,14 @@ if [[ "$sync_devtools" == 1 ]]; then
 		mkdir -p ~/.config/rtk/
 		cp ./files/ai/rtk/config.toml ~/.config/rtk/.
 	fi
+	if [[ -f ./files/ai/aitools/aitools ]]; then
+		mkdir -p ~/.local/bin/ ~/.config/aitools/
+		cp ./files/ai/aitools/aitools ~/.local/bin/aitools
+		chmod +x ~/.local/bin/aitools
+		if [[ ! -f ~/.config/aitools/config.json && -f ./files/ai/aitools/config.default.json ]]; then
+			cp ./files/ai/aitools/config.default.json ~/.config/aitools/config.json
+		fi
+	fi
 
 	echo -e "${fcgreenb}Synchronized Devtools configuration files!${fcr}"
 fi

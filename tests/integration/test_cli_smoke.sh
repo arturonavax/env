@@ -92,3 +92,12 @@ install_wizard_help_code=$?
 assert_exit_code 0 "$install_wizard_help_code" "./install.sh --wizard --help exit status" &&
 	assert_contains "$install_wizard_help" "Usage: ./src/wizard.sh" "Forwarded wizard usage" &&
 	pass "./install.sh --wizard forwarded CLI arguments directly to wizard runner"
+
+# Test 12: aitools CLI binary and status
+aitools_smoke="$("${REPO_ROOT}/files/ai/aitools/aitools" --help 2>&1)"
+aitools_smoke_code=$?
+assert_exit_code 0 "$aitools_smoke_code" "aitools --help exit status" &&
+	assert_contains "$aitools_smoke" "aitools: AI Productivity" "aitools description" &&
+	assert_contains "$aitools_smoke" "quota" "aitools quota command" &&
+	assert_contains "$aitools_smoke" "commit" "aitools commit command" &&
+	pass "aitools CLI verified with full subcommands suite"
