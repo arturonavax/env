@@ -539,9 +539,9 @@ vsync = true;
 use-damage = true;
 unredir-if-possible = false;
 
-xrender-sync-fence = false;
-glx-no-stencil = false;
-glx-no-rebind-pixmap = true;
+xrender-sync-fence = true;
+glx-no-stencil = true;
+glx-no-rebind-pixmap = false;
 
 shadow = false;
 fading = false;
@@ -562,6 +562,10 @@ rounded-corners-exclude = [
     "class_g = 'Flameshot'",
     "class_g = 'xfce4-screensaver'",
     "class_g = 'Xfce4-screensaver'",
+    "class_g = 'com.mitchellh.ghostty'",
+    "class_g = 'ghostty'",
+    "class_g = 'Brave-browser'",
+    "class_g = 'brave-browser'",
     "fullscreen"
 ];
 
@@ -586,6 +590,9 @@ blur-background-exclude = [
     "class_g = 'Flameshot'",
     "class_g = 'xfce4-screensaver'",
     "class_g = 'Xfce4-screensaver'",
+    "class_g = 'com.mitchellh.ghostty'",
+    "class_g = 'ghostty'",
+    "class_g = 'Brave-browser'",
     "window_type = 'dock'",
     "window_type = 'desktop'"
 ];
@@ -1022,91 +1029,259 @@ xfconf-query -c xfce4-panel -p "$XKB_PLUGIN/display-type" -s 0 2>/dev/null || tr
 
 xfce4-panel -r 2>/dev/null || true
 
-echo "==> 13. Configurando Redshift (Máxima Protección y acceso para Vicinae)..."
-mkdir -p "$HOME/.config/redshift"
+echo "==> 13. Configurando Luz Nocturna / Redshift (Binario Instantáneo, Horario Configurable)..."
+mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/state" "$HOME/.local/share/applications" "$HOME/.config/systemd/user"
 
-# 1. Detección automática de ubicación vía red con fallback exacto a Bogotá
-LAT="4.7110"
-LON="-74.0721"
-LOC_DATA=$(curl -fsSL --connect-timeout 3 -m 5 https://ipinfo.io/loc 2>/dev/null || true)
-if [[ "$LOC_DATA" =~ ^-?[0-9]+\.[0-9]+,-?[0-9]+\.[0-9]+$ ]]; then
-    LAT="${LOC_DATA%,*}"
-    LON="${LOC_DATA#*,}"
+# 1. Purgar cualquier autostart o demonio con curvas de transición progresiva
+rm -f "$HOME/.config/autostart/redshift.desktop" "$HOME/.config/redshift/redshift.conf" 2>/dev/null || true
+pkill -9 -x redshift 2>/dev/null || true
+
+# 2. Configuración declarativa de Luz Nocturna (editable por el usuario)
+if [ ! -f "$HOME/.config/night-shift.conf" ]; then
+cat <<'EOF' > "$HOME/.config/night-shift.conf"
+# ==============================================================================
+# Configuración de Luz Nocturna (Night Shift) - Dell Precision M6800 / Xfce
+# ==============================================================================
+
+# Horario automático (formato 24h HH:MM)
+# Activo por defecto desde las 16:00 (4:00 PM) hasta las 06:30 (6:30 AM)
+START_TIME="16:00"
+END_TIME="06:30"
+
+# Perfil de temperatura (Kelvin) y corrección Gamma
+# 2400K: Protección visual máxima sin estados intermedios
+TEMP_NIGHT=2400
+GAMMA_NIGHT=0.85
+
+# Programación automática activa (1 = habilitado, 0 = solo manual vía atajo)
+AUTO_SCHEDULE=1
+EOF
 fi
 
-# 2. Configurar perfil de Redshift: 2500K nocturno (máxima filtración) y gamma 0.85
-cat <<EOF > "$HOME/.config/redshift/redshift.conf"
-[redshift]
-; Temperatura de día y noche (2400K para máxima protección visual)
-temp-day=5800
-temp-night=2400
-transition=1
-gamma=0.85
-adjustment-method=randr
-location-provider=manual
-
-; Curva de elevación agresiva para máxima protección al atardecer:
-; A 6° (antes del ocaso) comienza a bajar, y a 0° (en el horizonte ~17:50) ya está al 100% de protección nocturna
-elevation-high=6
-elevation-low=0
-
-; Horarios definidos de transición adaptados a Bogotá
-dawn-time=05:45-06:15
-dusk-time=17:20-17:55
-
-[manual]
-lat=${LAT}
-lon=${LON}
-EOF
-
-# 3. Crear script de toggle para alternar entre el filtro y modo neutral
-sudo bash -c 'cat <<'"'"'EOF'"'"' > /usr/local/bin/toggle-redshift
+# 3. Crear script de control binario e idempotente con soporte de horario y RandR LUT
+cat <<'EOF' > "$HOME/.local/bin/toggle-redshift"
 #!/usr/bin/env bash
+# ==============================================================================
+# toggle-redshift: Interruptor binario y programador automático para Luz Nocturna
+# Optimizado para Dell Precision M6800 (Nouveau Kepler / Dual Display DP-2 + eDP-1)
+# ==============================================================================
 set -uo pipefail
 
-# Asegurar entorno X11 y D-Bus para ejecución sin fallos desde Vicinae, atajos o scripts
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -f "/run/user/$(id -u)/bus" ]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 fi
 
-# Archivo de estado en /tmp: se limpia en cada reinicio para evitar estados desfasados
-STATE_FILE="/tmp/redshift_${USER}_manual_state"
-
-# Detección inteligente del estado visual actual:
-# Está activo si el archivo de estado dice "on" O si el demonio redshift está en ejecución
-IS_ACTIVE=0
-if [ -f "$STATE_FILE" ]; then
-    [ "$(cat "$STATE_FILE" 2>/dev/null || true)" = "on" ] && IS_ACTIVE=1
-elif pgrep -x redshift >/dev/null 2>&1; then
-    IS_ACTIVE=1
+CONFIG_FILE="$HOME/.config/night-shift.conf"
+if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
 fi
 
-# Función para liberar de forma limpia y garantizada el control de gamma
-stop_redshift_cleanly() {
-    pkill -x redshift 2>/dev/null || true
-    for i in 1 2 3 4; do
-        pgrep -x redshift >/dev/null 2>&1 || break
-        sleep 0.05
-    done
+# Parámetros con valores por defecto resilientes
+START_TIME="${START_TIME:-16:00}"
+END_TIME="${END_TIME:-06:30}"
+TEMP_NIGHT="${TEMP_NIGHT:-2400}"
+GAMMA_NIGHT="${GAMMA_NIGHT:-0.85}"
+AUTO_SCHEDULE="${AUTO_SCHEDULE:-1}"
+
+STATE_DIR="$HOME/.local/state"
+mkdir -p "$STATE_DIR"
+STATE_FILE="$STATE_DIR/night-shift-state"
+OVERRIDE_FILE="$STATE_DIR/night-shift-override"
+
+time_to_sec() {
+    local t="${1:-00:00}"
+    local h="${t%%:*}"
+    local m="${t#*:}"
+    h=$((10#$h))
+    m=$((10#$m))
+    echo $(( h * 3600 + m * 60 ))
 }
 
-if [ "$IS_ACTIVE" -eq 1 ]; then
-    # DESACTIVAR: Limpiar procesos y restablecer calibración neutral inmediata (6500K)
-    stop_redshift_cleanly
+is_in_schedule() {
+    [ "${AUTO_SCHEDULE:-1}" = "1" ] || return 1
+    local now_h now_m now_sec start_sec end_sec
+    now_h=$(date +%H)
+    now_m=$(date +%M)
+    now_sec=$(( 10#$now_h * 3600 + 10#$now_m * 60 ))
+    start_sec=$(time_to_sec "$START_TIME")
+    end_sec=$(time_to_sec "$END_TIME")
+
+    if [ "$start_sec" -le "$end_sec" ]; then
+        if [ "$now_sec" -ge "$start_sec" ] && [ "$now_sec" -lt "$end_sec" ]; then
+            return 0
+        fi
+    else
+        if [ "$now_sec" -ge "$start_sec" ] || [ "$now_sec" -lt "$end_sec" ]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+is_hardware_night_shift_active() {
+    local gammas
+    gammas=$(xrandr --verbose 2>/dev/null | grep -E "^\s*Gamma:" | awk '{print $2}' || true)
+    if [ -n "$gammas" ] && echo "$gammas" | grep -qv "1.0:1.0:1.0"; then
+        return 0
+    fi
+    return 1
+}
+
+are_all_outputs_night_shift() {
+    local gammas
+    gammas=$(xrandr --verbose 2>/dev/null | grep -E "^\s*Gamma:" | awk '{print $2}' || true)
+    [ -n "$gammas" ] || return 1
+    if echo "$gammas" | grep -q "1.0:1.0:1.0"; then
+        return 1
+    fi
+    return 0
+}
+
+get_override_type() {
+    [ -f "$OVERRIDE_FILE" ] || return 1
+    local type ts
+    read -r type ts < "$OVERRIDE_FILE" 2>/dev/null || return 1
+    [[ "${ts:-}" =~ ^[0-9]+$ ]] || return 1
+
+    local now_epoch
+    now_epoch=$(date +%s)
+    local age=$(( now_epoch - ts ))
+
+    # La anulación manual vence pasadas 14 horas
+    if [ "$age" -gt 50400 ] || [ "$age" -lt 0 ]; then
+        rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+        return 1
+    fi
+    echo "$type"
+    return 0
+}
+
+apply_night_shift() {
+    pkill -x redshift 2>/dev/null || true
+    redshift -m randr -P -O "$TEMP_NIGHT" -g "$GAMMA_NIGHT" 2>/dev/null || true
+    echo "on" > "$STATE_FILE"
+}
+
+disable_night_shift() {
+    pkill -x redshift 2>/dev/null || true
     redshift -m randr -x 2>/dev/null || true
     echo "off" > "$STATE_FILE"
-    notify-send -t 1500 -i display "Luz Nocturna" "Filtro desactivado (Luz neutral 6500K)" 2>/dev/null || true
-else
-    # ACTIVAR: Detener procesos previos y forzar Protección Máxima (2400K - Gamma 0.85) inmediata
-    stop_redshift_cleanly
-    redshift -m randr -P -O 2400 -g 0.85 2>/dev/null || true
-    echo "on" > "$STATE_FILE"
-    notify-send -t 1500 -i display "Luz Nocturna" "Protección Máxima activada (2400K - Gamma 0.85)" 2>/dev/null || true
-fi
-EOF'
-sudo chmod +x /usr/local/bin/toggle-redshift
+}
+
+MODE="${1:-toggle}"
+
+case "$MODE" in
+    on)
+        apply_night_shift
+        rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+        notify-send -t 1200 -i display "Luz Nocturna" "Protección Máxima activada (${TEMP_NIGHT}K - Gamma ${GAMMA_NIGHT})" 2>/dev/null || true
+        ;;
+    off)
+        disable_night_shift
+        if is_in_schedule; then
+            echo "manual_off $(date +%s)" > "$OVERRIDE_FILE"
+        else
+            rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+        fi
+        notify-send -t 1200 -i display "Luz Nocturna" "Filtro desactivado (Luz neutral 6500K)" 2>/dev/null || true
+        ;;
+    toggle)
+        if is_hardware_night_shift_active; then
+            disable_night_shift
+            if is_in_schedule; then
+                echo "manual_off $(date +%s)" > "$OVERRIDE_FILE"
+            else
+                rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+            fi
+            notify-send -t 1200 -i display "Luz Nocturna" "Filtro desactivado (Luz neutral 6500K)" 2>/dev/null || true
+        else
+            apply_night_shift
+            if ! is_in_schedule; then
+                echo "manual_on $(date +%s)" > "$OVERRIDE_FILE"
+            else
+                rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+            fi
+            notify-send -t 1200 -i display "Luz Nocturna" "Protección Máxima activada (${TEMP_NIGHT}K - Gamma ${GAMMA_NIGHT})" 2>/dev/null || true
+        fi
+        ;;
+    auto)
+        [ "${AUTO_SCHEDULE:-1}" = "1" ] || exit 0
+
+        ov_type=$(get_override_type || true)
+
+        if is_in_schedule; then
+            [ "$ov_type" = "manual_on" ] && rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+
+            if [ "$ov_type" = "manual_off" ]; then
+                exit 0
+            fi
+
+            # Si ya está activo en todas las pantallas, no hacer nada (idempotente)
+            if are_all_outputs_night_shift; then
+                exit 0
+            fi
+
+            apply_night_shift
+        else
+            [ "$ov_type" = "manual_off" ] && rm -f "$OVERRIDE_FILE" 2>/dev/null || true
+
+            if [ "$ov_type" = "manual_on" ]; then
+                if ! are_all_outputs_night_shift; then
+                    apply_night_shift
+                fi
+                exit 0
+            fi
+
+            if is_hardware_night_shift_active; then
+                disable_night_shift
+            fi
+        fi
+        ;;
+    restore)
+        ov_type=$(get_override_type || true)
+
+        if [ "${AUTO_SCHEDULE:-1}" = "1" ]; then
+            if is_in_schedule; then
+                if [ "$ov_type" = "manual_off" ]; then
+                    disable_night_shift
+                else
+                    apply_night_shift
+                fi
+            else
+                if [ "$ov_type" = "manual_on" ]; then
+                    apply_night_shift
+                else
+                    disable_night_shift
+                fi
+            fi
+        else
+            target_state="off"
+            [ -f "$STATE_FILE" ] && target_state=$(cat "$STATE_FILE" 2>/dev/null || echo "off")
+            if [ "$target_state" = "on" ]; then
+                apply_night_shift
+            else
+                disable_night_shift
+            fi
+        fi
+        ;;
+    status)
+        if is_hardware_night_shift_active; then
+            echo "on"
+        else
+            echo "off"
+        fi
+        ;;
+    *)
+        echo "Uso: $0 {on|off|toggle|auto|restore|status}" >&2
+        exit 1
+        ;;
+esac
+EOF
+chmod +x "$HOME/.local/bin/toggle-redshift"
+sudo cp -f "$HOME/.local/bin/toggle-redshift" /usr/local/bin/toggle-redshift 2>/dev/null || true
 
 # 4. Registrar acceso de escritorio (.desktop) para indexación inmediata en Vicinae
 mkdir -p "$HOME/.local/share/applications"
@@ -1116,33 +1291,104 @@ Type=Application
 Name=Luz Nocturna (Night Shift)
 GenericName=Filtro de Luz Azul
 Comment=Alternar filtro de luz azul y protección de pantalla
-Exec=/usr/local/bin/toggle-redshift
+Exec=/home/arthurnavah/.local/bin/toggle-redshift
 Icon=display
 Terminal=false
 Categories=Settings;Utility;
 Keywords=night;shift;redshift;blue;light;filtro;luz;nocturna;
 EOF
 
-# 5. Configurar inicio automático del daemon
-cat <<'EOF' > "$HOME/.config/autostart/redshift.desktop"
-[Desktop Entry]
-Type=Application
-Name=Redshift
-Comment=Filtro automático de luz azul
-Exec=sh -c "sleep 3 && pkill -x redshift 2>/dev/null; exec redshift -m randr"
-Icon=display
-Terminal=false
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=3
+# 5. Configurar monitor de desbloqueo, reanudación y vigilancia de horario (Xfce Session Guard)
+mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
+cat <<'EOF' > "$HOME/.local/bin/xfce-session-guard"
+#!/usr/bin/env bash
+# ==============================================================================
+# xfce-session-guard: Centinela de sesión, geometría y luz nocturna para Xfce
+# Optimizado para Dell Precision M6800 (Quadro K3100M / DP-2 4K + eDP-1)
+# ==============================================================================
+set -euo pipefail
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -f "/run/user/$(id -u)/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+fi
+
+on_resume_or_unlock() {
+    # 1. Espera inicial breve para el panel interno eDP-1
+    sleep 0.6
+    if [ -x "$HOME/.local/bin/toggle-redshift" ]; then
+        "$HOME/.local/bin/toggle-redshift" restore >/dev/null 2>&1 || true
+    fi
+
+    # 2. Espera secundaria para permitir entrenamiento de enlace DisplayPort (DP-2 4K)
+    sleep 1.2
+    if [ -x "$HOME/.local/bin/toggle-redshift" ]; then
+        "$HOME/.local/bin/toggle-redshift" restore >/dev/null 2>&1 || true
+    fi
+
+    # 3. Re-afirmar geometría de ventanas y bordes bajo el panel superior
+    if pgrep -x xfwm4 >/dev/null 2>&1; then
+        xfwm4 --replace >/dev/null 2>&1 &
+    fi
+}
+
+# 1. Escuchar evento de desbloqueo de salvapantallas de Xfce
+gdbus monitor --session --dest org.xfce.ScreenSaver 2>/dev/null | while read -r line; do
+    if echo "$line" | grep -q "ActiveChanged: <false>"; then
+        on_resume_or_unlock "screensaver-unlock"
+    fi
+done &
+PID_SS=$!
+
+# 2. Escuchar evento de reanudación del sistema desde suspensión (systemd-logind)
+gdbus monitor --system --dest org.freedesktop.login1 2>/dev/null | while read -r line; do
+    if echo "$line" | grep -q "PrepareForSleep: <false>"; then
+        on_resume_or_unlock "system-resume"
+    fi
+done &
+PID_LOGIN=$!
+
+# 3. Bucle periódico watchdog (cada 30s) para programación automática e idempotencia
+while true; do
+    sleep 30
+    if [ -x "$HOME/.local/bin/toggle-redshift" ]; then
+        "$HOME/.local/bin/toggle-redshift" auto >/dev/null 2>&1 || true
+    fi
+done &
+PID_WATCHDOG=$!
+
+cleanup() {
+    kill "$PID_SS" "$PID_LOGIN" "$PID_WATCHDOG" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+wait
+EOF
+chmod +x "$HOME/.local/bin/xfce-session-guard"
+
+cat <<'EOF' > "$HOME/.config/systemd/user/xfce-session-guard.service"
+[Unit]
+Description=Xfce Session Guard (Night Shift and Strut Keeper on Unlock & Resume)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/xfce-session-guard
+Restart=always
+RestartSec=3
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+
+[Install]
+WantedBy=graphical-session.target default.target
 EOF
 
-# Reiniciar instancia activa de redshift de forma limpia y desasociada
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user enable --now xfce-session-guard.service 2>/dev/null || true
+
+# Restablecer estado visual neutral en RandR
 pkill -x redshift 2>/dev/null || true
-sleep 0.1
 redshift -m randr -x 2>/dev/null || true
-sleep 0.1
-(redshift -m randr >/dev/null 2>&1 &) || true
 
 echo "==> Configuración completada exitosamente."

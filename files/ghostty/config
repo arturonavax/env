@@ -10,7 +10,7 @@ font-size = 13
 # --- Apariencia ---
 theme = "light:TokyoNight Day,dark:TokyoNight Night"
 
-background-opacity = 0.97
+background-opacity = 1.0
 background-blur-radius = 0
 
 window-decoration = true
@@ -30,6 +30,8 @@ cursor-style = block
 cursor-style-blink = false
 font-feature = []
 window-vsync = false
+scrollback-limit = 10000
+image-storage-limit = 50000000
 
 # --- Inicio automático con Herdr ---
 # Desactivado para evitar race condition en X11/Xfce (OSC 52 selection ownership crash al renderizar buffers extensos en TUI)
@@ -46,3 +48,8 @@ notify-on-command-finish-after = 3s
 
 # for Herdr rename workspace
 keybind = control+,=unbind
+
+# --- Estabilidad de I/O y Portapapeles (Linux Kernel 7.x + X11) ---
+async-backend = epoll
+keybind = ctrl+shift+c=copy_to_clipboard:plain
+keybind = copy=copy_to_clipboard:plain
