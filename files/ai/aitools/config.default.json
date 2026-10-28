@@ -1,6 +1,51 @@
 {
   "version": "1.0.0",
   "default_commit_backend": "agy",
+  "backends": {
+    "agy": {
+      "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "effort_flag": "--effort"
+    },
+    "llm": {
+      "command": ["llm", "{prompt}"],
+      "input_mode": "stdin",
+      "output_mode": "stdout",
+      "model_flag": "-m"
+    },
+    "claude": {
+      "command": ["claude", "-p", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model"
+    },
+    "codex": {
+      "command": ["codex", "exec", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "-m"
+    },
+    "opencode": {
+      "command": ["opencode", "run", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "-m"
+    },
+    "pi": {
+      "command": ["pi", "ask", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model"
+    },
+    "ollama": {
+      "command": ["ollama", "run", "{model}"],
+      "default_model": "codellama",
+      "input_mode": "stdin",
+      "output_mode": "stdout"
+    }
+  },
   "commit": {
     "default_backend": "agy",
     "model": null,

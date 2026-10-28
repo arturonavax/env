@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -166,9 +167,91 @@ DEFAULT_COMMIT_TEMPLATES = {
     "detailed": COMMIT_PROMPT_DETAILED.strip()
 }
 
+DEFAULT_BACKENDS = {
+    "agy": {
+        "name": "agy",
+        "description": "Google Antigravity CLI (Gemini, Claude, GPT)",
+        "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
+        "input_mode": "arg",
+        "output_mode": "stdout",
+        "model_flag": "--model",
+        "effort_flag": "--effort",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 60,
+    },
+    "llm": {
+        "name": "llm",
+        "description": "Datasette LLM CLI (Simon Willison)",
+        "command": ["llm", "{prompt}"],
+        "input_mode": "stdin",
+        "output_mode": "stdout",
+        "model_flag": "-m",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 45,
+    },
+    "claude": {
+        "name": "claude",
+        "description": "Anthropic Claude Code CLI",
+        "command": ["claude", "-p", "{prompt}"],
+        "input_mode": "arg",
+        "output_mode": "stdout",
+        "model_flag": "--model",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 45,
+    },
+    "codex": {
+        "name": "codex",
+        "description": "OpenAI Codex CLI",
+        "command": ["codex", "exec", "{prompt}"],
+        "input_mode": "arg",
+        "output_mode": "stdout",
+        "model_flag": "-m",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 45,
+    },
+    "opencode": {
+        "name": "opencode",
+        "description": "OpenCode CLI",
+        "command": ["opencode", "run", "{prompt}"],
+        "input_mode": "arg",
+        "output_mode": "stdout",
+        "model_flag": "-m",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 45,
+    },
+    "pi": {
+        "name": "pi",
+        "description": "Inflection Pi CLI",
+        "command": ["pi", "ask", "{prompt}"],
+        "input_mode": "arg",
+        "output_mode": "stdout",
+        "model_flag": "--model",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 45,
+    },
+    "ollama": {
+        "name": "ollama",
+        "description": "Ollama Local LLM Runner",
+        "command": ["ollama", "run", "{model}"],
+        "default_model": "codellama",
+        "input_mode": "stdin",
+        "output_mode": "stdout",
+        "clean_ansi": True,
+        "clean_markdown": True,
+        "timeout_sec": 60,
+    }
+}
+
 DEFAULT_CONFIG = {
     "version": VERSION,
     "default_commit_backend": "agy",
+    "backends": DEFAULT_BACKENDS,
     "commit": {
         "default_backend": "agy",
         "model": None,
@@ -827,8 +910,257 @@ def run_watch(interval_sec: int = 30, target_filter: str = None) -> None:
 
 
 # ------------------------------------------------------------------------------
-# Action: GENERALIZED LLM DISPATCH & COMMIT PIPELINE
+# Action: HARNESS ADAPTER PATTERN & GENERALIZED LLM DISPATCH
 # ------------------------------------------------------------------------------
+ANSI_ESCAPE_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Strips ANSI terminal escape sequences, carriage returns, and terminal control chars."""
+    if not text:
+        return ""
+    clean = ANSI_ESCAPE_RE.sub('', text)
+    clean = clean.replace('\r', '')
+    return clean.strip()
+
+
+def extract_json_path(data: any, path_str: str) -> any:
+    """Extracts a nested value from JSON dict/list via dot notation (e.g. 'choices.0.message.content')."""
+    if not path_str or data is None:
+        return data
+    current = data
+    for part in path_str.split('.'):
+        if isinstance(current, dict):
+            current = current.get(part)
+        elif isinstance(current, list) and part.isdigit():
+            idx = int(part)
+            current = current[idx] if 0 <= idx < len(current) else None
+        else:
+            return None
+        if current is None:
+            break
+    return current
+
+
+class HarnessAdapter:
+    """
+    Adapter Pattern for AI Harnesses and CLI Backends.
+    Normalizes divergent I/O protocols:
+      - Input Strategy: 'arg' | 'stdin' | 'temp_file'
+      - Output Strategy: 'stdout' | 'temp_file' | 'json'
+      - Sanitization Pipeline: ANSI escape removal, markdown code fence stripping, JSON key extraction
+    """
+    def __init__(self, name: str, spec: dict):
+        self.name = name
+        self.description = spec.get("description", f"AI Harness {name}")
+        cmd = spec.get("command", [name])
+        if isinstance(cmd, str):
+            self.command = shlex.split(cmd)
+        else:
+            self.command = list(cmd)
+        self.input_mode = spec.get("input_mode", "arg")        # "arg" | "stdin" | "temp_file"
+        self.output_mode = spec.get("output_mode", "stdout")   # "stdout" | "temp_file" | "json"
+        self.json_key = spec.get("json_key", "response")
+        self.model_flag = spec.get("model_flag", "--model")
+        self.effort_flag = spec.get("effort_flag", "--effort")
+        self.default_model = spec.get("default_model")
+        self.default_effort = spec.get("default_effort")
+        self.clean_ansi = spec.get("clean_ansi", True)
+        self.clean_markdown = spec.get("clean_markdown", True)
+        self.timeout_sec = spec.get("timeout_sec", 60)
+
+    def is_available(self) -> bool:
+        if not self.command:
+            return False
+        bin_name = self.command[0]
+        return bool(shutil.which(bin_name) or os.path.exists(bin_name))
+
+    def execute(
+        self,
+        prompt: str,
+        model: str = None,
+        effort: str = None,
+        timeout_sec: int = None,
+        clean_markdown_fence: bool = True
+    ) -> str:
+        effective_timeout = timeout_sec or self.timeout_sec
+        prompt_file = None
+        output_file = None
+
+        try:
+            cmd_args = list(self.command)
+            input_data = None
+
+            # 1. Input strategy
+            if self.input_mode == "temp_file":
+                with tempfile.NamedTemporaryFile("w+", suffix=".prompt.txt", delete=False, encoding="utf-8") as tf:
+                    tf.write(prompt)
+                    prompt_file = tf.name
+                has_pf = any("{prompt_file}" in a or "{input_file}" in a for a in cmd_args)
+                if has_pf:
+                    cmd_args = [a.replace("{prompt_file}", prompt_file).replace("{input_file}", prompt_file) for a in cmd_args]
+                else:
+                    cmd_args.append(prompt_file)
+
+            elif self.input_mode == "stdin":
+                input_data = prompt
+                cmd_args = [a for a in cmd_args if a != "{prompt}"]
+
+            else:  # "arg"
+                has_prompt = any("{prompt}" in a for a in cmd_args)
+                if has_prompt:
+                    cmd_args = [a.replace("{prompt}", prompt) for a in cmd_args]
+                else:
+                    cmd_args.append(prompt)
+
+            # 2. Output strategy
+            if self.output_mode == "temp_file":
+                with tempfile.NamedTemporaryFile("w+", suffix=".out.txt", delete=False, encoding="utf-8") as tf:
+                    output_file = tf.name
+                has_of = any("{output_file}" in a for a in cmd_args)
+                if has_of:
+                    cmd_args = [a.replace("{output_file}", output_file) for a in cmd_args]
+                else:
+                    cmd_args.extend(["--output", output_file])
+
+            # 3. Model flag injection
+            eff_model = model or self.default_model
+            if eff_model:
+                has_model = any("{model}" in a for a in cmd_args)
+                if has_model:
+                    cmd_args = [a.replace("{model}", eff_model) for a in cmd_args]
+                elif self.model_flag:
+                    cmd_args.extend([self.model_flag, eff_model])
+
+            # 4. Effort flag injection
+            eff_effort = effort or self.default_effort
+            if eff_effort:
+                has_effort = any("{effort}" in a for a in cmd_args)
+                if has_effort:
+                    cmd_args = [a.replace("{effort}", eff_effort) for a in cmd_args]
+                elif self.effort_flag:
+                    cmd_args.extend([self.effort_flag, eff_effort])
+
+            # 5. Check executable existence
+            bin_name = cmd_args[0]
+            if not shutil.which(bin_name) and not os.path.exists(bin_name):
+                raise FileNotFoundError(f"AI CLI binary '{bin_name}' not found in PATH for backend '{self.name}'.")
+
+            # 6. Execute subprocess with isolated pipes
+            res = subprocess.run(
+                cmd_args,
+                input=input_data,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout
+            )
+
+            if res.returncode != 0:
+                err = res.stderr.strip() or res.stdout.strip()
+                raise RuntimeError(f"Harness '{self.name}' exited with code {res.returncode}: {err}")
+
+            # 7. Output extraction
+            if self.output_mode == "temp_file" and output_file and os.path.exists(output_file):
+                with open(output_file, "r", encoding="utf-8", errors="replace") as f:
+                    raw_output = f.read()
+            elif self.output_mode == "json":
+                raw_stdout = res.stdout.strip()
+                try:
+                    parsed = json.loads(raw_stdout)
+                    extracted = extract_json_path(parsed, self.json_key)
+                    raw_output = str(extracted) if extracted is not None else raw_stdout
+                except Exception:
+                    raw_output = raw_stdout
+            else:
+                raw_output = res.stdout
+
+            # 8. Post-processing & Sanitization Pipeline
+            output = raw_output
+            if self.clean_ansi:
+                output = strip_ansi_codes(output)
+
+            output = output.strip()
+
+            if clean_markdown_fence and self.clean_markdown:
+                output = re.sub(r'^```[a-zA-Z]*\n', '', output)
+                output = re.sub(r'\n```$', '', output).strip()
+                if output.startswith('"') and output.endswith('"'):
+                    output = output[1:-1].strip()
+
+            return output
+
+        finally:
+            if prompt_file and os.path.exists(prompt_file):
+                try:
+                    os.remove(prompt_file)
+                except OSError:
+                    pass
+            if output_file and os.path.exists(output_file):
+                try:
+                    os.remove(output_file)
+                except OSError:
+                    pass
+
+
+def resolve_backend_adapter(backend_name: str, config: dict = None) -> HarnessAdapter:
+    """Resolves a backend name to its corresponding HarnessAdapter."""
+    cfg = config or load_config()
+    custom_backends = cfg.get("backends", {})
+
+    target_name = (backend_name or "").strip()
+    if not target_name:
+        target_name = cfg.get("commit", {}).get("default_backend") or cfg.get("default_commit_backend", "agy")
+
+    # 1. Custom backend from configuration
+    if target_name in custom_backends:
+        return HarnessAdapter(target_name, custom_backends[target_name])
+
+    # 2. Built-in backend
+    if target_name in DEFAULT_BACKENDS:
+        return HarnessAdapter(target_name, DEFAULT_BACKENDS[target_name])
+
+    # 3. Ad-hoc command string or binary found in PATH
+    if " " in target_name or "/" in target_name or shutil.which(target_name):
+        ad_hoc_spec = {
+            "command": shlex.split(target_name),
+            "input_mode": "stdin",
+            "output_mode": "stdout",
+            "clean_ansi": True,
+            "clean_markdown": True
+        }
+        return HarnessAdapter(target_name, ad_hoc_spec)
+
+    # 4. Unknown backend: raise informative error
+    available = sorted(set(list(DEFAULT_BACKENDS.keys()) + list(custom_backends.keys())))
+    raise ValueError(f"Unknown AI backend '{backend_name}'. Available backends: {', '.join(available)}")
+
+
+def show_backends() -> None:
+    """Displays a formatted table of all registered AI harness backends and execution strategies."""
+    config = load_config()
+    custom_backends = config.get("backends", {})
+    all_names = sorted(set(list(DEFAULT_BACKENDS.keys()) + list(custom_backends.keys())))
+    default_backend = config.get("commit", {}).get("default_backend") or config.get("default_commit_backend", "agy")
+
+    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
+    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · Available AI Harness Backends & Execution Strategies':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
+    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    print(f"  {C_BOLD}{'BACKEND':<14} {'STATUS':<14} {'INPUT':<11} {'OUTPUT':<11} {'DESCRIPTION'}{C_RESET}")
+    print(f"  {C_GRAY}{'─'*14} {'─'*14} {'─'*11} {'─'*11} {'─'*30}{C_RESET}")
+
+    for name in all_names:
+        spec = custom_backends.get(name) or DEFAULT_BACKENDS.get(name, {})
+        adapter = HarnessAdapter(name, spec)
+        avail = adapter.is_available()
+        status_badge = f"{C_GREEN}✓ installed{C_RESET}" if avail else f"{C_GRAY}✗ not found{C_RESET}"
+        is_def = f" {C_YELLOW}★{C_RESET}" if name == default_backend else ""
+        b_name = f"{name}{is_def}"
+        print(f"  {C_BOLD_WHITE}{b_name:<18}{C_RESET} {status_badge:<22} {adapter.input_mode:<11} {adapter.output_mode:<11} {C_DIM}{adapter.description}{C_RESET}")
+
+    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}")
+    print(f"{C_DIM}★ = active default backend. Override per commit: aitools commit --backend <name> / -b <name>{C_RESET}\n")
+
+
 def query_llm(
     prompt: str,
     backend: str = "agy",
@@ -837,61 +1169,44 @@ def query_llm(
     timeout_sec: int = 45,
     clean_markdown_fence: bool = True
 ) -> str:
-    """Dispatches a prompt to the configured AI CLI backend with model and effort options."""
-    if backend == "agy":
-        cmd = ["agy", "-p", prompt]
-        if effort:
-            cmd.extend(["--effort", effort])
-        if model:
-            cmd.extend(["--model", model])
-    elif backend == "claude":
-        cmd = ["claude", "-p", prompt]
-        if model:
-            cmd.extend(["--model", model])
-    elif backend == "codex":
-        cmd = ["codex", "exec", prompt]
-        if model:
-            cmd.extend(["-m", model])
-    elif backend == "llm":
-        cmd = ["llm", prompt]
-        if model:
-            cmd.extend(["-m", model])
-    elif backend == "opencode":
-        cmd = ["opencode", "run", prompt]
-        if model:
-            cmd.extend(["-m", model])
-    elif backend == "pi":
-        cmd = ["pi", "ask", prompt]
-        if model:
-            cmd.extend(["--model", model])
-    else:
-        # Fallback to agy or llm
-        if shutil.which("agy"):
-            cmd = ["agy", "-p", prompt]
-            if effort:
-                cmd.extend(["--effort", effort])
-            if model:
-                cmd.extend(["--model", model])
-        elif shutil.which("llm"):
-            cmd = ["llm", prompt]
-            if model:
-                cmd.extend(["-m", model])
+    """
+    Dispatches a prompt to an AI harness using the HarnessAdapter pattern.
+    Normalizes input delivery (arg, stdin, temp_file) and output capture (stdout, temp_file, json).
+    """
+    config = load_config()
+    adapter = resolve_backend_adapter(backend, config)
+
+    # Check availability and apply intelligent fallback if preferred backend is missing
+    if not adapter.is_available():
+        fallbacks = ["agy", "llm", "claude", "codex", "opencode", "pi", "ollama"]
+        found = None
+        for fb in fallbacks:
+            if fb == adapter.name:
+                continue
+            try:
+                fb_adapter = resolve_backend_adapter(fb, config)
+                if fb_adapter.is_available():
+                    found = fb_adapter
+                    break
+            except Exception:
+                continue
+
+        if found:
+            print(f"{C_YELLOW}⚠ Backend '{adapter.name}' not found in PATH; falling back to '{found.name}'{C_RESET}", file=sys.stderr)
+            adapter = found
         else:
-            raise RuntimeError(f"No suitable AI CLI backend found (tried '{backend}', agy, llm).")
+            bin_name = adapter.command[0] if adapter.command else adapter.name
+            raise RuntimeError(
+                f"AI harness '{adapter.name}' binary ('{bin_name}') was not found in PATH, and no fallback CLI tools were detected."
+            )
 
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
-    if res.returncode != 0:
-        err = res.stderr.strip() or res.stdout.strip()
-        raise RuntimeError(f"LLM command failed ({backend}): {err}")
-
-    raw_output = res.stdout.strip()
-    if clean_markdown_fence:
-        clean = re.sub(r'^```[a-zA-Z]*\n', '', raw_output)
-        clean = re.sub(r'\n```$', '', clean).strip()
-        if clean.startswith('"') and clean.endswith('"'):
-            clean = clean[1:-1].strip()
-        return clean
-    return raw_output
+    return adapter.execute(
+        prompt=prompt,
+        model=model,
+        effort=effort,
+        timeout_sec=timeout_sec,
+        clean_markdown_fence=clean_markdown_fence
+    )
 
 
 def get_git_diff(stage_all: bool = False) -> tuple[str, bool]:
@@ -1049,8 +1364,13 @@ def run_commit(
     jira_id: str = None,
     scope: str = None,
     dry_run: bool = False,
-    list_templates: bool = False
+    list_templates: bool = False,
+    list_backends: bool = False
 ) -> None:
+    if list_backends:
+        show_backends()
+        return
+
     config = load_config()
     commit_cfg = config.get("commit", {})
 
@@ -1297,6 +1617,7 @@ def show_commands() -> None:
         ("watch", "builtin", "local/tui", "Live-updating TUI dashboard for AI quotas"),
         ("wake", "builtin", "multi-cli", "Evaluate models and prime idle/expired quotas"),
         ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (gcm)"),
+        ("backends", "builtin", "inspector", "List all available AI CLI harnesses and strategies"),
         ("daemon", "builtin", "systemd/rtc", "Manage background monitor and RTC auto-wake"),
         ("status", "builtin", "local", "Check availability and paths of all AI CLIs"),
         ("config", "builtin", "json/jsonc", "Show, locate, or initialize config file"),
@@ -1459,6 +1780,7 @@ def show_status() -> None:
         ("opencode", "OpenCode CLI"),
         ("pi", "Inflection Pi CLI"),
         ("llm", "Datasette LLM CLI"),
+        ("ollama", "Ollama local LLM runner"),
         ("rtk", "Rust Token Killer proxy"),
         ("git", "Git version control"),
         ("notify-send", "Desktop notifications"),
@@ -1481,7 +1803,7 @@ def show_status() -> None:
 def main() -> None:
     # Fast-path: Check for direct custom command invocation (e.g. `aitools review`)
     known_subcommands = {
-        "quota", "watch", "wake", "commit", "daemon", "status",
+        "quota", "watch", "wake", "commit", "backends", "daemon", "status",
         "config", "run", "commands", "-v", "--version", "-h", "--help"
     }
 
@@ -1520,32 +1842,36 @@ def main() -> None:
     # 4. Commit
     p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI")
     p_commit.add_argument("-a", "--all", action="store_true", help="Stage all tracked modified files before diffing")
-    p_commit.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi)")
+    p_commit.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi, ollama, or custom harness)")
     p_commit.add_argument("-m", "--model", help="Model override (e.g. gemini-2.5-flash, claude-3-7-sonnet)")
     p_commit.add_argument("-t", "--template", help="Commit prompt template name (conventional, jira, jira-scope, detailed) or custom template string")
     p_commit.add_argument("-j", "--jira", help="Jira / Issue ticket ID override (e.g. PROJ-1234)")
     p_commit.add_argument("-s", "--scope", help="Optional commit scope override")
     p_commit.add_argument("--list-templates", action="store_true", help="List all available commit templates")
+    p_commit.add_argument("--list-backends", action="store_true", help="List all available AI CLI harnesses and strategies")
     p_commit.add_argument("-d", "--dry-run", action="store_true", help="Preview message without committing")
 
-    # 5. Daemon
+    # 5. Backends
+    subparsers.add_parser("backends", help="List all available AI CLI harnesses and execution strategies")
+
+    # 6. Daemon
     p_daemon = subparsers.add_parser("daemon", help="Manage background wakeup daemon, RTC alarms, and suspension")
     p_daemon.add_argument("daemon_action", choices=["status", "install", "uninstall", "run-wake-cycle", "auto-wake"])
     p_daemon.add_argument("extra_arg", nargs="?", default="", help="Optional parameter for daemon action (e.g. on/off)")
 
-    # 6. Status
+    # 7. Status
     subparsers.add_parser("status", help="Check availability and paths of AI tools and runtimes")
 
-    # 7. Config
+    # 8. Config
     p_config = subparsers.add_parser("config", help="Show, edit, or locate configuration file")
     p_config.add_argument("config_action", choices=["show", "path", "init"], default="show", nargs="?")
 
-    # 8. Run (Declarative Custom Command)
+    # 9. Run (Declarative Custom Command)
     p_run = subparsers.add_parser("run", help="Execute a custom declarative AI command/pipeline")
     p_run.add_argument("command_name", help="Name of custom command defined in ~/.config/aitools/config.json")
     p_run.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to custom command")
 
-    # 9. Commands (List all built-in and declarative custom commands)
+    # 10. Commands (List all built-in and declarative custom commands)
     subparsers.add_parser("commands", help="List all built-in and declarative custom AI commands")
 
     args = parser.parse_args()
@@ -1569,8 +1895,11 @@ def main() -> None:
             jira_id=args.jira,
             scope=args.scope,
             dry_run=args.dry_run,
-            list_templates=args.list_templates
+            list_templates=args.list_templates,
+            list_backends=args.list_backends
         )
+    elif args.subcommand == "backends":
+        show_backends()
     elif args.subcommand == "daemon":
         handle_daemon_cli(args)
     elif args.subcommand == "status":

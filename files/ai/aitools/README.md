@@ -55,6 +55,7 @@ Commands:
   watch         Live-updating TUI dashboard for AI quotas and timers
   wake          Evaluate models and trigger wakeup probes for expired/idle quotas
   commit        Generate Conventional Git Commit messages from diff using AI
+  backends      List all available AI CLI harnesses and execution strategies
   daemon        Manage background wakeup daemon, RTC alarms, and suspension
   status        Check availability and paths of AI tools and runtimes
   config        Show, edit, or locate configuration file
@@ -100,6 +101,14 @@ aitools commit -t jira -j PROJ-999 --model gemini-2.5-flash
 
 # Multi-line detailed commit with scope override
 aitools commit --template detailed --scope auth
+
+# List available AI CLI harness backends and their I/O strategies
+aitools backends
+aitools commit --list-backends
+
+# Commit using specific AI backend (agy, claude, codex, llm, opencode, pi, ollama)
+aitools commit --backend agy
+aitools commit --backend llm
 
 # Stage all modified files and generate commit via Claude backend
 aitools commit -a --backend claude
@@ -189,7 +198,50 @@ When defining custom templates in `~/.config/aitools/config.json`, the following
 
 ---
 
-## 6. Configuration Schema (`~/.config/aitools/config.json`)
+## 6. AI Harness Adapters & I/O Protocol Normalization
+
+Different AI CLIs and agent harnesses use incompatible I/O protocols:
+- Some tools support **UNIX stdin pipes** (e.g. `llm`, `ollama`), while others require **CLI argument flags** (e.g. `agy -p`, `claude -p`).
+- Some harnesses dump terminal colors, spinners, or cursor controls to stdout that corrupt git commit pipelines.
+- Specialized harnesses write results to an **output file** (e.g. `--out {output_file}`) or emit **structured JSON** (e.g. `--format json`).
+
+`aitools` implements the **Adapter + Strategy Pattern** (`HarnessAdapter`) to normalize these divergent behaviors:
+
+### Registered Built-in Adapters
+
+| Backend | Input Strategy | Output Strategy | Notes |
+| :--- | :--- | :--- | :--- |
+| `agy` | `arg` (`-p`) | `stdout` | Strips ANSI escape codes and disables slash command expansion |
+| `llm` | `stdin` | `stdout` | Native UNIX pipeline support |
+| `claude` | `arg` (`-p`) | `stdout` | Anthropic Claude Code CLI |
+| `codex` | `arg` (`exec`) | `stdout` | OpenAI Codex CLI |
+| `opencode` | `arg` (`run`) | `stdout` | OpenCode CLI |
+| `pi` | `arg` (`ask`) | `stdout` | Inflection Pi CLI |
+| `ollama` | `stdin` | `stdout` | Ollama local model runner |
+
+### Custom Harness Registration
+
+You can register custom harnesses in `~/.config/aitools/config.json`:
+
+```jsonc
+"backends": {
+  "my-file-harness": {
+    "command": ["my-agent", "--in", "{prompt_file}", "--out", "{output_file}"],
+    "input_mode": "temp_file",
+    "output_mode": "temp_file"
+  },
+  "my-json-harness": {
+    "command": ["my-tool", "-p", "{prompt}", "--format", "json"],
+    "input_mode": "arg",
+    "output_mode": "json",
+    "json_key": "choices.0.message.content"
+  }
+}
+```
+
+---
+
+## 7. Configuration Schema (`~/.config/aitools/config.json`)
 
 Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and trailing commas. Full commented template available at [`files/ai/aitools/config.template.jsonc`](./config.template.jsonc).
 
@@ -197,6 +249,18 @@ Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and traili
 {
   "version": "1.0.0",
   "default_commit_backend": "agy",
+  "backends": {
+    "agy": {
+      "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
+      "input_mode": "arg",
+      "output_mode": "stdout"
+    },
+    "llm": {
+      "command": ["llm", "{prompt}"],
+      "input_mode": "stdin",
+      "output_mode": "stdout"
+    }
+  },
   "commit": {
     "default_backend": "agy",
     "model": null,

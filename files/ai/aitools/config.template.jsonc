@@ -10,8 +10,85 @@
 
   // Default AI backend CLI used when not explicitly specified
   // Options: "agy" (Google Antigravity), "claude" (Claude Code), "codex" (OpenAI),
-  //          "llm" (Datasette LLM), "opencode" (OpenCode), "pi" (Inflection Pi)
+  //          "llm" (Datasette LLM), "opencode" (OpenCode), "pi" (Inflection Pi),
+  //          "ollama" (Local Ollama), or any custom harness defined in "backends" below.
   "default_commit_backend": "agy",
+
+  // ----------------------------------------------------------------------------
+  // AI Harness Adapters & CLI Backends (`backends`)
+  // ----------------------------------------------------------------------------
+  // Adapter Pattern: Normalizes divergent I/O protocols across AI tools:
+  // - input_mode  : "arg" (via CLI argument/flag) | "stdin" (UNIX pipe) | "temp_file" ({prompt_file})
+  // - output_mode : "stdout" (standard output) | "temp_file" ({output_file}) | "json" (parsed via json_key)
+  // - clean_ansi  : Automatically strips ANSI color codes, cursor escapes, and spinner artifacts
+  // ----------------------------------------------------------------------------
+  "backends": {
+    // Google Antigravity CLI (Default)
+    "agy": {
+      "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "effort_flag": "--effort",
+      "clean_ansi": true,
+      "clean_markdown": true
+    },
+
+    // Datasette LLM CLI (Simon Willison) — Native UNIX stdin pipeline
+    "llm": {
+      "command": ["llm", "{prompt}"],
+      "input_mode": "stdin",
+      "output_mode": "stdout",
+      "model_flag": "-m",
+      "clean_ansi": true,
+      "clean_markdown": true
+    },
+
+    // Anthropic Claude Code CLI
+    "claude": {
+      "command": ["claude", "-p", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "clean_ansi": true,
+      "clean_markdown": true
+    },
+
+    // OpenAI Codex CLI
+    "codex": {
+      "command": ["codex", "exec", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "-m",
+      "clean_ansi": true,
+      "clean_markdown": true
+    },
+
+    // Ollama Local LLM Runner
+    "ollama": {
+      "command": ["ollama", "run", "{model}"],
+      "default_model": "codellama",
+      "input_mode": "stdin",
+      "output_mode": "stdout",
+      "clean_ansi": true,
+      "clean_markdown": true
+    }
+
+    // Example 1: Custom harness that writes to an output file instead of stdout:
+    // "file-harness": {
+    //   "command": ["my-agent", "--in", "{prompt_file}", "--out", "{output_file}"],
+    //   "input_mode": "temp_file",
+    //   "output_mode": "temp_file"
+    // },
+
+    // Example 2: Custom harness that outputs structured JSON:
+    // "json-harness": {
+    //   "command": ["my-tool", "-p", "{prompt}", "--format", "json"],
+    //   "input_mode": "arg",
+    //   "output_mode": "json",
+    //   "json_key": "choices.0.message.content"
+    // }
+  },
 
   // ----------------------------------------------------------------------------
   // Git Conventional Commit Generator Configuration (`aitools commit` / `gcm`)

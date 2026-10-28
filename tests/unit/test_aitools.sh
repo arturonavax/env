@@ -175,4 +175,71 @@ assert_exit_code 0 "$commit_help_code" "aitools commit --help exit code" &&
 	assert_contains "$commit_help_output" "--scope" "Scope flag present" &&
 	assert_contains "$commit_help_output" "--model" "Model flag present" &&
 	assert_contains "$commit_help_output" "--list-templates" "List templates flag present" &&
-	pass "aitools commit CLI flags (--template, --jira, --scope, --model, --list-templates) verified"
+	assert_contains "$commit_help_output" "--list-backends" "List backends flag present" &&
+	pass "aitools commit CLI flags (--template, --jira, --scope, --model, --list-templates, --list-backends) verified"
+
+# Test 14: aitools backends and commit --list-backends
+backends_output="$("$AITOOLS_BIN" backends 2>&1)"
+backends_code=$?
+assert_exit_code 0 "$backends_code" "aitools backends exit code" &&
+	assert_contains "$backends_output" "Available AI Harness Backends" "Backends header" &&
+	assert_contains "$backends_output" "agy" "Backend agy listed" &&
+	assert_contains "$backends_output" "llm" "Backend llm listed" &&
+	assert_contains "$backends_output" "claude" "Backend claude listed" &&
+	assert_contains "$backends_output" "ollama" "Backend ollama listed" &&
+	pass "aitools backends cleanly displayed all registered AI harnesses and execution strategies"
+
+commit_backends_output="$("$AITOOLS_BIN" commit --list-backends 2>&1)"
+commit_backends_code=$?
+assert_exit_code 0 "$commit_backends_code" "aitools commit --list-backends exit code" &&
+	assert_contains "$commit_backends_output" "Available AI Harness Backends" "Backends header from commit" &&
+	pass "aitools commit --list-backends cleanly inspected harness registry"
+
+# Test 15: HarnessAdapter unit tests (I/O normalization, ANSI stripping, JSON extraction, file modes)
+python3 -c "
+from importlib.machinery import SourceFileLoader
+import sys, os
+aitools = SourceFileLoader('aitools', '${REPO_ROOT}/files/ai/aitools/aitools').load_module()
+
+# 1. ANSI stripping test
+dirty = '\x1b[32m\x1b[1mfeat(core): test message\x1b[0m\r\n'
+clean = aitools.strip_ansi_codes(dirty)
+assert clean == 'feat(core): test message', f'Failed ANSI strip: {clean}'
+
+# 2. JSON path extraction test
+sample_json = {'data': {'choices': [{'message': {'content': 'fix(parser): syntax fix'}}]}}
+extracted = aitools.extract_json_path(sample_json, 'data.choices.0.message.content')
+assert extracted == 'fix(parser): syntax fix', f'Failed JSON path: {extracted}'
+
+# 3. HarnessAdapter with temp_file input and output mode
+spec_file = {
+    'command': ['bash', '-c', 'cat {prompt_file} > {output_file} && echo \"追加\" >> {output_file}'],
+    'input_mode': 'temp_file',
+    'output_mode': 'temp_file',
+    'clean_ansi': True,
+    'clean_markdown': True
+}
+adapter_file = aitools.HarnessAdapter('mock_file_harness', spec_file)
+out_file = adapter_file.execute('feat(test): hello world')
+assert 'feat(test): hello world' in out_file, f'Temp file I/O failed: {out_file}'
+
+# 4. HarnessAdapter with stdin input mode
+spec_stdin = {
+    'command': ['cat'],
+    'input_mode': 'stdin',
+    'output_mode': 'stdout',
+    'clean_ansi': True
+}
+adapter_stdin = aitools.HarnessAdapter('mock_stdin', spec_stdin)
+out_stdin = adapter_stdin.execute('chore(deps): bump library')
+assert out_stdin == 'chore(deps): bump library', f'Stdin pipe failed: {out_stdin}'
+
+# 5. Ad-hoc command resolution
+ad_hoc = aitools.resolve_backend_adapter('cat')
+assert ad_hoc.input_mode == 'stdin', 'Ad-hoc command should default to stdin'
+
+sys.exit(0)
+" >/dev/null 2>&1
+adapter_test_code=$?
+assert_exit_code 0 "$adapter_test_code" "HarnessAdapter protocol normalization tests" &&
+	pass "HarnessAdapter I/O protocols (stdin, temp_file, json, ANSI cleaning) verified with 100% precision"
