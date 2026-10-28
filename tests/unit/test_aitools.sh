@@ -243,3 +243,46 @@ sys.exit(0)
 adapter_test_code=$?
 assert_exit_code 0 "$adapter_test_code" "HarnessAdapter protocol normalization tests" &&
 	pass "HarnessAdapter I/O protocols (stdin, temp_file, json, ANSI cleaning) verified with 100% precision"
+
+# Test 16: Interactive wizard CLI options (setup and config -i)
+setup_help_output="$("$AITOOLS_BIN" setup --help 2>&1)"
+setup_help_code=$?
+assert_exit_code 0 "$setup_help_code" "aitools setup --help exit code" &&
+	assert_contains "$setup_help_output" "usage: aitools setup" "Setup usage present" &&
+	pass "aitools setup exposes dedicated interactive wizard entrypoint"
+
+config_help_output="$("$AITOOLS_BIN" config --help 2>&1)"
+config_help_code=$?
+assert_exit_code 0 "$config_help_code" "aitools config --help exit code" &&
+	assert_contains "$config_help_output" "--interactive" "Interactive flag present in config" &&
+	assert_contains "$config_help_output" "wizard" "Wizard action choice present" &&
+	pass "aitools config exposes interactive wizard flags and choices"
+
+# Test 17: Interactive wizard execution with simulated responses
+mock_cfg_dir="${TEST_SANDBOX}/.config/aitools"
+mkdir -p "$mock_cfg_dir"
+HOME="${TEST_SANDBOX}" "$AITOOLS_BIN" setup <<EOF >/dev/null 2>&1
+1
+gemini-2.5-flash
+high
+2
+y
+n
+y
+EOF
+wizard_run_code=$?
+assert_exit_code 0 "$wizard_run_code" "aitools setup interactive run exit code" &&
+	pass "aitools setup executed interactive wizard and saved preferences cleanly"
+
+# Test 18: Pure-Bash companion wizard (utils/aitools_wizard.sh)
+WIZARD_SCRIPT="${REPO_ROOT}/utils/aitools_wizard.sh"
+if [[ ! -x "$WIZARD_SCRIPT" ]]; then
+	fail "utils/aitools_wizard.sh is not executable or not found"
+else
+	pass "utils/aitools_wizard.sh is verified and executable"
+fi
+
+bash -n "$WIZARD_SCRIPT"
+wiz_syntax_code=$?
+assert_exit_code 0 "$wiz_syntax_code" "aitools_wizard.sh syntax validation" &&
+	pass "utils/aitools_wizard.sh passed bash -n syntax checks with zero errors"

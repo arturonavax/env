@@ -1602,6 +1602,172 @@ def execute_custom_command(cmd_name: str, cmd_def: dict, extra_args: list[str]) 
         sys.exit(1)
 
 
+# ------------------------------------------------------------------------------
+# Action: INTERACTIVE CONFIGURATION WIZARD
+# ------------------------------------------------------------------------------
+def run_config_wizard() -> None:
+    """Interactive TUI wizard to configure default AI harnesses, models, commit templates & preferences."""
+    config = load_config()
+    commit_cfg = config.get("commit", {})
+    daemon_cfg = config.get("daemon", {})
+    auto_wake_cfg = daemon_cfg.get("auto_wake", {})
+    backends = {**DEFAULT_BACKENDS, **config.get("backends", {})}
+
+    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
+    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · Interactive Configuration Wizard':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
+    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    print(f"  {C_WHITE}Configure default AI harnesses, models, commit templates & daemon preferences.{C_RESET}")
+    print(f"  {C_DIM}Press Enter to keep current values in [brackets]. Ctrl+C to cancel anytime.{C_RESET}")
+    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+
+    try:
+        # Step 1: Default AI Backend / Harness
+        curr_backend = commit_cfg.get("default_backend") or config.get("default_commit_backend", "agy")
+        sorted_backends = sorted(backends.keys())
+
+        print(f"{C_BOLD_CYAN}[Step 1/6] Select Default AI Harness / Backend:{C_RESET}")
+        for idx, b_name in enumerate(sorted_backends, 1):
+            b_spec = backends[b_name]
+            cmd_name = b_spec.get("command", [b_name])[0]
+            avail = bool(shutil.which(cmd_name))
+            st = f"{C_GREEN}✓ installed{C_RESET}" if avail else f"{C_GRAY}✗ not in PATH{C_RESET}"
+            is_cur = f" {C_YELLOW}(current){C_RESET}" if b_name == curr_backend else ""
+            print(f"  {C_BOLD}[{idx}]{C_RESET} {b_name:<12} {st:<22} {C_DIM}{b_spec.get('description', '')}{C_RESET}{is_cur}")
+        print(f"  {C_BOLD}[c]{C_RESET} Custom harness command...")
+
+        b_choice = input(f"\n  Select backend [1-{len(sorted_backends)} or name] [{curr_backend}]: ").strip()
+        selected_backend = curr_backend
+        if b_choice.lower() == "c":
+            custom_cmd = input("  Enter custom command executable: ").strip()
+            if custom_cmd:
+                selected_backend = custom_cmd
+        elif b_choice.isdigit() and 1 <= int(b_choice) <= len(sorted_backends):
+            selected_backend = sorted_backends[int(b_choice) - 1]
+        elif b_choice in backends:
+            selected_backend = b_choice
+
+        # Step 2: Model Configuration
+        curr_model = commit_cfg.get("model") or ""
+        model_suggestions = {
+            "agy": ["gemini-3.8-flash-low", "gemini-2.5-flash", "claude-sonnet-5-5-low", "gemini-3-pro-low"],
+            "claude": ["claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku"],
+            "codex": ["o3-mini", "gpt-4o", "gpt-4o-mini"],
+            "llm": ["gpt-4o", "claude-3-5-sonnet", "gemini-2.5-flash"],
+            "ollama": ["codellama", "llama3", "qwen2.5-coder", "deepseek-coder"],
+        }
+        suggs = model_suggestions.get(selected_backend, [])
+
+        print(f"\n{C_BOLD_CYAN}[Step 2/6] Select Model for '{selected_backend}':{C_RESET}")
+        if suggs:
+            print(f"  {C_DIM}Popular models for {selected_backend}:{C_RESET}")
+            for s_idx, m_name in enumerate(suggs, 1):
+                is_cur = f" {C_YELLOW}(current){C_RESET}" if m_name == curr_model else ""
+                print(f"  {C_BOLD}[{s_idx}]{C_RESET} {m_name}{is_cur}")
+            print(f"  {C_DIM}Or enter any specific model string (or 'default' to clear override).{C_RESET}")
+
+        m_prompt = f"  Select model [1-{len(suggs)} or name] [{curr_model or 'default'}]: " if suggs else f"  Enter model name [{curr_model or 'default'}]: "
+        m_choice = input(m_prompt).strip()
+        selected_model = curr_model
+        if m_choice.isdigit() and suggs and 1 <= int(m_choice) <= len(suggs):
+            selected_model = suggs[int(m_choice) - 1]
+        elif m_choice:
+            selected_model = None if m_choice.lower() in ("default", "none", "null", "clear") else m_choice
+
+        # Step 3: Reasoning Effort
+        curr_effort = commit_cfg.get("effort", "low")
+        print(f"\n{C_BOLD_CYAN}[Step 3/6] Reasoning Effort:{C_RESET}")
+        print(f"  Options: {C_WHITE}low{C_RESET}, {C_WHITE}medium{C_RESET}, {C_WHITE}high{C_RESET}, {C_WHITE}xhigh{C_RESET}")
+        e_choice = input(f"  Select effort level [{curr_effort}]: ").strip().lower()
+        selected_effort = e_choice if e_choice in ("low", "medium", "high", "xhigh") else curr_effort
+
+        # Step 4: Commit Message Template
+        curr_tmpl = commit_cfg.get("default_template", "conventional")
+        print(f"\n{C_BOLD_CYAN}[Step 4/6] Default Conventional Commit Template:{C_RESET}")
+        templates_list = ["conventional", "jira", "jira-scope", "detailed"]
+        for t_idx, t_name in enumerate(templates_list, 1):
+            desc = ""
+            if t_name == "conventional": desc = "<type>(<scope>): <summary>"
+            elif t_name == "jira": desc = "[<JIRA-ID>] <type>(<scope>): <summary>"
+            elif t_name == "jira-scope": desc = "<type>(<JIRA-ID>): <summary>"
+            elif t_name == "detailed": desc = "Multi-line with WHAT/WHY paragraph and bullet points"
+            is_cur = f" {C_YELLOW}(current){C_RESET}" if t_name == curr_tmpl else ""
+            print(f"  {C_BOLD}[{t_idx}]{C_RESET} {t_name:<16} {C_DIM}{desc}{C_RESET}{is_cur}")
+
+        t_choice = input(f"\n  Select template [1-{len(templates_list)} or name] [{curr_tmpl}]: ").strip()
+        selected_tmpl = curr_tmpl
+        if t_choice.isdigit() and 1 <= int(t_choice) <= len(templates_list):
+            selected_tmpl = templates_list[int(t_choice) - 1]
+        elif t_choice in DEFAULT_COMMIT_TEMPLATES:
+            selected_tmpl = t_choice
+
+        # Step 5: Git Staging Behavior
+        curr_stage = commit_cfg.get("default_stage_all", False)
+        stage_str = "y" if curr_stage else "n"
+        print(f"\n{C_BOLD_CYAN}[Step 5/6] Git Staging Behavior:{C_RESET}")
+        stage_choice = input(f"  Stage all tracked changes by default on commit (git add -u)? [y/N] [{stage_str}]: ").strip().lower()
+        selected_stage = stage_choice in ("y", "yes", "true", "1") if stage_choice else curr_stage
+
+        # Step 6: Hardware RTC Auto-Wake & Notifications
+        curr_auto_wake = auto_wake_cfg.get("enabled", False)
+        wake_str = "y" if curr_auto_wake else "n"
+        print(f"\n{C_BOLD_CYAN}[Step 6/6] Hardware RTC Auto-Wake & Quota Priming:{C_RESET}")
+        wake_choice = input(f"  Enable scheduled RTC hardware auto-wake & quota probe? [y/N] [{wake_str}]: ").strip().lower()
+        selected_auto_wake = wake_choice in ("y", "yes", "true", "1") if wake_choice else curr_auto_wake
+
+        selected_wake_time = auto_wake_cfg.get("time", "04:00")
+        selected_resuspend = auto_wake_cfg.get("auto_resuspend", True)
+        if selected_auto_wake:
+            wt = input(f"  Target wake time (HH:MM 24h format) [{selected_wake_time}]: ").strip()
+            if wt:
+                selected_wake_time = wt
+            resusp_choice = input(f"  Auto-resuspend system after models primed? [Y/n]: ").strip().lower()
+            selected_resuspend = resusp_choice not in ("n", "no", "false", "0")
+
+        # Review Summary
+        print(f"\n{C_BOLD}{C_GREEN}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
+        print(f"{C_BOLD}{C_GREEN}│{C_RESET}  {C_BOLD_WHITE}Configuration Review:{C_RESET}")
+        print(f"{C_BOLD}{C_GREEN}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+        print(f"  {C_BOLD}Backend:{C_RESET}          {C_WHITE}{selected_backend}{C_RESET}")
+        print(f"  {C_BOLD}Model:{C_RESET}            {C_WHITE}{selected_model or '(default)'}{C_RESET}")
+        print(f"  {C_BOLD}Effort:{C_RESET}           {C_WHITE}{selected_effort}{C_RESET}")
+        print(f"  {C_BOLD}Commit Template:{C_RESET}  {C_WHITE}{selected_tmpl}{C_RESET}")
+        print(f"  {C_BOLD}Auto-Stage:{C_RESET}       {C_WHITE}{selected_stage}{C_RESET}")
+        print(f"  {C_BOLD}RTC Auto-Wake:{C_RESET}    {C_WHITE}{selected_auto_wake} (time: {selected_wake_time}, resuspend: {selected_resuspend}){C_RESET}")
+        print(f"  {C_BOLD}Target File:{C_RESET}      {C_DIM}{CONFIG_FILE}{C_RESET}")
+        print(f"{C_BOLD}{C_GREEN}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+
+        confirm = input(f"  Save configuration to {CONFIG_FILE}? [Y/n]: ").strip().lower()
+        if confirm in ("", "y", "yes"):
+            config["default_commit_backend"] = selected_backend
+            commit_cfg["default_backend"] = selected_backend
+            commit_cfg["model"] = selected_model
+            commit_cfg["effort"] = selected_effort
+            commit_cfg["default_template"] = selected_tmpl
+            commit_cfg["default_stage_all"] = selected_stage
+            config["commit"] = commit_cfg
+
+            daemon_cfg.setdefault("auto_wake", {})
+            daemon_cfg["auto_wake"]["enabled"] = selected_auto_wake
+            daemon_cfg["auto_wake"]["time"] = selected_wake_time
+            daemon_cfg["auto_wake"]["auto_resuspend"] = selected_resuspend
+            config["daemon"] = daemon_cfg
+
+            if os.path.exists(CONFIG_FILE):
+                bak_path = f"{CONFIG_FILE}.bak"
+                try:
+                    shutil.copy2(CONFIG_FILE, bak_path)
+                except OSError:
+                    pass
+
+            save_config(config)
+            print(f"\n{C_BOLD}{C_GREEN}✓ Configuration saved successfully!{C_RESET}\n")
+        else:
+            print(f"\n{C_YELLOW}Configuration wizard aborted without saving changes.{C_RESET}\n")
+
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n\n{C_YELLOW}Configuration wizard cancelled by user.{C_RESET}\n")
+
+
 def show_commands() -> None:
     config = load_config()
     custom_cmds = config.get("commands", {})
@@ -1618,6 +1784,7 @@ def show_commands() -> None:
         ("wake", "builtin", "multi-cli", "Evaluate models and prime idle/expired quotas"),
         ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (gcm)"),
         ("backends", "builtin", "inspector", "List all available AI CLI harnesses and strategies"),
+        ("setup", "builtin", "wizard", "Interactive setup wizard for harnesses, models & templates"),
         ("daemon", "builtin", "systemd/rtc", "Manage background monitor and RTC auto-wake"),
         ("status", "builtin", "local", "Check availability and paths of all AI CLIs"),
         ("config", "builtin", "json/jsonc", "Show, locate, or initialize config file"),
@@ -1804,7 +1971,7 @@ def main() -> None:
     # Fast-path: Check for direct custom command invocation (e.g. `aitools review`)
     known_subcommands = {
         "quota", "watch", "wake", "commit", "backends", "daemon", "status",
-        "config", "run", "commands", "-v", "--version", "-h", "--help"
+        "config", "setup", "run", "commands", "-v", "--version", "-h", "--help"
     }
 
     if len(sys.argv) > 1 and sys.argv[1] not in known_subcommands and not sys.argv[1].startswith("-"):
@@ -1864,14 +2031,18 @@ def main() -> None:
 
     # 8. Config
     p_config = subparsers.add_parser("config", help="Show, edit, or locate configuration file")
-    p_config.add_argument("config_action", choices=["show", "path", "init"], default="show", nargs="?")
+    p_config.add_argument("config_action", choices=["show", "path", "init", "wizard", "interactive"], default="show", nargs="?")
+    p_config.add_argument("-i", "--interactive", action="store_true", help="Launch interactive configuration wizard")
 
-    # 9. Run (Declarative Custom Command)
+    # 9. Setup (Interactive Configuration Wizard)
+    subparsers.add_parser("setup", help="Launch interactive setup & configuration wizard")
+
+    # 10. Run (Declarative Custom Command)
     p_run = subparsers.add_parser("run", help="Execute a custom declarative AI command/pipeline")
     p_run.add_argument("command_name", help="Name of custom command defined in ~/.config/aitools/config.json")
     p_run.add_argument("args", nargs=argparse.REMAINDER, help="Arguments passed to custom command")
 
-    # 10. Commands (List all built-in and declarative custom commands)
+    # 11. Commands (List all built-in and declarative custom commands)
     subparsers.add_parser("commands", help="List all built-in and declarative custom AI commands")
 
     args = parser.parse_args()
@@ -1900,6 +2071,8 @@ def main() -> None:
         )
     elif args.subcommand == "backends":
         show_backends()
+    elif args.subcommand == "setup":
+        run_config_wizard()
     elif args.subcommand == "daemon":
         handle_daemon_cli(args)
     elif args.subcommand == "status":
@@ -1917,7 +2090,9 @@ def main() -> None:
     elif args.subcommand == "commands":
         show_commands()
     elif args.subcommand == "config":
-        if args.config_action == "path":
+        if getattr(args, "interactive", False) or args.config_action in ("wizard", "interactive"):
+            run_config_wizard()
+        elif args.config_action == "path":
             print(CONFIG_FILE)
         elif args.config_action == "init":
             repo_template = os.path.join(os.path.dirname(__file__), "config.template.jsonc")

@@ -56,6 +56,7 @@ Commands:
   wake          Evaluate models and trigger wakeup probes for expired/idle quotas
   commit        Generate Conventional Git Commit messages from diff using AI
   backends      List all available AI CLI harnesses and execution strategies
+  setup         Launch interactive setup & configuration wizard
   daemon        Manage background wakeup daemon, RTC alarms, and suspension
   status        Check availability and paths of AI tools and runtimes
   config        Show, edit, or locate configuration file
@@ -68,6 +69,12 @@ Commands:
 ```sh
 # View all available built-in commands and custom declarative pipelines
 aitools commands
+
+# Launch interactive configuration wizard (harnesses, models, templates, RTC auto-wake)
+aitools setup
+aitools config --interactive
+# Or launch standalone Pure-Bash wizard:
+./utils/aitools_wizard.sh
 
 # Run declarative custom commands (direct invocation or via run)
 aitools review                     # AI code review on current staged diff
