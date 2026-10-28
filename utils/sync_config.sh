@@ -209,10 +209,16 @@ if [[ "$sync_devtools" == 1 ]]; then
 	fi
 	if [[ -f ./files/ai/aitools/aitools ]]; then
 		mkdir -p ~/.local/bin/ ~/.config/aitools/
-		cp ./files/ai/aitools/aitools ~/.local/bin/aitools
-		chmod +x ~/.local/bin/aitools
-		if [[ ! -f ~/.config/aitools/config.json && -f ./files/ai/aitools/config.default.json ]]; then
-			cp ./files/ai/aitools/config.default.json ~/.config/aitools/config.json
+		if [[ ! -f ~/.local/bin/aitools ]] || ! cmp -s ./files/ai/aitools/aitools ~/.local/bin/aitools; then
+			cp ./files/ai/aitools/aitools ~/.local/bin/aitools
+			chmod +x ~/.local/bin/aitools
+		fi
+		if [[ ! -f ~/.config/aitools/config.json ]]; then
+			if [[ -f ./files/ai/aitools/config.template.jsonc ]]; then
+				cp ./files/ai/aitools/config.template.jsonc ~/.config/aitools/config.json
+			elif [[ -f ./files/ai/aitools/config.default.json ]]; then
+				cp ./files/ai/aitools/config.default.json ~/.config/aitools/config.json
+			fi
 		fi
 	fi
 

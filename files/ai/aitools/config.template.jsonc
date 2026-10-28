@@ -1,0 +1,270 @@
+// ==============================================================================
+// ~/.config/aitools/config.json (JSON with Comments supported)
+// aitools — AI Productivity, Quota Management & Automated Workflows Suite.
+// All sections and commands are 100% declarative and extensible.
+// Changes here take effect immediately without recompilation or code modification.
+// ==============================================================================
+{
+  // Schema version for future automated migrations
+  "version": "1.0.0",
+
+  // Default AI backend CLI used when not explicitly specified
+  // Options: "agy" (Google Antigravity), "claude" (Claude Code), "codex" (OpenAI),
+  //          "llm" (Datasette LLM), "opencode" (OpenCode), "pi" (Inflection Pi)
+  "default_commit_backend": "agy",
+
+  // ----------------------------------------------------------------------------
+  // Git Conventional Commit Generator Configuration (`aitools commit` / `gcm`)
+  // ----------------------------------------------------------------------------
+  "commit": {
+    // Backend CLI used for commit message generation
+    "default_backend": "agy",
+
+    // Optional model override (e.g. "gemini-3.8-flash-low", "claude-sonnet-5-5-low")
+    "model": null,
+
+    // Reasoning effort passed to LLMs that support it (e.g. agy: "low", "high")
+    "effort": "low",
+
+    // Whether to automatically stage all modified tracked files by default
+    "default_stage_all": false,
+
+    // Maximum diff characters sent to LLM prompt (prevents OS arg overflow)
+    "max_diff_length": 15000,
+
+    // Prompt template sent to LLM. Must include {diff} placeholder.
+    "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add 'Co-Authored-By', AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}"
+  },
+
+  // ----------------------------------------------------------------------------
+  // Background Wakeup & Hardware RTC Auto-Wake Daemon (`aitools daemon`)
+  // ----------------------------------------------------------------------------
+  "daemon": {
+    // Hardware Real-Time Clock (RTC) auto-wake from S3 sleep
+    "auto_wake": {
+      // Toggle motherboard hardware RTC alarm
+      "enabled": false,
+
+      // Target wake time in 24-hour format (HH:MM)
+      "time": "04:00",
+
+      // Automatically return system to sleep (suspend) after wake cycle completes
+      "auto_resuspend": true,
+
+      // Delay in seconds before putting system back to sleep to allow notifications
+      "resuspend_delay_seconds": 12,
+
+      // Maximum wake window timeout in minutes
+      "max_wake_window_minutes": 15
+    },
+
+    // Daily active window during which models can be monitored and alerted
+    "active_hours": {
+      "start": "03:55",
+      "end": "22:00"
+    },
+
+    // Advance warning in minutes before a model quota refreshes
+    "reset_alert_lead_minutes": 5,
+
+    // Desktop notification banners (via notify-send on Linux or osascript on macOS)
+    "desktop_notifications": true,
+
+    // Optional Telegram Bot notifications for quota alerts and wake completions
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    }
+  },
+
+  // ----------------------------------------------------------------------------
+  // Model Targets & Quota Buckets (`aitools quota`, `watch`, `wake`)
+  // Add as many models, agents, tools, or accounts as desired!
+  // ----------------------------------------------------------------------------
+  "targets": [
+    {
+      "id": "gemini",
+      "name": "Google Gemini (Antigravity)",
+      "tool": "agy",
+      "account": "default",
+      "enabled": true,
+      // Telemetry type:
+      //   "agy_usage": Scrapes live JSON telemetry via `agy -p /usage --output-format json`
+      //   "claude_status": Parses `claude status --json`
+      //   "timed_fallback": Fallback countdown timer based on last successful wake epoch
+      "telemetry_type": "agy_usage",
+      "bucket_id": "gemini-5h",
+      "wake_command": [
+        "agy",
+        "-p",
+        "Reply with: 1",
+        "--model",
+        "gemini-3.8-flash-low",
+        "--effort",
+        "low"
+      ],
+      "status_command": [
+        "agy",
+        "-p",
+        "/usage",
+        "--output-format",
+        "json"
+      ],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 20
+    },
+    {
+      "id": "claude-gpt-agy",
+      "name": "Claude & GPT (Antigravity)",
+      "tool": "agy",
+      "account": "default",
+      "enabled": true,
+      "telemetry_type": "agy_usage",
+      "bucket_id": "3p-5h",
+      "wake_command": [
+        "agy",
+        "-p",
+        "Reply with: 1",
+        "--model",
+        "claude-sonnet-5-5-low",
+        "--effort",
+        "low"
+      ],
+      "status_command": [
+        "agy",
+        "-p",
+        "/usage",
+        "--output-format",
+        "json"
+      ],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 25
+    },
+    {
+      "id": "claude-cli",
+      "name": "Anthropic Claude Code CLI",
+      "tool": "claude",
+      "account": "default",
+      "enabled": false,
+      "telemetry_type": "claude_status",
+      "wake_command": [
+        "claude",
+        "-p",
+        "Reply with: 1"
+      ],
+      "status_command": [
+        "claude",
+        "status",
+        "--json"
+      ],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 25
+    },
+    {
+      "id": "codex-cli",
+      "name": "OpenAI Codex CLI",
+      "tool": "codex",
+      "account": "default",
+      "enabled": false,
+      "telemetry_type": "timed_fallback",
+      "wake_command": [
+        "codex",
+        "exec",
+        "echo 1"
+      ],
+      "status_command": [],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 20
+    },
+    {
+      "id": "opencode-cli",
+      "name": "OpenCode CLI",
+      "tool": "opencode",
+      "account": "default",
+      "enabled": false,
+      "telemetry_type": "timed_fallback",
+      "wake_command": [
+        "opencode",
+        "run",
+        "echo 1"
+      ],
+      "status_command": [],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 20
+    },
+    {
+      "id": "pi-cli",
+      "name": "Inflection Pi CLI",
+      "tool": "pi",
+      "account": "default",
+      "enabled": false,
+      "telemetry_type": "timed_fallback",
+      "wake_command": [
+        "pi",
+        "ask",
+        "hi"
+      ],
+      "status_command": [],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 20
+    },
+    {
+      "id": "llm-datasette",
+      "name": "Datasette LLM CLI",
+      "tool": "llm",
+      "account": "default",
+      "enabled": false,
+      "telemetry_type": "timed_fallback",
+      "wake_command": [
+        "llm",
+        "prompt",
+        "1"
+      ],
+      "status_command": [],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 15
+    }
+  ],
+
+  // ----------------------------------------------------------------------------
+  // Custom Declarative AI Pipelines & Commands
+  // Users can define any custom workflow here and run it via `aitools <command>`
+  // or `aitools run <command>` without touching Python code!
+  // ----------------------------------------------------------------------------
+  "commands": {
+    "review": {
+      "description": "Perform an AI code review on current staged git diff",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      // input_type options: "git_staged_diff", "git_diff", "stdin", "args", "stdin_or_args", "file", "none"
+      "input_type": "git_staged_diff",
+      "prompt_template": "You are a Principal Software Architect. Review the following git diff for logical bugs, security vulnerabilities, edge cases, and performance regressions. Be concise, actionable, and prioritize findings by severity:\n\n{input}"
+    },
+    "explain": {
+      "description": "Explain a code snippet, error message, or technical concept",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "You are an expert technical instructor. Explain the following code, error trace, or concept clearly with a focus on fundamentals and concise practical examples:\n\n{input}"
+    },
+    "ask": {
+      "description": "Quick one-line question to the default AI assistant",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "args",
+      "prompt_template": "Answer the following question concisely and technically without introductory conversational fluff:\n\n{input}"
+    },
+    "optimize": {
+      "description": "Suggest performance optimizations for code provided via stdin or argument",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Analyze the following code for memory allocations, CPU complexity, and latency bottlenecks. Suggest optimal refactoring with concrete code diffs:\n\n{input}"
+    }
+  }
+}

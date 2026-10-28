@@ -58,11 +58,22 @@ Commands:
   daemon        Manage background wakeup daemon, RTC alarms, and suspension
   status        Check availability and paths of AI tools and runtimes
   config        Show, edit, or locate configuration file
+  run           Execute a custom declarative AI command/pipeline
+  commands      List all built-in and declarative custom AI commands
 ```
 
 ### Examples
 
 ```sh
+# View all available built-in commands and custom declarative pipelines
+aitools commands
+
+# Run declarative custom commands (direct invocation or via run)
+aitools review                     # AI code review on current staged diff
+aitools explain "what is defer in go"  # Explain snippet or concept
+aitools ask "difference between slice and array" # Quick one-line question
+aitools run optimize "code..."     # Optimize code snippet
+
 # View current quota status and reset times
 aitools quota
 
@@ -90,7 +101,40 @@ aitools daemon auto-wake on 04:00
 
 ---
 
-## 3. Shell Aliases
+## 3. Declarative AI Pipelines & Dynamic Commands
+
+`aitools` allows defining custom workflows in `~/.config/aitools/config.json` without recompiling or writing Python code. Any command declared under `"commands"` is automatically exposed as an executable CLI subcommand:
+
+```jsonc
+"commands": {
+  "review": {
+    "description": "Perform an AI code review on current staged git diff",
+    "backend": "agy",
+    "effort": "low",
+    "input_type": "git_staged_diff",
+    "prompt_template": "You are a Principal Software Architect. Review the diff:\n\n{input}"
+  },
+  "explain": {
+    "description": "Explain code or error trace",
+    "backend": "agy",
+    "input_type": "stdin_or_args",
+    "prompt_template": "Explain clearly with fundamentals:\n\n{input}"
+  }
+}
+```
+
+Supported `input_type` modes:
+- `git_staged_diff`: Automatically feeds `git diff --cached` into `{input}`.
+- `git_diff`: Feeds repository working tree diff into `{input}`.
+- `stdin_or_args`: Reads from piped stdin (e.g. `cat file | aitools explain`) or command line arguments.
+- `args`: Concatenates trailing CLI arguments into `{input}`.
+- `stdin`: Reads input directly from standard input until EOF.
+- `file`: Reads file content from path specified in first argument.
+- `none`: Static prompt execution without input interpolation.
+
+---
+
+## 4. Shell Aliases
 
 Configured in `~/.base.zsh`:
 
@@ -103,12 +147,22 @@ Configured in `~/.base.zsh`:
 
 ---
 
-## 4. Configuration Schema (`~/.config/aitools/config.json`)
+## 5. Configuration Schema (`~/.config/aitools/config.json`)
 
-```json
+Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and trailing commas. Full commented template available at [`files/ai/aitools/config.template.jsonc`](./config.template.jsonc).
+
+```jsonc
 {
   "version": "1.0.0",
   "default_commit_backend": "agy",
+  "commit": {
+    "default_backend": "agy",
+    "model": null,
+    "effort": "low",
+    "default_stage_all": false,
+    "max_diff_length": 15000,
+    "prompt_template": "You are an expert developer creating a clean conventional git commit message...\n\nGit Diff:\n{diff}"
+  },
   "daemon": {
     "auto_wake": {
       "enabled": false,

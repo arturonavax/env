@@ -1,6 +1,14 @@
 {
   "version": "1.0.0",
   "default_commit_backend": "agy",
+  "commit": {
+    "default_backend": "agy",
+    "model": null,
+    "effort": "low",
+    "default_stage_all": false,
+    "max_diff_length": 15000,
+    "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add 'Co-Authored-By', AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}"
+  },
   "daemon": {
     "auto_wake": {
       "enabled": false,
@@ -160,5 +168,39 @@
       "fallback_interval_hours": 5,
       "timeout_sec": 15
     }
-  ]
+  ],
+  "commands": {
+    "review": {
+      "description": "Perform an AI code review on current staged git diff",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "git_staged_diff",
+      "prompt_template": "You are a Principal Software Architect. Review the following git diff for logical bugs, security vulnerabilities, edge cases, and performance regressions. Be concise, actionable, and prioritize findings by severity:\n\n{input}"
+    },
+    "explain": {
+      "description": "Explain a code snippet, error message, or technical concept",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "You are an expert technical instructor. Explain the following code, error trace, or concept clearly with a focus on fundamentals and concise practical examples:\n\n{input}"
+    },
+    "ask": {
+      "description": "Quick one-line question to the default AI assistant",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "args",
+      "prompt_template": "Answer the following question concisely and technically without introductory conversational fluff:\n\n{input}"
+    },
+    "optimize": {
+      "description": "Suggest performance optimizations for code provided via stdin or argument",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Analyze the following code for memory allocations, CPU complexity, and latency bottlenecks. Suggest optimal refactoring with concrete code diffs:\n\n{input}"
+    }
+  }
 }

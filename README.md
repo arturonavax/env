@@ -157,6 +157,7 @@ make uninstall-plan
   - **Selective Idempotent Wakeup (`aitools wake`)**: Automatically skips sending wake probes if the rolling 5-hour window is already ticking, preserving 100% of unused tokens. Sends low-effort 1-token probes only when expired.
   - **Hardware RTC Auto-Wake & Auto-Resuspend (`aitools daemon`)**: Wakes the machine at 04:00 AM via motherboard RTC alarm (`rtcwake`), verifies network, primes expired models, schedules next day's alarm, and suspends back to sleep in 12s. Emits desktop alerts and Telegram notifications.
   - **AI Conventional Commit Pipeline (`aitools commit` / `gcm`)**: Inspects staged diffs and generates Conventional Commit messages via LLM (`agy`, `claude`, `codex`, `opencode`, `pi`, `llm`) with interactive accept/edit/regenerate.
+  - **Declarative AI Pipelines (`aitools <cmd>` / `aitools run <cmd>`)**: Extensible zero-code commands declared in `~/.config/aitools/config.json` (`review`, `explain`, `ask`, `optimize`). Rich JSONC format with inline comments and trailing commas. Inspect all pipelines via `aitools commands`.
 - **RTK (Rust Token Killer)**: High-speed proxy compressing LLM command outputs by up to 90%.
 - **MCP Ecosystem**: Configured Model Context Protocol servers and prompt harnesses.
 

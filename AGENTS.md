@@ -370,13 +370,21 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
 - **AI Git Conventional Commit Pipeline (`aitools commit` / `gcm`)**:
   - Inspects `git diff --cached` (or unstaged changes) and queries the active LLM backend (`agy`, `claude`, `codex`, `llm`, etc.) to produce clean Conventional Commit messages.
   - Interactive loop: accept `[a]`, edit `[e]`, regenerate `[r]`, cancel `[c]`.
+  - Fully customizable via `"commit"` block in `~/.config/aitools/config.json` (`prompt_template`, `effort`, `max_diff_length`).
+- **Declarative AI Pipelines & Custom Commands (`aitools <cmd>` / `aitools run <cmd>`)**:
+  - Users and agents can define custom AI workflows in `~/.config/aitools/config.json` (`review`, `explain`, `ask`, `optimize`) without touching Python code or recompiling.
+  - Supports multiple input modes: `git_staged_diff`, `git_diff`, `stdin_or_args`, `args`, `file`.
+  - Rich JSONC format: inline comments (`//`, `/* */`, `#`) and trailing commas supported.
 - **Command Reference**:
+  - `aitools commands`: List all built-in and declarative custom AI pipelines.
+  - `aitools run <cmd> [args...]`: Dispatch any declarative custom pipeline.
   - `aitools quota`: Display quota status table and reset timestamps.
   - `aitools watch [--interval SECONDS]`: Continuous terminal TUI monitor.
   - `aitools wake [--force]`: Prime expired or idle rolling quota windows.
   - `aitools commit [-a] [--backend=<id>]`: Generate conventional commit from diff.
   - `aitools daemon auto-wake [on|off]`: Toggle hardware RTC auto-wake.
   - `aitools status`: Check local presence and paths of all AI CLIs.
+  - `aitools config [show|path|init]`: Inspect or initialize configuration.
 
 ---
 

@@ -32,6 +32,7 @@ DEST_USER_BIN="${DEST_BIN_DIR:-$HOME/.local/bin}"
 CONFIG_DIR="$HOME/.config/aitools"
 SRC_BIN="./files/ai/aitools/aitools"
 SRC_CFG="./files/ai/aitools/config.default.json"
+SRC_TEMPLATE="./files/ai/aitools/config.template.jsonc"
 
 mkdir -p "$DEST_USER_BIN" "$CONFIG_DIR"
 
@@ -40,30 +41,44 @@ if [[ ! -f "$SRC_BIN" ]]; then
 	exit 1
 fi
 
-# 1. Install executable binary into target user bin
-cp -f "$SRC_BIN" "${DEST_USER_BIN}/aitools"
-chmod +x "${DEST_USER_BIN}/aitools"
-
-if command -v tx_record_file_created >/dev/null 2>&1; then
-	tx_record_file_created "${DEST_USER_BIN}/aitools"
+# 1. Install executable binary into target user bin (smart idempotency)
+target_bin="${DEST_USER_BIN}/aitools"
+if [[ ! -f "$target_bin" ]] || ! cmp -s "$SRC_BIN" "$target_bin"; then
+	cp -f "$SRC_BIN" "$target_bin"
+	chmod +x "$target_bin"
+	if command -v tx_record_file_created >/dev/null 2>&1; then
+		tx_record_file_created "$target_bin"
+	fi
 fi
 
 # 2. Symlink to /usr/local/bin if root or passwordless sudo available
 if [[ -w "/usr/local/bin" ]]; then
-	ln -sf "${DEST_USER_BIN}/aitools" "/usr/local/bin/aitools" 2>/dev/null || true
+	if [[ "$(readlink "/usr/local/bin/aitools" 2>/dev/null)" != "$target_bin" ]]; then
+		ln -sf "$target_bin" "/usr/local/bin/aitools" 2>/dev/null || true
+	fi
 elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-	sudo ln -sf "${DEST_USER_BIN}/aitools" "/usr/local/bin/aitools" 2>/dev/null || true
-	if command -v tx_record_symlink_created >/dev/null 2>&1; then
-		tx_record_symlink_created "/usr/local/bin/aitools"
+	if [[ "$(readlink "/usr/local/bin/aitools" 2>/dev/null)" != "$target_bin" ]]; then
+		sudo ln -sf "$target_bin" "/usr/local/bin/aitools" 2>/dev/null || true
+		if command -v tx_record_symlink_created >/dev/null 2>&1; then
+			tx_record_symlink_created "/usr/local/bin/aitools"
+		fi
 	fi
 fi
 
-# 3. Deploy default configuration if none exists
-if [[ ! -f "${CONFIG_DIR}/config.json" ]] && [[ -f "$SRC_CFG" ]]; then
-	cp "$SRC_CFG" "${CONFIG_DIR}/config.json"
-	log_info "Initialized default configuration at ${CONFIG_DIR}/config.json"
-	if command -v tx_record_file_created >/dev/null 2>&1; then
-		tx_record_file_created "${CONFIG_DIR}/config.json"
+# 3. Deploy default configuration if none exists (prioritizes richly commented template)
+if [[ ! -f "${CONFIG_DIR}/config.json" ]]; then
+	if [[ -f "$SRC_TEMPLATE" ]]; then
+		cp "$SRC_TEMPLATE" "${CONFIG_DIR}/config.json"
+		log_info "Initialized commented configuration template at ${CONFIG_DIR}/config.json"
+		if command -v tx_record_file_created >/dev/null 2>&1; then
+			tx_record_file_created "${CONFIG_DIR}/config.json"
+		fi
+	elif [[ -f "$SRC_CFG" ]]; then
+		cp "$SRC_CFG" "${CONFIG_DIR}/config.json"
+		log_info "Initialized default configuration at ${CONFIG_DIR}/config.json"
+		if command -v tx_record_file_created >/dev/null 2>&1; then
+			tx_record_file_created "${CONFIG_DIR}/config.json"
+		fi
 	fi
 fi
 
