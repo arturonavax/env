@@ -66,3 +66,31 @@ curl -fsSL "https://env.arturonavax.dev/macos_osconfig.sh" | bash
 ```sh
 curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash
 ```
+
+## AI Quota Primer & RTC Auto-Wake Daemon (Linux / Xfce)
+
+Intelligently primes rolling 5-hour quota windows for Antigravity (Gemini, Claude, GPT) via `agy -p /usage --output-format json` telemetry and manages hardware RTC alarms (04:00 AM) with auto-resuspend.
+
+### Installation
+
+```sh
+curl -fsSL "https://env.arturonavax.dev/install_quota_daemon_xfce.sh" | bash
+```
+
+Or locally:
+
+```sh
+./src/remotes/install_quota_daemon_xfce.sh --install
+```
+
+### Uninstallation
+
+```sh
+curl -fsSL "https://env.arturonavax.dev/uninstall_quota_daemon_xfce.sh" | bash
+```
+
+Or with full configuration purge:
+
+```sh
+./src/remotes/uninstall_quota_daemon_xfce.sh --purge
+```

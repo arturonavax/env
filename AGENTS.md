@@ -307,6 +307,25 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
   - Configured at `~/.config/rtk/config.toml` (template in `files/ai/rtk/config.toml`).
   - Telemetry is explicitly disabled (`RTK_TELEMETRY_DISABLED=1`, `telemetry.enabled = false`).
 
+### Quota Primer & Auto-Wake Daemon (`quota-ctl`)
+
+`quota-ctl` (`src/remotes/install_quota_daemon_xfce.sh`) is an intelligent rate-limit primer and hardware RTC auto-wake manager designed for rolling quota windows (e.g., Antigravity CLI / Gemini 5-hour limits):
+
+- **Structured Quota Telemetry**: Queries `agy -p /usage --output-format json` directly to evaluate exact remaining fractions and UTC reset timestamps across model groups (`gemini-5h`, `3p-5h`, `gemini-argon`).
+- **Selective Idempotency**: If a model's 5-hour rolling window is actively ticking (`reset_time > now`), pings are automatically skipped. Pings only trigger when the window is expired or idle.
+- **Hardware RTC Auto-Wake (04:00 AM) & Auto-Resuspend**:
+  - Automatically arms `/usr/sbin/rtcwake -m no -t <04:00 AM>` before S3 sleep.
+  - Motherboard RTC wakes the laptop at 04:00 AM, waits for Wi-Fi, activates expired models, schedules the next day's alarm, and re-suspends in 12s (`systemctl suspend`) to preserve battery.
+- **Extensible Schema (`~/.config/quota-primer/config.json`)**:
+  - Define custom AI targets, model IDs, CLI commands, and timeout thresholds.
+- **Service & Lifecycle Management**:
+  - **Install**: `./src/remotes/install_quota_daemon_xfce.sh --install`
+  - **Status Dashboard**: `quota-ctl status`
+  - **Manual / Forced Wake**: `quota-ctl wake` / `quota-ctl force-wake [target_id]`
+  - **Toggle Nightly 04:00 AM Wake**: `quota-ctl auto-wake on` / `quota-ctl auto-wake off`
+  - **Uninstall**: `./src/remotes/uninstall_quota_daemon_xfce.sh` (or `./src/remotes/install_quota_daemon_xfce.sh --uninstall`)
+  - **Purge Configs & State**: `./src/remotes/uninstall_quota_daemon_xfce.sh --purge`
+
 ---
 
 ## 5. Low-Token AI Engineer Workflow Directives
