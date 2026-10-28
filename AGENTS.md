@@ -444,6 +444,9 @@ The repository incorporates an enterprise-grade automated test runner and qualit
   - `test_plan.sh`: Dry-run installation plan and uninstallation teardown manifest.
   - `test_toolchain.sh`: Multi-tier fallback strategy resolution and prerequisite dependency management.
   - `test_wizard_engine.sh`: Pure-Bash zero-dependency wizard framework, progress bar, and prompt validation.
+  - `test_transaction.sh`: Transaction journal logging, rollback on interrupt/failure, and LIFO reversal.
+  - `test_aitools.sh`: AI productivity suite, declarative JSONC pipelines, and daemon management.
+  - `test_shell_configs.sh`: Strict idempotency, zero-fork lookups, footprint cleanup, and non-Zsh guards in `.base.zsh` and `.tools.sh`.
 - **Integration Smoke Tests (`tests/integration/`)**:
   - `test_cli_smoke.sh`: CLI flags (`./install.sh --check`, `--help`, `./utils/restore_backup.sh`, `./utils/sync_config.sh`).
 - **Optional Bats Specifications (`tests/bats/`)**: Executed automatically when `bats` is installed in PATH.

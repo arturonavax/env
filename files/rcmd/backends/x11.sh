@@ -198,7 +198,7 @@ rcmd_backend_x11() {
 
         local WINS=()
         local app_wmclass_l="${app_wmclass,,}"
-        while read -r w d c host title || [ -n "$w" ]; do
+        while read -r w d c _host title || [ -n "$w" ]; do
             [ -z "$w" ] && continue
             local c_l="${c,,}"
             if [[ "$c_l" == *"$app_wmclass_l"* ]]; then
@@ -243,7 +243,7 @@ rcmd_backend_x11() {
     local WINS=()
     declare -A WINS_MAP
 
-    while read -r w d c host title || [ -n "$w" ]; do
+    while read -r w d c _host title || [ -n "$w" ]; do
         [ -z "$w" ] && continue
         local c_l="${c,,}"
         local t_l="${title,,}"

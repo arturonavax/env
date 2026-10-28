@@ -1,36 +1,41 @@
 #!/bin/zsh
-[[ "$0" != *"zsh"* ]] && return
+# Guard: execute only within interactive Zsh
+[ -n "${ZSH_VERSION:-}" ] || return 0
 
 bindkey -e
 
-# PATH Basics
-[[ ":$PATH:" != *":/usr/local/bin:"* ]] && export PATH="$PATH:/usr/local/bin"
-[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
-[[ -d "$HOME/.fzf/bin" && ":$PATH:" != *":$HOME/.fzf/bin:"* ]] && export PATH="$HOME/.fzf/bin:$PATH"
-[[ -d "$HOME/.atuin/bin" && ":$PATH:" != *":$HOME/.atuin/bin:"* ]] && export PATH="$HOME/.atuin/bin:$PATH"
+# PATH Basics & Native Deduplication
+typeset -U path PATH
+path=(
+    "$HOME/.local/bin"
+    "$HOME/.fzf/bin"
+    "$HOME/.atuin/bin"
+    /usr/local/bin
+    $path
+)
+export PATH
 
 # Linux - GTK Renderer (Estabilidad y prevención de fugas de texturas en GTK 4.14 / Wayland)
-if [[ "$(uname -s)" == "Linux" ]]; then
+if [[ "$OSTYPE" == linux* ]]; then
     export GSK_RENDERER=gl
 fi
 
-# MacOS - Homebrew
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    brewbin="/usr/local/bin/brew"
-    [[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-    [[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
+# MacOS - Homebrew bootstrap
+if [[ "$OSTYPE" == darwin* ]]; then
+    if [[ -x "/opt/homebrew/bin/brew" ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x "/usr/local/bin/brew" ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
 fi
 
-# EDITOR
-if [[ "$(command -v nvim)" != "" ]]; then
-  export EDITOR=nvim
-  export VISUAL=nvim
-elif [[ "$(command -v code)" != "" ]]; then
-  export EDITOR=code
-  export VISUAL=code
-elif [[ "$(command -v vim)" != "" ]]; then
-  export EDITOR=vim
-  export VISUAL=vim
+# EDITOR (Fast in-memory command hashtable lookup)
+if (( $+commands[nvim] )); then
+    export EDITOR=nvim VISUAL=nvim
+elif (( $+commands[code] )); then
+    export EDITOR=code VISUAL=code
+elif (( $+commands[vim] )); then
+    export EDITOR=vim VISUAL=vim
 fi
 
 ## ls colors
@@ -268,11 +273,14 @@ fi
 function transparent() {
     if [[ -f "$HOME/.config/ghostty/config" ]]; then
         local ghostty_conf="$HOME/.config/ghostty/config"
+        local sed_cmd=(sed -i)
+        [[ "$OSTYPE" == darwin* ]] && sed_cmd=(sed -i '')
+
         if grep -q "^background-opacity = 1" "$ghostty_conf"; then
-            sed -i 's/^background-opacity = 2.*/background-opacity = 0.97/' "$ghostty_conf"
+            "${sed_cmd[@]}" 's/^background-opacity = .*/background-opacity = 0.97/' "$ghostty_conf"
             echo "Ghostty transparency enabled (opacity: 0.97)"
         else
-            sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$ghostty_conf"
+            "${sed_cmd[@]}" 's/^background-opacity = .*/background-opacity = 1.0/' "$ghostty_conf"
             echo "Ghostty transparency disabled (opacity: 1.0)"
         fi
     fi
@@ -280,21 +288,22 @@ function transparent() {
 
 alias tt='transparent'
 
-# Abrir archivos o carpetas visualmente en segundo plano y en silencio
-function open() {
-    (xdg-open "${1:-.}" >/dev/null 2>&1 &)
-}
+# Abrir archivos o carpetas visualmente en segundo plano y en silencio (Linux only; preserva /usr/bin/open en macOS)
+if [[ "$OSTYPE" != darwin* ]] && (( $+commands[xdg-open] )); then
+    function open() {
+        (xdg-open "${1:-.}" >/dev/null 2>&1 &)
+    }
+fi
 
 # Clear swap and cache
 function cleanup() {
-    if [[ "$(uname -s)" == "Linux" ]]; then
+    if [[ "$OSTYPE" == linux* ]]; then
         sudo sync
-        sudo echo 3 | sudo tee /proc/sys/vm/drop_caches
+        echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null
         sudo swapoff -a
         sudo swapon -a
-
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
-        # Swap memory and caches in MacOS does not work exactly the same way as in Linux, you do not have to worry about clearing it manually.
+    elif [[ "$OSTYPE" == darwin* ]]; then
+        # Swap memory and caches in macOS are managed by Darwin kernel; purge releases inactive pages
         sudo purge
     fi
 }
@@ -307,11 +316,11 @@ function reloadenv() {
 }
 
 function update-go() {
-    curl -fsSL https://env.arturonavax.dev/install_golang.sh | bash -s -- $@
+    curl -fsSL https://env.arturonavax.dev/install_golang.sh | bash -s -- "$@"
 }
 
 function update-python() {
-    curl -fsSL https://env.arturonavax.dev/install_python.sh | bash -s -- $@
+    curl -fsSL https://env.arturonavax.dev/install_python.sh | bash -s -- "$@"
 }
 
 # Update
@@ -380,8 +389,8 @@ EOF
     fi
 
     if [[ "$update_system" == 1 ]]; then
-        if [[ "$(uname -s)" == "Linux" ]]; then
-            if [[ "$(command -v apt)" != "" ]]; then
+        if [[ "$OSTYPE" == linux* ]]; then
+            if (( $+commands[apt] )); then
                 sudo apt update -y
                 sudo apt upgrade -y
                 sudo apt dist-upgrade -y
@@ -390,21 +399,21 @@ EOF
                 sudo apt autoclean
             fi
 
-            if [[ "$(command -v snap)" != "" ]]; then
+            if (( $+commands[snap] )); then
                 sudo snap refresh
             fi
 
-            if [[ "$(command -v dnf)" != "" ]]; then
+            if (( $+commands[dnf] )); then
                 sudo dnf update -y
                 sudo dnf upgrade -y
                 sudo dnf distro-sync -y
                 sudo dnf autoremove
             fi
 
-        elif [[ "$(uname -s)" == "Darwin" ]]; then
+        elif [[ "$OSTYPE" == darwin* ]]; then
             sudo softwareupdate -i -a
 
-            if [[ "$(command -v brew)" != "" ]]; then
+            if (( $+commands[brew] )); then
                 brew update
                 brew upgrade
                 brew cleanup
@@ -418,13 +427,13 @@ EOF
 
 # Light theme mode
 function lighttheme() {
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        if [[ "$(command -v gsettings)" != "" ]]; then
+    if [[ "$OSTYPE" == linux* ]]; then
+        if (( $+commands[gsettings] )); then
             gsettings set org.gnome.desktop.interface color-scheme default
             gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red"
         fi
 
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
+    elif [[ "$OSTYPE" == darwin* ]]; then
         osascript -e 'tell app "System Events" to tell appearance preferences to set dark mode to false' &>/dev/null
     fi
 
@@ -440,13 +449,13 @@ alias li=lighttheme
 
 # Dark mode
 function darktheme() {
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        if [[ "$(command -v gsettings)" != "" ]]; then
+    if [[ "$OSTYPE" == linux* ]]; then
+        if (( $+commands[gsettings] )); then
             gsettings set org.gnome.desktop.interface color-scheme prefer-dark
             gsettings set org.gnome.desktop.interface gtk-theme "Yaru-red-dark"
         fi
 
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
+    elif [[ "$OSTYPE" == darwin* ]]; then
         osascript -e 'tell app "System Events" to tell appearance preferences to set dark mode to true' &>/dev/null
     fi
 
@@ -462,20 +471,20 @@ alias da=darktheme
 
 # Copy current path
 function cpath() {
-    if [[ "$(uname -s)" == "Linux" && "$(command -v xclip)" != "" ]]; then
+    if [[ "$OSTYPE" == linux* && (( $+commands[xclip] )) ]]; then
         pwd | tr -d '\n' | xclip -selection clipboard
 
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
+    elif [[ "$OSTYPE" == darwin* ]]; then
         pwd | tr -d '\n' | pbcopy
     fi
 }
 
 # Flush the DNS Cache
 function flushdns() {
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        sudo systemd-resolve --flush-caches
+    if [[ "$OSTYPE" == linux* ]]; then
+        sudo systemd-resolve --flush-caches 2>/dev/null || sudo resolvectl flush-caches 2>/dev/null || true
 
-    elif [[ "$(uname -s)" == "Darwin" ]]; then
+    elif [[ "$OSTYPE" == darwin* ]]; then
         sudo dscacheutil -flushcache
         sudo killall -HUP mDNSResponder
         sudo killall mDNSResponderHelper
@@ -487,22 +496,25 @@ alias publicip='curl --silent ipinfo.io/ip'
 
 # Get Public IP Geolocation
 function geoip() {
-    fgcolor_reset='\033[0m'
-    fgcolor_white_bold='\033[1;37m'
-    fgcolor_blue_bold='\033[1;34m'
-    fgcolor_green_bold='\033[1;32m'
+    local fgcolor_reset='\033[0m'
+    local fgcolor_white_bold='\033[1;37m'
+    local fgcolor_blue_bold='\033[1;34m'
+    local fgcolor_green_bold='\033[1;32m'
+
+    local formatter="cat"
+    if (( $+commands[jq] )); then
+        formatter="jq ."
+    elif (( $+commands[json_pp] )); then
+        formatter="json_pp"
+    fi
 
     if [[ "$#" == 0 ]]; then
         echo "${fgcolor_white_bold}My GeoIP:${fgcolor_reset}"
-
-        curl --silent ipinfo.io/"$(curl --silent ipinfo.io/ip)" | json_pp
-
+        curl --silent ipinfo.io/"$(curl --silent ipinfo.io/ip)" | eval "$formatter"
     else
         for arg in "$@"; do
             echo "${fgcolor_white_bold}GeoIP ${fgcolor_green_bold}$arg$fgcolor_white_bold:${fgcolor_reset}"
-
-            curl --silent "ipinfo.io/$arg" | json_pp
-
+            curl --silent "ipinfo.io/$arg" | eval "$formatter"
             echo "${fgcolor_blue_bold}---${fgcolor_reset}"
         done
     fi
@@ -510,15 +522,22 @@ function geoip() {
 
 # Create a new project in Go
 function gonew() {
-    [[ "$1" == "" ]] && 1="sandbox"
+    local project_name="${1:-sandbox}"
 
-    mkdir "$1" || return 1
+    mkdir -p "$project_name" || return 1
+    cd "$project_name" || return 1
 
-    cd "$1" || return
+    go mod init "$project_name"
 
-    go mod init "$1"
+    cat <<'EOF' > main.go
+package main
 
-    echo -e 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello world!")\n}' >main.go
+import "fmt"
+
+func main() {
+	fmt.Println("Hello world!")
+}
+EOF
 }
 
 # Clear
@@ -529,25 +548,29 @@ alias path='echo "${PATH//:/\n}" | sort'
 
 # Set tools
 ## Ripgrep (Preservar grep POSIX nativo; atajo ergonomico para busqueda oculta)
-[[ "$(command -v rg)" != "" ]] && alias rgh='rg --hidden'
+(( $+commands[rg] )) && alias rgh='rg --hidden'
 
 ## Fd (Normalizar nombre de paquete en Debian/Ubuntu sin romper GNU find)
-if [[ "$(command -v fdfind)" != "" && "$(command -v fd)" == "" ]]; then
+if (( $+commands[fdfind] )) && (( ! $+commands[fd] )); then
     alias fd='fdfind'
 fi
-[[ "$(command -v fd)" != "" || "$(command -v fdfind)" != "" ]] && alias fdh='fd --hidden'
+if (( $+commands[fd] )) || (( $+commands[fdfind] )); then
+    alias fdh='fd --hidden'
+fi
 
 ## Bat (Normalizar nombre en Debian/Ubuntu sin secuestrar cat o less nativos)
-if [[ "$(command -v batcat)" != "" && "$(command -v bat)" == "" ]]; then
+if (( $+commands[batcat] )) && (( ! $+commands[bat] )); then
     alias bat='batcat'
 fi
-[[ "$(command -v bat)" != "" || "$(command -v batcat)" != "" ]] && alias preview='bat'
+if (( $+commands[bat] )) || (( $+commands[batcat] )); then
+    alias preview='bat'
+fi
 
 ## Difftastic (Diff estructural AST basado en Tree-sitter)
-[[ "$(command -v difft)" != "" ]] && alias dft='difft'
+(( $+commands[difft] )) && alias dft='difft'
 
 ## aitools (AI Productivity, Quota Management & Automated Workflows Suite)
-if [[ "$(command -v aitools)" != "" ]]; then
+if (( $+commands[aitools] )); then
     alias ait='aitools'
     alias gcm='aitools commit'
     alias ai-wake='aitools wake'
@@ -555,7 +578,7 @@ if [[ "$(command -v aitools)" != "" ]]; then
 fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
-if [[ "$(command -v eza)" != "" ]]; then
+if (( $+commands[eza] )); then
     alias l='eza --icons --classify=always'
     alias ll='eza --icons --classify=always -lh'
     alias la='eza --icons --classify=always -lha'
@@ -569,12 +592,12 @@ else
 fi
 
 ## zoxide
-if [[ "$(command -v zoxide)" != "" ]]; then
+if (( $+commands[zoxide] )); then
     eval "$(zoxide init zsh)"
 fi
 
 ## direnv
-if [[ "$(command -v direnv)" != "" ]]; then
+if (( $+commands[direnv] )); then
     eval "$(direnv hook zsh)"
 fi
 
@@ -718,10 +741,10 @@ add-zsh-hook precmd __notify_precmd 2>/dev/null || :
 ## Compile Zsh startup files to word-code (.zwc) for ultra-fast startup
 zcompile-all() {
     local file
-    for file in "${ZDOTDIR:-$HOME}"/.zshrc "${ZDOTDIR:-$HOME}"/.base.zsh "${ZDOTDIR:-$HOME}"/.tools.sh "${ZDOTDIR:-$HOME}"/.lscolors.sh; do
+    for file in "${ZDOTDIR:-$HOME}"/.zshrc "${ZDOTDIR:-$HOME}"/.base.zsh "${ZDOTDIR:-$HOME}"/.tools.sh "${ZDOTDIR:-$HOME}"/.lscolors.sh "${ZDOTDIR:-$HOME}"/.zcompdump; do
         if [[ -f "$file" ]]; then
             if [[ ! -f "${file}.zwc" || "$file" -nt "${file}.zwc" ]]; then
-                zcompile "$file" && echo "Compiled: ${file}.zwc"
+                zcompile "$file" 2>/dev/null && echo "Compiled: ${file}.zwc"
             fi
         fi
     done

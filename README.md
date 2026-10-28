@@ -322,8 +322,8 @@ make test
 # Or directly: ./tests/run_tests.sh
 
 # Run individual test suites:
-make lint              # Syntax validation (bash -n) across 99+ scripts & ShellCheck across 34+ scripts
-make test-unit         # Unit tests (platform, packages, smart_append, backup, concurrency, transaction, aitools)
+make lint              # Syntax validation (bash -n) across 100+ scripts & ShellCheck across 36+ scripts
+make test-unit         # 12 Unit suites (platform, packages, smart_append, backup, concurrency, transaction, aitools, shell_configs, etc.)
 make test-integration  # Integration smoke test suite
 make check             # System hardware and platform pre-flight check
 ```

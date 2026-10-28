@@ -146,6 +146,14 @@ if [[ "$RUN_SYNTAX" -eq 1 ]]; then
 				printf '    %s%s%s Syntax error in: %s\n' "$RED" "$SYM_CROSS" "$RESET" "$script_file"
 				syntax_errors=$((syntax_errors + 1))
 			fi
+		elif [[ "$script_file" == *.zsh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*zsh'; then
+			if command -v zsh >/dev/null 2>&1; then
+				checked_count=$((checked_count + 1))
+				if ! zsh -n "$script_file" 2>/dev/null; then
+					printf '    %s%s%s Zsh syntax error in: %s\n' "$RED" "$SYM_CROSS" "$RESET" "$script_file"
+					syntax_errors=$((syntax_errors + 1))
+				fi
+			fi
 		fi
 	done < <(find "$REPO_ROOT" -type f ! -path "*/.git/*" ! -path "*/.agents/*" ! -path "*/.gemini/*" ! -path "*/.claude/*" | sort)
 
@@ -200,7 +208,9 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"tests/unit/test_wizard_engine.sh"
 			"tests/unit/test_transaction.sh"
 			"tests/unit/test_aitools.sh"
+			"tests/unit/test_shell_configs.sh"
 			"src/ai/install_aitools.sh"
+			"files/zsh/.tools.sh"
 			"tests/integration/test_cli_smoke.sh"
 		)
 

@@ -36,22 +36,22 @@ inspect_binary "picom"
 
 XFWM_COMPOSITING=$(xfconf-query -c xfwm4 -p /general/use_compositing 2>/dev/null || echo "not_found")
 if [ "$XFWM_COMPOSITING" = "false" ]; then
-    pass "Compositor interno de xfwm4 desactivado"[cite: 11, 15, 17]
+    pass "Compositor interno de xfwm4 desactivado"
 else
-    fail "Compositor de xfwm4 aún activo ($XFWM_COMPOSITING)"[cite: 11, 15, 17]
+    fail "Compositor de xfwm4 aún activo ($XFWM_COMPOSITING)"
 fi
 
 if pgrep -x "picom" >/dev/null; then
     PICOM_PID=$(pgrep -x "picom" | head -n1)
-    pass "Picom en ejecución (PID: $PICOM_PID)"[cite: 11, 15, 17]
+    pass "Picom en ejecución (PID: $PICOM_PID)"
     if [ -f "$HOME/.config/picom/picom.conf" ]; then
         BACKEND=$(grep -E '^[[:space:]]*backend' "$HOME/.config/picom/picom.conf" | tr -d '"; ' | cut -d'=' -f2)
-        pass "Configuración picom.conf detectada (backend: ${BACKEND:-glx})"[cite: 11, 15, 17]
+        pass "Configuración picom.conf detectada (backend: ${BACKEND:-glx})"
     else
-        fail "Archivo ~/.config/picom/picom.conf no existe"[cite: 11, 15, 17]
+        fail "Archivo ~/.config/picom/picom.conf no existe"
     fi
 else
-    fail "Picom NO está corriendo como proceso activo"[cite: 11, 15, 17]
+    fail "Picom NO está corriendo como proceso activo"
 fi
 
 # ==============================================================================
@@ -63,30 +63,30 @@ inspect_binary "rofi"
 
 XFWM_ALTTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt>Tab" 2>/dev/null || echo "none")
 if [ "$XFWM_ALTTAB" = "cycle_windows_key" ]; then
-    pass "Atajo nativo xfwm4 <Alt>Tab configurado en: cycle_windows_key"[cite: 11, 15, 17]
+    pass "Atajo nativo xfwm4 <Alt>Tab configurado en: cycle_windows_key"
 else
-    fail "Atajo nativo xfwm4 <Alt>Tab incorrecto (actual: '$XFWM_ALTTAB')"[cite: 11, 15, 17]
+    fail "Atajo nativo xfwm4 <Alt>Tab incorrecto (actual: '$XFWM_ALTTAB')"
 fi
 
 XFWM_ALTSHIFTTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/<Alt><Shift>Tab" 2>/dev/null || echo "none")
 if [ "$XFWM_ALTSHIFTTAB" = "cycle_reverse_windows_key" ]; then
-    pass "Atajo nativo xfwm4 <Alt><Shift>Tab configurado en: cycle_reverse_windows_key"[cite: 11, 15, 17]
+    pass "Atajo nativo xfwm4 <Alt><Shift>Tab configurado en: cycle_reverse_windows_key"
 else
-    fail "Atajo nativo xfwm4 <Alt><Shift>Tab incorrecto (actual: '$XFWM_ALTSHIFTTAB')"[cite: 11, 15, 17]
+    fail "Atajo nativo xfwm4 <Alt><Shift>Tab incorrecto (actual: '$XFWM_ALTSHIFTTAB')"
 fi
 
 CMD_ALTTAB=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>Tab" 2>/dev/null || echo "none")
 if [ "$CMD_ALTTAB" = "none" ] || [ -z "$CMD_ALTTAB" ]; then
-    pass "Sin comandos custom interceptando <Alt>Tab (control delegado a xfwm4)"[cite: 11, 15, 17]
+    pass "Sin comandos custom interceptando <Alt>Tab (control delegado a xfwm4)"
 else
-    fail "<Alt>Tab interceptado por comando personalizado: '$CMD_ALTTAB'"[cite: 11, 15, 17]
+    fail "<Alt>Tab interceptado por comando personalizado: '$CMD_ALTTAB'"
 fi
 
 CMD_ALTSLASH=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Alt>slash" 2>/dev/null || echo "none")
 if [[ "$CMD_ALTSLASH" == *"rofi"* && "$CMD_ALTSLASH" == *"window"* ]]; then
-    pass "<Alt>slash asignado a modo búsqueda modal ($CMD_ALTSLASH)"[cite: 11, 15, 17]
+    pass "<Alt>slash asignado a modo búsqueda modal ($CMD_ALTSLASH)"
 else
-    fail "<Alt>slash no apunta a 'rofi -show window' (actual: '$CMD_ALTSLASH')"[cite: 11, 15, 17]
+    fail "<Alt>slash no apunta a 'rofi -show window' (actual: '$CMD_ALTSLASH')"
 fi
 
 # ==============================================================================
@@ -103,12 +103,12 @@ if [ -f "$HOME/.config/autostart/vicinae.desktop" ]; then
         warn "Autostart no contiene sleep previo a 'vicinae server' (riesgo de degradación XEmbed al reiniciar)"
     fi
 else
-    fail "Archivo ~/.config/autostart/vicinae.desktop no existe"[cite: 11, 15, 17]
+    fail "Archivo ~/.config/autostart/vicinae.desktop no existe"
 fi
 
 # Verificar neutralización de daemons conflictivos de Ayatana
 if systemctl --user is-active --quiet ayatana-indicator-application.service 2>/dev/null; then
-    fail "ayatana-indicator-application.service activo (secuestrará el icono en el próximo reinicio)"[cite: 15, 17]
+    fail "ayatana-indicator-application.service activo (secuestrará el icono en el próximo reinicio)"
 elif [ -f "$HOME/.config/autostart/ayatana-indicator-application.desktop" ]; then
     pass "ayatana-indicator-application neutralizado correctamente en systemd y autostart"
 else
@@ -119,18 +119,18 @@ VICINAE_PROC_PIDS=$(pgrep -f "vicinae.*server|[v]icinae-server" 2>/dev/null | gr
 [ -z "$VICINAE_PROC_PIDS" ] && VICINAE_PROC_PIDS=$(pgrep -x "vicinae" 2>/dev/null | grep -v "^$$$" | tr '\n' ' ' || true)
 
 if [ -n "$VICINAE_PROC_PIDS" ]; then
-    pass "Daemon Vicinae activo en memoria (PID: $VICINAE_PROC_PIDS)"[cite: 11, 15, 17]
+    pass "Daemon Vicinae activo en memoria (PID: $VICINAE_PROC_PIDS)"
 elif command -v vicinae >/dev/null 2>&1 && vicinae ping >/dev/null 2>&1; then
-    pass "Daemon Vicinae respondiendo activamente a peticiones IPC"[cite: 11, 15, 17]
+    pass "Daemon Vicinae respondiendo activamente a peticiones IPC"
 else
-    fail "Vicinae no se encuentra en ejecución"[cite: 11, 15, 17]
+    fail "Vicinae no se encuentra en ejecución"
 fi
 
 SYNTHETIC_EXISTS=$(grep -rn "vicinae-grad" /usr/share/icons /usr/share/pixmaps "$HOME/.local/share/icons" 2>/dev/null | head -n1 || true)
 if [ -n "$SYNTHETIC_EXISTS" ]; then
-    fail "Icono sintético anterior aún presente en el sistema"[cite: 15, 17]
+    fail "Icono sintético anterior aún presente en el sistema"
 else
-    pass "Sin rastros del icono sintético anterior"[cite: 15, 17]
+    pass "Sin rastros del icono sintético anterior"
 fi
 
 CHECK_ICON_PATHS=(
@@ -150,24 +150,24 @@ for ip in "${CHECK_ICON_PATHS[@]}"; do
 done
 
 if [ -n "$FOUND_ICON" ]; then
-    pass "Icono oficial de Vicinae registrado para panel y bandeja ($FOUND_ICON)"[cite: 11, 15, 17]
+    pass "Icono oficial de Vicinae registrado para panel y bandeja ($FOUND_ICON)"
 else
-    fail "Icono oficial de Vicinae no encontrado en las rutas de resolución del panel"[cite: 15, 17]
+    fail "Icono oficial de Vicinae no encontrado en las rutas de resolución del panel"
 fi
 
 FOCUS_STEAL=$(xfconf-query -c xfwm4 -p /general/prevent_focus_stealing 2>/dev/null || echo "true")
 FOCUS_NEW=$(xfconf-query -c xfwm4 -p /general/focus_new 2>/dev/null || echo "false")
 if [ "$FOCUS_STEAL" = "false" ] && [ "$FOCUS_NEW" = "true" ]; then
-    pass "Reglas de foco en xfwm4 óptimas para captura inmediata de teclado"[cite: 11, 15, 17]
+    pass "Reglas de foco en xfwm4 óptimas para captura inmediata de teclado"
 else
-    fail "Reglas de foco restringen teclado (prevent_focus_stealing: $FOCUS_STEAL, focus_new: $FOCUS_NEW)"[cite: 11, 15, 17]
+    fail "Reglas de foco restringen teclado (prevent_focus_stealing: $FOCUS_STEAL, focus_new: $FOCUS_NEW)"
 fi
 
 VICINAE_KEY=$(xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>space" 2>/dev/null || echo "none")
 if [[ "$VICINAE_KEY" == *"vicinae toggle"* ]]; then
-    pass "Atajo <Super>space asignado a 'vicinae toggle'"[cite: 11, 15, 17]
+    pass "Atajo <Super>space asignado a 'vicinae toggle'"
 else
-    fail "Atajo <Super>space no asignado (actual: '$VICINAE_KEY')"[cite: 11, 15, 17]
+    fail "Atajo <Super>space no asignado (actual: '$VICINAE_KEY')"
 fi
 
 # ==============================================================================
@@ -184,9 +184,9 @@ for pkg in "${OBSOLETE_PKGS[@]}"; do
 done
 
 if [ ${#RESIDUAL_PACKAGES[@]} -eq 0 ]; then
-    pass "Todos los paquetes obsoletos purgados de APT"[cite: 11, 15, 17]
+    pass "Todos los paquetes obsoletos purgados de APT"
 else
-    fail "Paquetes obsoletos aún presentes: ${RESIDUAL_PACKAGES[*]}"[cite: 11, 15, 17]
+    fail "Paquetes obsoletos aún presentes: ${RESIDUAL_PACKAGES[*]}"
 fi
 
 RESIDUAL_PATHS=(
@@ -217,9 +217,9 @@ for path in "${RESIDUAL_PATHS[@]}"; do
 done
 
 if [ ${#FOUND_ORPHANS[@]} -eq 0 ]; then
-    pass "Sin binarios manuales ni scripts huérfanos"[cite: 11, 15, 17]
+    pass "Sin binarios manuales ni scripts huérfanos"
 else
-    fail "Rutas residuales detectadas:"[cite: 11, 15, 17]
+    fail "Rutas residuales detectadas:"
     for item in "${FOUND_ORPHANS[@]}"; do
         echo "       - $item"
     done
@@ -232,17 +232,17 @@ header "5. Distribución de Teclado (XKB Nativo)"
 
 XINPUTRC_CONTENT=$(cat "$HOME/.xinputrc" 2>/dev/null || echo "none")
 if [[ "$XINPUTRC_CONTENT" == *"run_im none"* ]]; then
-    pass "~/.xinputrc configurado en 'run_im none' (Input method framework desactivado)"[cite: 11, 15, 17]
+    pass "$HOME/.xinputrc configurado en 'run_im none' (Input method framework desactivado)"
 else
-    warn "~/.xinputrc no contiene 'run_im none' (actual: '$XINPUTRC_CONTENT')"[cite: 11, 15, 17]
+    warn "$HOME/.xinputrc no contiene 'run_im none' (actual: '$XINPUTRC_CONTENT')"
 fi
 
 XKB_LAYOUTS=$(xfconf-query -c keyboard-layout -p /Default/XkbLayout 2>/dev/null || echo "none")
 XKB_GRP=$(xfconf-query -c keyboard-layout -p /Default/XkbOptions/Group 2>/dev/null || echo "none")
 if [[ "$XKB_LAYOUTS" == *"us"* ]] && [[ "$XKB_LAYOUTS" == *"es"* ]] && [ "$XKB_GRP" = "grp:alt_shift_toggle" ]; then
-    pass "XKB configurado con layouts '$XKB_LAYOUTS' y alternancia 'Alt+Shift'"[cite: 11, 15, 17]
+    pass "XKB configurado con layouts '$XKB_LAYOUTS' y alternancia 'Alt+Shift'"
 else
-    fail "Configuración XKB no óptima (layouts: '$XKB_LAYOUTS', options: '$XKB_GRP')"[cite: 11, 15, 17]
+    fail "Configuración XKB no óptima (layouts: '$XKB_LAYOUTS', options: '$XKB_GRP')"
 fi
 
 XKB_PLUGIN_FOUND=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep -E '^/plugins/plugin-[0-9]+$' | while read -r p; do
@@ -250,9 +250,9 @@ XKB_PLUGIN_FOUND=$(xfconf-query -c xfce4-panel -p /plugins -l 2>/dev/null | grep
 done)
 
 if [ -n "$XKB_PLUGIN_FOUND" ]; then
-    pass "Plugin xkb presente y activo en el panel ($XKB_PLUGIN_FOUND)"[cite: 11, 15, 17]
+    pass "Plugin xkb presente y activo en el panel ($XKB_PLUGIN_FOUND)"
 else
-    fail "Plugin xkb no encontrado en el panel de Xfce"[cite: 11, 15, 17]
+    fail "Plugin xkb no encontrado en el panel de Xfce"
 fi
 
 # ==============================================================================
@@ -268,12 +268,12 @@ CAP_SCRIPTS=("cap-area" "cap-repeat" "cap-window" "cap-fullscreen" "cap-ocr")
 ALL_SCRIPTS_OK=true
 for scr in "${CAP_SCRIPTS[@]}"; do
     if [ ! -x "$HOME/.local/bin/$scr" ]; then
-        fail "Script ~/.local/bin/$scr no existe o no es ejecutable"[cite: 11, 15, 17]
+        fail "Script ~/.local/bin/$scr no existe o no es ejecutable"
         ALL_SCRIPTS_OK=false
     fi
 done
 if [ "$ALL_SCRIPTS_OK" = true ]; then
-    pass "Scripts de captura y OCR presentes y ejecutables en ~/.local/bin"[cite: 11, 15, 17]
+    pass "Scripts de captura y OCR presentes y ejecutables en ~/.local/bin"
 fi
 
 echo ""

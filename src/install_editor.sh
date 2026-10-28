@@ -118,11 +118,13 @@ function install_editor() {
 			arch="$(uname -m)"
 			lg_arch="x86_64"
 			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && lg_arch="arm64"
-			curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION#v}_linux_${lg_arch}.tar.gz" | tar -xz -C "$HOME/.local/bin/" lazygit 2>/dev/null && chmod +x "$HOME/.local/bin/lazygit" || {
+			if curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION#v}_linux_${lg_arch}.tar.gz" | tar -xz -C "$HOME/.local/bin/" lazygit 2>/dev/null; then
+				chmod +x "$HOME/.local/bin/lazygit"
+			else
 				if [[ "$(command -v go)" != "" ]]; then
 					go install -ldflags="-s -w" github.com/jesseduffield/lazygit@"${LAZYGIT_VERSION}" || :
 				fi
-			}
+			fi
 		fi
 	fi
 
@@ -135,11 +137,13 @@ function install_editor() {
 			arch="$(uname -m)"
 			shfmt_arch="amd64"
 			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && shfmt_arch="arm64"
-			curl -fsSL "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_${shfmt_arch}" -o "$HOME/.local/bin/shfmt" 2>/dev/null && chmod +x "$HOME/.local/bin/shfmt" || {
+			if curl -fsSL "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_${shfmt_arch}" -o "$HOME/.local/bin/shfmt" 2>/dev/null; then
+				chmod +x "$HOME/.local/bin/shfmt"
+			else
 				if [[ "$(command -v go)" != "" ]]; then
 					go install -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@"${SHFMT_VERSION}" || :
 				fi
-			}
+			fi
 		fi
 	fi
 
@@ -199,13 +203,16 @@ function install_editor() {
 			arch="$(uname -m)"
 			stylua_zip="stylua-linux-x86_64.zip"
 			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && stylua_zip="stylua-linux-aarch64.zip"
-			curl -fsSL "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/${stylua_zip}" -o /tmp/stylua.zip 2>/dev/null && \
-				unzip -o /tmp/stylua.zip -d "$HOME/.local/bin/" 2>/dev/null && \
-				chmod +x "$HOME/.local/bin/stylua" && rm -f /tmp/stylua.zip || {
+			if curl -fsSL "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/${stylua_zip}" -o /tmp/stylua.zip 2>/dev/null && \
+				unzip -o /tmp/stylua.zip -d "$HOME/.local/bin/" 2>/dev/null; then
+				chmod +x "$HOME/.local/bin/stylua"
+				rm -f /tmp/stylua.zip
+			else
+				rm -f /tmp/stylua.zip
 				if [[ "$(command -v cargo)" != "" ]]; then
 					RUSTFLAGS="-C target-cpu=native" cargo install --locked stylua --version "${STYLUA_VERSION}" || :
 				fi
-			}
+			fi
 		fi
 	fi
 
@@ -218,11 +225,13 @@ function install_editor() {
 			arch="$(uname -m)"
 			ts_bin="tree-sitter-linux-x64.gz"
 			[[ "$arch" == "aarch64" || "$arch" == "arm64" ]] && ts_bin="tree-sitter-linux-arm64.gz"
-			curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/${ts_bin}" | gunzip -c > "$HOME/.local/bin/tree-sitter" 2>/dev/null && chmod +x "$HOME/.local/bin/tree-sitter" || {
+			if curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/${ts_bin}" | gunzip -c > "$HOME/.local/bin/tree-sitter" 2>/dev/null; then
+				chmod +x "$HOME/.local/bin/tree-sitter"
+			else
 				if [[ "$(command -v cargo)" != "" ]]; then
 					RUSTFLAGS="-C target-cpu=native" cargo install --locked tree-sitter-cli --version "${TREE_SITTER_VERSION}" || :
 				fi
-			}
+			fi
 		fi
 	fi
 

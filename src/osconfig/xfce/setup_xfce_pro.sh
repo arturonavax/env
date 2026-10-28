@@ -462,12 +462,12 @@ done
 
 echo "==> 6.2. Asegurando persistencia de Bluetooth y reactivación sin fallos tras suspensión..."
 # Regla udev para evitar que el kernel ponga en autosuspend el chip Bluetooth USB (8087:07dc)
-sudo bash -c "cat <<'EOF_BT_UDEV' > /etc/udev/rules.d/50-bluetooth-power.rules
+sudo tee /etc/udev/rules.d/50-bluetooth-power.rules >/dev/null <<'EOF_BT_UDEV'
 # Desactivar autosuspend para chip Intel Bluetooth (8087:07dc) y controladores btusb
 ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="07dc", ATTR{power/control}="on"
 ACTION=="add", SUBSYSTEM=="usb", ATTR{bInterfaceClass}=="e0", ATTR{bInterfaceSubClass}=="01", ATTR{power/control}="on"
 ACTION=="add", SUBSYSTEM=="bluetooth", ATTR{power/control}="on"
-EOF_BT_UDEV"
+EOF_BT_UDEV
 sudo udevadm control --reload-rules 2>/dev/null || true
 sudo udevadm trigger --subsystem-match=usb 2>/dev/null || true
 
@@ -481,16 +481,16 @@ fi
 
 # Hook de sistema systemd-sleep para forzar máximo rendimiento y despertar limpio de Bluetooth y Picom al salir de suspensión
 sudo mkdir -p /etc/systemd/system-sleep
-sudo bash -c "cat <<'EOF_SLEEP' > /etc/systemd/system-sleep/99-performance-resume.sh
+sudo tee /etc/systemd/system-sleep/99-performance-resume.sh >/dev/null <<'EOF_SLEEP'
 #!/bin/sh
-case "\$1" in
+case "$1" in
     post)
         # 1. Restaurar frecuencia máxima y gobernador de CPU
         for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            [ -f "\$g" ] && echo performance > "\$g" 2>/dev/null || true
+            [ -f "$g" ] && echo performance > "$g" 2>/dev/null || true
         done
         for p in /sys/devices/system/cpu/cpu*/power/energy_perf_bias; do
-            [ -f "\$p" ] && echo 0 > "\$p" 2>/dev/null || true
+            [ -f "$p" ] && echo 0 > "$p" 2>/dev/null || true
         done
 
         # 2. Desbloquear rfkill y asegurar que hci0 esté activo
@@ -503,9 +503,11 @@ case "\$1" in
         # 4. Señal de refresco al compositor Picom en sesiones X11 activas
         pkill -USR1 picom 2>/dev/null || true
         ;;
+    *)
+        ;;
 esac
-EOF_SLEEP"
-sudo chmod +x /etc/systemd/system-sleep/99-performance-resume.sh
+EOF_SLEEP
+sudo chmod +x /etc/systemd/system-sleep/99-performance-resume.sh 2>/dev/null || true
 
 
 POLKIT_BIN="/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1"
