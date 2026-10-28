@@ -4,7 +4,7 @@
 # ==============================================================================
 
 .DEFAULT_GOAL := help
-.PHONY: help test test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean
+.PHONY: help test test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean rebuild rebuild-tools
 
 help:
 	@echo "arturonavax/env — Development & Operational Interface"
@@ -22,8 +22,14 @@ help:
 	@echo "  make restore           Interactively restore configuration from backup"
 	@echo "  make diff              Inspect configuration diffs against active system"
 	@echo "  make sync              Propagate repository dotfiles into active system"
+	@echo "  make rebuild           Recompile and reinstall global tools across all language runtimes"
 	@echo "  make clean             Remove temporary test sandboxes and stale caches"
 	@echo ""
+
+rebuild:
+	@./utils/rebuild_tools.sh
+
+rebuild-tools: rebuild
 
 plan:
 	@./install.sh --plan

@@ -57,6 +57,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── sync_config.sh      # Propagate repo dotfiles into the active filesystem
 │   ├── backup_config.sh    # Snapshot active user configurations to ~/.arturonavax-env-backups/
 │   ├── restore_backup.sh   # Interactive or scripted configuration rollback from snapshots
+│   ├── rebuild_tools.sh    # Post-upgrade rebuilder & recompiler across Python, Node, Go, Rust, Neovim
 │   ├── create_wizard.sh    # Pure-bash wizard generator scaffolding new interactive setups
 │   ├── copy_config.sh      # Ingest active user dotfiles back into the repo
 │   └── diff_snapshots.sh   # Review differences between local machine and repo
@@ -448,6 +449,7 @@ The repository incorporates an enterprise-grade automated test runner and qualit
   - `test_aitools.sh`: AI productivity suite, declarative JSONC pipelines, and daemon management.
   - `test_shell_configs.sh`: Strict idempotency, zero-fork lookups, footprint cleanup, and non-Zsh guards in `.base.zsh` and `.tools.sh`.
   - `test_runtimes.sh`: Multi-platform Python (pyenv), Node.js (fnm), and pnpm runtime management, version locking, and shell hooks.
+  - `test_rebuild_tools.sh`: Universal runtime post-upgrade tool rebuilder across Python/pipx, Node/pnpm, Go, Rust, and Neovim.
 - **Integration Smoke Tests (`tests/integration/`)**:
   - `test_cli_smoke.sh`: CLI flags (`./install.sh --check`, `--help`, `./utils/restore_backup.sh`, `./utils/sync_config.sh`).
 - **Optional Bats Specifications (`tests/bats/`)**: Executed automatically when `bats` is installed in PATH.

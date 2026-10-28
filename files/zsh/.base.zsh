@@ -323,6 +323,18 @@ function update-python() {
     curl -fsSL https://env.arturonavax.dev/install_python.sh | bash -s -- "$@"
 }
 
+function rebuild-tools() {
+    local script_path="${REPO_ROOT:-$HOME/repos/github.com/arturonavax/env}/utils/rebuild_tools.sh"
+    [[ ! -f "$script_path" ]] && script_path="${HOME}/.local/share/env/utils/rebuild_tools.sh"
+
+    if [[ -f "$script_path" ]]; then
+        bash "$script_path" "$@"
+    else
+        curl -fsSL https://env.arturonavax.dev/rebuild_tools.sh | bash -s -- "$@"
+    fi
+}
+alias rbt=rebuild-tools
+
 # Update
 function update() {
     fcwb='\033[1;37m'
@@ -330,28 +342,33 @@ function update() {
 
     function usage_update(){
         echo -e "$(cat <<EOF
-[Updater]: List of update:
-  ${fcwb}system ${fcr}/ ${fcwb}s ${fcr}- Upgrades the system.
-  ${fcwb}tools ${fcr}/ ${fcwb}t  ${fcr}- Update the tools.
-  ${fcwb}all ${fcr}/ ${fcwb}a    ${fcr}- Updates all of the above.
-  ${fcwb}help ${fcr}/ ${fcwb}h   ${fcr}- This helpful explanation.${fcr}
+[Updater]: List of update options:
+  ${fcwb}system ${fcr}/ ${fcwb}s    ${fcr}- Upgrades operating system packages (apt/dnf/brew).
+  ${fcwb}tools ${fcr}/ ${fcwb}t     ${fcr}- Updates toolchain managers (rustup, pnpm, pyenv, gvm).
+  ${fcwb}rebuild ${fcr}/ ${fcwb}r   ${fcr}- Recompiles/reinstalls global tools with active language versions (Python/pipx, Node/pnpm, Go, Rust, Neovim).
+  ${fcwb}all ${fcr}/ ${fcwb}a       ${fcr}- Runs system + tools + rebuild.
+  ${fcwb}help ${fcr}/ ${fcwb}h      ${fcr}- This helpful explanation.${fcr}
 EOF
         )"
     }
+
+    local update_tools=0
+    local update_system=0
+    local update_rebuild=0
+    local update_all=0
 
     for arg in "$@"; do
         case "$arg" in
             tools | t) update_tools=1 ;;
             system | s) update_system=1 ;;
+            rebuild | r) update_rebuild=1 ;;
             all | a) update_all=1 ;;
             h | help)
                 usage_update
-
                 return 0
                 ;;
             *)
                 usage_update
-
                 return 1
                 ;;
         esac
@@ -362,6 +379,7 @@ EOF
     if [[ "$update_all" == 1 ]]; then
         update_tools=1
         update_system=1
+        update_rebuild=1
     fi
 
 	sudo true
@@ -381,11 +399,15 @@ EOF
         if [[ "$(command -v python3)" != "" ]]; then
             python3 -m pip install --upgrade pip
             python3 -m pip install --user --upgrade pipx
-            pipx upgrade-all
+            pipx upgrade-all 2>/dev/null || true
         fi
 
         update-go -i
-        update-python
+        update-python -i
+    fi
+
+    if [[ "$update_rebuild" == 1 ]]; then
+        rebuild-tools
     fi
 
     if [[ "$update_system" == 1 ]]; then
