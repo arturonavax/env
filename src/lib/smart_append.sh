@@ -48,6 +48,9 @@ smart_append_block() {
 			echo "$block_body"
 			echo "$end_marker"
 		} >"$target_file"
+		if command -v tx_record_marker_block >/dev/null 2>&1; then
+			tx_record_marker_block "$target_file" "$block_id"
+		fi
 		log_debug "Created ${target_file} with block '${block_id}'."
 		return 0
 	fi
@@ -84,6 +87,9 @@ smart_append_block() {
 			echo "$block_body"
 			echo "$end_marker"
 		} >>"$target_file"
+		if command -v tx_record_marker_block >/dev/null 2>&1; then
+			tx_record_marker_block "$target_file" "$block_id"
+		fi
 		log_debug "Appended block '${block_id}' to ${target_file} (user content preserved)."
 	fi
 }
@@ -102,7 +108,13 @@ smart_preserve_copy() {
 		return 0
 	fi
 
+	local target_existed=0
+	[[ -e "$target_file" ]] && target_existed=1
+
 	cp -p "$source_file" "$target_file"
+	if ((target_existed == 0)) && command -v tx_record_file_created >/dev/null 2>&1; then
+		tx_record_file_created "$target_file"
+	fi
 	log_debug "Copied ${source_file} -> ${target_file}"
 }
 

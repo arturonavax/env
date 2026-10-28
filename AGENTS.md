@@ -25,14 +25,15 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── starship/           # Cross-shell Starship prompt configuration
 │   └── [cursor,vscode,...] # IDE configs, settings, and formatters
 ├── src/                    # Subsystem installation scripts & modular runtime
-│   ├── wizard.sh           # Absolute idempotent interactive installation wizard (8 stages)
-│   ├── lib/                # Core modular libraries (strict, colors, logging, platform, packages, backup, download, concurrency, smart_append)
+│   ├── wizard.sh           # Master installation wizard (dual interactive interview & autonomous non-interactive modes)
+│   ├── lib/                # Core modular libraries (strict, colors, logging, platform, packages, backup, download, concurrency, smart_append, transaction)
 │   │   ├── strict.sh       # set -euo pipefail, root anchoring, callstack traceback traps, sudo keep-alive
 │   │   ├── colors.sh       # Cross-terminal ANSI color palette and legacy compatibility variables
 │   │   ├── logging.sh      # Structured logging (log_info, log_step, log_success, log_warn, log_error, log_fatal)
 │   │   ├── platform.sh     # Multi-platform OS, distribution, architecture, and hardware discovery (Linux, macOS, Windows, Android Termux)
 │   │   ├── packages.sh     # Universal package translation matrix (apt, dnf, pacman, brew, pkg, zypper) & pkg_* commands
 │   │   ├── backup.sh       # Portable configuration snapshot, rotation (50MB quota), and rollback engine
+│   │   ├── transaction.sh  # Transactional execution, audit journal, graceful shutdown traps (SIGINT/SIGTERM), and LIFO rollback
 │   │   ├── download.sh     # Resilient retry-capable downloader with checksums, extraction, and parallel execution
 │   │   ├── concurrency.sh  # Parallel background task pool with real-time status monitor and error capture
 │   │   ├── smart_append.sh # Non-destructive smart file preservation (smart-append-first) with marker blocks
@@ -40,12 +41,17 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   │   ├── wizard_engine.sh# Pure-Bash zero-dependency interactive wizard & TUI framework
 │   │   ├── plan.sh         # Dry-run execution plan and filesystem interaction manifest inspector
 │   │   └── remote_env.sh   # Dual local/remote resolver for env.arturonavax.dev subdomains
+│   ├── osconfig/           # Centralized OS & desktop environment setups
+│   │   ├── linux_osconfig.sh # Core Linux settings, limits, sysctl, and fonts cache
+│   │   ├── xfce/           # XFCE Pro power-user desktop workflow & keyboard shortcuts
+│   │   └── macos/          # macOS Safari tweaks, spaces animation, and TouchID sudo
+│   ├── hacks/              # Workstation & hardware-specific hacks (quota daemons, scroll lock)
 │   ├── install_terminal.sh # Ghostty, Herdr, zsh, fonts setup
 │   ├── install_editor.sh   # Neovim, Mason dependencies, LazyVim sync
 │   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, prompt configs
 │   ├── _install_requirements.sh # Core system packages & package managers (GVM primary)
 │   ├── requirements/       # Pre-flight requirement checks (editor, terminal, ai)
-│   ├── remotes/            # Self-contained remote scripts executable via curl
+│   ├── remotes/            # Self-contained remote scripts & compatibility shims executable via curl
 │   └── dom-scraping/       # Browser/node utility scraping scripts
 ├── utils/                  # Safe system lifecycle & synchronization utilities
 │   ├── sync_config.sh      # Propagate repo dotfiles into the active filesystem
@@ -61,10 +67,11 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 
 ### Lifecycle Entry Points
 
-- **`./install.sh [--wizard | args]`**:
+- **`./install.sh [--wizard | -y | args]`**:
   - Automatically triggers `backup_create` before mutating files.
-  - Interactive mode: `./install.sh --wizard` (or `./src/wizard.sh`) runs an 8-stage guided setup with zero silent failures and stage recovery options.
-  - Parameters: `requirements` (`r`), `fonts` (`f`), `terminal` (`t`), `editor` (`e`), `ai`, `osconfig` (`o`), `all` (`a`), `--check`.
+  - Interactive mode (`./install.sh --wizard` or `./src/wizard.sh` in TTY): Runs a guided upfront interview collecting all parameters (paths, component selection, GVM/standalone Go strategies, OS tweaks, rollback policies) before beginning autonomous execution.
+  - Non-interactive mode (`./install.sh -y` or `./src/wizard.sh -y [flags]`): Autonomous execution driven by CLI flags (`--components`, `--dest-bin`, `--go-manager`, `--rollback-on-error`, `--skip-backup`) with zero prompts.
+  - Transactional rollback: Operates under `src/lib/transaction.sh` audit journal. Catches SIGINT/Ctrl-C or stage failures to reverse filesystem mutations in LIFO order and restore clean state.
   - Planning / Dry-run: `./install.sh --plan` (or `plan [components]`, `make plan`) displays native package translations, toolchains, binaries, and all touched/preserved files without modifying the system.
   - Uninstallation plan: `./install.sh --uninstall-plan` previews teardown manifest.
   - Sudo privileges are acquired upfront with an active background keep-alive loop.

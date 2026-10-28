@@ -68,3 +68,27 @@ assert_exit_code 0 "$uninst_smoke_code" "./uninstall.sh --plan exit status" &&
 	assert_contains "$uninst_smoke" "Uninstallation Plan & Teardown Preview" "Uninstall plan header" &&
 	assert_contains "$uninst_help" "Usage: ./uninstall.sh" "Uninstall usage string" &&
 	pass "./uninstall.sh --plan and --help executed cleanly without side effects"
+
+# Test 9: ./src/wizard.sh --help
+wizard_help="$("${REPO_ROOT}/src/wizard.sh" --help 2>&1)"
+wizard_help_code=$?
+assert_exit_code 0 "$wizard_help_code" "./src/wizard.sh --help exit status" &&
+	assert_contains "$wizard_help" "Usage: ./src/wizard.sh" "Wizard usage documentation" &&
+	assert_contains "$wizard_help" "--non-interactive" "Non-interactive flag documentation" &&
+	assert_contains "$wizard_help" "--rollback-on-error" "Rollback on error flag documentation" &&
+	pass "./src/wizard.sh --help displayed comprehensive execution options"
+
+# Test 10: ./src/wizard.sh --plan
+wizard_plan="$("${REPO_ROOT}/src/wizard.sh" --plan --components=terminal,editor 2>&1)"
+wizard_plan_code=$?
+assert_exit_code 0 "$wizard_plan_code" "./src/wizard.sh --plan exit status" &&
+	assert_contains "$wizard_plan" "Installation Plan & Manifest Preview" "Wizard plan header" &&
+	assert_contains "$wizard_plan" "Ghostty" "Selected terminal component in plan" &&
+	pass "./src/wizard.sh --plan previewed component manifest cleanly"
+
+# Test 11: ./install.sh --wizard --help forwarding
+install_wizard_help="$("${REPO_ROOT}/install.sh" --wizard --help 2>&1)"
+install_wizard_help_code=$?
+assert_exit_code 0 "$install_wizard_help_code" "./install.sh --wizard --help exit status" &&
+	assert_contains "$install_wizard_help" "Usage: ./src/wizard.sh" "Forwarded wizard usage" &&
+	pass "./install.sh --wizard forwarded CLI arguments directly to wizard runner"

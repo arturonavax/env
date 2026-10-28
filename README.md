@@ -19,7 +19,7 @@ _**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
 
 ### 1. Interactive Setup Wizard (Recommended)
 
-Run the guided, 8-stage setup wizard directly from the remote subdomain:
+Run the guided setup wizard directly from the remote subdomain:
 
 ```sh
 bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") --wizard
@@ -31,15 +31,18 @@ Or clone and run locally:
 ./install.sh --wizard
 ```
 
-The wizard runs pre-flight platform diagnostics, creates an automatic restorable snapshot in `~/.arturonavax-env-backups/`, lets you select individual components, and enforces strict zero-silent-failure boundaries with interactive retry and rollback options.
+The wizard conducts an **upfront parameter interview**—asking for all destination paths, subsystem components, runtime strategies (GVM vs standalone Go, pnpm vs npm), and OS integrations—before starting autonomous execution. It operates under a transactional audit journal with graceful traps (Ctrl-C / errors) and LIFO rollback protection.
 
 ### 2. Automated Non-Interactive Installation
 
 ```sh
-# Install all components
-./install.sh all
+# Install all components unattended (zero prompts)
+./install.sh -y
 
-# Or install specific subsystems
+# Or install specific subsystems with custom flags
+./install.sh -y --components=terminal,editor --rollback-on-error
+
+# Or pass subsystem names directly
 ./install.sh terminal editor ai
 ```
 

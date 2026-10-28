@@ -212,24 +212,46 @@ toolchain_install() {
 			return 0
 		fi
 
+		local preferred="${GO_MANAGER_STRATEGY:-gvm}"
+
 		log_box "Toolchain: Provisioning Golang" \
-			"Primary Strategy: GVM (Go Version Manager)" \
-			"Fallback 1: Standalone release installer (install_golang.sh)" \
-			"Fallback 2: Native package manager (golang)"
+			"Selected Preference: ${preferred}" \
+			"Supported Strategies: GVM, Standalone (install_golang.sh), Package Manager"
 
-		# Chain: GVM script -> Standalone installer script -> Package manager
-		if _install_golang_script_gvm; then
-			log_success "Golang provisioned via GVM (Go Version Manager)."
-			return 0
+		if [[ "$preferred" == "standalone" ]]; then
+			if _install_golang_script_standalone; then
+				log_success "Golang provisioned via standalone release installer."
+				return 0
+			fi
+			log_warn "Standalone installer failed. Falling back to GVM..."
+			if _install_golang_script_gvm; then
+				log_success "Golang provisioned via GVM."
+				return 0
+			fi
+		elif [[ "$preferred" == "package" ]]; then
+			if _install_golang_package; then
+				log_success "Golang provisioned via native package manager."
+				return 0
+			fi
+			log_warn "Package installation failed. Falling back to GVM..."
+			if _install_golang_script_gvm; then
+				log_success "Golang provisioned via GVM."
+				return 0
+			fi
+		else
+			# Default: GVM first
+			if _install_golang_script_gvm; then
+				log_success "Golang provisioned via GVM (Go Version Manager)."
+				return 0
+			fi
+			log_warn "GVM installation strategy did not complete. Falling back to standalone installer script..."
+			if _install_golang_script_standalone; then
+				log_success "Golang provisioned via standalone release installer."
+				return 0
+			fi
 		fi
 
-		log_warn "GVM installation strategy did not complete. Falling back to standalone installer script..."
-		if _install_golang_script_standalone; then
-			log_success "Golang provisioned via standalone release installer."
-			return 0
-		fi
-
-		log_warn "Standalone installer failed. Falling back to native package manager..."
+		log_warn "Primary strategies exhausted. Falling back to native package manager..."
 		if _install_golang_package; then
 			log_success "Golang provisioned via native package manager."
 			return 0

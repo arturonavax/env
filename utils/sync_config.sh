@@ -252,10 +252,10 @@ if [[ "$sync_osconfig" == 1 ]]; then
 		if [[ -d ./files/gnome/extensions/rcmd-shell@arturonavax.dev ]]; then
 			cp -r ./files/gnome/extensions/rcmd-shell@arturonavax.dev/* ~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev/ 2>/dev/null || :
 		fi
-		./src/remotes/linux_osconfig.sh
+		./src/osconfig/linux_osconfig.sh
 
 	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		./src/remotes/macos_osconfig.sh
+		./src/osconfig/macos/macos_osconfig.sh
 		cp ./files/amethyst/.amethyst.yml ~/.
 		mkdir -p ~/.config/karabiner/
 		cp ./files/karabiner/karabiner.json ~/.config/karabiner/.

@@ -104,20 +104,27 @@ download_and_extract() {
 	return 0
 }
 
-# Install a standalone executable binary directly into ~/.local/bin/
+# Install a standalone executable binary directly into target user bin directory (~/.local/bin)
 install_binary() {
 	local src_binary="$1"
 	local binary_name="$2"
-	local target_user_bin="$HOME/.local/bin"
+	local target_user_bin="${DEST_BIN_DIR:-$HOME/.local/bin}"
 	local target_sys_bin="/usr/local/bin"
 
 	mkdir -p "$target_user_bin"
 	chmod +x "$src_binary"
 	cp -f "$src_binary" "${target_user_bin}/${binary_name}"
 
+	if command -v tx_record_file_created >/dev/null 2>&1; then
+		tx_record_file_created "${target_user_bin}/${binary_name}"
+	fi
+
 	# Try to symlink into /usr/local/bin for all users if sudo privileges available
 	if [[ -d "$target_sys_bin" ]] && [[ -w "$target_sys_bin" ]]; then
 		ln -sf "${target_user_bin}/${binary_name}" "${target_sys_bin}/${binary_name}" 2>/dev/null || true
+		if command -v tx_record_symlink_created >/dev/null 2>&1; then
+			tx_record_symlink_created "${target_sys_bin}/${binary_name}"
+		fi
 	elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
 		sudo ln -sf "${target_user_bin}/${binary_name}" "${target_sys_bin}/${binary_name}" 2>/dev/null || true
 	fi
