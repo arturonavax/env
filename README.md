@@ -134,6 +134,12 @@ The installer of this environment features a universal package abstraction layer
 3. **Portable Backup & Rollback Engine**:
    POSIX-compliant snapshots in `~/.arturonavax-env-backups/` capped at 50MB with instant rollback via `./utils/restore_backup.sh`.
 
+4. **Multi-Tier Toolchain & Fallback Architecture (GVM Primary)**:
+   Installs toolchains using a resilient priority strategy: Pre-compiled static binary -> Native package manager -> Official setup script -> Compile from source. Uses **GVM (Go Version Manager)** as the primary Go manager, backed by the refined standalone installer [`src/remotes/install_golang.sh`](./src/remotes/install_golang.sh).
+
+5. **Pure-Bash Zero-Dependency Wizard Framework**:
+   Portable interactive TUI framework ([`src/lib/wizard_engine.sh`](./src/lib/wizard_engine.sh)) with zero external dependencies (no Python, no Node, no dialog/whiptail). Easily scaffold custom wizards for other projects using [`./utils/create_wizard.sh`](./utils/create_wizard.sh).
+
 If `pnpm` is installed, it will be used instead of `npm`.
 
 If `pipx` is installed, it will be used instead of `python3 -m pip` for some installations.

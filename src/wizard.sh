@@ -31,12 +31,11 @@ source ./src/lib/concurrency.sh
 source ./src/lib/smart_append.sh
 source ./src/lib/remote_env.sh
 source ./src/lib/plan.sh
+source ./src/lib/toolchain.sh
+source ./src/lib/wizard_engine.sh
 source ./src/remotes/_versions.sh
 
 # Wizard State
-TOTAL_STAGES=8
-_STAGE_INDEX=0
-_INITIAL_BACKUP=""
 ENV_LOG_FILE="${ENV_LOG_FILE:-$HOME/.arturonavax-env-install.log}"
 
 # Component Flags (Default: all enabled)
@@ -46,123 +45,6 @@ DO_TERMINAL=1
 DO_EDITOR=1
 DO_AI=1
 DO_OSCONFIG=1
-
-# Terminal clearing helper (respects non-interactive and dumb terms)
-_clear_screen() {
-	if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
-		if command -v tput >/dev/null 2>&1 && tput clear 2>/dev/null; then
-			return 0
-		fi
-		printf '\033[2J\033[3J\033[H'
-	fi
-}
-
-# Graphical Progress Bar
-render_progress_bar() {
-	local current="$1" total="$2"
-	local width=22
-	local percent=$((current * 100 / total))
-	local filled=$((current * width / total))
-	local empty=$((width - filled))
-
-	local bar=""
-	for ((b = 0; b < filled; b++)); do bar+="█"; done
-	for ((b = 0; b < empty; b++)); do bar+="░"; done
-
-	printf '%s[%s%s%s%s] %3d%%%s' "$DIM" "$BOLD_GREEN" "$bar" "$RESET" "$DIM" "$percent" "$RESET"
-}
-
-# Wizard UI Helpers
-wizard_banner() {
-	_clear_screen
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_BLUE" "$BOLD_WHITE" "arturonavax/env · Master Environment Wizard" "$RESET" "$BOLD_BLUE" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$RESET" "High-performance modular development environment." "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$RESET" "Multi-platform: Linux (all distros), macOS, Windows, Android." "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$DIM" "Ghostty, Herdr, LazyVim, AI Suite, concurrent task downloads." "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$DIM" "Smart file preservation (smart-append-first) & instant rollback." "$BOLD_BLUE" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n\n' "$BOLD_BLUE" "$RESET"
-}
-
-wizard_stage() {
-	_clear_screen
-	_STAGE_INDEX=$((_STAGE_INDEX + 1))
-	local progress_bar
-	progress_bar="$(render_progress_bar "$_STAGE_INDEX" "$TOTAL_STAGES")"
-
-	printf '\n%s%s▸ Stage %s/%s · %s%s  %s\n' \
-		"$BOLD" "$BLUE" "$_STAGE_INDEX" "$TOTAL_STAGES" "$1" "$RESET" "$progress_bar"
-	printf '%s----------------------------------------------------------------------%s\n' "$DIM" "$RESET"
-}
-
-say()  { printf '  %s\n' "$*"; }
-step() { printf '  %s•%s %s\n' "$BOLD_BLUE" "$RESET" "$*"; }
-note() { printf '  %s%s%s\n' "$DIM" "$*" "$RESET"; }
-warn() { printf '  %s⚠ %s%s\n' "$BOLD_YELLOW" "$*" "$RESET"; }
-
-pause() {
-	printf '\n  %s%s%s ' "$DIM" "${1:-Press Enter to proceed...}" "$RESET"
-	read -r _ || true
-}
-
-confirm() {
-	local prompt="$1"
-	local default="${2:-y}"
-	local reply=""
-
-	if [[ "$default" == "y" ]]; then
-		printf '  %s? %s [Y/n]: %s' "$BOLD_YELLOW" "$prompt" "$RESET"
-	else
-		printf '  %s? %s [y/N]: %s' "$BOLD_YELLOW" "$prompt" "$RESET"
-	fi
-
-	read -r reply || true
-	reply="${reply:-$default}"
-	[[ "$reply" =~ ^[Yy] ]]
-}
-
-# Failure Recovery Prompt
-handle_stage_failure() {
-	local stage_name="$1"
-	local exit_code="$2"
-
-	printf '\n%s%s  STAGE FAILURE: %s (Exit code: %s)%s\n' "$BOLD_RED" "$SYM_CROSS" "$stage_name" "$exit_code" "$RESET"
-	printf '  %sThe installer encountered an error during this stage.%s\n' "$RED" "$RESET"
-	printf '  %sDetailed logs are available at: %s%s\n\n' "$DIM" "$ENV_LOG_FILE" "$RESET"
-
-	printf '  %sChoose recovery action:%s\n' "$BOLD_WHITE" "$RESET"
-	printf '    %s[r]%s Retry this stage\n' "$BOLD_GREEN" "$RESET"
-	printf '    %s[s]%s Skip this stage and continue\n' "$BOLD_YELLOW" "$RESET"
-	if [[ -n "$_INITIAL_BACKUP" ]]; then
-		printf '    %s[b]%s Rollback to initial snapshot and abort\n' "$BOLD_CYAN" "$RESET"
-	fi
-	printf '    %s[a]%s Abort installer immediately (default)\n\n' "$BOLD_RED" "$RESET"
-
-	local choice=""
-	read -r -p "  Enter choice [r/s/b/a]: " choice
-	choice="${choice:-a}"
-
-	case "$choice" in
-	r | R)
-		return 10 # Code for retry
-		;;
-	s | S)
-		log_warn "Stage '${stage_name}' skipped by user choice."
-		return 0 # Code for skip
-		;;
-	b | B)
-		if [[ -n "$_INITIAL_BACKUP" ]]; then
-			log_step "Rolling back to ${_INITIAL_BACKUP}..."
-			backup_restore "$_INITIAL_BACKUP"
-		fi
-		log_fatal "Installation aborted and rolled back by user." 1
-		;;
-	*)
-		log_fatal "Installation aborted by user due to error in stage '${stage_name}'." "$exit_code"
-		;;
-	esac
-}
 
 # ==============================================================================
 # Wizard Execution Stages
@@ -229,6 +111,7 @@ stage_backup() {
 	echo
 
 	_INITIAL_BACKUP="$(backup_create)"
+	export WIZARD_INITIAL_BACKUP="$_INITIAL_BACKUP"
 	echo
 	step "Snapshot created: ${BOLD_WHITE}$(basename "$_INITIAL_BACKUP")${RESET}"
 	note "Smart Preservation Policy (smart-append-first):"
@@ -483,8 +366,8 @@ stage_finalize() {
 # Main Entry Point
 # ==============================================================================
 main() {
+	wizard_init "arturonavax/env · Master Environment Wizard" 8 "High-performance modular development environment."
 	wizard_banner
-	pause "Ready to begin setup? Press Enter to start..."
 
 	stage_preflight
 	stage_backup

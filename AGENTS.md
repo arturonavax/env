@@ -36,11 +36,14 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   │   ├── download.sh     # Resilient retry-capable downloader with checksums, extraction, and parallel execution
 │   │   ├── concurrency.sh  # Parallel background task pool with real-time status monitor and error capture
 │   │   ├── smart_append.sh # Non-destructive smart file preservation (smart-append-first) with marker blocks
+│   │   ├── toolchain.sh    # Multi-tier resilient toolchain & declarative dependency fallback engine
+│   │   ├── wizard_engine.sh# Pure-Bash zero-dependency interactive wizard & TUI framework
+│   │   ├── plan.sh         # Dry-run execution plan and filesystem interaction manifest inspector
 │   │   └── remote_env.sh   # Dual local/remote resolver for env.arturonavax.dev subdomains
 │   ├── install_terminal.sh # Ghostty, Herdr, zsh, fonts setup
 │   ├── install_editor.sh   # Neovim, Mason dependencies, LazyVim sync
 │   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, prompt configs
-│   ├── _install_requirements.sh # Core system packages & package managers
+│   ├── _install_requirements.sh # Core system packages & package managers (GVM primary)
 │   ├── requirements/       # Pre-flight requirement checks (editor, terminal, ai)
 │   ├── remotes/            # Self-contained remote scripts executable via curl
 │   └── dom-scraping/       # Browser/node utility scraping scripts
@@ -48,6 +51,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── sync_config.sh      # Propagate repo dotfiles into the active filesystem
 │   ├── backup_config.sh    # Snapshot active user configurations to ~/.arturonavax-env-backups/
 │   ├── restore_backup.sh   # Interactive or scripted configuration rollback from snapshots
+│   ├── create_wizard.sh    # Pure-bash wizard generator scaffolding new interactive setups
 │   ├── copy_config.sh      # Ingest active user dotfiles back into the repo
 │   └── diff_snapshots.sh   # Review differences between local machine and repo
 ├── .atl/                   # Agent runtime state (skill registry index & cache)
@@ -144,9 +148,9 @@ To maximize terminal responsiveness and eliminate subshell latency, shell initia
   - Sub-millisecond indexed queries across 500k+ commands with execution directory scoping (`filter_mode = "directory"`), exit codes, durations, and fuzzy matching.
   - Configured strictly offline with zero telemetry or remote synchronization (`auto_sync = false`, `update_check = false`).
 - **Strict Configuration Separation (`.zshrc` vs `.base.zsh` vs `.tools.sh`)**:
-  - `~/.zshrc`: Minimal 6-line loader exclusively sourcing `~/.base.zsh` then `~/.tools.sh`. Must NEVER contain inline tool setups, PATH mutations, or installer boilerplate.
-  - `~/.base.zsh`: Core shell configuration, completion caching, prompt initialization (`starship init zsh`), editor variables, and interactive shell widget bindings (such as `eval "$(atuin init zsh)"` and FZF widgets).
-  - `~/.tools.sh`: Development runtimes, tool paths, and package manager environments (`pnpm` / `PNPM_HOME`, `fnm`, `pyenv`, `go`, `cargo`, `. "$HOME/.atuin/bin/env"`).
+  - `~/.zshrc`: Shell loader encapsulating repository imports in `# >>> arturonavax/env >>>` blocks while preserving 100% of custom user aliases and functions.
+  - `~/.base.zsh`: Core shell configuration, completion caching, prompt initialization (`starship init zsh`), editor variables, and interactive shell widget bindings. Maintained by repo and updated upon sync/install.
+  - `~/.tools.sh`: Development runtimes, tool paths, and package manager environments (GVM primary for Go, `pnpm` / `PNPM_HOME`, `fnm`, `pyenv`, `cargo`, `. "$HOME/.atuin/bin/env"`). Maintained by repo and updated upon sync/install.
 - **Lean Starship Prompt**:
   - Compact 2-line layout with minimal execution overhead (`cmd_duration` threshold 2000ms).
   - Cloud modules (`aws`, `gcloud`, `package`) are disabled to prevent synchronous blocking on network or slow runtimes.
@@ -413,6 +417,9 @@ The repository incorporates an enterprise-grade automated test runner and qualit
   - `test_backup.sh`: Snapshot generation, manifest verification, 50MB quota rotation, and rollback.
   - `test_concurrency.sh`: CPU core detection, parallel task pool execution, and error isolation.
   - `test_strict.sh`: Automated temporary file cleanup and termination hooks.
+  - `test_plan.sh`: Dry-run installation plan and uninstallation teardown manifest.
+  - `test_toolchain.sh`: Multi-tier fallback strategy resolution and prerequisite dependency management.
+  - `test_wizard_engine.sh`: Pure-Bash zero-dependency wizard framework, progress bar, and prompt validation.
 - **Integration Smoke Tests (`tests/integration/`)**:
   - `test_cli_smoke.sh`: CLI flags (`./install.sh --check`, `--help`, `./utils/restore_backup.sh`, `./utils/sync_config.sh`).
 - **Optional Bats Specifications (`tests/bats/`)**: Executed automatically when `bats` is installed in PATH.

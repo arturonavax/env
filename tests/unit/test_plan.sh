@@ -19,7 +19,8 @@ assert_contains "$plan_all_output" "Installation Plan & Manifest Preview" "Full 
 	assert_contains "$plan_all_output" "Standalone Binaries & High-Performance CLI Tools" "Plan contains CLI tools" &&
 	assert_contains "$plan_all_output" "File System Interactions" "Plan contains file interactions" &&
 	assert_contains "$plan_all_output" "SMART-APPEND" "Plan documents smart-append-first marker blocks" &&
-	assert_contains "$plan_all_output" "PRESERVED" "Plan documents preserved user files" &&
+	assert_contains "$plan_all_output" ".base.zsh" "Plan documents managed .base.zsh configuration" &&
+	assert_contains "$plan_all_output" ".tools.sh" "Plan documents managed .tools.sh configuration" &&
 	pass "show_install_plan all generated complete manifest with file interactions"
 
 # Test 2: Scoped Subsystem Plan Output (Terminal Only)

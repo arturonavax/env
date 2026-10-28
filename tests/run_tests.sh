@@ -182,9 +182,12 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"src/lib/smart_append.sh"
 			"src/lib/remote_env.sh"
 			"src/lib/plan.sh"
+			"src/lib/toolchain.sh"
+			"src/lib/wizard_engine.sh"
 			"utils/backup_config.sh"
 			"utils/restore_backup.sh"
 			"utils/sync_config.sh"
+			"utils/create_wizard.sh"
 			"tests/test_helper.sh"
 			"tests/unit/test_platform.sh"
 			"tests/unit/test_packages.sh"
@@ -193,6 +196,8 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"tests/unit/test_concurrency.sh"
 			"tests/unit/test_strict.sh"
 			"tests/unit/test_plan.sh"
+			"tests/unit/test_toolchain.sh"
+			"tests/unit/test_wizard_engine.sh"
 			"tests/integration/test_cli_smoke.sh"
 		)
 

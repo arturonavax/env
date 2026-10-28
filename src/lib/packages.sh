@@ -39,6 +39,8 @@ _translate_debian() {
 	make) echo "make" ;;
 	gcc) echo "gcc" ;;
 	clang) echo "clang" ;;
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig" ;;
 	pkg-config) echo "pkg-config" ;;
 	ca-certificates) echo "ca-certificates" ;;
@@ -111,6 +113,8 @@ _translate_fedora() {
 	make) echo "make" ;;
 	gcc) echo "gcc gcc-c++" ;;
 	clang) echo "clang" ;;
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig fontconfig-devel" ;;
 	pkg-config) echo "pkgconf pkgconf-pkg-config" ;;
 	ca-certificates) echo "ca-certificates" ;;
@@ -183,6 +187,8 @@ _translate_arch() {
 	make) echo "make" ;;
 	gcc) echo "gcc" ;;
 	clang) echo "clang" ;;
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig" ;;
 	pkg-config) echo "pkgconf" ;;
 	ca-certificates) echo "ca-certificates" ;;
@@ -255,6 +261,8 @@ _translate_darwin() {
 	make) echo "make" ;;
 	gcc) echo "gcc" ;;
 	clang) echo "" ;; # Built into macOS CLT
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig" ;;
 	pkg-config) echo "pkg-config" ;;
 	ca-certificates) echo "ca-certificates" ;;
@@ -327,6 +335,8 @@ _translate_termux() {
 	make) echo "make" ;;
 	gcc) echo "clang" ;;
 	clang) echo "clang" ;;
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig" ;;
 	pkg-config) echo "pkg-config" ;;
 	ca-certificates) echo "ca-certificates" ;;
@@ -399,6 +409,8 @@ _translate_suse() {
 	make) echo "make" ;;
 	gcc) echo "gcc gcc-c++" ;;
 	clang) echo "clang" ;;
+	bison) echo "bison" ;;
+	binutils) echo "binutils" ;;
 	fontconfig) echo "fontconfig fontconfig-devel" ;;
 	pkg-config) echo "pkg-config" ;;
 	ca-certificates) echo "ca-certificates" ;;

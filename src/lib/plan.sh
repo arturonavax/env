@@ -129,7 +129,7 @@ show_install_plan() {
 		_plan_item "RUNTIME" "Fast Node Manager (fnm)" "Node.js version manager in ${HOME}/.local/share/fnm"
 		_plan_item "RUNTIME" "Node.js (LTS/Latest)" "Configured via fnm with corepack isolation"
 		_plan_item "RUNTIME" "pnpm" "Fast package manager in ${HOME}/.local/share/pnpm"
-		_plan_item "RUNTIME" "Go (Golang SDK)" "Official Go SDK installed to /usr/local/go and ${HOME}/go"
+		_plan_item "RUNTIME" "GVM / Golang" "GVM (Go Version Manager) primary, with standalone Go SDK fallback"
 		_plan_item "RUNTIME" "Python 3 / pyenv" "Configured with virtualenv & pip support"
 	fi
 
@@ -168,9 +168,11 @@ show_install_plan() {
 	_plan_item "SMART-APPEND" "${HOME}/.zshrc" "Preserves user content; injects # >>> arturonavax/env >>> loader"
 	_plan_item "SMART-APPEND" "${HOME}/.bashrc" "Preserves user content; injects fallback loader marker block"
 
+	# Managed Repo Dotfiles (always kept updated from repository)
+	_plan_item "CONFIG" "${HOME}/.base.zsh" "Core shell configuration (maintained & updated by repository)"
+	_plan_item "CONFIG" "${HOME}/.tools.sh" "Development toolchain PATHs (maintained & updated by repository)"
+
 	# Preserved Files
-	_plan_item "PRESERVED" "${HOME}/.base.zsh" "User custom shell options (copied ONLY if missing, never overwritten)"
-	_plan_item "PRESERVED" "${HOME}/.tools.sh" "User development PATHs (copied ONLY if missing, never overwritten)"
 	if [[ "$os" == "linux" ]]; then
 		_plan_item "PRESERVED" "${HOME}/.config/rcmd/rcmd.conf" "User custom window switcher app bindings (kept intact)"
 	fi
@@ -278,8 +280,8 @@ show_uninstall_plan() {
 	_plan_header "5. Files & Assets Preserved (NEVER DELETED)"
 	_plan_item "PRESERVED" "${HOME}/.arturonavax-env-backups/" "All previous configuration snapshots and manifests"
 	_plan_item "PRESERVED" "${HOME}/.zshrc, ${HOME}/.bashrc" "Custom user shell aliases, PATHs, functions (intact)"
-	_plan_item "PRESERVED" "${HOME}/.base.zsh, ${HOME}/.tools.sh" "User custom additions (kept in user home)"
 	_plan_item "PRESERVED" "${HOME}/go/, ${HOME}/.cargo/" "Installed user packages, Go modules, and Cargo crates"
+	_plan_item "PRESERVED" "${HOME}/.gvm/" "Go versions and pkgsets managed by GVM"
 	_plan_item "PRESERVED" "${HOME}/.local/share/fnm/" "Node.js runtimes managed by fnm"
 
 	printf '\n%s----------------------------------------------------------------------%s\n' "$DIM" "$RESET"

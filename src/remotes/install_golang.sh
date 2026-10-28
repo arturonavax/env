@@ -1,227 +1,245 @@
-#!/bin/bash
-# This is a script made to run individually, it looks for the latest version of Go and
-# compares it with the one currently installed.
+#!/usr/bin/env bash
+# ==============================================================================
+# install_golang.sh
+# Standalone Golang release installer, version checker, and source compiler.
+# Part of arturonavax/env development environment.
 #
-# Run: bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh")
-# Flag to install update available: -i
-# Flag to compiling from sources: -c
-set -o errexit
-trap exit-error-message ERR SIGINT
+# Primary Recommendation:
+#   For multi-version Go management, GVM is the recommended primary manager.
+#   This script serves as a standalone system-wide Go runtime provider.
+#
+# Usage:
+#   ./src/remotes/install_golang.sh [-i] [-c]
+# Remote:
+#   bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh") -i
+#
+# Flags:
+#   -i   Install or update Go to the latest stable release.
+#   -c   Compile Go from source (requires existing bootstrap Go or download).
+#   -h   Show help documentation.
+# ==============================================================================
 
-url_webscraping="https://go.dev/dl/"
+set -euo pipefail
 
-installation_dirpath="/usr/local/"
-bootstrap_dirpath="${installation_dirpath}go-bootstrap/"
-
+# Sourcing colors
 if [[ -f ./src/remotes/_vars_colors.sh ]]; then
+	# shellcheck source=/dev/null
 	source ./src/remotes/_vars_colors.sh
 elif [[ -f "$(dirname "$0")/_vars_colors.sh" ]]; then
+	# shellcheck source=/dev/null
 	source "$(dirname "$0")/_vars_colors.sh"
+else
+	fcwb="\033[1;37m"
+	fcgb="\033[1;32m"
+	fcyb="\033[1;33m"
+	fcrb="\033[1;31m"
+	fccb="\033[1;36m"
+	fcr="\033[0m"
 fi
 
-function exit-error-message() {
-	echo
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_reset}"
+INSTALL_FLAG=0
+COMPILE_FLAG=0
+INSTALLATION_DIR="/usr/local"
+BOOTSTRAP_DIR="${INSTALLATION_DIR}/go-bootstrap"
+API_URL="https://go.dev/dl/?mode=json"
+DL_URL="https://go.dev/dl/"
 
-	exit 1
+show_help() {
+	cat <<EOF
+${fcwb}Golang Standalone Installer & Updater${fcr}
+
+Usage:
+  install_golang.sh [options]
+
+Options:
+  -i          Install or update to latest official Go release
+  -c          Compile from source repository (via git + all.bash)
+  -h          Show this help message
+
+Environment Notice:
+  GVM (Go Version Manager) is the primary Go manager for arturonavax/env.
+  This standalone installer installs official binaries into ${INSTALLATION_DIR}/go.
+EOF
+	exit 0
 }
 
-if [[ "$(command -v wget)" == "" ]]; then
-	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}The wget command is needed to run this script.${fgcolor_reset}"
-
-	exit 1
-fi
-
-while getopts ':ic' flag; do
+while getopts ':ich' flag; do
 	case "$flag" in
-	i)
-		install_flag=1
-		;;
-	c)
-		compile_flag=1
-		;;
+	i) INSTALL_FLAG=1 ;;
+	c) COMPILE_FLAG=1 ;;
+	h) show_help ;;
 	*)
-		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}Unknown flag${fgcolor_reset}, only ${fgcolor_green_bold}'-i'${fgcolor_reset} is accepted to install in case you don't have Golang installed on your system or find an update available, and ${fgcolor_green_bold}'-c'${fgcolor_reset} to perform the process by compiling from sources"
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}Unknown flag: -${OPTARG}${fcr}. Use ${fcgb}'-i'${fcr} to install/update or ${fcgb}'-c'${fcr} to compile from source." >&2
 		exit 1
 		;;
 	esac
 done
 
-echo -e "${fgcolor_white_bold}[Golang Installer]: 🔎 Finding latest version of Golang ${fgcolor_cyan_bold}🐹${fgcolor_white_bold}...${fgcolor_reset}"
-
-latest_version="$(wget -qO- "$url_webscraping" | command grep -E "/go1(\.[0-9]+){0,2}" | command grep -v "[0-9]rc" | command grep -E -o "/go1(\.[0-9]+){0,2}" | sort --version-sort | tail -n 1 | cut -d "/" -f 2)"
-
-os=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-if [[ "$(uname -s)" == "Linux" ]]; then
-	linux_arch="$(uname -m)"
-	if [[ "$linux_arch" == "x86_64" || "$(uname -p)" == "x86_64" || "$(uname -p)" == "unknown" ]]; then
-		arch="amd64"
-
-	elif [[ "$linux_arch" == "aarch64" || "$linux_arch" == "arm64" || "$(uname -p)" == "arm64" ]]; then
-		arch="arm64"
-
-	elif [[ "$linux_arch" == "i386" || "$linux_arch" == "i686" || "$(uname -p)" == "i386" ]]; then
-		arch="386"
-
-	elif [[ "$linux_arch" == "armv6l" || "$(uname -p)" == "armv6l" ]]; then
-		arch="armv6l"
-
-	elif [[ "$linux_arch" == "ppc64le" || "$(uname -p)" == "ppc64le" ]]; then
-		arch="ppc64le"
-
-	elif [[ "$linux_arch" == "s390x" || "$(uname -p)" == "s390x" ]]; then
-		arch="s390x"
-
+# HTTP client helper (curl or wget)
+fetch_url() {
+	local url="$1"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$url"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO- "$url"
 	else
-		echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}❌ The architecture ($linux_arch) is not compatible with this installation."
-
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}Error: curl or wget is required to query releases.${fcr}" >&2
 		exit 1
 	fi
+}
 
-elif [[ "$(uname -s)" == "Darwin" ]]; then
-	if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
-		arch="arm64"
-	else
-		arch="amd64"
-	fi
+echo -e "${fcwb}[Golang Installer]: 🔎 Resolving latest stable release of Golang ${fccb}🐹${fcwb}...${fcr}"
 
-else
-	echo "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red_bold}❌ The operating system is not compatible with this installation."
+# 1. Query latest stable release via official Go JSON API
+latest_version=""
+json_response="$(fetch_url "$API_URL" 2>/dev/null || true)"
+if [[ -n "$json_response" ]]; then
+	latest_version="$(echo "$json_response" | grep -o '"version": "go[^"]*"' | head -n 1 | cut -d '"' -f 4 || true)"
+fi
 
+# Fallback to HTML scraping if JSON API fails
+if [[ -z "$latest_version" ]]; then
+	latest_version="$(fetch_url "$DL_URL" 2>/dev/null | grep -E "/go1(\.[0-9]+){0,2}" | grep -v "[0-9]rc" | grep -E -o "/go1(\.[0-9]+){0,2}" | sort --version-sort | tail -n 1 | cut -d "/" -f 2 || true)"
+fi
+
+if [[ -z "$latest_version" ]]; then
+	echo -e "${fcwb}[Golang Installer]: ${fcrb}Failed to resolve latest Go version from go.dev.${fcr}" >&2
 	exit 1
 fi
 
-go_latest_filename="${latest_version}.${os}-${arch}.tar.gz"
-go_latest_url="${url_webscraping}${go_latest_filename}"
+# 2. Detect Operating System & CPU Architecture
+raw_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+raw_arch="$(uname -m)"
 
-case "$SHELL" in
-*zsh) shell_file=".zshrc" ;;
-*tcsh) shell_file=".tcshrc" ;;
-*ksh) shell_file=".kshrc" ;;
-*csh) shell_file=".cshrc" ;;
-*) shell_file=".bashrc" ;;
+case "$raw_os" in
+linux)
+	target_os="linux"
+	case "$raw_arch" in
+	x86_64 | amd64) target_arch="amd64" ;;
+	aarch64 | arm64) target_arch="arm64" ;;
+	i386 | i686) target_arch="386" ;;
+	armv6l | armv7l) target_arch="armv6l" ;;
+	ppc64le) target_arch="ppc64le" ;;
+	s390x) target_arch="s390x" ;;
+	*)
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}Unsupported Linux architecture: $raw_arch${fcr}" >&2
+		exit 1
+		;;
+	esac
+	;;
+darwin)
+	target_os="darwin"
+	if [[ "$raw_arch" == "arm64" ]] || [[ "$(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)" == *"Apple"* ]]; then
+		target_arch="arm64"
+	else
+		target_arch="amd64"
+	fi
+	;;
+*)
+	echo -e "${fcwb}[Golang Installer]: ${fcrb}Unsupported operating system: $raw_os${fcr}" >&2
+	exit 1
+	;;
 esac
 
-# eval_installation Print the installation line to be executed with "eval".
-#  $1 = Installation path
-function eval_installation() {
-	[[ "$1" == "" ]] && return
+archive_filename="${latest_version}.${target_os}-${target_arch}.tar.gz"
+archive_url="${DL_URL}${archive_filename}"
 
-	echo -n "rm -f ${go_latest_filename} ; wget ${go_latest_url} && sudo rm -rf ${1}go && sudo tar -C ${1} -xzf ${go_latest_filename} && sudo chmod -R a+rX ${1}go 2>/dev/null && rm -f ${go_latest_filename}"
-}
+# Helper for binary release installation
+install_binary_release() {
+	echo -e "${fcwb}[Golang Installer]: ${fccb}⚡ Downloading ${archive_filename}...${fcr}"
+	local tmp_dir
+	tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/golang_install.XXXXXX")"
+	local tmp_archive="${tmp_dir}/${archive_filename}"
 
-line_installation=$(
-	cat <<EOF
- ${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}⚡ Installation command (You still have to set up your PATH):${fgcolor_reset}
-  ${fgcolor_yellow}$ ${fgcolor_cyan}$(eval_installation "$installation_dirpath")${fgcolor_reset}
-EOF
-)
-
-line_example=$(
-	cat <<EOF
- ${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}# Example for adding "go" and "GOPATH/bin" to your PATH:
-  ${fgcolor_yellow}$ ${fgcolor_cyan}echo 'export PATH="${installation_dirpath}go/bin:\$HOME/go/bin:\$PATH"' >> ~/${shell_file}${fgcolor_reset}
-EOF
-)
-
-function compiled_installation() {
-	echo -e "${fgcolor_white_bold}[Golang Installer]: Getting bootstrap...${fgcolor_reset}"
-	echo
-
-	sudo mkdir -p "$bootstrap_dirpath"
-
-	eval "$(eval_installation "$bootstrap_dirpath")" || exit 1
-
-	if [[ -d "${installation_dirpath}go/.git/" ]]; then
-		cd "${installation_dirpath}go/"
-
-		sudo git pull
-
-		sudo git checkout "$latest_version"
-
-		sudo rm -f "${installation_dirpath}go/bin/*"
-
-		cd "${installation_dirpath}go/src/"
-
-		sudo su root --login --command "cd ${installation_dirpath}go/src/; GOROOT_BOOTSTRAP=${bootstrap_dirpath}go; ./all.bash"
+	if command -v curl >/dev/null 2>&1; then
+		curl --proto '=https' --tlsv1.2 -fsSL "$archive_url" -o "$tmp_archive"
 	else
-		sudo rm -rf "${installation_dirpath}go/"
-
-		echo -e "${fgcolor_white_bold}[Golang Installer]: Cloning Golang sources...${fgcolor_reset}"
-		echo
-
-		sudo git clone https://go.googlesource.com/go "${installation_dirpath}go"
-
-		cd "${installation_dirpath}go/"
-
-		sudo git checkout "$latest_version"
-
-		sudo rm -f "${installation_dirpath}go/bin/*"
-
-		cd "${installation_dirpath}go/src/"
-
-		sudo su root --login --command "cd ${installation_dirpath}go/src/; export GOROOT_BOOTSTRAP=${bootstrap_dirpath}go; ./all.bash"
+		wget -q "$archive_url" -O "$tmp_archive"
 	fi
+
+	echo -e "${fcwb}[Golang Installer]: Extracting into ${INSTALLATION_DIR}/go...${fcr}"
+	sudo rm -rf "${INSTALLATION_DIR}/go"
+	sudo mkdir -p "${INSTALLATION_DIR}"
+	sudo tar -C "${INSTALLATION_DIR}" -xzf "$tmp_archive"
+	sudo chmod -R a+rX "${INSTALLATION_DIR}/go"
+	rm -rf "$tmp_dir"
 }
 
-if [[ "$(command -v go)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_red}❌ Golang is not installed on this system.${fgcolor_reset}"
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}ℹ️ The latest available version of Golang is: ${fgcolor_yellow_bold}${latest_version#go}${fgcolor_reset}"
-	echo
+# Helper for compiling from source
+install_from_source() {
+	echo -e "${fcwb}[Golang Installer]: Compiling Go from source repository...${fcr}"
 
-	if [[ "$install_flag" == 1 ]]; then
-		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_cyan_bold}⚡ Running installation... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
-		echo
-
-		if [[ "$compile_flag" == 1 ]]; then
-			echo -e "${fgcolor_white_bold}(!!! Compiling from sources)${fgcolor_reset}"
-			echo
-
-			compiled_installation
+	# Ensure bootstrap Go exists
+	if [[ ! -x "${BOOTSTRAP_DIR}/go/bin/go" ]]; then
+		echo -e "${fcwb}[Golang Installer]: Provisioning bootstrap compiler in ${BOOTSTRAP_DIR}...${fcr}"
+		local b_tmp
+		b_tmp="$(mktemp -d "${TMPDIR:-/tmp}/go_bootstrap.XXXXXX")"
+		local b_archive="${b_tmp}/${archive_filename}"
+		if command -v curl >/dev/null 2>&1; then
+			curl --proto '=https' --tlsv1.2 -fsSL "$archive_url" -o "$b_archive"
 		else
-			sudo mkdir -p "$installation_dirpath"
-
-			eval "$(eval_installation "$installation_dirpath")"
+			wget -q "$archive_url" -O "$b_archive"
 		fi
-
-		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green_bold}✔️ Installation completed.${fgcolor_reset}"
-	else
-		echo -e "$line_installation"
+		sudo mkdir -p "$BOOTSTRAP_DIR"
+		sudo tar -C "$BOOTSTRAP_DIR" -xzf "$b_archive"
+		rm -rf "$b_tmp"
 	fi
 
-	echo
-	echo -e "$line_example"
+	local source_repo="${INSTALLATION_DIR}/go"
+	if [[ -d "${source_repo}/.git" ]]; then
+		echo -e "${fcwb}[Golang Installer]: Updating existing Go git clone...${fcr}"
+		sudo git -C "$source_repo" fetch --tags
+		sudo git -C "$source_repo" checkout "$latest_version"
+	else
+		echo -e "${fcwb}[Golang Installer]: Cloning Go source repository...${fcr}"
+		sudo rm -rf "$source_repo"
+		sudo git clone --depth 1 --branch "$latest_version" https://go.googlesource.com/go "$source_repo"
+	fi
 
-	exit 0
+	echo -e "${fcwb}[Golang Installer]: Running ./all.bash compilation...${fcr}"
+	sudo env GOROOT_BOOTSTRAP="${BOOTSTRAP_DIR}/go" bash -c "cd '${source_repo}/src' && ./all.bash"
+}
+
+# 3. Version Comparison & Action
+current_version=""
+if command -v go >/dev/null 2>&1; then
+	current_version="$(go version 2>/dev/null | awk '{print $3}' || true)"
+elif [[ -x "${INSTALLATION_DIR}/go/bin/go" ]]; then
+	current_version="$("${INSTALLATION_DIR}/go/bin/go" version 2>/dev/null | awk '{print $3}' || true)"
 fi
 
-current_version="$("$installation_dirpath/go/bin/go" version | cut -d " " -f 3)"
-
-if [[ "$latest_version" != "$current_version" ]]; then
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow}⚠️ There is a different version of Golang: ${current_version}"
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_yellow_bold}ℹ️ Latest new version available: ${latest_version#go}${fgcolor_reset}"
+if [[ -z "$current_version" ]]; then
+	echo -e "${fcwb}[Golang Installer]: ${fcrb}❌ Golang is not currently installed on this system.${fcr}"
+	echo -e "${fcwb}[Golang Installer]: ${fcyb}ℹ️  Latest stable release: ${fcyb}${latest_version#go}${fcr}"
 	echo
 
-	if [[ "$install_flag" == 1 ]]; then
-		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_cyan_bold}⚡ Running updating... (in ${fgcolor_white_bold}${installation_dirpath}${fgcolor_cyan_bold})${fgcolor_reset}"
-		echo
-
-		if [[ "$compile_flag" == 1 ]]; then
-			echo -e "${fgcolor_white_bold}(!!! Compiling from sources)${fgcolor_reset}"
-			echo
-
-			compiled_installation
+	if [[ "$INSTALL_FLAG" -eq 1 ]]; then
+		if [[ "$COMPILE_FLAG" -eq 1 ]]; then
+			install_from_source
 		else
-			sudo mkdir -p "$installation_dirpath"
-
-			eval "$(eval_installation "$installation_dirpath")"
+			install_binary_release
 		fi
-
-		echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green_bold}✔️ Updating completed.${fgcolor_reset}"
+		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Installation completed successfully!${fcr}"
 	else
-		echo -e "$line_installation"
+		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically install: ${fccb}./src/remotes/install_golang.sh -i${fcr}"
+	fi
+elif [[ "$current_version" != "$latest_version" ]]; then
+	echo -e "${fcwb}[Golang Installer]: ${fcyb}⚠️ Installed version (${current_version#go}) differs from latest (${latest_version#go}).${fcr}"
+	if [[ "$INSTALL_FLAG" -eq 1 ]]; then
+		echo -e "${fcwb}[Golang Installer]: ${fccb}⚡ Updating Go to ${latest_version#go}...${fcr}"
+		if [[ "$COMPILE_FLAG" -eq 1 ]]; then
+			install_from_source
+		else
+			install_binary_release
+		fi
+		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Update completed successfully!${fcr}"
+	else
+		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically update: ${fccb}./src/remotes/install_golang.sh -i${fcr}"
 	fi
 else
-	echo -e "${fgcolor_white_bold}[Golang Installer]: ${fgcolor_green}✔️ You have the latest version of Golang: ${current_version#go}${fgcolor_reset}"
+	echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Golang is up to date: ${current_version#go}${fcr}"
 fi
+
+echo -e "\n${fcwb}[Golang Installer]: ${fcyb}Note:${fcr} To manage multiple Go versions dynamically per project, use ${fcwb}GVM${fcr}:"
+echo -e "  ${fccb}gvm install ${latest_version}${fcr}"
+echo -e "  ${fccb}gvm use ${latest_version} --default${fcr}"

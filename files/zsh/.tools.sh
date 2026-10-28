@@ -6,6 +6,7 @@
 
 # go
 [[ -d /usr/local/go/bin/ ]] && export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 # rust
 [[ -d "$HOME/.cargo/bin" && ":$PATH:" != *":$HOME/.cargo/bin:"* ]] && export PATH="$HOME/.cargo/bin:$PATH"

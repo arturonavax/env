@@ -24,6 +24,7 @@ source ./src/lib/logging.sh
 source ./src/lib/platform.sh
 source ./src/lib/packages.sh
 source ./src/lib/download.sh
+source ./src/lib/toolchain.sh
 source ./src/lib/remote_env.sh
 source ./src/remotes/_versions.sh
 
@@ -116,17 +117,14 @@ if ! command -v pnpm >/dev/null 2>&1; then
 	log_success "pnpm installed."
 fi
 
-# 6. Go (Golang)
-if ! command -v go >/dev/null 2>&1; then
-	log_step "Installing Go language runtime..."
-	if [[ -f ./src/remotes/install_golang.sh ]]; then
-		bash ./src/remotes/install_golang.sh -i
-	else
-		curl -fsSL "${REMOTE_PRIMARY_URL}/install_golang.sh" | bash -s -- -i
-	fi
-	export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
-	log_success "Go language runtime installed."
+# 6. Go (Golang) via Multi-Tier Toolchain (GVM primary, standalone & package fallbacks)
+log_step "Configuring Go language runtime via Toolchain..."
+toolchain_install golang
+if [[ -s "$HOME/.gvm/scripts/gvm" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.gvm/scripts/gvm"
 fi
+export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 # 7. Python (pyenv / system python)
 log_step "Configuring Python environment..."
