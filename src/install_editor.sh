@@ -100,14 +100,11 @@ function install_editor() {
 	node_pkg_add yarn eslint typescript prettier emmet-ls bash-language-server \
 		markdownlint-cli nginxbeautifier sql-formatter stylelint
 
-	# check exists goenv
-	export GOENV_ROOT="$HOME/.goenv"
-
-	if [[ -d "$GOENV_ROOT" ]]; then
-		export PATH="$GOENV_ROOT/bin:$PATH"
-		eval "$(goenv init -)"
-		export PATH="$GOROOT/bin:$PATH"
-		export PATH="$PATH:$GOPATH/bin"
+	# GVM (Go Version Manager) environment integration
+	export GVM_ROOT="${GVM_ROOT:-$HOME/.gvm}"
+	if [[ -s "$GVM_ROOT/scripts/gvm" ]]; then
+		# shellcheck source=/dev/null
+		source "$GVM_ROOT/scripts/gvm"
 	fi
 
 	mkdir -p "$HOME/.local/bin"

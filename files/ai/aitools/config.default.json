@@ -7,6 +7,8 @@
     "effort": "low",
     "default_stage_all": false,
     "max_diff_length": 15000,
+    "default_template": "conventional",
+    "jira_id": null,
     "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add 'Co-Authored-By', AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}"
   },
   "daemon": {

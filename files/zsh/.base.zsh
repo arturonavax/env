@@ -71,6 +71,13 @@ else
     compinit -C
 fi
 
+# GVM (Go Version Manager) bash completion integration in Zsh
+if [[ -s "${GVM_ROOT:-$HOME/.gvm}/scripts/completion" ]]; then
+    autoload -U +X bashcompinit 2>/dev/null && bashcompinit 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "${GVM_ROOT:-$HOME/.gvm}/scripts/completion" 2>/dev/null || true
+fi
+
 # ==============================================================================
 # 2. OPCIONES ZLE Y ESTILOS NATIVOS DE ZSH
 # ==============================================================================
@@ -595,6 +602,8 @@ fi
 if (( $+commands[aitools] )); then
     alias ait='aitools'
     alias gcm='aitools commit'
+    alias gcmj='aitools commit --template jira'
+    alias gcmd='aitools commit --template detailed'
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
 fi

@@ -23,13 +23,16 @@ _tools_path_append "/usr/local/bin"
 _tools_path_prepend "$HOME/.local/bin"
 _tools_path_prepend "$HOME/.fzf/bin"
 
-# 2. Go (Golang) Runtime & Tools
+# 2. Go (Golang) Runtime & Tools (GVM primary, standalone & system Go fallback)
+export GVM_ROOT="${GVM_ROOT:-$HOME/.gvm}"
+_tools_path_prepend "$HOME/go/bin"
 _tools_path_prepend "/usr/local/go/bin"
 _tools_path_prepend "/opt/homebrew/opt/go/bin"
-_tools_path_prepend "$HOME/go/bin"
-if ! command -v gvm >/dev/null 2>&1 && [[ -s "$HOME/.gvm/scripts/gvm" ]]; then
-	# shellcheck source=/dev/null
-	source "$HOME/.gvm/scripts/gvm"
+if [[ -s "$GVM_ROOT/scripts/gvm" ]]; then
+	if ! command -v gvm >/dev/null 2>&1; then
+		# shellcheck source=/dev/null
+		source "$GVM_ROOT/scripts/gvm"
+	fi
 fi
 
 # 3. Rust & Cargo Toolchain

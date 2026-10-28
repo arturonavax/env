@@ -118,3 +118,61 @@ direct_missing_code=$?
 assert_exit_code 1 "$direct_missing_code" "direct ask without args should fail with exit code 1" &&
 	assert_contains "$direct_missing_args" "requires arguments" "Direct usage hint check" &&
 	pass "Direct custom command dispatch without 'run' prefix properly verified"
+
+# Test 11: aitools commit --list-templates
+tmpl_list_output="$("$AITOOLS_BIN" commit --list-templates 2>&1)"
+tmpl_list_code=$?
+assert_exit_code 0 "$tmpl_list_code" "aitools commit --list-templates exit code" &&
+	assert_contains "$tmpl_list_output" "Available Commit Message Templates" "Templates header" &&
+	assert_contains "$tmpl_list_output" "conventional" "Template conventional listed" &&
+	assert_contains "$tmpl_list_output" "jira" "Template jira listed" &&
+	assert_contains "$tmpl_list_output" "jira-scope" "Template jira-scope listed" &&
+	assert_contains "$tmpl_list_output" "detailed" "Template detailed listed" &&
+	pass "aitools commit --list-templates cleanly listed all available templates"
+
+# Test 12: Jira ticket extraction and safe template rendering
+python3 -c "
+from importlib.machinery import SourceFileLoader
+import sys
+aitools = SourceFileLoader('aitools', '${REPO_ROOT}/files/ai/aitools/aitools').load_module()
+
+# Test Jira extraction
+assert aitools.extract_jira_id('feature/ENG-942-auth-flow') == 'ENG-942', 'Failed to extract ENG-942'
+assert aitools.extract_jira_id('fix/CORE-105-checkout') == 'CORE-105', 'Failed to extract CORE-105'
+assert aitools.extract_jira_id('hotfix/ABC-1_urgent') == 'ABC-1', 'Failed to extract ABC-1'
+assert aitools.extract_jira_id('chore/clean-tests') == '', 'Non-jira branch should return empty string'
+
+# Test render_commit_template does not crash with KeyError on arbitrary braces
+tmpl = 'Format: <type>({scope}): <summary>\nJira: {jira_id}\nBranch: {branch}\nDiff:\n{diff}'
+ctx = {
+    'jira_id': 'PROJ-1234',
+    'branch': 'feature/PROJ-1234-login',
+    'diff': 'sample diff content',
+    'scope': 'auth'
+}
+rendered = aitools.render_commit_template(tmpl, ctx)
+assert 'Format: <type>(auth): <summary>' in rendered, 'Failed to replace scope'
+assert 'Jira: PROJ-1234' in rendered, 'Failed to replace jira_id'
+assert 'Branch: feature/PROJ-1234-login' in rendered, 'Failed to replace branch'
+assert 'sample diff content' in rendered, 'Failed to replace diff'
+
+# Test built-in template resolution
+t_str, t_name = aitools.resolve_commit_template('jira', {})
+assert t_name == 'jira', 'Failed to resolve jira template'
+assert '{jira_id}' in t_str or '[{jira_id}]' in t_str, 'Jira placeholder missing in template'
+sys.exit(0)
+" >/dev/null 2>&1
+jira_test_code=$?
+assert_exit_code 0 "$jira_test_code" "Jira extraction and template rendering assertions" &&
+	pass "Jira ticket extraction and safe template rendering validated with 100% precision"
+
+# Test 13: aitools commit options verification
+commit_help_output="$("$AITOOLS_BIN" commit --help 2>&1)"
+commit_help_code=$?
+assert_exit_code 0 "$commit_help_code" "aitools commit --help exit code" &&
+	assert_contains "$commit_help_output" "--template" "Template flag present" &&
+	assert_contains "$commit_help_output" "--jira" "Jira flag present" &&
+	assert_contains "$commit_help_output" "--scope" "Scope flag present" &&
+	assert_contains "$commit_help_output" "--model" "Model flag present" &&
+	assert_contains "$commit_help_output" "--list-templates" "List templates flag present" &&
+	pass "aitools commit CLI flags (--template, --jira, --scope, --model, --list-templates) verified"

@@ -32,7 +32,32 @@
     // Maximum diff characters sent to LLM prompt (prevents OS arg overflow)
     "max_diff_length": 15000,
 
-    // Prompt template sent to LLM. Must include {diff} placeholder.
+    // Default commit template to use. Built-in options:
+    // - "conventional" : Standard Conventional Commits (<type>(<scope>): <summary>)
+    // - "jira"         : Jira-prefixed commit ([<JIRA-ID>] <type>(<scope>): <summary>)
+    // - "jira-scope"   : Jira issue as commit scope (<type>(<JIRA-ID>): <summary>)
+    // - "detailed"     : Multi-line commit with WHAT/WHY paragraph and bullet points
+    // Or specify any custom key defined under "templates" below.
+    "default_template": "conventional",
+
+    // Optional manual Jira issue ticket ID (e.g. "PROJ-1234").
+    // If null, aitools automatically extracts ticket patterns from the current Git branch name.
+    "jira_id": null,
+
+    // Optional custom commit message templates.
+    // Available placeholders for dynamic string interpolation:
+    //   {diff}     : Git staged diff
+    //   {branch}   : Current Git branch name
+    //   {jira_id}  : Jira ticket ID (auto-extracted from branch or CLI/config override)
+    //   {files}    : Comma-separated list of modified/staged files
+    //   {scope}    : Scope override passed via CLI --scope
+    //   {model}    : Active model name
+    "templates": {
+      // Example of custom team template:
+      // "org-custom": "Write a commit for branch {branch} (Ticket: {jira_id}).\nFormat: {jira_id}: <type>: <summary>\nDiff:\n{diff}"
+    },
+
+    // Legacy default prompt template (used if no named template is chosen)
     "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add 'Co-Authored-By', AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}"
   },
 

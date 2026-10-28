@@ -89,6 +89,18 @@ aitools wake --force
 # Generate Conventional Commit from staged changes
 aitools commit
 
+# List available commit prompt templates
+aitools commit --list-templates
+
+# Commit using Jira ticket convention (auto-extracted from branch e.g. feature/PROJ-123-auth)
+aitools commit --template jira
+
+# Commit with manual Jira ID and specific model override
+aitools commit -t jira -j PROJ-999 --model gemini-2.5-flash
+
+# Multi-line detailed commit with scope override
+aitools commit --template detailed --scope auth
+
 # Stage all modified files and generate commit via Claude backend
 aitools commit -a --backend claude
 
@@ -142,12 +154,42 @@ Configured in `~/.base.zsh`:
 | :--- | :--- | :--- |
 | `ait` | `aitools` | Fast CLI prefix |
 | `gcm` | `aitools commit` | AI-powered conventional commit from diff |
+| `gcmj` | `aitools commit --template jira` | AI commit with auto-extracted Jira ticket ID |
+| `gcmd` | `aitools commit --template detailed` | AI commit with multi-line detailed breakdown |
 | `ai-wake` | `aitools wake` | Quota primer probe |
 | `ai-quota` | `aitools quota` | Quick quota status inspection |
 
 ---
 
-## 5. Configuration Schema (`~/.config/aitools/config.json`)
+## 5. Commit Templates & Jira Integration
+
+`aitools commit` supports dynamic templates for organizations requiring specific commit structures (e.g. Jira issue IDs, branch names, scopes).
+
+### Built-in Templates
+
+- **`conventional`**: Standard Conventional Commits: `<type>(<scope>): <summary>`
+- **`jira`**: Jira-prefixed format: `[<JIRA-ID>] <type>(<scope>): <summary>`
+- **`jira-scope`**: Jira ticket as scope: `<type>(<JIRA-ID>): <summary>`
+- **`detailed`**: Multi-line commit with summary, WHAT/WHY paragraph, bullets, and ticket
+
+### Ticket Auto-Detection
+
+If your current Git branch follows ticket naming conventions (e.g. `feature/PROJ-123-auth`, `fix/CORE-942_login`), `aitools` automatically extracts the Jira ID (`PROJ-123`, `CORE-942`) and injects it into `{jira_id}` without requiring manual input. You can override it anytime with `--jira <ID>` or `-j <ID>`.
+
+### Template Placeholders
+
+When defining custom templates in `~/.config/aitools/config.json`, the following placeholders are available:
+
+- `{diff}`: Git staged diff
+- `{branch}`: Active Git branch name
+- `{jira_id}`: Auto-detected or overridden Jira ticket ID
+- `{files}`: Comma-separated list of modified files
+- `{model}`: Active LLM model name
+- `{scope}`: Scope passed via `--scope` / `-s`
+
+---
+
+## 6. Configuration Schema (`~/.config/aitools/config.json`)
 
 Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and trailing commas. Full commented template available at [`files/ai/aitools/config.template.jsonc`](./config.template.jsonc).
 
@@ -161,7 +203,12 @@ Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and traili
     "effort": "low",
     "default_stage_all": false,
     "max_diff_length": 15000,
-    "prompt_template": "You are an expert developer creating a clean conventional git commit message...\n\nGit Diff:\n{diff}"
+    "default_template": "conventional",
+    "jira_id": null,
+    "templates": {
+      // Custom templates can be registered here:
+      // "my-team": "Write commit for {jira_id}...\n{diff}"
+    }
   },
   "daemon": {
     "auto_wake": {

@@ -67,7 +67,7 @@ C_BOLD_GREEN = "\033[1;32m"
 C_BOLD_YELLOW = "\033[1;33m"
 C_BOLD_RED = "\033[1;31m"
 
-COMMIT_PROMPT_TEMPLATE = """You are an expert developer creating a clean conventional git commit message.
+COMMIT_PROMPT_CONVENTIONAL = """You are an expert developer creating a clean conventional git commit message.
 Analyze the following git diff and output a single, high-quality conventional commit message.
 
 Requirements:
@@ -84,6 +84,88 @@ Git Diff:
 {diff}
 """
 
+COMMIT_PROMPT_JIRA = """You are an expert developer creating an enterprise conventional git commit message linked to a Jira/Issue ticket.
+Analyze the following git diff and output a single, high-quality commit message following the organization's Jira structure.
+
+Context:
+- Current Branch: {branch}
+- Jira / Issue ID: {jira_id}
+- Modified Files: {files}
+
+Requirements:
+1. First line format:
+   - If Jira ID is present and non-empty: [{jira_id}] <type>(<scope>): <summary in imperative mood, lower case>
+   - If Jira ID is empty or not provided: <type>(<scope>): <summary in imperative mood, lower case>
+   Types: feat, fix, refactor, docs, chore, test, perf, build, ci
+2. Keep the first line under 72 characters.
+3. If necessary, add a blank line followed by concise bullet points describing key changes.
+4. If Jira ID is present and non-empty, you may include a trailing reference line: "Ref: {jira_id}".
+5. Output in English.
+6. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.
+7. Do NOT add "Co-Authored-By", AI attribution, or metadata.
+8. Output ONLY the raw commit message.
+
+Git Diff:
+{diff}
+"""
+
+COMMIT_PROMPT_JIRA_SCOPE = """You are an expert developer creating a conventional git commit message where the scope is the Jira issue ticket.
+Analyze the following git diff and output a single conventional commit message.
+
+Context:
+- Current Branch: {branch}
+- Jira / Issue ID: {jira_id}
+- Modified Files: {files}
+
+Requirements:
+1. First line format:
+   - If Jira ID is present: <type>({jira_id}): <summary in imperative mood, lower case>
+   - If Jira ID is empty: <type>(<scope>): <summary in imperative mood, lower case>
+   Types: feat, fix, refactor, docs, chore, test, perf, build, ci
+2. Keep the first line under 72 characters.
+3. If necessary, add a blank line followed by bullet points describing key changes.
+4. Output in English.
+5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.
+6. Do NOT add "Co-Authored-By", AI attribution, or metadata.
+7. Output ONLY the raw commit message.
+
+Git Diff:
+{diff}
+"""
+
+COMMIT_PROMPT_DETAILED = """You are an expert developer creating a comprehensive, well-structured git commit message.
+Analyze the following git diff and output a detailed commit message.
+
+Context:
+- Current Branch: {branch}
+- Jira / Issue ID: {jira_id}
+- Modified Files: {files}
+
+Requirements:
+1. Header line: <type>(<scope>): <summary in imperative mood, lower case> (<72 characters)
+   Types: feat, fix, refactor, docs, chore, test, perf, build, ci
+2. Leave one blank line after the header.
+3. Body: A brief 1-2 sentence paragraph explaining WHAT changed and WHY.
+4. Followed by bullet points highlighting architectural changes, affected components, or resolved edge cases.
+5. If Jira ID is present ({jira_id}), append a line: "Ticket: {jira_id}".
+6. Output in English.
+7. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.
+8. Do NOT add "Co-Authored-By", AI attribution, or metadata.
+9. Output ONLY the raw commit message.
+
+Git Diff:
+{diff}
+"""
+
+COMMIT_PROMPT_TEMPLATE = COMMIT_PROMPT_CONVENTIONAL
+
+DEFAULT_COMMIT_TEMPLATES = {
+    "conventional": COMMIT_PROMPT_CONVENTIONAL.strip(),
+    "jira": COMMIT_PROMPT_JIRA.strip(),
+    "jira-scope": COMMIT_PROMPT_JIRA_SCOPE.strip(),
+    "detailed": COMMIT_PROMPT_DETAILED.strip()
+}
+
 DEFAULT_CONFIG = {
     "version": VERSION,
     "default_commit_backend": "agy",
@@ -91,9 +173,11 @@ DEFAULT_CONFIG = {
         "default_backend": "agy",
         "model": None,
         "effort": "low",
+        "default_template": "conventional",
         "default_stage_all": False,
         "max_diff_length": 15000,
-        "prompt_template": COMMIT_PROMPT_TEMPLATE.strip()
+        "prompt_template": COMMIT_PROMPT_CONVENTIONAL.strip(),
+        "templates": DEFAULT_COMMIT_TEMPLATES
     },
     "daemon": {
         "auto_wake": {
@@ -766,14 +850,20 @@ def query_llm(
             cmd.extend(["--model", model])
     elif backend == "codex":
         cmd = ["codex", "exec", prompt]
+        if model:
+            cmd.extend(["-m", model])
     elif backend == "llm":
         cmd = ["llm", prompt]
         if model:
             cmd.extend(["-m", model])
     elif backend == "opencode":
         cmd = ["opencode", "run", prompt]
+        if model:
+            cmd.extend(["-m", model])
     elif backend == "pi":
         cmd = ["pi", "ask", prompt]
+        if model:
+            cmd.extend(["--model", model])
     else:
         # Fallback to agy or llm
         if shutil.which("agy"):
@@ -835,11 +925,101 @@ def get_git_diff(stage_all: bool = False) -> tuple[str, bool]:
     return "", False
 
 
+def get_git_branch() -> str:
+    """Returns current git branch name or empty string if not in git repository."""
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0:
+            branch = res.stdout.strip()
+            if branch != "HEAD":
+                return branch
+    except Exception:
+        pass
+    return ""
+
+
+def extract_jira_id(branch_name: str) -> str:
+    """Extracts Jira ticket ID (e.g. PROJ-1234, ENG-42) from a branch name."""
+    if not branch_name:
+        return ""
+    match = re.search(r'([A-Za-z]{2,10}-[0-9]+)', branch_name)
+    if match:
+        return match.group(1).upper()
+    return ""
+
+
+def get_git_staged_files() -> list[str]:
+    """Returns list of staged modified files, or unstaged if none staged."""
+    try:
+        res = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return [f.strip() for f in res.stdout.splitlines() if f.strip()]
+        res_unstaged = subprocess.run(
+            ["git", "diff", "--name-only"],
+            capture_output=True, text=True, check=False
+        )
+        if res_unstaged.returncode == 0:
+            return [f.strip() for f in res_unstaged.stdout.splitlines() if f.strip()]
+    except Exception:
+        pass
+    return []
+
+
+def render_commit_template(template: str, context: dict[str, str]) -> str:
+    """Safely substitutes {key} placeholders in template without raising KeyError on literal braces."""
+    result = template
+    for key, val in context.items():
+        result = result.replace(f"{{{key}}}", str(val))
+    return result
+
+
+def resolve_commit_template(
+    template_name_or_str: str | None,
+    config: dict
+) -> tuple[str, str]:
+    """Resolves commit prompt template string and its identifier."""
+    commit_cfg = config.get("commit", {})
+    configured_templates = {**DEFAULT_COMMIT_TEMPLATES, **commit_cfg.get("templates", {})}
+
+    # 1. Explicit CLI choice
+    if template_name_or_str:
+        if template_name_or_str in configured_templates:
+            return configured_templates[template_name_or_str], template_name_or_str
+        if "{diff}" in template_name_or_str:
+            return template_name_or_str, "custom-inline"
+        if os.path.isfile(template_name_or_str):
+            try:
+                with open(template_name_or_str, "r", encoding="utf-8") as f:
+                    return f.read(), os.path.basename(template_name_or_str)
+            except Exception:
+                pass
+        print(f"{C_YELLOW}⚠️ Unknown template '{template_name_or_str}', falling back to default.{C_RESET}", file=sys.stderr)
+
+    # 2. Configured default template
+    default_tpl_name = commit_cfg.get("default_template", "conventional")
+    if default_tpl_name in configured_templates:
+        return configured_templates[default_tpl_name], default_tpl_name
+
+    # 3. Legacy prompt_template property
+    if "prompt_template" in commit_cfg and commit_cfg["prompt_template"]:
+        return commit_cfg["prompt_template"], "config-prompt"
+
+    # 4. Built-in conventional fallback
+    return DEFAULT_COMMIT_TEMPLATES["conventional"], "conventional"
+
+
 def query_llm_for_commit(
     diff_text: str,
     backend: str,
     model: str = None,
-    prompt_template: str = None,
+    template_str: str = None,
+    template_context: dict = None,
     effort: str = "low",
     max_diff_length: int = 15000
 ) -> str:
@@ -847,34 +1027,92 @@ def query_llm_for_commit(
     if max_diff_length and len(diff_text) > max_diff_length:
         diff_text = diff_text[:max_diff_length] + "\n... [diff truncated for length]"
 
-    template = prompt_template or COMMIT_PROMPT_TEMPLATE
-    prompt = template.format(diff=diff_text)
+    context = dict(template_context or {})
+    context["diff"] = diff_text
+    context.setdefault("branch", "")
+    context.setdefault("jira_id", "")
+    context.setdefault("issue_id", context.get("jira_id", ""))
+    context.setdefault("files", "")
+    context.setdefault("model", model or "")
+    context.setdefault("scope", "")
+
+    template = template_str or DEFAULT_COMMIT_TEMPLATES["conventional"]
+    prompt = render_commit_template(template, context)
     return query_llm(prompt, backend=backend, model=model, effort=effort, timeout_sec=45, clean_markdown_fence=True)
 
 
-def run_commit(stage_all: bool = False, backend: str = None, model: str = None, dry_run: bool = False) -> None:
+def run_commit(
+    stage_all: bool = False,
+    backend: str = None,
+    model: str = None,
+    template: str = None,
+    jira_id: str = None,
+    scope: str = None,
+    dry_run: bool = False,
+    list_templates: bool = False
+) -> None:
     config = load_config()
     commit_cfg = config.get("commit", {})
+
+    configured_templates = {**DEFAULT_COMMIT_TEMPLATES, **commit_cfg.get("templates", {})}
+
+    if list_templates:
+        print(f"\n{C_BOLD}{C_CYAN}Available Commit Message Templates:{C_RESET}\n")
+        default_name = commit_cfg.get("default_template", "conventional")
+        for name in sorted(configured_templates.keys()):
+            is_def = " (default)" if name == default_name else ""
+            desc = name
+            if name == "conventional":
+                desc = "Standard Conventional Commits (<type>(<scope>): <summary>)"
+            elif name == "jira":
+                desc = "Jira-prefixed Conventional Commits ([<JIRA-ID>] <type>(<scope>): <summary>)"
+            elif name == "jira-scope":
+                desc = "Jira issue as scope (<type>(<JIRA-ID>): <summary>)"
+            elif name == "detailed":
+                desc = "Multi-line with summary, WHAT/WHY paragraph, bullets, and ticket"
+            print(f"  • {C_BOLD_WHITE}{name:<16}{C_RESET}{C_GREEN}{is_def:<10}{C_RESET} {C_DIM}{desc}{C_RESET}")
+        print(f"\n{C_DIM}Select via: aitools commit --template <name> (or configure default_template in config.json){C_RESET}\n")
+        return
 
     chosen_backend = backend or commit_cfg.get("default_backend") or config.get("default_commit_backend", "agy")
     chosen_model = model or commit_cfg.get("model")
     effort = commit_cfg.get("effort", "low")
     max_len = commit_cfg.get("max_diff_length", 15000)
-    prompt_tpl = commit_cfg.get("prompt_template", COMMIT_PROMPT_TEMPLATE)
     should_stage = stage_all or commit_cfg.get("default_stage_all", False)
+
+    # Resolve git branch and Jira ID
+    branch = get_git_branch()
+    resolved_jira = jira_id or commit_cfg.get("jira_id") or extract_jira_id(branch)
+    files = ", ".join(get_git_staged_files()[:15])
+
+    # Resolve template
+    template_str, template_name = resolve_commit_template(template, config)
+
+    context = {
+        "branch": branch,
+        "jira_id": resolved_jira,
+        "issue_id": resolved_jira,
+        "files": files,
+        "model": chosen_model or "",
+        "scope": scope or ""
+    }
 
     diff_text, ok = get_git_diff(stage_all=should_stage)
     if not ok or not diff_text.strip():
         print(f"{C_RED}✗ No changes to commit (working tree clean).{C_RESET}")
         return
 
-    print(f"\n{C_BOLD}{C_CYAN}==> Generating Conventional Commit with AI backend: {C_WHITE}{chosen_backend}{C_RESET}...")
+    model_display = f" (model: {C_WHITE}{chosen_model}{C_RESET})" if chosen_model else ""
+    jira_display = f" [Jira: {C_YELLOW}{resolved_jira}{C_RESET}]" if resolved_jira else ""
+    print(f"\n{C_BOLD}{C_CYAN}==> Generating Commit with AI backend: {C_WHITE}{chosen_backend}{C_RESET}{model_display} [template: {C_GREEN}{template_name}{C_RESET}]{jira_display}...")
+
     try:
         commit_msg = query_llm_for_commit(
             diff_text=diff_text,
             backend=chosen_backend,
             model=chosen_model,
-            prompt_template=prompt_tpl,
+            template_str=template_str,
+            template_context=context,
             effort=effort,
             max_diff_length=max_len
         )
@@ -931,7 +1169,8 @@ def run_commit(stage_all: bool = False, backend: str = None, model: str = None, 
                     diff_text=diff_text,
                     backend=chosen_backend,
                     model=chosen_model,
-                    prompt_template=prompt_tpl,
+                    template_str=template_str,
+                    template_context=context,
                     effort=effort,
                     max_diff_length=max_len
                 )
@@ -1282,7 +1521,11 @@ def main() -> None:
     p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI")
     p_commit.add_argument("-a", "--all", action="store_true", help="Stage all tracked modified files before diffing")
     p_commit.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi)")
-    p_commit.add_argument("-m", "--model", help="Model override")
+    p_commit.add_argument("-m", "--model", help="Model override (e.g. gemini-2.5-flash, claude-3-7-sonnet)")
+    p_commit.add_argument("-t", "--template", help="Commit prompt template name (conventional, jira, jira-scope, detailed) or custom template string")
+    p_commit.add_argument("-j", "--jira", help="Jira / Issue ticket ID override (e.g. PROJ-1234)")
+    p_commit.add_argument("-s", "--scope", help="Optional commit scope override")
+    p_commit.add_argument("--list-templates", action="store_true", help="List all available commit templates")
     p_commit.add_argument("-d", "--dry-run", action="store_true", help="Preview message without committing")
 
     # 5. Daemon
@@ -1318,7 +1561,16 @@ def main() -> None:
     elif args.subcommand == "wake":
         run_wake(force=args.force, target_filter=args.target)
     elif args.subcommand == "commit":
-        run_commit(stage_all=args.all, backend=args.backend, model=args.model, dry_run=args.dry_run)
+        run_commit(
+            stage_all=args.all,
+            backend=args.backend,
+            model=args.model,
+            template=args.template,
+            jira_id=args.jira,
+            scope=args.scope,
+            dry_run=args.dry_run,
+            list_templates=args.list_templates
+        )
     elif args.subcommand == "daemon":
         handle_daemon_cli(args)
     elif args.subcommand == "status":
