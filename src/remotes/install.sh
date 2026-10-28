@@ -1,56 +1,79 @@
-#!/bin/bash
-# Run: bash <(curl -fsSL "https://env.arturonavax.dev/install.sh")
-# Parameter to install requirements: requirements
-# Parameter to install fonts: fonts
-# Parameter to install terminal: terminal
-# Parameter to install editor: editor
-# Parameter to install AI tooling: ai
-# Parameter to install OS config: osconfig
-# Parameter to install all: all
-# Parameter to help: help
-[[ "$(command -v curl)" == "" ]] && echo "The curl command is needed to execute this installation." && exit 1
+#!/usr/bin/env bash
+# ==============================================================================
+# src/remotes/install.sh
+# Remote bootstrap entry point served from https://env.arturonavax.dev/install.sh
+# Run: bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") [options]
+# ==============================================================================
 
-if [[ -f ./src/remotes/usage_install.sh ]]; then
-	./src/remotes/usage_install.sh "$@" || exit 1
-elif [[ -f "$(dirname "$0")/usage_install.sh" ]]; then
-	"$(dirname "$0")/usage_install.sh" "$@" || exit 1
-else
-	bash <(curl -fsSL "https://env.arturonavax.dev/usage_install.sh") "$@" || exit 1
+set -euo pipefail
+
+export REMOTE_PRIMARY_URL="${REMOTE_PRIMARY_URL:-https://env.arturonavax.dev}"
+export REMOTE_FALLBACK_URL="${REMOTE_FALLBACK_URL:-https://environment.arturonavax.dev}"
+installation_folder="${installation_folder:-$HOME/arturonavax-env}"
+
+if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+	echo "[Installer Error]: 'curl' or 'wget' is required to execute remote bootstrap." >&2
+	exit 1
 fi
 
-for arg in "$@"; do
-	case "$arg" in
-	h | help) exit 0 ;;
+# Multi-Platform Git Bootstrapper
+if ! command -v git >/dev/null 2>&1; then
+	echo "[Remote Bootstrap]: Git is not installed. Bootstrapping Git..."
+
+	case "$(uname -s)" in
+	Linux)
+		if [[ -f /etc/os-release ]]; then
+			# shellcheck source=/dev/null
+			. /etc/os-release
+			id="${ID:-}"
+			id_like="${ID_LIKE:-}"
+
+			if [[ "$id_like" == *"debian"* || "$id_like" == *"ubuntu"* || "$id" == "debian" || "$id" == "ubuntu" ]]; then
+				sudo apt update -y && sudo apt install -y git
+			elif [[ "$id_like" == *"fedora"* || "$id_like" == *"rhel"* || "$id" == "fedora" || "$id" == "rhel" ]]; then
+				sudo dnf install -y git 2>/dev/null || sudo yum install -y git
+			elif [[ "$id_like" == *"arch"* || "$id" == "arch" || "$id" == "manjaro" || "$id" == "endeavouros" ]]; then
+				sudo pacman -Sy --noconfirm git
+			elif [[ "$id" == "alpine" ]]; then
+				sudo apk add --no-cache git
+			else
+				echo "[Remote Bootstrap Error]: Unsupported Linux distribution: $id" >&2
+				exit 1
+			fi
+		fi
+		;;
+	Darwin)
+		# On macOS, git comes with Command Line Tools
+		if [[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
+			echo "[Remote Bootstrap]: Installing macOS Command Line Tools..."
+			xcode-select --install 2>/dev/null || true
+			until [[ -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; do
+				sleep 5
+			done
+		fi
+		;;
+	*)
+		echo "[Remote Bootstrap Error]: Unsupported operating system: $(uname -s)" >&2
+		exit 1
+		;;
 	esac
-done
-
-[[ -z "$installation_folder" ]] && installation_folder="$HOME/arturonavax-env"
-
-echo "Installation folder: $installation_folder"
-echo
-
-if [[ "$(uname -s)" == "Linux" && "$(command -v git)" == "" ]]; then
-	source /etc/os-release
-
-	# install git
-	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		sudo apt install -y git
-
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-		sudo dnf install -y git
-
-	else
-		echo "The operating system is not compatible with this installation." && exit 1
-	fi
-
-elif [[ "$(uname -s)" == "Darwin" && ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
-	# install CommandLineTools (this contains GIT)
-	curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash || exit 1
-
-	[[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]] && echo "An error occurred with the CommandLineTools installation." && exit 1
 fi
 
-rm -rf "$installation_folder"
-git clone --depth 1 https://github.com/arturonavax/env.git "$installation_folder"
+# Clone or Update Repository
+if [[ -d "${installation_folder}/.git" ]]; then
+	echo "[Remote Bootstrap]: Existing repository found in ${installation_folder}. Updating..."
+	git -C "$installation_folder" pull --rebase origin main 2>/dev/null || true
+else
+	echo "[Remote Bootstrap]: Cloning repository into ${installation_folder}..."
+	rm -rf "$installation_folder"
+	git clone --depth 1 https://github.com/arturonavax/env.git "$installation_folder"
+fi
 
-cd "$installation_folder" && ./install.sh "$@"
+cd "$installation_folder"
+
+# Launch main installer
+if [[ "$#" -eq 0 ]] && [[ -t 0 ]]; then
+	exec ./install.sh --wizard
+else
+	exec ./install.sh "$@"
+fi

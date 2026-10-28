@@ -11,7 +11,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ### Repository Structure
 
 ```text
-├── install.sh              # Primary system installation entry point
+├── install.sh              # Primary system installation entry point (--wizard or CLI targets)
 ├── uninstall.sh            # Systematic uninstallation and cache purging entry point
 ├── files/                  # Canonical configuration files deployed to target systems
 │   ├── nvim/               # Neovim (LazyVim) modular configuration and exclusions
@@ -24,7 +24,19 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── zsh/                # Zsh config, plugins, tools, and color definitions
 │   ├── starship/           # Cross-shell Starship prompt configuration
 │   └── [cursor,vscode,...] # IDE configs, settings, and formatters
-├── src/                    # Subsystem installation scripts
+├── src/                    # Subsystem installation scripts & modular runtime
+│   ├── wizard.sh           # Absolute idempotent interactive installation wizard (8 stages)
+│   ├── lib/                # Core modular libraries (strict, colors, logging, platform, packages, backup, download, concurrency, smart_append)
+│   │   ├── strict.sh       # set -euo pipefail, root anchoring, callstack traceback traps, sudo keep-alive
+│   │   ├── colors.sh       # Cross-terminal ANSI color palette and legacy compatibility variables
+│   │   ├── logging.sh      # Structured logging (log_info, log_step, log_success, log_warn, log_error, log_fatal)
+│   │   ├── platform.sh     # Multi-platform OS, distribution, architecture, and hardware discovery (Linux, macOS, Windows, Android Termux)
+│   │   ├── packages.sh     # Universal package translation matrix (apt, dnf, pacman, brew, pkg, zypper) & pkg_* commands
+│   │   ├── backup.sh       # Portable configuration snapshot, rotation (50MB quota), and rollback engine
+│   │   ├── download.sh     # Resilient retry-capable downloader with checksums, extraction, and parallel execution
+│   │   ├── concurrency.sh  # Parallel background task pool with real-time status monitor and error capture
+│   │   ├── smart_append.sh # Non-destructive smart file preservation (smart-append-first) with marker blocks
+│   │   └── remote_env.sh   # Dual local/remote resolver for env.arturonavax.dev subdomains
 │   ├── install_terminal.sh # Ghostty, Herdr, zsh, fonts setup
 │   ├── install_editor.sh   # Neovim, Mason dependencies, LazyVim sync
 │   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, prompt configs
@@ -35,6 +47,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ├── utils/                  # Safe system lifecycle & synchronization utilities
 │   ├── sync_config.sh      # Propagate repo dotfiles into the active filesystem
 │   ├── backup_config.sh    # Snapshot active user configurations to ~/.arturonavax-env-backups/
+│   ├── restore_backup.sh   # Interactive or scripted configuration rollback from snapshots
 │   ├── copy_config.sh      # Ingest active user dotfiles back into the repo
 │   └── diff_snapshots.sh   # Review differences between local machine and repo
 ├── .atl/                   # Agent runtime state (skill registry index & cache)
@@ -44,18 +57,20 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 
 ### Lifecycle Entry Points
 
-- **`./install.sh [args]`**:
-  - Automatically triggers `./utils/backup_config.sh` before mutating files.
-  - Parameters: `requirements` (`r`), `fonts` (`f`), `terminal` (`t`), `editor` (`e`), `ai`, `osconfig` (`o`), `all` (`a`).
-  - Acquires sudo credentials upfront and runs a background keep-alive loop (`sleep 60; kill -0 "$$"`).
+- **`./install.sh [--wizard | args]`**:
+  - Automatically triggers `backup_create` before mutating files.
+  - Interactive mode: `./install.sh --wizard` (or `./src/wizard.sh`) runs an 8-stage guided setup with zero silent failures and stage recovery options.
+  - Parameters: `requirements` (`r`), `fonts` (`f`), `terminal` (`t`), `editor` (`e`), `ai`, `osconfig` (`o`), `all` (`a`), `--check`.
+  - Sudo privileges are acquired upfront with an active background keep-alive loop.
 - **`./uninstall.sh`**:
   - Two-phase teardown:
-    1. Uninstalls packages (apt, snap, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries.
+    1. Uninstalls packages (apt, dnf, pacman, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries.
     2. Purges configuration directories (`~/.config/nvim`, `~/.config/ghostty`, `~/.config/herdr`), caches (`~/.cache/nvim`), and local states (`~/.local/state/nvim`, `~/.local/share/nvim`).
 - **`./utils/sync_config.sh [target]`**:
   - Selectively applies configuration updates without a complete installation cycle. Targets: `terminal`, `editor`, `plugins`, `plugins-update`, `osconfig`, `vscode`, `cursor`, `devtools`, `all`.
-- **`./utils/backup_config.sh`**:
-  - Creates timestamped snapshots in `~/.arturonavax-env-backups/YYYY-MM-DD_HH-MM` before destructive operations (capped at 50MB rotation).
+- **`./utils/backup_config.sh` / `./utils/restore_backup.sh`**:
+  - `backup_config.sh`: Creates timestamped snapshots in `~/.arturonavax-env-backups/YYYY-MM-DD_HH-MM-SS` before destructive operations (capped at 50MB rotation using POSIX-portable commands).
+  - `restore_backup.sh`: Reverses modifications by restoring any snapshot interactively or via timestamp flag (`-latest`, `<timestamp>`).
 
 ---
 
@@ -234,6 +249,20 @@ All shell scripts in this repository must adhere to the following strict convent
      ```
    - Standardized `exit-error-message` functions output high-visibility error blocks to stderr and terminate cleanly.
 
+4. **Multi-Platform Translation & Android (Termux) Support**:
+   - Package manager operations MUST use `src/lib/packages.sh` (`pkg_install`, `pkg_update_cache`, `pkg_remove`).
+   - Supports Debian/Ubuntu (`apt`), Fedora/RHEL (`dnf`), Arch Linux (`pacman`), macOS (`brew`), openSUSE (`zypper`), and Android Termux (`pkg`).
+   - Termux runs in a single-user sandbox without `sudo`. Scripts MUST use `has_sudo_capability` from `src/lib/platform.sh` and never assume `sudo` is installed or required.
+
+5. **Smart Non-Destructive File Preservation (`smart-append-first`)**:
+   - User configuration files (`~/.zshrc`, `~/.bashrc`) MUST NEVER be blindly overwritten.
+   - Use `smart_append_block` (`src/lib/smart_append.sh`) to encapsulate repository environment loaders inside managed marker blocks (`# >>> arturonavax/env:<id> >>> ... # <<< arturonavax/env:<id> <<<`), leaving all user-defined aliases, functions, and custom variables 100% intact.
+   - Standalone configs (`rcmd.conf`, `keyd/default.conf`) MUST use `smart_preserve_copy` to ensure non-empty user configurations are preserved.
+
+6. **Parallel Concurrency Pool (`src/lib/concurrency.sh`)**:
+   - Independent network and compilation workloads (such as downloading multiple modern CLI tools or synchronizing Zsh plugins) SHOULD run concurrently via `run_parallel_task_pool`.
+   - Each background worker captures stdout/stderr into isolated logs, displaying real-time spinner statuses and outputting detailed error extracts only upon failure.
+
 ---
 
 ## 4. AI Tooling & Context Architecture: CodeGraph, Engram & RTK
@@ -367,19 +396,34 @@ To maximize token economy, speed, and accuracy, AI agents MUST follow these seve
 
 ## 6. Testing, Quality Assurance & Linters
 
-### Strict TDD Status: `false`
+### Test Harness Architecture
 
-There is no workspace-wide unit test runner (e.g. pytest or go test) for the repository as a whole. Do not attempt to run a nonexistent test suite.
+The repository incorporates an enterprise-grade automated test runner and quality gate (`tests/run_tests.sh` and `Makefile`):
+
+- **Master Test Runner**: `./tests/run_tests.sh` (or `make test`).
+- **Syntax Verification**: `bash -n` across all shell scripts in the repository (`make lint`).
+- **Static Analysis**: `shellcheck` with zero allowed warnings across core libraries and entry points (`make lint`).
+- **Unit Test Suite (`tests/unit/`)**: Pure-Bash isolated assertion tests via `tests/test_helper.sh`:
+  - `test_platform.sh`: OS, architecture, distribution, hardware metrics, and Termux/Windows emulation.
+  - `test_packages.sh`: Translation matrix across Debian, Fedora, Arch, macOS, openSUSE, and Termux.
+  - `test_smart_append.sh`: Non-destructive marker block creation, updates, and preservation.
+  - `test_backup.sh`: Snapshot generation, manifest verification, 50MB quota rotation, and rollback.
+  - `test_concurrency.sh`: CPU core detection, parallel task pool execution, and error isolation.
+  - `test_strict.sh`: Automated temporary file cleanup and termination hooks.
+- **Integration Smoke Tests (`tests/integration/`)**:
+  - `test_cli_smoke.sh`: CLI flags (`./install.sh --check`, `--help`, `./utils/restore_backup.sh`, `./utils/sync_config.sh`).
+- **Optional Bats Specifications (`tests/bats/`)**: Executed automatically when `bats` is installed in PATH.
 
 ### Verification Tools
 
 | Domain            | Tool            | Configuration                       | Check Command                                               |
 | ----------------- | --------------- | ----------------------------------- | ----------------------------------------------------------- |
-| **Shell Scripts** | `shellcheck`    | `.shellcheckrc`                     | `shellcheck install.sh uninstall.sh utils/*.sh src/**/*.sh` |
+| **Full Suite**    | `test runner`   | `tests/run_tests.sh`                | `make test` or `./tests/run_tests.sh`                       |
+| **Shell Scripts** | `shellcheck`    | `.shellcheckrc`                     | `make lint` or `shellcheck src/lib/*.sh tests/**/*.sh`      |
 | **Lua (Neovim)**  | `stylua`        | `files/nvim/stylua.toml`            | `stylua --check files/nvim/`                                |
 | **Go Tools**      | `golangci-lint` | `files/golangci-lint/.golangci.yml` | `golangci-lint run`                                         |
 | **JavaScript**    | `eslint`        | `files/eslint/.eslintrc.json`       | `npx eslint files/gnome/extensions/`                        |
 | **Formatting**    | `prettier`      | `files/prettier/.prettierrc.json`   | `prettier --check "**/*.{json,md,yaml}"`                    |
 | **Markdown**      | `markdownlint`  | `.markdownlint.json`                | `markdownlint "**/*.md"`                                    |
 
-Before committing or completing any change, run the relevant domain linter to verify zero regressions.
+Before committing or completing any change, execute `make test` to ensure zero regressions across syntax, linting, unit tests, and integration smoke tests.

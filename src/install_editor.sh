@@ -16,6 +16,11 @@ done
 
 ./src/requirements/editor.sh || exit 1
 
+source ./src/lib/strict.sh
+source ./src/lib/colors.sh
+source ./src/lib/logging.sh
+source ./src/lib/platform.sh
+source ./src/lib/packages.sh
 source ./src/remotes/_vars_colors.sh
 source ./src/remotes/_versions.sh
 
@@ -69,32 +74,9 @@ function install_editor() {
 
 	echo -e "${fgcolor_white_bold}[Editor Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		source /etc/os-release
-
-		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-			sudo dnf update -y
-			sudo dnf install -y epel-release
-		fi
-
-		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			sudo apt update -y
-			sudo apt install -y apt-transport-https curl git xclip xsel ripgrep clang-format vim vim-nox fd-find pipx python3-pip python3-dev
-
-		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			sudo dnf update -y
-			sudo dnf install -y curl git xclip xsel ripgrep pipx python3-pip
-
-		else
-			echo "The operating system is not compatible with this installation." && exit 1
-		fi
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew install curl git xclip xsel ripgrep vim lua fd readline
-
-	else
-		echo "The operating system is not compatible with this installation." && exit 1
-	fi
+	# Update package indexes and install editor prerequisites across all supported distributions
+	pkg_update_cache
+	pkg_install curl git xclip xsel ripgrep clang-format vim python3-pip fzf
 
 	if [[ "$(uname -s)" == "Linux" && "$(command -v fdfind)" != "" ]]; then
 		sudo rm -f /usr/bin/fd || :

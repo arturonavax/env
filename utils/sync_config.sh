@@ -17,7 +17,13 @@ while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	fi
 done
 
-source ./src/remotes/_vars_colors.sh
+if [[ -f ./src/lib/colors.sh ]]; then
+	source ./src/lib/colors.sh
+	source ./src/lib/logging.sh 2>/dev/null || true
+	source ./src/lib/smart_append.sh 2>/dev/null || true
+else
+	source ./src/remotes/_vars_colors.sh
+fi
 
 editor="nvim"
 
@@ -94,10 +100,16 @@ if [[ "$sync_terminal" == 1 ]]; then
 
 	cp ./files/starship/starship.toml ~/.config/.
 
-	cp ./files/zsh/.zshrc ~/.
 	cp ./files/zsh/.lscolors.sh ~/.
 	cp ./files/zsh/.base.zsh ~/.
 	cp ./files/zsh/.tools.sh ~/.
+
+	# Smart Non-Destructive sync for ~/.zshrc (preserves existing user aliases and history)
+	if [[ ! -f ~/.zshrc ]] || [[ ! -s ~/.zshrc ]]; then
+		cp ./files/zsh/.zshrc ~/.
+	elif command -v smart_append_block >/dev/null 2>&1; then
+		smart_append_block "$HOME/.zshrc" "env-loader" "$(cat ./files/zsh/.zshrc)"
+	fi
 
 	# Ensure fzf-tab is installed and up to date
 	fzf_tab_dir="$HOME/.zsh/fzf-tab"

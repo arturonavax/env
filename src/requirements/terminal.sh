@@ -1,33 +1,31 @@
-#!/bin/bash
-# Run: ./src/requirements/terminal.sh
+#!/usr/bin/env bash
+# ==============================================================================
+# src/requirements/terminal.sh
+# Verifies prerequisites for terminal stack and multiplexer installation.
+# Part of arturonavax/env development environment.
+# ==============================================================================
+
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	if [[ "$PWD" == "/" ]]; then
-		echo "Repository root not found"
-
+		echo "Repository root not found" >&2
 		exit 1
 	fi
-
 	if ! cd ..; then
-		echo "An error occurred while doing 'cd ..'"
-
+		echo "An error occurred while doing 'cd ..'" >&2
 		exit 1
 	fi
 done
 
-source ./src/remotes/_required_commands.sh
+source ./src/lib/strict.sh
+source ./src/lib/platform.sh
+source ./src/lib/logging.sh
 
-if [[ "$(uname -s)" == "Linux" ]]; then
-	source /etc/os-release
-
-	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		required-sudo-commands apt
-
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-		required-sudo-commands dnf
-	fi
-
-elif [[ "$(uname -s)" == "Darwin" ]]; then
-	required-commands brew
+pkg_mgr="$(detect_pkg_mgr)"
+if [[ "$pkg_mgr" == "unknown" ]]; then
+	log_fatal "No supported package manager found (apt, dnf, pacman, brew, apk)."
 fi
 
-required-commands git
+# Verify Git is available
+if ! command -v git >/dev/null 2>&1; then
+	log_fatal "git is required but not installed."
+fi

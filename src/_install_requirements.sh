@@ -1,203 +1,164 @@
-#!/bin/bash
-# Installs the tools and languages needed to run the installation script.
-# Automatically add to the PATH of the current session everything to be able to run the installation script in the same session.
-# This script must be executed with the "source" command.
-#
-# Run: source ./src/_install_requirements.sh
+#!/usr/bin/env bash
+# ==============================================================================
+# src/_install_requirements.sh
+# Multi-platform development dependencies, compilers, language runtimes (Rust,
+# Node/fnm, pnpm, Go, Python) and base tools installer.
+# Part of arturonavax/env development environment.
+# ==============================================================================
+
+# Anchoring
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	if [[ "$PWD" == "/" ]]; then
-		echo "Repository root not found"
-
+		echo "[Requirements Error]: Repository root not found." >&2
 		exit 1
 	fi
-
 	if ! cd ..; then
-		echo "An error occurred while doing 'cd ..'"
-
+		echo "[Requirements Error]: Failed to change directory." >&2
 		exit 1
 	fi
 done
 
-repo_remote_files="https://env.arturonavax.dev"
-
-source ./src/remotes/_basics.sh
-source ./src/remotes/_vars_colors.sh
+source ./src/lib/strict.sh
+source ./src/lib/colors.sh
+source ./src/lib/logging.sh
+source ./src/lib/platform.sh
+source ./src/lib/packages.sh
+source ./src/lib/download.sh
+source ./src/lib/remote_env.sh
 source ./src/remotes/_versions.sh
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: Starting _install_requirements.sh script...${fgcolor_reset}"
+log_box "Requirements Installer" \
+	"Platform: $(detect_os) ($(detect_distro) - $(detect_arch))" \
+	"Installing build toolchains, system headers, and language runtimes."
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing basic dependencies...${fgcolor_reset}"
-
-# dependencies
-if [[ "$(uname -s)" == "Linux" ]]; then
-	source /etc/os-release
-
-	if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-		sudo dnf update -y
-		sudo dnf install -y epel-release
+# 1. macOS Command Line Tools & Homebrew bootstrap
+if [[ "$(detect_os)" == "darwin" ]]; then
+	if [[ ! -e "/Library/Developer/CommandLineTools/usr/bin/git" ]]; then
+		log_step "Installing macOS Command Line Tools..."
+		bash ./src/remotes/macos_install_clt.sh
 	fi
 
-	if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-		sudo apt update -y
-
-		sudo apt install -y build-essential libssl-dev zlib1g-dev \
-			libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
-			libncursesw5-dev ncurses-term xz-utils tk tk-dev libffi-dev \
-			liblzma-dev libxml2-dev libxslt1-dev libxcb-xinerama0 libxcb-cursor0
-
-		# tools
-		sudo apt install -y curl wget git unzip zstd make gcc fontconfig wmctrl xdotool x11-utils keyd
-
-	elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-		sudo dnf update -y
-
-		sudo dnf group install -y "Development Tools"
-		sudo dnf install -y zlib zlib-devel bzip2-devel openssl-devel sqlite-devel readline readline-devel \
-			llvm xz ncurses ncurses-devel ncurses-term libffi tk tk-devel sqlite qt5-qtbase-devel libxml2-devel
-
-		sudo dnf install -y curl wget git unzip zstd make gcc fontconfig wmctrl xdotool keyd
-
-	else
-		echo "The operating system is not compatible with this installation." && exit 1
+	# Rosetta 2 on Apple Silicon
+	if [[ "$(detect_arch)" == "arm64" ]]; then
+		softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
 	fi
 
-elif [[ "$(uname -s)" == "Darwin" ]]; then
-	# CommandLineTools
-	./src/remotes/macos_install_clt.sh
-
-	# rosetta2
-	softwareupdate --install-rosetta --agree-to-license || :
-
-	# Homebrew
-	if [[ "$(command -v brew)" == "" ]]; then
+	# Homebrew bootstrap if missing
+	if ! command -v brew >/dev/null 2>&1; then
+		log_step "Installing Homebrew..."
 		/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+		brewbin="/opt/homebrew/bin/brew"
+		[[ ! -f "$brewbin" ]] && brewbin="/usr/local/bin/brew"
+		[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
 	fi
-
-	brewbin="/usr/local/bin/brew"
-	[[ ! -f "$brewbin" ]] && brewbin="/opt/homebrew/bin/brew" # For Apple Silicon
-	[[ -f "$brewbin" ]] && eval "$("$brewbin" shellenv)"
-
-	if [[ "$(command -v brew)" == "" ]]; then
-		echo "!!! Homebrew installation error occurred." && exit 1
-	fi
-
-	# tools
-	brew install curl wget git make gcc unzip fontconfig ncurses openssl@3 readline sqlite xz zlib
-
-else
-	echo "The operating system is not compatible with this installation." && exit 1
 fi
 
-echo
+# 2. Update Package Index & Install Development Packages
+pkg_update_cache
 
-# ---
+log_step "Installing development toolchains and library headers..."
+pkg_install \
+	build-essential \
+	ssl-dev \
+	zlib-dev \
+	bz2-dev \
+	readline-dev \
+	sqlite-dev \
+	ffi-dev \
+	ncurses-dev \
+	ncurses-term \
+	xz-dev \
+	xml2-dev \
+	xslt-dev \
+	tk-dev \
+	curl \
+	wget \
+	git \
+	unzip \
+	zstd \
+	make \
+	gcc \
+	fontconfig \
+	pkg-config \
+	wmctrl \
+	xdotool \
+	x11-utils \
+	keyd
 
-if [[ "$(command -v cargo)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing rust...${fgcolor_reset}"
-
-	# download rust
+# 3. Rust Toolchain (rustup & cargo)
+if ! command -v cargo >/dev/null 2>&1; then
+	log_step "Installing Rust toolchain (rustup)..."
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-
-	echo
+	export PATH="$HOME/.cargo/bin:$PATH"
+	log_success "Rust toolchain installed."
 fi
 
-# ---
-
-if [[ "$(command -v fnm)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing fnm (node version manager)...${fgcolor_reset}"
-
-	## download fnm
+# 4. Fast Node Manager (fnm)
+if ! command -v fnm >/dev/null 2>&1; then
+	log_step "Installing Fast Node Manager (fnm)..."
 	curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-
-	echo
+	export PATH="$HOME/.local/share/fnm:$PATH"
+	if command -v fnm >/dev/null 2>&1; then
+		eval "$(fnm env --use-on-cd 2>/dev/null || true)"
+	fi
+	log_success "fnm installed."
 fi
 
-# ---
-
-if [[ "$(command -v pnpm)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing pnpm (node package module)...${fgcolor_reset}"
-
-	## download pnpm
-	tmp_shell="$SHELL"
-	export SHELL="bash" # To prevent the following installer, write to the ~/.zshrc file
+# 5. pnpm (Fast, disk space efficient package manager)
+if ! command -v pnpm >/dev/null 2>&1; then
+	log_step "Installing pnpm (${PNPM_VERSION})..."
+	tmp_shell="${SHELL:-/bin/bash}"
+	export SHELL="bash"
 	curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${PNPM_VERSION}" sh -
 	export SHELL="$tmp_shell"
-
-	echo
+	export PNPM_HOME="$HOME/.local/share/pnpm"
+	export PATH="$PNPM_HOME:$PATH"
+	log_success "pnpm installed."
 fi
 
-# ---
-
-if [[ "$(command -v go)" == "" ]]; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing golang...${fgcolor_reset}"
-
-	## download go
+# 6. Go (Golang)
+if ! command -v go >/dev/null 2>&1; then
+	log_step "Installing Go language runtime..."
 	if [[ -f ./src/remotes/install_golang.sh ]]; then
 		bash ./src/remotes/install_golang.sh -i
 	else
-		curl -fsSL "$repo_remote_files/install_golang.sh" | bash -s -- -i
+		curl -fsSL "${REMOTE_PRIMARY_URL}/install_golang.sh" | bash -s -- -i
 	fi
-
-	echo
+	export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+	log_success "Go language runtime installed."
 fi
 
-# ---
+# 7. Python (pyenv / system python)
+log_step "Configuring Python environment..."
+bash ./src/remotes/install_python.sh -i
 
-# install python
-./src/remotes/install_python.sh -i
-
-# ---
-
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Loading installations (source command)...${fgcolor_reset}"
-
-function rehash() {
-	hash -r "$@"
-}
-
-# loads
-source ./files/zsh/.tools.sh || :
-
-echo
-
-# ---
-
-# Install nodejs if the current nodejs is not from fnm
-if ! command -v node | grep -q "fnm"; then
-	echo -e "${fgcolor_white_bold}[Requirements Installer]: - Installing nodejs...${fgcolor_reset}"
-
-	# install node
-	fnm install --latest
-
-	node_latest_label="$(fnm list | sort --version-sort | awk '{print $2}' | tail -n 1)"
-
-	fnm use "$node_latest_label"
-	fnm default "$node_latest_label"
-
-	echo
+# 8. Load Development Tools Paths
+if [[ -f ./files/zsh/.tools.sh ]]; then
+	# shellcheck source=/dev/null
+	source ./files/zsh/.tools.sh || true
 fi
 
-# Decouple and disable corepack
-if command -v corepack &>/dev/null; then
-	corepack disable 2>/dev/null || :
+# 9. Node.js via fnm
+if command -v fnm >/dev/null 2>&1; then
+	if ! command -v node >/dev/null 2>&1 || ! command -v node | grep -q "fnm"; then
+		log_step "Installing latest Node.js via fnm..."
+		fnm install --latest
+		latest_node="$(fnm list 2>/dev/null | sort --version-sort | awk '{print $2}' | tail -n 1)"
+		if [[ -n "$latest_node" ]]; then
+			fnm use "$latest_node"
+			fnm default "$latest_node"
+			log_success "Node.js ${latest_node} configured as default."
+		fi
+	fi
 fi
 
-# ---
+# Decouple and disable Corepack to prevent npm/pnpm interference
+if command -v corepack >/dev/null 2>&1; then
+	corepack disable 2>/dev/null || true
+fi
 
-case "$SHELL" in
-*zsh) shell_file=".zshrc" ;;
-*tcsh) shell_file=".tcshrc" ;;
-*ksh) shell_file=".kshrc" ;;
-*csh) shell_file=".cshrc" ;;
-*) shell_file=".bashrc" ;;
-esac
+# 10. Synchronize ~/.tools.sh into user home
+cp -f ./files/zsh/.tools.sh "$HOME/.tools.sh"
+bash ./src/remotes/add_lines.sh tools
 
-echo -e "${fgcolor_white_bold}[Requirements Installer]: - Adding lines (~/$shell_file)...${fgcolor_reset}"
-
-cp ./files/zsh/.tools.sh ~/.
-
-touch ~/"$shell_file"
-
-# add 'source ~/.tools.sh' command to the end of the file
-./src/remotes/add_lines.sh tools
-
-echo -e "${fgcolor_white_bold}[Requirements Installer]: ${fgcolor_green_bold}✔️ Requirements successfully installed!${fgcolor_reset}"
+log_success "All development requirements and languages verified successfully!"

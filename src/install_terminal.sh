@@ -16,6 +16,11 @@ done
 
 ./src/requirements/terminal.sh || exit 1
 
+source ./src/lib/strict.sh
+source ./src/lib/colors.sh
+source ./src/lib/logging.sh
+source ./src/lib/platform.sh
+source ./src/lib/packages.sh
 source ./src/remotes/_vars_colors.sh
 source ./src/remotes/_versions.sh
 
@@ -66,144 +71,16 @@ function install_terminal() {
 
 	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing tools and dependencies...${fgcolor_reset}"
 
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		source /etc/os-release
+	# Update package indexes and install universal base tools
+	pkg_update_cache
 
-		if [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* ]]; then
-			sudo dnf update -y
-			sudo dnf install -y epel-release
-		fi
-
-		if [[ "$ID_LIKE" == *"debian"* || "$ID_LIKE" == *"ubuntu"* ]]; then
-			sudo apt update -y
-
-			# en_US.UTF-8
-			sudo apt install -y language-pack-en
-			sudo locale-gen en_US.UTF-8
-
-			# GNU/Linux only dependencies
-			## CLI/TUI dependencies
-			sudo apt install -y libncurses5-dev libncursesw5-dev libncurses-dev ncurses-term
-
-			## Async dependencies
-			sudo apt install -y libevent-dev
-
-			## Fonts dependencies
-			sudo apt install -y pkg-config fontconfig
-
-			## Ghostty build dependencies (Debian and Ubuntu)
-			sudo apt install -y libgtk-4-dev libadwaita-1-dev gettext libxml2-utils patchelf xz-utils
-			sudo apt install -y libgtk4-layer-shell-dev 2>/dev/null || :
-			sudo apt install -y gcc-multilib 2>/dev/null || :
-
-			# GNU/Linux base tools
-			sudo apt install -y ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
-				automake cmake python3 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
-				jq htop wdiff tcpdump iftop rsync openssl openvpn gdb nasm binutils coreutils diffutils findutils util-linux
-
-			# GNU tools for GNU/Linux only
-			sudo apt install -y net-tools command-not-found strace
-
-			# GNU tools with different names between APT and Homebrew
-			sudo apt install -y netcat-traditional ssh
-
-			# Tools
-			sudo apt install -y clang-format rar mtr exiftool git-flow tree eza bat ripgrep xclip xsel tor \
-				shellcheck nmap arp-scan aircrack-ng sqlmap direnv git-delta tealdeer 2>/dev/null || :
-
-			sudo apt install -y wireshark tshark
-
-			# Tools with different names between APT and Homebrew
-			sudo apt install -y tidy protobuf-compiler john fd-find
-
-			sudo apt install -y clang
-
-		elif [[ "$ID_LIKE" == *"rhel"* || "$ID_LIKE" == *"centos"* || "$ID_LIKE" == *"fedora"* || "$ID" == *"fedora"* ]]; then
-			sudo dnf update -y
-
-			sudo dnf install -y ncurses ncurses-term ncurses-devel
-
-			sudo dnf install -y libevent
-
-			sudo dnf install -y fontconfig
-
-			## Ghostty build dependencies (Fedora / RHEL)
-			sudo dnf install -y gtk4-devel libadwaita-devel gettext pkgconf patchelf xz
-			sudo dnf install -y gtk4-layer-shell-devel 2>/dev/null || :
-			sudo dnf group install -y "Development Tools"
-
-			sudo dnf install -y ca-certificates bash zsh vim-enhanced nano less grep screen ed zip unzip gzip gcc make \
-				autoconf automake cmake python3 git mercurial curl wget m4 byacc bison flex llvm jq htop wdiff \
-				tcpdump iftop rsync openssl openvpn gdb binutils coreutils diffutils findutils util-linux
-
-			sudo dnf install -y net-tools strace
-
-			sudo dnf install -y netcat openssh
-
-			sudo dnf install -y mtr tree eza bat ripgrep xclip xsel tor \
-				shellcheck nmap arp-scan
-
-			sudo dnf install -y wireshark # includes tshark
-
-			sudo dnf install -y tidy protobuf
-
-			sudo dnf install -y clang
-
-			if [[ "$ID" == *"fedora"* ]]; then
-				sudo dnf install -y nasm swig john protobuf-compiler aircrack-ng util-linux-user
-			fi
-
-		else
-			echo "The operating system is not compatible with this installation." && exit 1
-		fi
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew tap --force homebrew/cask
-		brew update
-
-		# MacOS only dependencies
-		## CLI/TUI depedencies
-		brew install ncurses
-
-		## Async dependencies
-		brew install libevent
-
-		## Fonts dependencies
-		brew install freetype fontconfig
-
-		## Ghostty build dependencies (macOS)
-		brew install gettext
-
-		# GNU/Linux base tools
-		brew install ca-certificates gnupg bash zsh vim nano less grep screen ed watch zip unzip gzip gcc make autoconf \
-			automake cmake python@3.12 git mercurial curl wget m4 byacc swig bison flex ffmpeg pkg-config llvm \
-			jq htop wdiff tcpdump iftop rsync openssl@3 openvpn nasm binutils coreutils diffutils findutils util-linux
-		# jq htop wdiff tcpdump iftop rsync openssl@3 openvpn gdb nasm binutils coreutils diffutils findutils util-linux
-
-		# GNU tools for MacOS only
-		brew install gnu-indent gnu-sed gnu-tar gnu-which gnutls gnu-getopt gawk gpatch lsusb
-
-		# GNU tools with different names between APT and Homebrew
-		brew install netcat openssh
-
-		# Tools
-		brew install clang-format rar mtr exiftool git-flow tree eza bat ripgrep xclip xsel tor \
-			shellcheck nmap arp-scan aircrack-ng sqlmap direnv difftastic git-delta tealdeer xo/xo/usql atuin
-
-		sudo ln -s /opt/homebrew/bin/zsh /usr/local/bin/zsh || :
-
-		brew install --cask wireshark # includes tshark
-
-		xattr -d com.apple.quarantine /Applications/Wireshark.app || :
-
-		# Tools with different names between APT and Homebrew
-		brew install tidy-html5 protobuf john-jumbo fd
-
-		# clang is installed with xcode-select --install
-
-	else
-		echo "The operating system is not compatible with this installation." && exit 1
-	fi
+	# Install essential TUI, Async, Font, Ghostty build, and terminal tools
+	pkg_install \
+		ca-certificates gnupg bash zsh vim nano less grep screen watch zip unzip gzip gcc make autoconf \
+		automake cmake python3 git curl wget pkg-config llvm jq htop rsync \
+		fontconfig ncurses-dev ncurses-term libevent-dev \
+		gtk4-dev adwaita-dev gettext patchelf xz-dev \
+		tree bat ripgrep xclip xsel direnv shellcheck nmap fzf
 
 	# install zoxide
 	curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
@@ -789,25 +666,32 @@ function install_terminal() {
 
 	# ---
 
-	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins...${fgcolor_reset}"
+	echo -e "${fgcolor_white_bold}[Terminal Installer]: - Installing Zsh Plugins (in parallel)...${fgcolor_reset}"
 	mkdir -p "$HOME/.zsh"
-	for plugin_spec in \
-		"https://github.com/Aloxaf/fzf-tab $HOME/.zsh/fzf-tab" \
-		"https://github.com/zsh-users/zsh-autosuggestions $HOME/.zsh/zsh-autosuggestions" \
-		"https://github.com/zdharma-continuum/fast-syntax-highlighting $HOME/.zsh/fast-syntax-highlighting" \
-		"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions"; do
-		plugin_url="${plugin_spec% *}"
-		plugin_dest="${plugin_spec#* }"
-		if [[ -d "$plugin_dest/.git" ]]; then
-			if ! git -C "$plugin_dest" pull --rebase --quiet 2>/dev/null; then
-				git -C "$plugin_dest" remote prune origin 2>/dev/null || :
-				git -C "$plugin_dest" pull --rebase --quiet 2>/dev/null || :
+	if [[ -f ./src/lib/concurrency.sh ]]; then
+		# shellcheck source=/dev/null
+		source ./src/lib/concurrency.sh
+		run_parallel_task_pool "Zsh Plugins Sync" \
+			"fzf-tab:::if [[ -d '$HOME/.zsh/fzf-tab/.git' ]]; then git -C '$HOME/.zsh/fzf-tab' pull --rebase --quiet 2>/dev/null || true; else rm -rf '$HOME/.zsh/fzf-tab'; git clone --quiet https://github.com/Aloxaf/fzf-tab '$HOME/.zsh/fzf-tab' || true; fi" \
+			"zsh-autosuggestions:::if [[ -d '$HOME/.zsh/zsh-autosuggestions/.git' ]]; then git -C '$HOME/.zsh/zsh-autosuggestions' pull --rebase --quiet 2>/dev/null || true; else rm -rf '$HOME/.zsh/zsh-autosuggestions'; git clone --quiet https://github.com/zsh-users/zsh-autosuggestions '$HOME/.zsh/zsh-autosuggestions' || true; fi" \
+			"fast-syntax-highlighting:::if [[ -d '$HOME/.zsh/fast-syntax-highlighting/.git' ]]; then git -C '$HOME/.zsh/fast-syntax-highlighting' pull --rebase --quiet 2>/dev/null || true; else rm -rf '$HOME/.zsh/fast-syntax-highlighting'; git clone --quiet https://github.com/zdharma-continuum/fast-syntax-highlighting '$HOME/.zsh/fast-syntax-highlighting' || true; fi" \
+			"zsh-completions:::if [[ -d '$HOME/.zsh/zsh-completions/.git' ]]; then git -C '$HOME/.zsh/zsh-completions' pull --rebase --quiet 2>/dev/null || true; else rm -rf '$HOME/.zsh/zsh-completions'; git clone --quiet https://github.com/zsh-users/zsh-completions.git '$HOME/.zsh/zsh-completions' || true; fi"
+	else
+		for plugin_spec in \
+			"https://github.com/Aloxaf/fzf-tab $HOME/.zsh/fzf-tab" \
+			"https://github.com/zsh-users/zsh-autosuggestions $HOME/.zsh/zsh-autosuggestions" \
+			"https://github.com/zdharma-continuum/fast-syntax-highlighting $HOME/.zsh/fast-syntax-highlighting" \
+			"https://github.com/zsh-users/zsh-completions.git $HOME/.zsh/zsh-completions"; do
+			plugin_url="${plugin_spec% *}"
+			plugin_dest="${plugin_spec#* }"
+			if [[ -d "$plugin_dest/.git" ]]; then
+				git -C "$plugin_dest" pull --rebase --quiet 2>/dev/null || true
+			else
+				rm -rf "$plugin_dest"
+				git clone --quiet "$plugin_url" "$plugin_dest" || true
 			fi
-		else
-			rm -rf "$plugin_dest"
-			git clone --quiet "$plugin_url" "$plugin_dest" || :
-		fi
-	done
+		done
+	fi
 	rm -f ~/.zcompdump*
 	if [[ "$(command -v compinit)" != "" ]]; then
 		compinit -d ~/.zcompdump || :

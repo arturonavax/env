@@ -17,42 +17,103 @@ _**[:scroll: Tutorials here :scroll:](./docs/README.md)**_
 
 ## Installation :sparkles:
 
+### 1. Interactive Setup Wizard (Recommended)
+
+Run the guided, 8-stage setup wizard directly from the remote subdomain:
+
 ```sh
-bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") help
+bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") --wizard
+```
+
+Or clone and run locally:
+
+```sh
+./install.sh --wizard
+```
+
+The wizard runs pre-flight platform diagnostics, creates an automatic restorable snapshot in `~/.arturonavax-env-backups/`, lets you select individual components, and enforces strict zero-silent-failure boundaries with interactive retry and rollback options.
+
+### 2. Automated Non-Interactive Installation
+
+```sh
+# Install all components
+./install.sh all
+
+# Or install specific subsystems
+./install.sh terminal editor ai
 ```
 
 List of installation parameters:
 
+- `wizard` / `-w`: Launch interactive step-by-step installation wizard.
 - `requirements` / `r`: Install the necessary tools, languages and dependencies.
-
-  Install basic dependencies (depending on the operating system), and the
+  Installs basic dependencies (via `apt`, `dnf`, `pacman`, or `brew`), and the
   following: `pyenv`, `python3`, `pipx`, `cargo`, `rustc`, `fnm`, `node`,
-  `npm`, `pnpm` and `go`
-
+  `npm`, `pnpm` and `go`.
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, Herdr and terminal tools.
 - `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
 - `ai`: Install AI tooling (CLI assistants, MCP environment, harnesses and prompt files).
-- `osconfig` / `o`: Configure the operationg system with personal preferences.
+- `osconfig` / `o`: Configure the operating system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
+- `--check`: Run platform discovery and hardware diagnostics without modifying files.
 
-### Aggressive new installation
+### Aggressive New Installation & Rollback
 
-Uninstall the main programs and delete the configuration and cache folders
+Uninstall main programs, delete configs, and reinstall cleanly:
 
 ```sh
 ./uninstall.sh && ./install.sh all
 ```
 
-## Requirements
+To rollback configuration changes at any time:
 
-The installer of this environment is prepared for:
+```sh
+# List available snapshots
+./utils/restore_backup.sh -l
 
-- Debian/Ubuntu based systems using `apt` and `snap`.
+# Restore the most recent snapshot
+./utils/restore_backup.sh -latest
+```
 
-- Fedora/CentOS/RHEL based systems using `dnf`.
+### Testing & Quality Assurance
 
-- MacOS Systems.
+The environment includes a comprehensive automated test harness with static analysis, syntax verification, and multi-platform unit tests:
+
+```sh
+# Run the complete test suite (syntax, shellcheck, unit, integration)
+make test
+# Or directly: ./tests/run_tests.sh
+
+# Run specific test suites
+make lint              # Syntax check (bash -n) and ShellCheck static analysis
+make test-unit         # Multi-platform unit tests
+make test-integration  # Integration smoke test suite
+```
+
+## Supported Platforms & Requirements
+
+The installer of this environment features a universal package abstraction layer supporting:
+
+- **Debian / Ubuntu / Pop!_OS / Linux Mint** (`apt`)
+- **Fedora / RHEL / CentOS / Rocky Linux / AlmaLinux** (`dnf`)
+- **Arch Linux / EndeavourOS / Manjaro / Garuda** (`pacman`)
+- **openSUSE / SLES** (`zypper`)
+- **Alpine Linux** (`apk`)
+- **macOS** (Apple Silicon arm64 & Intel x86_64) (`brew` + Command Line Tools)
+- **Android (Termux)** (`pkg`, single-user sandbox without root/sudo)
+- **Windows** (WSL 1/2, MSYS2, Git Bash)
+
+### High-Performance Capabilities
+
+1. **Parallel Concurrency Pool**:
+   Downloads modern single-binary CLI tools (`difftastic`, `delta`, `tealdeer`, `usql`, `fx`), clones Zsh plugins, and runs health probes in parallel using CPU-core-bounded background worker pools.
+
+2. **Smart Non-Destructive Preservation (`smart-append-first`)**:
+   Existing shell configurations (`~/.zshrc`, `~/.bashrc`) and user files (`rcmd.conf`) are never destroyed. Environment loaders are encapsulated inside `# >>> arturonavax/env >>>` marker blocks, leaving all your custom aliases, functions, and history 100% intact.
+
+3. **Portable Backup & Rollback Engine**:
+   POSIX-compliant snapshots in `~/.arturonavax-env-backups/` capped at 50MB with instant rollback via `./utils/restore_backup.sh`.
 
 If `pnpm` is installed, it will be used instead of `npm`.
 

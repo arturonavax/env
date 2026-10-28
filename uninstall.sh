@@ -1,128 +1,115 @@
-#!/bin/bash
-# Run: ./uninstall.sh
+#!/usr/bin/env bash
+# ==============================================================================
+# uninstall.sh
+# Multi-platform systematic uninstallation and cache purging entry point.
+# Removes binaries, services, desktop entries, configurations, and caches cleanly.
+# Part of arturonavax/env development environment.
+# ==============================================================================
+
 while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	if [[ "$PWD" == "/" ]]; then
-		echo "Repository root not found"
-
+		echo "[Uninstaller Error]: Repository root not found." >&2
 		exit 1
 	fi
-
 	if ! cd ..; then
-		echo "An error occurred while doing 'cd ..'"
-
+		echo "[Uninstaller Error]: Failed to change directory." >&2
 		exit 1
 	fi
 done
 
-source ./src/remotes/_vars_colors.sh
+source ./src/lib/strict.sh
+source ./src/lib/colors.sh
+source ./src/lib/logging.sh
+source ./src/lib/platform.sh
+source ./src/lib/packages.sh
 
-# Go clean: golangci-lint cache clean ; sudo rm -rf "$(go env GOPATH)/pkg" ; go clean -x -cache -modcache -testcache -fuzzcache
+log_box "arturonavax/env Uninstaller" \
+	"Platform: $(detect_os) ($(detect_distro) - $(detect_arch))" \
+	"Phase 1: Package removal, systemd units, binaries & desktop entries." \
+	"Phase 2: Purging configuration files, local states, and caches."
 
-function uninstall() {
-	set -o errexit
-	trap exit-error-message ERR SIGINT
+log_step "Acquiring administrator credentials for uninstallation..."
+ensure_sudo
+log_success "Privileges confirmed."
 
-	source ./src/remotes/_required_commands.sh
+# ------------------------------------------------------------------------------
+# Phase 1: Packages, Binaries, Desktop Entries & Services
+# ------------------------------------------------------------------------------
+log_step "Phase 1/2: Removing installed packages and binaries..."
 
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		required-commands curl
-		required-sudo-commands apt
+# 1. Native package removal
+pkg_remove neovim fzf
 
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		required-commands brew curl
+# 2. Linux snap cleanups if snap is present
+if command -v snap >/dev/null 2>&1; then
+	sudo snap remove --purge ghostty 2>/dev/null || true
+	sudo snap remove --purge tmux 2>/dev/null || true
+	sudo snap remove --purge nvim 2>/dev/null || true
+fi
+
+# 3. Purge system and local binaries
+sudo rm -rf \
+	/opt/nvim-linux-* /opt/zig-* \
+	/usr/local/bin/zig /usr/local/bin/nvim "$HOME/.local/bin/nvim" \
+	/usr/local/bin/tmux /usr/local/bin/herdr "$HOME/.local/bin/herdr" \
+	/usr/local/bin/atuin "$HOME/.local/bin/atuin" "$HOME/.cargo/bin/atuin" \
+	/usr/local/bin/rtk "$HOME/.local/bin/rtk" \
+	/usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
+	/usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* \
+	/usr/include/ghostty* /usr/include/gtk4-layer-shell* \
+	/usr/share/applications/*ghostty*.desktop /usr/share/applications/nvim.desktop /usr/share/applications/lvim.desktop \
+	"$HOME/.local/share/applications/nvim.desktop" "$HOME/.local/share/applications/lvim.desktop" \
+	/usr/share/terminfo/g/ghostty* /usr/share/terminfo/x/xterm-ghostty* \
+	/usr/share/icons/hicolor/*/apps/*ghostty* 2>/dev/null || true
+
+# 4. macOS Cask and App cleanups
+if [[ "$(detect_os)" == "darwin" ]]; then
+	if command -v brew >/dev/null 2>&1; then
+		brew uninstall --cask ghostty 2>/dev/null || true
+		brew uninstall tmux neovim fzf 2>/dev/null || true
 	fi
+	rm -rf /Applications/Ghostty.app 2>/dev/null || true
+fi
 
-	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - Uninstalling ghostty, herdr, and neovim..."
-
-	echo -en "$fgcolor_yellow_bold"
-
-	# Ask for the administrator password upfront
-	sudo -v
-
-	# Keep-alive: update existing `sudo` time stamp until `install.sh` has finished
-	while true; do
-		sudo -n true
-		sleep 60
-		kill -0 "$$" || exit
-	done 2>/dev/null &
-
-	echo -e "${fgcolor_white_bold}[Uninstaller]: ${fgcolor_green_bold}Privileges for uninstallation obtained"
-	echo -en "$fgcolor_reset"
-
-	echo -en "$fgcolor_white_bold"
-	echo "[Uninstaller]: - ... Phase 1/2"
-
-	if [[ "$(uname -s)" == "Linux" ]]; then
-		sudo apt remove -y --purge neovim fzf &>/dev/null || :
-		sudo snap remove --purge ghostty &>/dev/null || :
-		sudo snap remove --purge tmux &>/dev/null || :
-		sudo snap remove --purge nvim &>/dev/null || :
-		sudo rm -rf /opt/nvim-linux-* /opt/zig-* /usr/local/bin/zig /usr/local/bin/nvim "$HOME/.local/bin/nvim" \
-			/usr/local/bin/tmux /usr/local/bin/herdr "$HOME/.local/bin/herdr" \
-			/usr/local/bin/atuin "$HOME/.local/bin/atuin" "$HOME/.cargo/bin/atuin" \
-			/usr/bin/ghostty /usr/local/bin/ghostty /usr/share/ghostty \
-			/usr/lib/libghostty* /usr/lib/libgtk4-layer-shell* /usr/lib64/libghostty* /usr/lib64/libgtk4-layer-shell* \
-			/usr/include/ghostty* /usr/include/gtk4-layer-shell* \
-			/usr/share/applications/*ghostty*.desktop /usr/share/applications/nvim.desktop /usr/share/applications/lvim.desktop \
-			"$HOME/.local/share/applications/nvim.desktop" "$HOME/.local/share/applications/lvim.desktop" \
-			/usr/share/terminfo/g/ghostty* \
-			/usr/share/terminfo/x/xterm-ghostty* /usr/share/icons/hicolor/*/apps/*ghostty* &>/dev/null || :
-		systemctl --user stop app-com.mitchellh.ghostty.service ghostty.service &>/dev/null || :
-		systemctl --user disable app-com.mitchellh.ghostty.service ghostty.service &>/dev/null || :
-		rm -f "$HOME/.config/systemd/user/"*ghostty* "$HOME/.local/share/applications/"*ghostty*.desktop 2>/dev/null || :
-		sudo rm -f /usr/lib/systemd/user/*ghostty* /usr/share/systemd/user/*ghostty* 2>/dev/null || :
-		systemctl --user daemon-reload &>/dev/null || :
-		sudo ldconfig &>/dev/null || :
-		if command -v update-desktop-database &>/dev/null; then
-			sudo bash -c 'umask 022 && update-desktop-database /usr/share/applications && chmod a+r /usr/share/applications/mimeinfo.cache' &>/dev/null || :
-			update-desktop-database "$HOME/.local/share/applications" &>/dev/null || :
-		fi
-
-	elif [[ "$(uname -s)" == "Darwin" ]]; then
-		brew uninstall --cask ghostty &>/dev/null || :
-		rm -rf /Applications/Ghostty.app /usr/local/bin/ghostty "$HOME/.local/bin/ghostty" &>/dev/null || :
-		brew uninstall tmux neovim fzf &>/dev/null || :
+# 5. Systemd user services cleanup
+if command -v systemctl >/dev/null 2>&1; then
+	systemctl --user stop app-com.mitchellh.ghostty.service ghostty.service 2>/dev/null || true
+	systemctl --user disable app-com.mitchellh.ghostty.service ghostty.service 2>/dev/null || true
+	rm -f "$HOME/.config/systemd/user/"*ghostty* 2>/dev/null || true
+	if [[ -d /usr/lib/systemd/user ]]; then
+		sudo rm -f /usr/lib/systemd/user/*ghostty* 2>/dev/null || true
 	fi
+	systemctl --user daemon-reload 2>/dev/null || true
+fi
 
-	echo "[Uninstaller]: - ... Phase 2/2"
+# 6. Desktop database and linker cache refresh
+if [[ "$(detect_os)" == "linux" ]]; then
+	sudo ldconfig 2>/dev/null || true
+	if command -v update-desktop-database >/dev/null 2>&1; then
+		sudo update-desktop-database /usr/share/applications 2>/dev/null || true
+		update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+	fi
+fi
 
-	rm -rf ~/.config/ghostty ~/.config/nvim || :
+# ------------------------------------------------------------------------------
+# Phase 2: Configuration Directories, Local States & Caches
+# ------------------------------------------------------------------------------
+log_step "Phase 2/2: Purging configuration files, local states, and caches..."
 
-	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
+rm -rf \
+	"$HOME/.config/ghostty" \
+	"$HOME/.config/herdr" \
+	"$HOME/.config/atuin" "$HOME/.local/share/atuin" \
+	"$HOME/.config/nvim" \
+	"$HOME/.local/share/nvim" \
+	"$HOME/.local/state/nvim" \
+	"$HOME/.cache/nvim" \
+	"$HOME/.cache/tmux" \
+	"$HOME/.tmux" 2>/dev/null || true
 
-	echo
-	echo "[Uninstaller]: - Deleting configuration files and caches..."
-	rm -rf ~/.config/ghostty &>/dev/null || :
-	rm -rf ~/.config/herdr &>/dev/null || :
-	rm -rf ~/.config/atuin ~/.local/share/atuin &>/dev/null || :
-	rm -rf ~/.config/nvim &>/dev/null || :
-	rm -rf ~/.local/share/nvim &>/dev/null || :
-	rm -rf ~/.local/state/nvim &>/dev/null || :
-	rm -rf ~/.cache/nvim &>/dev/null || :
-	rm -rf ~/.cache/tmux &>/dev/null || :
-	rm -rf ~/.tmux &>/dev/null || :
-	golangci-lint cache clean &>/dev/null || :
-	echo -e "[Uninstaller]: - ${fgcolor_green_bold}... Ready!${fgcolor_white_bold}"
+if command -v golangci-lint >/dev/null 2>&1; then
+	golangci-lint cache clean 2>/dev/null || true
+fi
 
-	echo
-	echo -e "[Uninstaller]: ${fgcolor_green_bold}✔️ Uninstallation is complete${fgcolor_white_bold}"
-
-	echo -en "$fgcolor_reset"
-	echo
-}
-
-function exit-error-message() {
-	echo -e "$(
-		cat <<EOF
-
-${fgcolor_white_bold}[Uninstaller Error]: ---
-[Uninstaller Error]: ${fgcolor_red_bold}The installation had an error and was interrupted, the installation was not completed.${fgcolor_white_bold}
-[Uninstaller Error]: ---${fgcolor_reset}
-EOF
-	)"
-
-	exit 1
-}
-
-uninstall "$@"
+log_box "Uninstallation Completed Successfully" \
+	"Binaries, desktop integrations, configs, and caches have been removed."

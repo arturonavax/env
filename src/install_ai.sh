@@ -18,6 +18,10 @@ done
 
 ./src/requirements/ai.sh || exit 1
 
+source ./src/lib/strict.sh
+source ./src/lib/colors.sh
+source ./src/lib/logging.sh
+source ./src/lib/platform.sh
 source ./src/remotes/_vars_colors.sh
 source ./src/remotes/_versions.sh
 

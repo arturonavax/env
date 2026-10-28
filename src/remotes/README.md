@@ -9,19 +9,25 @@ The following subdomains redirect to this folder:
 - `environment.arturonavax.dev`
 - `environment.arturonavax.com`
 
-## Environment installer
+## Environment installer (Interactive Wizard or Non-Interactive)
 
 ```sh
+# Launch interactive step-by-step installation wizard (Recommended)
+bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") --wizard
+
+# Or display command-line options
 bash <(curl -fsSL "https://env.arturonavax.dev/install.sh") help
 ```
 
 List of installation parameters:
 
+- `wizard` / `-w`: Launch interactive step-by-step installation wizard with safety checks and rollback.
 - `requirements` / `r`: Install the necessary tools, languages and dependencies.
 - `fonts` / `f`: Install patched mono fonts.
 - `terminal` / `t`: Install the terminal, shell, prompt, Herdr and terminal tools.
 - `editor` / `e`: Install the editor (`nvim` - LazyVim) and development tools.
-- `osconfig` / `o`: Configure the operationg system with personal preferences.
+- `ai`: Install AI CLI assistants (`agy`), RTK token killer, MCP servers, and harnesses.
+- `osconfig` / `o`: Configure the operating system with personal preferences.
 - `all` / `a`: Install and integrate all of the above.
 
 ## Golang installer

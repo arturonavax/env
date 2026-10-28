@@ -16,7 +16,11 @@ while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	fi
 done
 
-source ./src/remotes/_vars_colors.sh
+if [[ -f ./src/lib/colors.sh ]]; then
+	source ./src/lib/colors.sh
+else
+	source ./src/remotes/_vars_colors.sh
+fi
 
 # set viewer / diff highlighter
 if [[ "$(command -v delta)" != "" ]]; then
