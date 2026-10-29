@@ -384,6 +384,7 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
   - `aitools wake [--force]`: Prime expired or idle rolling quota windows.
   - `aitools commit [-a] [--backend=<id>]`: Generate conventional commit from diff (`ai-commit`, `ai-cm`).
   - `aitools pr [-B <branch>]`: Generate Markdown Pull Request description (`ai-pr`).
+  - `aitools optimize [-d|-y|-a]`: Hardware & Lynis audit with AI optimization script and guardrails (`ai-opt`, `sysopt`).
   - `aitools llm "<prompt>"`: Unified non-interactive AI query wrapper (`ai-llm`).
   - `aitools daemon auto-wake [on|off]`: Toggle hardware RTC auto-wake.
   - `aitools status`: Check local presence and paths of all AI CLIs.

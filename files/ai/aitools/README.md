@@ -225,6 +225,9 @@ Configured in `~/.base.zsh`:
 | `ai-wake` | `aitools wake` | Quota primer probe |
 | `ai-quota` | `aitools quota` | Quick quota status inspection |
 | `ai-llm` | `aitools llm` | Unified non-interactive AI query wrapper |
+| `ai-optimize` | `aitools optimize` | Hardware & security audit and AI optimization script generator |
+| `ai-opt` | `aitools optimize` | Short alias for system optimizer |
+| `sysopt` | `aitools optimize` | System optimizer alias |
 
 ---
 
@@ -354,7 +357,49 @@ You can register custom harnesses in `~/.config/aitools/config.json`:
 
 ---
 
-## 7. Configuration Schema (`~/.config/aitools/config.json`)
+## 8. Multi-Platform AI System Hardware & Performance Optimizer (`aitools optimize` / `ai-opt` / `utils/optimize_system.sh`)
+
+`aitools optimize` audits the host system's hardware, kernel tunables, storage devices, and Lynis security profile, distills high-signal actionable bottlenecks, and delegates to `aitools llm` to generate an ultra-personalized, reversible optimization script backed by strict automated security guardrails.
+
+### Capabilities:
+- **Comprehensive Hardware Profiling**: Detects CPU architecture, physical cores, logical threads, scaling governor/driver, total/available RAM, swap size, ZRAM/Zswap status, storage devices (SSD/NVMe vs mechanical HDD), active I/O schedulers, SSD TRIM timer, and GPU/display server.
+- **Deep Security & Lynis Audit**: Integrates with Lynis (when installed) for fast, non-intrusive compliance and hardening audits; falls back gracefully to native firewall, kernel pointer exposure, and core dump security checks.
+- **Actionable Report Distillation**: Condenses noisy raw outputs into a structured, low-token Markdown digest emphasizing concrete bottlenecks (e.g. NVMe scheduler alignment, swappiness for SSDs, inotify watch expansion for IDEs, BBR congestion control).
+- **Automated Security Guardrail Engine**: Inspects generated code line-by-line and strictly blocks execution if any destructive operations are detected (`rm -rf`, `mkfs`, `fdisk`, `dd if=`, raw block device writes, firewall disabling, credential tampering, or remote pipeline executions).
+- **Execution Modes**:
+  - Interactive Wizard (`--wizard` / `-w`): Step-by-step TUI guided by `wizard_engine.sh`.
+  - Dry-Run (`--dry-run` / `-d`, default): Generates, validates guardrails, and previews script without executing.
+  - Apply (`--apply` / `-y`): Applies verified optimizations with automatic backups.
+  - Audit Only (`--audit-only` / `-a`): Prints distilled hardware & security actionable report without generating code.
+
+### Usage Examples:
+
+```bash
+# Print distilled hardware & security actionable report (fast inspection)
+aitools optimize --audit-only
+
+# Launch interactive step-by-step optimization wizard
+aitools optimize --wizard
+
+# Generate and preview tailored optimization script (dry-run)
+aitools optimize
+
+# Bypass Lynis scan for near-instant audit
+aitools optimize --skip-lynis
+
+# Save generated script directly to file
+aitools optimize -o /tmp/custom_opt.sh
+
+# Apply optimizations with elevated privileges after guardrail verification
+aitools optimize --apply
+
+# Validate an external script against the security guardrail engine
+aitools optimize --validate ./my_script.sh
+```
+
+---
+
+## 9. Configuration Schema (`~/.config/aitools/config.json`)
 
 Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and trailing commas. Full commented template available at [`files/ai/aitools/config.template.jsonc`](./config.template.jsonc).
 

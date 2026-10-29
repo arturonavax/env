@@ -470,3 +470,15 @@ assert_exit_code 0 "$pr_print_code" "aitools pr --print exit code" &&
 	assert_contains "$pr_print_output" "TICKET-77" "Output contains task ID" &&
 	[[ -f "$pr_out_file" ]] && assert_contains "$(<"$pr_out_file")" "TICKET-77" "File written with task ID" &&
 	pass "aitools pr --print routed markdown description directly to stdout and file"
+
+# Test 30: aitools optimize subcommand & command registry
+opt_help_out="$("$AITOOLS_BIN" optimize --help 2>&1)"
+assert_exit_code 0 "$?" "aitools optimize --help exit code" &&
+	assert_contains "$opt_help_out" "--dry-run" "aitools optimize has dry-run flag" &&
+	assert_contains "$opt_help_out" "--audit-only" "aitools optimize has audit-only flag" &&
+	assert_contains "$opt_help_out" "--validate" "aitools optimize has validate flag" &&
+	pass "aitools optimize subcommand exposes comprehensive CLI flags and manual"
+
+cmds_output="$("$AITOOLS_BIN" commands 2>&1)"
+assert_contains "$cmds_output" "optimize" "Commands lists optimize" &&
+	pass "aitools commands properly registers optimize as a built-in multi-llm command"

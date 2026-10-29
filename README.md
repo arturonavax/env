@@ -157,6 +157,7 @@ make uninstall-plan
   - **Selective Idempotent Wakeup (`aitools wake`)**: Automatically skips sending wake probes if the rolling 5-hour window is already ticking, preserving 100% of unused tokens. Sends low-effort 1-token probes only when expired.
   - **Hardware RTC Auto-Wake & Auto-Resuspend (`aitools daemon`)**: Wakes the machine at 04:00 AM via motherboard RTC alarm (`rtcwake`), verifies network, primes expired models, schedules next day's alarm, and suspends back to sleep in 12s. Emits desktop alerts and Telegram notifications.
   - **AI Conventional Commit Pipeline (`aitools commit` / `ai-commit` / `ai-cm`)**: Inspects staged diffs and generates Conventional Commit messages via LLM (`agy`, `claude`, `codex`, `opencode`, `pi`, `llm`) with interactive accept/edit/regenerate.
+  - **AI System Hardware & Security Optimizer (`aitools optimize` / `ai-opt` / `make optimize`)**: Multi-platform hardware profiler (CPU, RAM, NVMe/SSD, I/O schedulers, BBR, sysctl, systemd blame) and Lynis security auditor, distilling actionable bottlenecks into high-signal reports for `aitools llm` to generate tailored, reversible tuning scripts with strict automated security guardrails.
   - **Declarative AI Pipelines (`aitools <cmd>` / `aitools run <cmd>`)**: Extensible zero-code commands declared in `~/.config/aitools/config.json` (`review`, `explain`, `ask`, `optimize`). Rich JSONC format with inline comments and trailing commas. Inspect all pipelines via `aitools commands`.
 - **RTK (Rust Token Killer)**: High-speed proxy compressing LLM command outputs by up to 90%.
 - **MCP Ecosystem**: Configured Model Context Protocol servers and prompt harnesses.
@@ -187,6 +188,7 @@ Standard Unix utilities (`grep`, `find`, `cat`, `less`) **remain completely unto
 | **Token Killer** | Terminal output | **`rtk`** | Compresses command outputs by up to 90% before sending to LLM context. | `rtk` |
 | **Shell History** | `~/.zsh_history` | **`atuin`** | Embedded SQLite history engine with directory scoping; offline and private. | `Ctrl+R` |
 | **AI Commits** | Manual commit | **`aitools commit`** | AI Conventional Commit generation from git diff. | `ai-commit` / `ai-cm` |
+| **System Tuning** | Manual tuning | **`aitools optimize`** | Hardware & Lynis audit with AI optimization script and guardrails. | `ai-opt` / `sysopt` |
 | **Clipboard** | System specific | **`clip` / `clip-paste`** | Multiplatform clipboard wrapper (Wayland, X11, macOS, WSL, Termux). | `cb`, `copy`, `paste` |
 | **File Listing** | `ls` | **`eza`** | Modern file listing with icons, git status, and tree view. | `l`, `ll`, `la`, `lt` |
 | **File Search** | `find` | **`fd`** | Fast directory traversal ignoring `.git`. | `fdh` (`fd --hidden`) |

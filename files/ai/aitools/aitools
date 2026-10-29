@@ -3105,6 +3105,45 @@ def run_config_wizard() -> None:
         print(f"\n\n{C_YELLOW}Configuration wizard cancelled by user.{C_RESET}\n")
 
 
+def run_system_optimize(args: argparse.Namespace) -> None:
+    """Execute the multi-platform system optimization and hardware audit engine."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    script_path = os.path.join(repo_root, "utils", "optimize_system.sh")
+    if not os.path.isfile(script_path):
+        script_path = shutil.which("optimize_system.sh") or ""
+
+    if not script_path or not os.path.isfile(script_path):
+        print(f"{C_RED}[ERROR] optimize_system.sh script not found in utils/ or PATH.{C_RESET}", file=sys.stderr)
+        sys.exit(1)
+
+    cmd = [script_path]
+    if getattr(args, "wizard", False):
+        cmd.append("--wizard")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "apply", False):
+        cmd.append("--apply")
+    if getattr(args, "audit_only", False):
+        cmd.append("--audit-only")
+    if getattr(args, "skip_lynis", False):
+        cmd.append("--skip-lynis")
+    if getattr(args, "output", None):
+        cmd.extend(["--output", args.output])
+    if getattr(args, "backend", None):
+        cmd.extend(["--backend", args.backend])
+    if getattr(args, "model", None):
+        cmd.extend(["--model", args.model])
+    if getattr(args, "validate", None):
+        cmd.extend(["--validate", args.validate])
+
+    try:
+        ret = subprocess.run(cmd)
+        sys.exit(ret.returncode)
+    except KeyboardInterrupt:
+        print("\nAborted by user.")
+        sys.exit(130)
+
+
 def show_commands() -> None:
     config = load_config()
     custom_cmds = config.get("commands", {})
@@ -3123,6 +3162,7 @@ def show_commands() -> None:
         ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (ai-commit / ai-cm)"),
         ("pr", "builtin", "multi-llm", "Generate Pull Request Markdown descriptions from branch diff (ai-pr)"),
         ("llm", "builtin", "multi-llm", "Unified AI CLI wrapper (stdin streaming, files, modes)"),
+        ("optimize", "builtin", "multi-llm", "Hardware audit & AI system optimization script generator (ai-opt)"),
         ("backends", "builtin", "inspector", "List all available AI CLI harnesses and strategies"),
         ("setup", "builtin", "wizard", "Interactive setup wizard for harnesses, models & templates"),
         ("daemon", "builtin", "systemd/rtc", "Manage background monitor and RTC auto-wake"),
@@ -3311,8 +3351,9 @@ def show_status() -> None:
 def main() -> None:
     # Fast-path: Check for direct custom command invocation (e.g. `aitools review`)
     known_subcommands = {
-        "quota", "watch", "wake", "commit", "backends", "daemon", "status",
-        "config", "setup", "run", "commands", "llm", "-v", "--version", "-h", "--help"
+        "quota", "watch", "wake", "commit", "pr", "llm", "optimize", "sysopt",
+        "backends", "daemon", "status", "config", "setup", "run", "commands",
+        "-v", "--version", "-h", "--help"
     }
 
     if len(sys.argv) > 1 and sys.argv[1] not in known_subcommands and not sys.argv[1].startswith("-"):
@@ -3429,6 +3470,22 @@ def main() -> None:
     p_llm.add_argument("--no-clean-markdown", action="store_true", help="Do not strip markdown code fences from response")
     p_llm.add_argument("--list-backends", action="store_true", help="List all available AI CLI harnesses and execution strategies")
 
+    # 7. System Hardware & Performance Optimizer
+    p_opt = subparsers.add_parser(
+        "optimize",
+        aliases=["sysopt"],
+        help="Audit hardware, kernel & Lynis security and generate AI optimization script (ai-opt)"
+    )
+    p_opt.add_argument("-d", "--dry-run", action="store_true", help="Audit, generate script & validate guardrails without applying (default)")
+    p_opt.add_argument("-y", "--apply", action="store_true", help="Generate, validate guardrails, and execute optimizations")
+    p_opt.add_argument("-a", "--audit-only", action="store_true", help="Print distilled hardware & security actionable report and exit")
+    p_opt.add_argument("--skip-lynis", action="store_true", help="Bypass Lynis audit scan (rely on native security audit)")
+    p_opt.add_argument("-w", "--wizard", action="store_true", help="Launch interactive step-by-step TUI wizard")
+    p_opt.add_argument("-o", "--output", help="Save generated optimization script directly to file")
+    p_opt.add_argument("-b", "--backend", help="AI CLI backend override")
+    p_opt.add_argument("-m", "--model", help="AI model identifier override")
+    p_opt.add_argument("--validate", help="Validate an existing script against the security guardrail engine")
+
     args = parser.parse_args()
 
     if not args.subcommand:
@@ -3470,6 +3527,8 @@ def main() -> None:
         )
     elif args.subcommand == "llm":
         run_llm_cli(args)
+    elif args.subcommand in ("optimize", "sysopt"):
+        run_system_optimize(args)
     elif args.subcommand == "backends":
         show_backends()
     elif args.subcommand == "setup":

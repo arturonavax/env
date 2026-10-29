@@ -4,7 +4,7 @@
 # ==============================================================================
 
 .DEFAULT_GOAL := help
-.PHONY: help test test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean rebuild rebuild-tools
+.PHONY: help test test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean rebuild rebuild-tools optimize optimize-apply
 
 help:
 	@echo "arturonavax/env — Development & Operational Interface"
@@ -18,6 +18,8 @@ help:
 	@echo "  make lint              Run syntax check (bash -n) and ShellCheck analysis"
 	@echo "  make check             Run environment & hardware pre-flight check"
 	@echo "  make wizard            Launch 8-stage interactive installation wizard"
+	@echo "  make optimize          Audit hardware, security and generate AI optimization script (dry-run)"
+	@echo "  make optimize-apply    Execute verified AI system optimizations (requires sudo)"
 	@echo "  make backup            Create timestamped configuration snapshot"
 	@echo "  make restore           Interactively restore configuration from backup"
 	@echo "  make diff              Inspect configuration diffs against active system"
@@ -25,6 +27,12 @@ help:
 	@echo "  make rebuild           Recompile and reinstall global tools across all language runtimes"
 	@echo "  make clean             Remove temporary test sandboxes and stale caches"
 	@echo ""
+
+optimize:
+	@./utils/optimize_system.sh --dry-run
+
+optimize-apply:
+	@./utils/optimize_system.sh --apply
 
 rebuild:
 	@./utils/rebuild_tools.sh

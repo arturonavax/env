@@ -622,6 +622,10 @@ if (( $+commands[aitools] )); then
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
     alias ai-llm='aitools llm'
+    # AI System Hardware & Performance Optimizer
+    alias ai-optimize='aitools optimize'
+    alias ai-opt='aitools optimize'
+    alias sysopt='aitools optimize'
 fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
