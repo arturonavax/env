@@ -1,0 +1,19 @@
+id: x11-scroll-lock-led
+name: X11 Scroll Lock Keyboard Backlight LED Toggle
+category: hardware-input
+description: >-
+  Toggles the X11 Scroll Lock hardware LED indicator for external keyboards
+  whose backlight illumination is controlled by the Scroll Lock state.
+safe_by_opt_in: true
+match:
+  os:
+    - linux
+  display_server:
+    - x11
+backup_paths: []
+steps:
+  - id: toggle-scroll-lock-led
+    name: Toggle X11 Scroll Lock LED
+    description: Queries the X11 keyboard LED state via xset and toggles Scroll Lock.
+    script: activate_scroll_lock.sh
+    privileged: false

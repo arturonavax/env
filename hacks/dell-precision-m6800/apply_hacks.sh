@@ -60,7 +60,7 @@ chmod +x "$HOME/.local/bin/ghostty"
 if [ -f "/usr/share/applications/com.mitchellh.ghostty.desktop" ]; then
     mkdir -p "$HOME/.local/share/applications"
     cp -f "/usr/share/applications/com.mitchellh.ghostty.desktop" "$HOME/.local/share/applications/"
-    sed -i 's|Exec=.*ghostty.*|Exec=/home/arthurnavah/.local/bin/ghostty|g' "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop"
+    sed -i "s|Exec=.*ghostty.*|Exec=$HOME/.local/bin/ghostty|g" "$HOME/.local/share/applications/com.mitchellh.ghostty.desktop"
 fi
 
 # ------------------------------------------------------------------------------
@@ -559,13 +559,13 @@ if command -v xfconf-query >/dev/null 2>&1; then
     xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>n" -s "$HOME/.local/bin/toggle-redshift" 2>/dev/null || true
 fi
 
-cat <<'EOF' > "$HOME/.local/share/applications/toggle-redshift.desktop"
+cat <<EOF > "$HOME/.local/share/applications/toggle-redshift.desktop"
 [Desktop Entry]
 Type=Application
 Name=Luz Nocturna (Night Shift)
 GenericName=Filtro de Luz Azul
 Comment=Alternar filtro de luz azul y protección de pantalla
-Exec=/home/arthurnavah/.local/bin/toggle-redshift
+Exec=$HOME/.local/bin/toggle-redshift
 Icon=display
 Terminal=false
 Categories=Settings;Utility;
