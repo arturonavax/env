@@ -1,0 +1,342 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/arturonavax/env/internal/catalog"
+	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/execution"
+	"github.com/arturonavax/env/internal/journal"
+	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/providers"
+	"github.com/arturonavax/env/internal/snapshot"
+	"github.com/arturonavax/env/internal/state"
+)
+
+// InstallService orchestrates planning and execution of packages and configuration sync steps.
+type InstallService struct {
+	platform   *platform.Info
+	catalog    *catalog.Registry
+	journal    *journal.FileJournal
+	snapshots  *snapshot.Manager
+	provider   providers.Provider
+	store      *state.Store
+	sync       *SyncService
+	engine     *execution.Engine
+	onProgress EventHandler
+}
+
+// InstallDeps bundles the collaborators required by InstallService.
+type InstallDeps struct {
+	Platform   *platform.Info
+	Catalog    *catalog.Registry
+	Journal    *journal.FileJournal
+	Snapshots  *snapshot.Manager
+	Provider   providers.Provider
+	Store      *state.Store
+	Sync       *SyncService
+	OnProgress EventHandler
+}
+
+// NewInstallService constructs an InstallService from its dependencies.
+func NewInstallService(deps InstallDeps) *InstallService {
+	return &InstallService{
+		platform:   deps.Platform,
+		catalog:    deps.Catalog,
+		journal:    deps.Journal,
+		snapshots:  deps.Snapshots,
+		provider:   deps.Provider,
+		store:      deps.Store,
+		sync:       deps.Sync,
+		engine:     execution.NewEngine(4),
+		onProgress: deps.OnProgress,
+	}
+}
+
+// Plan resolves requested packages (or a profile) into a dependency-ordered plan.
+// Already-installed packages are skipped, making Apply idempotent and Resume trivial.
+func (s *InstallService) Plan(ctx context.Context, profileName string, requested []string) (*domain.ExecutionPlan, error) {
+	now := time.Now()
+	plan := &domain.ExecutionPlan{
+		ID:        fmt.Sprintf("plan-%d", now.UnixNano()),
+		CreatedAt: now,
+		Platform:  s.platform.OS(),
+		Profile:   profileName,
+		Steps:     make([]domain.PlanStep, 0, 16),
+	}
+
+	ids := requested
+	includeConfigs := false
+	if len(ids) == 0 {
+		if profileName == "" {
+			profileName = "developer"
+			plan.Profile = profileName
+		}
+		resolved, err := s.catalog.ResolveProfilePackages(profileName)
+		if err != nil {
+			return nil, err
+		}
+		ids = resolved
+		includeConfigs = true
+	}
+
+	ordered, err := s.catalog.ResolveInstallOrder(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	stepID := 1
+	for _, pkg := range ordered {
+		if len(pkg.SupportedOS) > 0 && !containsOS(pkg.SupportedOS, s.platform.OS()) {
+			continue
+		}
+		installed, _, _ := s.provider.IsInstalled(ctx, pkg)
+		if installed {
+			continue
+		}
+		plan.Steps = append(plan.Steps, domain.PlanStep{
+			ID:          stepID,
+			ResourceID:  pkg.ID,
+			Action:      domain.ActionInstall,
+			Description: fmt.Sprintf("Install %s (%s)", pkg.Name, pkg.Description),
+			Provider:    s.provider.Name(),
+			Strategy:    string(pkg.Strategy),
+			IsExclusive: true,
+			Status:      domain.StepPending,
+		})
+		stepID++
+	}
+
+	if includeConfigs && s.sync != nil {
+		cfgs, err := s.catalog.ResolveProfileConfigurations(profileName)
+		if err != nil {
+			return nil, err
+		}
+		for _, cfg := range cfgs {
+			if !cfg.SupportsOS(s.platform.OS()) {
+				continue
+			}
+			plan.Steps = append(plan.Steps, domain.PlanStep{
+				ID:          stepID,
+				ResourceID:  cfg.ID,
+				Action:      domain.ActionSync,
+				Description: fmt.Sprintf("Synchronize %s", cfg.Name),
+				SourcePath:  cfg.Source,
+				TargetPath:  s.platform.ExpandPath(cfg.TargetForOS(s.platform.OS())),
+				Status:      domain.StepPending,
+			})
+			stepID++
+		}
+	}
+
+	return plan, nil
+}
+
+// Apply executes plan under an exclusive advisory lock with journaling and LIFO compensation on failure.
+func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) error {
+	if plan == nil || len(plan.Steps) == 0 {
+		return nil
+	}
+	if plan.DryRun {
+		return nil
+	}
+
+	lock, err := state.AcquireLock(s.platform.StateDir(), "apply")
+	if err != nil {
+		return domain.NewExitError(domain.ExitPreflightFailed, err)
+	}
+	defer func() { _ = lock.Release() }()
+
+	txID := fmt.Sprintf("tx-%d", time.Now().UnixNano())
+	s.journalAppend(domain.JournalEntry{
+		TxID: txID, Timestamp: time.Now(), Type: "begin",
+		Details: fmt.Sprintf("plan %s (%d steps)", plan.ID, len(plan.Steps)),
+	})
+
+	tasks := make([]execution.Task, len(plan.Steps))
+	for i := range plan.Steps {
+		tasks[i] = s.buildTask(txID, plan.Steps[i])
+	}
+
+	byID := make(map[int]*domain.PlanStep, len(plan.Steps))
+	for i := range plan.Steps {
+		byID[plan.Steps[i].ID] = &plan.Steps[i]
+	}
+
+	_, execErr := s.engine.ExecuteTasks(ctx, tasks, func(res execution.Result) {
+		step := byID[res.StepID]
+		if step == nil {
+			return
+		}
+		step.Status = res.Status
+		if res.Error != nil {
+			step.Error = res.Error.Error()
+		}
+		if s.onProgress != nil {
+			s.onProgress(ProgressEvent{
+				StepID: step.ID, TotalSteps: len(plan.Steps), ResourceID: step.ResourceID,
+				Action: step.Action, Description: step.Description, Status: res.Status, Error: step.Error,
+			})
+		}
+	})
+
+	if execErr != nil {
+		s.journalAppend(domain.JournalEntry{
+			TxID: txID, Timestamp: time.Now(), Type: "rollback", Details: execErr.Error(),
+		})
+		if errors.Is(execErr, execution.ErrExecutionInterrupted) {
+			return domain.NewExitError(domain.ExitInterrupted, execErr)
+		}
+		return domain.NewExitError(domain.ExitRollbackOrPartial, execErr)
+	}
+
+	s.journalAppend(domain.JournalEntry{
+		TxID: txID, Timestamp: time.Now(), Type: "commit", Details: "all steps succeeded",
+	})
+	return nil
+}
+
+func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.Task {
+	task := execution.Task{Step: step, Exclusive: step.IsExclusive}
+
+	switch step.Action {
+	case domain.ActionInstall:
+		pkg, ok := s.catalog.GetPackage(step.ResourceID)
+		if !ok {
+			pkg = domain.ManagedResource{ID: step.ResourceID, Name: step.ResourceID}
+		}
+		task.Timeout = 30 * time.Minute
+		task.Execute = func(ctx context.Context) error {
+			s.journalStep(txID, "step_start", step, "")
+			if err := s.provider.Install(ctx, pkg); err != nil {
+				s.journalStep(txID, "step_failed", step, err.Error())
+				return err
+			}
+			_, ver, _ := s.provider.IsInstalled(ctx, pkg)
+			s.recordInstalled(pkg, ver)
+			s.journalStep(txID, "step_done", step, "")
+			return nil
+		}
+		task.Compensate = func(ctx context.Context) error {
+			if err := s.provider.Uninstall(ctx, pkg); err != nil {
+				return err
+			}
+			if s.store != nil {
+				_ = s.store.RemoveResource(pkg.ID)
+			}
+			return nil
+		}
+
+	case domain.ActionSync:
+		var snapID string
+		task.Execute = func(ctx context.Context) error {
+			s.journalStep(txID, "step_start", step, "")
+			if s.sync == nil {
+				return errors.New("sync service not configured")
+			}
+			res, err := s.sync.SyncOne(ctx, step.ResourceID, SyncOptions{})
+			if err != nil {
+				s.journalStep(txID, "step_failed", step, err.Error())
+				return err
+			}
+			snapID = res.SnapshotID
+			s.journalStep(txID, "step_done", step, "")
+			return nil
+		}
+		task.Compensate = func(_ context.Context) error {
+			if snapID == "" || s.snapshots == nil {
+				return nil
+			}
+			return s.snapshots.Restore(snapID)
+		}
+	}
+	return task
+}
+
+// Uninstall removes managed packages and clears their state records.
+func (s *InstallService) Uninstall(ctx context.Context, ids []string) error {
+	lock, err := state.AcquireLock(s.platform.StateDir(), "uninstall")
+	if err != nil {
+		return domain.NewExitError(domain.ExitPreflightFailed, err)
+	}
+	defer func() { _ = lock.Release() }()
+
+	for _, id := range ids {
+		pkg, ok := s.catalog.GetPackage(id)
+		if !ok {
+			pkg = domain.ManagedResource{ID: id, Name: id}
+		}
+		if err := s.provider.Uninstall(ctx, pkg); err != nil {
+			return fmt.Errorf("uninstalling %s: %w", id, err)
+		}
+		if s.store != nil {
+			_ = s.store.RemoveResource(id)
+		}
+	}
+	return nil
+}
+
+// Rollback restores the most recent configuration snapshot.
+func (s *InstallService) Rollback(_ context.Context) (*domain.Snapshot, error) {
+	if s.snapshots == nil {
+		return nil, errors.New("snapshot manager not configured")
+	}
+	return s.snapshots.RestoreLatest()
+}
+
+// PendingTransaction returns the last unfinished journal transaction, if any.
+func (s *InstallService) PendingTransaction() (*domain.Transaction, error) {
+	return s.journal.GetLastPendingTx()
+}
+
+// Resume re-plans using the active profile; completed steps are skipped because Plan is idempotent.
+func (s *InstallService) Resume(ctx context.Context) (*domain.ExecutionPlan, error) {
+	profile := "developer"
+	if s.store != nil {
+		profile = s.store.ActiveProfile()
+	}
+	plan, err := s.Plan(ctx, profile, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plan, s.Apply(ctx, plan)
+}
+
+func (s *InstallService) recordInstalled(pkg domain.ManagedResource, version string) {
+	if s.store == nil {
+		return
+	}
+	_ = s.store.RecordResource(state.InstalledRecord{
+		ResourceID:   pkg.ID,
+		Version:      strings.TrimSpace(version),
+		Strategy:     string(pkg.Strategy),
+		Provider:     s.provider.Name(),
+		ManagedByAnx: true,
+	})
+}
+
+func (s *InstallService) journalAppend(e domain.JournalEntry) {
+	if s.journal != nil {
+		_ = s.journal.Append(e)
+	}
+}
+
+func (s *InstallService) journalStep(txID, typ string, step domain.PlanStep, errMsg string) {
+	s.journalAppend(domain.JournalEntry{
+		TxID: txID, Timestamp: time.Now(), Type: typ, StepID: step.ID,
+		Action: step.Action, Target: step.TargetPath, Error: errMsg,
+	})
+}
+
+func containsOS(list []string, goos string) bool {
+	for _, v := range list {
+		if v == goos || v == "all" {
+			return true
+		}
+	}
+	return false
+}

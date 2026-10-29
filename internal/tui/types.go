@@ -1,0 +1,102 @@
+package tui
+
+import (
+	"context"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/catalog"
+	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/journal"
+	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/providers"
+	"github.com/arturonavax/env/internal/theme"
+)
+
+// TabID represents an active view screen in the TUI dashboard.
+type TabID int
+
+const (
+	TabOverview TabID = iota
+	TabPackages
+	TabConfigs
+	TabAI
+	TabHacks
+	TabDoctor
+	TabHistory
+	TabSecurity
+)
+
+// TabNames provides human-readable labels for the dashboard tabs.
+var TabNames = []string{
+	"1:Overview",
+	"2:Packages",
+	"3:Configs",
+	"4:AI",
+	"5:Hacks",
+	"6:Doctor",
+	"7:History",
+	"8:Security",
+}
+
+// Deps encapsulates external services and runtime dependencies passed to the TUI.
+type Deps struct {
+	Platform *platform.Info
+	Catalog  *catalog.Registry
+	Provider providers.Provider
+	Sync     *app.SyncService
+	Doctor   *app.DoctorService
+	Audit    *app.AuditService
+	Hacks    *app.HacksService
+	Journal  *journal.FileJournal
+	Theme    *theme.Palette
+	Styles   *theme.Styles
+}
+
+// Async message types for loading data without freezing the UI.
+type (
+	doctorLoadedMsg []app.DoctorCheck
+	auditLoadedMsg  []domain.AuditFinding
+	hacksLoadedMsg  []domain.HackProfile
+	statusUpdateMsg string
+	errMsg          struct{ err error }
+)
+
+// loadDoctorCmd returns a tea.Cmd fetching doctor health checks asynchronously.
+func loadDoctorCmd(ctx context.Context, svc *app.DoctorService) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return doctorLoadedMsg(nil)
+		}
+		checks, err := svc.Diagnose(ctx)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return doctorLoadedMsg(checks)
+	}
+}
+
+// loadAuditCmd returns a tea.Cmd running OSV vulnerability scanning asynchronously.
+func loadAuditCmd(ctx context.Context, svc *app.AuditService) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return auditLoadedMsg(nil)
+		}
+		findings, err := svc.Audit(ctx)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return auditLoadedMsg(findings)
+	}
+}
+
+// loadHacksCmd returns a tea.Cmd detecting hardware/system hacks asynchronously.
+func loadHacksCmd(ctx context.Context, svc *app.HacksService) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return hacksLoadedMsg(nil)
+		}
+		_, detected := svc.Detect(ctx)
+		return hacksLoadedMsg(detected)
+	}
+}
