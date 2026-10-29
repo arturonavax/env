@@ -16,6 +16,8 @@ _LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "${_LIB_DIR}/colors.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
+source "${_LIB_DIR}/ui_box.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
 source "${_LIB_DIR}/logging.sh" 2>/dev/null || true
 
 # ------------------------------------------------------------------------------
@@ -79,13 +81,18 @@ wizard_init() {
 
 wizard_banner() {
 	wizard_clear
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_BLUE" "$BOLD_WHITE" "$WIZARD_TITLE" "$RESET" "$BOLD_BLUE" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$RESET" "$WIZARD_SUBTITLE" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  Total Stages: %-50s  %s│%s\n' "$BOLD_BLUE" "$DIM" "${WIZARD_TOTAL_STAGES} stages planned" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$DIM" "Stop anytime with Ctrl+C. Safe idempotent state recovery." "$BOLD_BLUE" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n\n' "$BOLD_BLUE" "$RESET"
+	local width
+	width="$(ui_box_width 70)"
+
+	echo
+	ui_box_top "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "$WIZARD_TITLE" "$width" "rounded" "$BOLD_BLUE" "$BOLD_WHITE" "left"
+	ui_box_mid "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "$WIZARD_SUBTITLE" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "Total Stages: ${WIZARD_TOTAL_STAGES} stages planned" "$width" "rounded" "$BOLD_BLUE" "$DIM" "left"
+	ui_box_line "Stop anytime with Ctrl+C. Safe idempotent state recovery." "$width" "rounded" "$BOLD_BLUE" "$DIM" "left"
+	ui_box_bottom "$width" "rounded" "$BOLD_BLUE"
+	echo
 
 	pause "Press Enter to start setup..."
 }
@@ -312,12 +319,16 @@ handle_stage_failure() {
 wizard_finish() {
 	local custom_msg="${1:-Setup completed successfully!}"
 	wizard_clear
+	local width
+	width="$(ui_box_width 70)"
 
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$GREEN" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_GREEN" "$BOLD_WHITE" "$custom_msg" "$RESET" "$BOLD_GREEN" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_GREEN" "$RESET"
-	printf '%s│%s  All %d stages completed with zero unhandled errors.            %s│%s\n' "$BOLD_GREEN" "$RESET" "$WIZARD_TOTAL_STAGES" "$BOLD_GREEN" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n\n' "$BOLD_GREEN" "$RESET"
+	echo
+	ui_box_top "$width" "rounded" "$BOLD_GREEN"
+	ui_box_line "$custom_msg" "$width" "rounded" "$BOLD_GREEN" "$BOLD_WHITE" "left"
+	ui_box_mid "$width" "rounded" "$BOLD_GREEN"
+	ui_box_line "All ${WIZARD_TOTAL_STAGES} stages completed with zero unhandled errors." "$width" "rounded" "$BOLD_GREEN" "$RESET" "left"
+	ui_box_bottom "$width" "rounded" "$BOLD_GREEN"
+	echo
 
 	if (( ${#WIZARD_WRITTEN_ENV[@]} > 0 )); then
 		step "Configuration variables persisted:"

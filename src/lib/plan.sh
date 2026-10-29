@@ -15,6 +15,8 @@ _LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "${_LIB_DIR}/colors.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
+source "${_LIB_DIR}/ui_box.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
 source "${_LIB_DIR}/logging.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "${_LIB_DIR}/platform.sh" 2>/dev/null || true
@@ -24,8 +26,10 @@ source "${_LIB_DIR}/packages.sh" 2>/dev/null || true
 # Format section header
 _plan_header() {
 	local title="$1"
+	local width
+	width="$(ui_box_width 70)"
 	printf '\n%s%s%s %s%s%s\n' "$BOLD_BLUE" "$SYM_ARROW" "$RESET" "$BOLD_WHITE" "$title" "$RESET"
-	printf '%s----------------------------------------------------------------------%s\n' "$DIM" "$RESET"
+	ui_box_separator "$width" "─" "$DIM"
 }
 
 _plan_item() {
@@ -79,13 +83,17 @@ show_install_plan() {
 		do_os=1
 	fi
 
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_BLUE" "$BOLD_WHITE" "arturonavax/env · Installation Plan & Manifest Preview" "$RESET" "$BOLD_BLUE" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  Platform:     %-50s  %s│%s\n' "$BOLD_BLUE" "$RESET" "${os} (${distro}) - ${arch}" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  Package Mgr:  %-50s  %s│%s\n' "$BOLD_BLUE" "$RESET" "$pkg_mgr" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  Execution:    %-50s  %s│%s\n' "$BOLD_BLUE" "$RESET" "DRY RUN / PREVIEW (No files modified)" "$BOLD_BLUE" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n' "$BOLD_BLUE" "$RESET"
+	local width
+	width="$(ui_box_width 70)"
+
+	echo
+	ui_box_top "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "arturonavax/env · Installation Plan & Manifest Preview" "$width" "rounded" "$BOLD_BLUE" "$BOLD_WHITE" "left"
+	ui_box_mid "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "Platform:     ${os} (${distro}) - ${arch}" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "Package Mgr:  $pkg_mgr" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "Execution:    DRY RUN / PREVIEW (No files modified)" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_bottom "$width" "rounded" "$BOLD_BLUE"
 
 	# 1. Pre-installation Safeguards
 	_plan_header "1. Pre-Installation Safeguards & Backups"
@@ -224,13 +232,17 @@ show_uninstall_plan() {
 	arch="$(detect_arch)"
 	pkg_mgr="$(detect_pkg_mgr)"
 
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$RED" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_RED" "$BOLD_WHITE" "arturonavax/env · Uninstallation Plan & Teardown Preview" "$RESET" "$BOLD_RED" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_RED" "$RESET"
-	printf '%s│%s  Platform:     %-50s  %s│%s\n' "$BOLD_RED" "$RESET" "${os} (${distro}) - ${arch}" "$BOLD_RED" "$RESET"
-	printf '%s│%s  Package Mgr:  %-50s  %s│%s\n' "$BOLD_RED" "$RESET" "$pkg_mgr" "$BOLD_RED" "$RESET"
-	printf '%s│%s  Execution:    %-50s  %s│%s\n' "$BOLD_RED" "$RESET" "DRY RUN / PREVIEW (No files modified or removed)" "$BOLD_RED" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n' "$BOLD_RED" "$RESET"
+	local width
+	width="$(ui_box_width 70)"
+
+	echo
+	ui_box_top "$width" "rounded" "$BOLD_RED"
+	ui_box_line "arturonavax/env · Uninstallation Plan & Teardown Preview" "$width" "rounded" "$BOLD_RED" "$BOLD_WHITE" "left"
+	ui_box_mid "$width" "rounded" "$BOLD_RED"
+	ui_box_line "Platform:     ${os} (${distro}) - ${arch}" "$width" "rounded" "$BOLD_RED" "$RESET" "left"
+	ui_box_line "Package Mgr:  $pkg_mgr" "$width" "rounded" "$BOLD_RED" "$RESET" "left"
+	ui_box_line "Execution:    DRY RUN / PREVIEW (No files modified or removed)" "$width" "rounded" "$BOLD_RED" "$RESET" "left"
+	ui_box_bottom "$width" "rounded" "$BOLD_RED"
 
 	# 1. Packages Removed
 	_plan_header "1. Packages Removed via Native Manager ($pkg_mgr)"

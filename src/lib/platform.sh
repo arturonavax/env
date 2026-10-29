@@ -14,6 +14,10 @@ if [[ -f "${_LIB_DIR}/colors.sh" ]]; then
 	# shellcheck source=/dev/null
 	source "${_LIB_DIR}/colors.sh"
 fi
+if [[ -f "${_LIB_DIR}/ui_box.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${_LIB_DIR}/ui_box.sh"
+fi
 
 # Detect Operating System Kernel
 detect_os() {
@@ -269,16 +273,21 @@ print_platform_summary() {
 	free_disk="$(get_free_disk_space_mb "$HOME")"
 	ram="$(get_total_ram_mb)"
 
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$BLUE" "$RESET"
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_BLUE" "$BOLD_WHITE" "System Hardware & Platform Profile" "$RESET" "$BOLD_BLUE" "$RESET"
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Operating System:  %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$os" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Distribution:      %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$distro" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Architecture:      %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$arch" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Package Manager:   %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$pkg_mgr" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Init System:       %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$init_sys" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Display Server:    %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "$display" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Total Memory:      %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "${ram} MB" "$BOLD_BLUE" "$RESET"
-	printf '%s│%s  • Home Free Space:   %-43s%s│%s\n' "$BOLD_BLUE" "$RESET" "${free_disk} MB" "$BOLD_BLUE" "$RESET"
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n\n' "$BOLD_BLUE" "$RESET"
+	local width
+	width="$(ui_box_width 70)"
+
+	echo
+	ui_box_top "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "System Hardware & Platform Profile" "$width" "rounded" "$BOLD_BLUE" "$BOLD_WHITE" "left"
+	ui_box_mid "$width" "rounded" "$BOLD_BLUE"
+	ui_box_line "• Operating System:  $os" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Distribution:      $distro" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Architecture:      $arch" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Package Manager:   $pkg_mgr" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Init System:       $init_sys" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Display Server:    $display" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Total Memory:      ${ram} MB" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_line "• Home Free Space:   ${free_disk} MB" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+	ui_box_bottom "$width" "rounded" "$BOLD_BLUE"
+	echo
 }

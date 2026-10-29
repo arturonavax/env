@@ -229,9 +229,22 @@ if command -v pipx >/dev/null 2>&1; then
 	pipx ensurepath 2>/dev/null || true
 fi
 
-echo -e "\n${COLOR_GREEN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}"
+_render_separator() {
+	local w=70
+	if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+		w=$(tput cols 2>/dev/null || echo 70)
+		((w > 2)) && w=$((w - 2))
+		((w < 40)) && w=40
+		((w > 100)) && w=100
+	fi
+	printf "%b%s%b\n" "$COLOR_GREEN" "$(printf "%${w}s" "" | tr ' ' '═')" "$COLOR_RESET"
+}
+
+echo
+_render_separator
 echo -e "  ${COLOR_GREEN}✔ Python ${TARGET_VERSION} & pyenv configured successfully!${COLOR_RESET}"
 echo -e "    Active binary: $(command -v python3 2>/dev/null || echo "$PYENV_ROOT/shims/python3")"
 echo -e "    Python version: $(python3 --version 2>&1)"
 echo -e "    Isolated tools: pipx available ($(command -v pipx 2>/dev/null || echo "in ~/.local/bin/pipx"))"
-echo -e "${COLOR_GREEN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}\n"
+_render_separator
+echo

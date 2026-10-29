@@ -9,11 +9,15 @@
 [[ -n "${_LOGGING_SH_LOADED:-}" ]] && return 0
 _LOGGING_SH_LOADED=1
 
-# Resolve colors
+# Resolve colors and UI box engine
 _LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${_LIB_DIR}/colors.sh" ]]; then
 	# shellcheck source=/dev/null
 	source "${_LIB_DIR}/colors.sh"
+fi
+if [[ -f "${_LIB_DIR}/ui_box.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${_LIB_DIR}/ui_box.sh"
 fi
 
 # Configuration Defaults
@@ -81,18 +85,28 @@ log_debug() {
 }
 
 log_separator() {
-	printf '%s----------------------------------------------------------------------%s\n' "$DIM" "$RESET" >&2
+	local width
+	width="$(ui_box_width 70)"
+	ui_box_separator "$width" "─" "$DIM" >&2
 }
 
 log_box() {
 	local title="$1"
 	shift
-	printf '\n%s%s╭────────────────────────────────────────────────────────────────────╮%s\n' "$BOLD" "$BLUE" "$RESET" >&2
-	printf '%s│%s  %-64s  %s%s│%s\n' "$BOLD_BLUE" "$BOLD_WHITE" "$title" "$RESET" "$BOLD_BLUE" "$RESET" >&2
-	printf '%s├────────────────────────────────────────────────────────────────────┤%s\n' "$BOLD_BLUE" "$RESET" >&2
-	while (("$#")); do
-		printf '%s│%s  %-64s  %s│%s\n' "$BOLD_BLUE" "$RESET" "$1" "$BOLD_BLUE" "$RESET" >&2
-		shift
-	done
-	printf '%s╰────────────────────────────────────────────────────────────────────╯%s\n\n' "$BOLD_BLUE" "$RESET" >&2
+	local width
+	width="$(ui_box_width 70)"
+	{
+		echo
+		ui_box_top "$width" "rounded" "$BOLD_BLUE"
+		ui_box_line "$title" "$width" "rounded" "$BOLD_BLUE" "$BOLD_WHITE" "left"
+		if (($# > 0)); then
+			ui_box_mid "$width" "rounded" "$BOLD_BLUE"
+			while (($#)); do
+				ui_box_line "$1" "$width" "rounded" "$BOLD_BLUE" "$RESET" "left"
+				shift
+			done
+		fi
+		ui_box_bottom "$width" "rounded" "$BOLD_BLUE"
+		echo
+	} >&2
 }

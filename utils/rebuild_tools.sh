@@ -24,6 +24,11 @@ elif [[ -f "${SCRIPT_DIR}/../src/remotes/_versions.sh" ]]; then
 	source "${SCRIPT_DIR}/../src/remotes/_versions.sh"
 fi
 
+if [[ -n "${REPO_ROOT}" && -f "${REPO_ROOT}/src/lib/ui_box.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "${REPO_ROOT}/src/lib/ui_box.sh" 2>/dev/null || true
+fi
+
 # Colors and formatting
 COLOR_RESET="\033[0m"
 COLOR_BOLD="\033[1;37m"
@@ -137,12 +142,29 @@ elif [[ -n "${REPO_ROOT}" && -f "${REPO_ROOT}/files/zsh/.tools.sh" ]]; then
 	source "${REPO_ROOT}/files/zsh/.tools.sh" 2>/dev/null || true
 fi
 
-echo -e "\n${COLOR_CYAN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}"
+_render_separator() {
+	local w="${1:-70}"
+	local color="${2:-$COLOR_CYAN}"
+	if declare -f ui_box_separator >/dev/null 2>&1; then
+		ui_box_separator "$w" "═" "$color"
+	else
+		printf "%b%s%b\n" "$color" "$(printf "%${w}s" "" | tr ' ' '═')" "$COLOR_RESET"
+	fi
+}
+
+BANNER_WIDTH=70
+if declare -f ui_box_width >/dev/null 2>&1; then
+	BANNER_WIDTH="$(ui_box_width 70)"
+fi
+
+echo
+_render_separator "$BANNER_WIDTH" "$COLOR_CYAN"
 echo -e "  ${COLOR_BOLD}🔄 arturonavax/env Universal Tool Rebuilder & Synchronizer${COLOR_RESET}"
 if [[ "$DRY_RUN" -eq 1 ]]; then
 	echo -e "  ${COLOR_YELLOW}Mode: DRY-RUN (Previewing actions without modifying filesystem)${COLOR_RESET}"
 fi
-echo -e "${COLOR_CYAN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}\n"
+_render_separator "$BANNER_WIDTH" "$COLOR_CYAN"
+echo
 
 START_TIME=$(date +%s)
 TOTAL_TASKS=0
@@ -382,6 +404,7 @@ rebuild_nvim() {
 
 ELAPSED=$(( $(date +%s) - START_TIME ))
 
-echo -e "${COLOR_CYAN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}"
+_render_separator "$BANNER_WIDTH" "$COLOR_CYAN"
 echo -e "  ${COLOR_GREEN}✔ Universal Tool Rebuild Completed (${PASSED_TASKS}/${TOTAL_TASKS} subsystems synchronized in ${ELAPSED}s)${COLOR_RESET}"
-echo -e "${COLOR_CYAN}══════════════════════════════════════════════════════════════════════${COLOR_RESET}\n"
+_render_separator "$BANNER_WIDTH" "$COLOR_CYAN"
+echo

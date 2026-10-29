@@ -25,6 +25,8 @@ export REPO_ROOT
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/src/lib/colors.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
+source "${REPO_ROOT}/src/lib/ui_box.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
 source "${REPO_ROOT}/src/lib/logging.sh" 2>/dev/null || true
 
 # Execution modes
@@ -112,9 +114,12 @@ SUITES_PASSED=0
 SUITES_FAILED=0
 START_TIME=$(date +%s)
 
-printf '\n%s%s══════════════════════════════════════════════════════════════════════%s\n' "$BOLD" "$CYAN" "$RESET"
+header_w="$(ui_box_width 70)"
+echo
+ui_box_separator "$header_w" "═" "$CYAN"
 printf '%s  %s arturonavax/env Comprehensive Test Harness%s\n' "$BOLD_WHITE" "🧪" "$RESET"
-printf '%s══════════════════════════════════════════════════════════════════════%s\n\n' "$CYAN" "$RESET"
+ui_box_separator "$header_w" "═" "$CYAN"
+echo
 
 _indent_output() {
 	local text="$1"
@@ -192,6 +197,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"src/lib/plan.sh"
 			"src/lib/toolchain.sh"
 			"src/lib/wizard_engine.sh"
+			"src/lib/ui_box.sh"
 			"utils/backup_config.sh"
 			"utils/restore_backup.sh"
 			"utils/sync_config.sh"
@@ -211,6 +217,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"tests/unit/test_shell_configs.sh"
 			"tests/unit/test_runtimes.sh"
 			"tests/unit/test_rebuild_tools.sh"
+			"tests/unit/test_ui_box.sh"
 			"utils/rebuild_tools.sh"
 			"src/remotes/rebuild_tools.sh"
 			"src/remotes/install_python.sh"
@@ -357,15 +364,18 @@ fi
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
-printf '%s══════════════════════════════════════════════════════════════════════%s\n' "$CYAN" "$RESET"
+summary_w="$(ui_box_width 70)"
+ui_box_separator "$summary_w" "═" "$CYAN"
 if [[ "$SUITES_FAILED" -eq 0 ]]; then
 	printf '  %s%s ALL TEST SUITES PASSED%s %s(%d/%d passed in %ds)%s\n' \
 		"$BOLD_GREEN" "$SYM_CHECK" "$RESET" "$GREEN" "$SUITES_PASSED" "$SUITES_TOTAL" "$DURATION" "$RESET"
-	printf '%s══════════════════════════════════════════════════════════════════════%s\n\n' "$CYAN" "$RESET"
+	ui_box_separator "$summary_w" "═" "$CYAN"
+	echo
 	exit 0
 else
 	printf '  %s%s TEST SUITE FAILURES DETECTED%s %s(%d failed, %d passed in %ds)%s\n' \
 		"$BOLD_RED" "$SYM_CROSS" "$RESET" "$RED" "$SUITES_FAILED" "$SUITES_PASSED" "$DURATION" "$RESET"
-	printf '%s══════════════════════════════════════════════════════════════════════%s\n\n' "$CYAN" "$RESET"
+	ui_box_separator "$summary_w" "═" "$CYAN"
+	echo
 	exit 1
 fi

@@ -35,6 +35,7 @@ import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from typing import Optional, List, Dict, Any, Tuple
 
 # ------------------------------------------------------------------------------
 # Constants & Paths
@@ -67,6 +68,125 @@ C_BOLD_CYAN = "\033[1;36m"
 C_BOLD_GREEN = "\033[1;32m"
 C_BOLD_YELLOW = "\033[1;33m"
 C_BOLD_RED = "\033[1;31m"
+
+
+# ------------------------------------------------------------------------------
+# UIBox: Dynamic Terminal-Aware Box Drawing & Normalization Engine
+# ------------------------------------------------------------------------------
+class UIBox:
+    """Dynamic, ANSI-aware box drawing, table separator, and banner renderer."""
+
+    STYLES = {
+        "rounded": {"tl": "╭", "tr": "╮", "bl": "╰", "br": "╯", "h": "─", "v": "│", "ml": "├", "mr": "┤"},
+        "single":  {"tl": "┌", "tr": "┐", "bl": "└", "br": "┘", "h": "─", "v": "│", "ml": "├", "mr": "┤"},
+        "double":  {"tl": "╔", "tr": "╗", "bl": "╚", "br": "╝", "h": "═", "v": "║", "ml": "╠", "mr": "╣"},
+        "ascii":   {"tl": "+", "tr": "+", "bl": "+", "br": "+", "h": "-", "v": "|", "ml": "+", "mr": "+"},
+    }
+
+    _ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+    @classmethod
+    def strip_ansi(cls, text: str) -> str:
+        """Removes ANSI escape codes and carriage returns to compute visible string width."""
+        if not text:
+            return ""
+        clean = cls._ANSI_RE.sub('', str(text))
+        return clean.replace('\r', '')
+
+    @classmethod
+    def visible_len(cls, text: str) -> int:
+        """Calculates visual terminal length ignoring ANSI codes."""
+        return len(cls.strip_ansi(text))
+
+    @classmethod
+    def get_width(cls, default: int = 84, min_w: int = 40, max_w: int = 100) -> int:
+        """Dynamically detects terminal columns and clamps between min_w and max_w."""
+        try:
+            cols = shutil.get_terminal_size(fallback=(default, 24)).columns
+            if cols > 2:
+                cols -= 2
+        except Exception:
+            cols = default
+
+        return max(min_w, min(max_w, cols))
+
+    @classmethod
+    def top(cls, width: Optional[int] = None, style: str = "rounded", color: str = C_BOLD_BLUE) -> str:
+        w = width if width is not None else cls.get_width()
+        s = cls.STYLES.get(style, cls.STYLES["rounded"])
+        inner = s["h"] * max(0, w - 2)
+        return f"{color}{s['tl']}{inner}{s['tr']}{C_RESET}"
+
+    @classmethod
+    def mid(cls, width: Optional[int] = None, style: str = "rounded", color: str = C_BOLD_BLUE) -> str:
+        w = width if width is not None else cls.get_width()
+        s = cls.STYLES.get(style, cls.STYLES["rounded"])
+        inner = s["h"] * max(0, w - 2)
+        return f"{color}{s['ml']}{inner}{s['mr']}{C_RESET}"
+
+    @classmethod
+    def bottom(cls, width: Optional[int] = None, style: str = "rounded", color: str = C_BOLD_BLUE) -> str:
+        w = width if width is not None else cls.get_width()
+        s = cls.STYLES.get(style, cls.STYLES["rounded"])
+        inner = s["h"] * max(0, w - 2)
+        return f"{color}{s['bl']}{inner}{s['br']}{C_RESET}"
+
+    @classmethod
+    def line(
+        cls,
+        text: str,
+        width: Optional[int] = None,
+        style: str = "rounded",
+        border_color: str = C_BOLD_BLUE,
+        text_color: str = "",
+        align: str = "left"
+    ) -> str:
+        w = width if width is not None else cls.get_width()
+        s = cls.STYLES.get(style, cls.STYLES["rounded"])
+        inner_width = max(0, w - 4)
+        vlen = cls.visible_len(text)
+
+        if vlen >= inner_width:
+            pad_l, pad_r = 0, 0
+        elif align == "center":
+            total_pad = inner_width - vlen
+            pad_l = total_pad // 2
+            pad_r = total_pad - pad_l
+        elif align == "right":
+            pad_l = inner_width - vlen
+            pad_r = 0
+        else:  # left
+            pad_l = 0
+            pad_r = inner_width - vlen
+
+        spaces_l = " " * pad_l
+        spaces_r = " " * pad_r
+
+        return f"{border_color}{s['v']}{C_RESET}  {spaces_l}{text_color}{text}{spaces_r}  {border_color}{s['v']}{C_RESET}"
+
+    @classmethod
+    def rule(cls, width: Optional[int] = None, char: str = "─", color: str = C_DIM) -> str:
+        w = width if width is not None else cls.get_width()
+        return f"{color}{char * w}{C_RESET}"
+
+    @classmethod
+    def banner(
+        cls,
+        title: str,
+        subtitle: str = "",
+        width: Optional[int] = None,
+        color: str = C_BOLD_BLUE,
+        style: str = "rounded"
+    ) -> None:
+        w = width if width is not None else cls.get_width()
+        print()
+        print(cls.top(w, style=style, color=color))
+        print(cls.line(title, w, style=style, border_color=color, text_color=C_BOLD_WHITE, align="left"))
+        if subtitle:
+            print(cls.mid(w, style=style, color=color))
+            print(cls.line(subtitle, w, style=style, border_color=color, text_color=C_RESET, align="left"))
+        print(cls.bottom(w, style=style, color=color))
+        print()
 
 COMMIT_PROMPT_CONVENTIONAL = """You are an expert developer creating a clean conventional git commit message.
 Analyze the following git diff and output a single, high-quality conventional commit message.
@@ -913,9 +1033,10 @@ def show_quota(as_json: bool = False, target_filter: str = None) -> None:
         print(json.dumps(targets, indent=2))
         return
 
-    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · AI Models Quota & Reset Timers':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    width = UIBox.get_width(84)
+    print(f"\n{UIBox.top(width, color=C_BOLD_BLUE)}")
+    print(UIBox.line(f"{C_BOLD_WHITE}aitools · AI Models Quota & Reset Timers{C_RESET}", width, border_color=C_BOLD_BLUE))
+    print(UIBox.mid(width, color=C_BOLD_BLUE))
     print(f"  {C_BOLD}{'ID':<16} {'TOOL':<8} {'ACCOUNT':<10} {'QUOTA':<20} {'RESETS AT':<10} {'STATUS'}{C_RESET}")
     print(f"  {C_GRAY}{'─'*16} {'─'*8} {'─'*10} {'─'*20} {'─'*10} {'─'*24}{C_RESET}")
 
@@ -932,7 +1053,7 @@ def show_quota(as_json: bool = False, target_filter: str = None) -> None:
         bar = format_progress_bar(t["remaining_percent"]) if t["enabled"] else f"{C_GRAY}─{C_RESET}"
         print(f"  {C_WHITE}{t['id']:<16}{C_RESET} {t['tool']:<8} {t['account']:<10} {bar:<29} {t['reset_time_local']:<10} {status_badge}")
 
-    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+    print(f"{UIBox.bottom(width, color=C_BOLD_BLUE)}\n")
 
 
 def run_watch(interval_sec: int = 30, target_filter: str = None) -> None:
@@ -1233,9 +1354,10 @@ def show_backends() -> None:
     all_names = sorted(set(list(DEFAULT_BACKENDS.keys()) + list(custom_backends.keys())))
     default_backend = config.get("commit", {}).get("default_backend") or config.get("default_commit_backend", "agy")
 
-    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · Available AI Harness Backends & Execution Strategies':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    width = UIBox.get_width(84)
+    print(f"\n{UIBox.top(width, color=C_BOLD_BLUE)}")
+    print(UIBox.line(f"{C_BOLD_WHITE}aitools · Available AI Harness Backends & Execution Strategies{C_RESET}", width, border_color=C_BOLD_BLUE))
+    print(UIBox.mid(width, color=C_BOLD_BLUE))
     print(f"  {C_BOLD}{'BACKEND':<14} {'STATUS':<14} {'INPUT':<11} {'OUTPUT':<11} {'DESCRIPTION'}{C_RESET}")
     print(f"  {C_GRAY}{'─'*14} {'─'*14} {'─'*11} {'─'*11} {'─'*30}{C_RESET}")
 
@@ -1248,7 +1370,7 @@ def show_backends() -> None:
         b_name = f"{name}{is_def}"
         print(f"  {C_BOLD_WHITE}{b_name:<18}{C_RESET} {status_badge:<22} {adapter.input_mode:<11} {adapter.output_mode:<11} {C_DIM}{adapter.description}{C_RESET}")
 
-    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}")
+    print(f"{UIBox.bottom(width, color=C_BOLD_BLUE)}")
     print(f"{C_DIM}★ = active default backend. Override per commit: aitools commit --backend <name> / -b <name>{C_RESET}\n")
 
 
@@ -1889,11 +2011,13 @@ def run_commit(
         return
 
     while True:
-        print(f"\n{C_BOLD}{C_GREEN}╭────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-        print(f"{C_BOLD}{C_GREEN}│ Proposed Commit Message:{C_RESET}")
+        box_w = UIBox.get_width(74)
+        print(f"\n{UIBox.top(box_w, color=C_BOLD_GREEN)}")
+        print(UIBox.line(f"{C_BOLD_GREEN}Proposed Commit Message:{C_RESET}", box_w, border_color=C_BOLD_GREEN))
+        print(UIBox.mid(box_w, color=C_BOLD_GREEN))
         for line in commit_msg.splitlines():
-            print(f"  {C_BOLD_WHITE}{line}{C_RESET}")
-        print(f"{C_BOLD}{C_GREEN}╰────────────────────────────────────────────────────────────────────────╯{C_RESET}")
+            print(UIBox.line(f"{C_BOLD_WHITE}{line}{C_RESET}", box_w, border_color=C_BOLD_GREEN))
+        print(f"{UIBox.bottom(box_w, color=C_BOLD_GREEN)}")
 
         if dry_run:
             print(f"{C_DIM}[Dry Run: not creating git commit]{C_RESET}")
@@ -2065,12 +2189,13 @@ def run_config_wizard() -> None:
     auto_wake_cfg = daemon_cfg.get("auto_wake", {})
     backends = {**DEFAULT_BACKENDS, **config.get("backends", {})}
 
-    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · Interactive Configuration Wizard':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
-    print(f"  {C_WHITE}Configure default AI harnesses, models, commit templates & daemon preferences.{C_RESET}")
-    print(f"  {C_DIM}Press Enter to keep current values in [brackets]. Ctrl+C to cancel anytime.{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+    wizard_w = UIBox.get_width(84)
+    print(f"\n{UIBox.top(wizard_w, color=C_BOLD_BLUE)}")
+    print(UIBox.line(f"{C_BOLD_WHITE}aitools · Interactive Configuration Wizard{C_RESET}", wizard_w, border_color=C_BOLD_BLUE))
+    print(UIBox.mid(wizard_w, color=C_BOLD_BLUE))
+    print(UIBox.line(f"{C_WHITE}Configure default AI harnesses, models, commit templates & daemon preferences.{C_RESET}", wizard_w, border_color=C_BOLD_BLUE))
+    print(UIBox.line(f"{C_DIM}Press Enter to keep current values in [brackets]. Ctrl+C to cancel anytime.{C_RESET}", wizard_w, border_color=C_BOLD_BLUE))
+    print(f"{UIBox.bottom(wizard_w, color=C_BOLD_BLUE)}\n")
 
     try:
         # Step 1: Default AI Backend / Harness
@@ -2177,17 +2302,18 @@ def run_config_wizard() -> None:
             selected_resuspend = resusp_choice not in ("n", "no", "false", "0")
 
         # Review Summary
-        print(f"\n{C_BOLD}{C_GREEN}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-        print(f"{C_BOLD}{C_GREEN}│{C_RESET}  {C_BOLD_WHITE}Configuration Review:{C_RESET}")
-        print(f"{C_BOLD}{C_GREEN}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
-        print(f"  {C_BOLD}Backend:{C_RESET}          {C_WHITE}{selected_backend}{C_RESET}")
-        print(f"  {C_BOLD}Model:{C_RESET}            {C_WHITE}{selected_model or '(default)'}{C_RESET}")
-        print(f"  {C_BOLD}Effort:{C_RESET}           {C_WHITE}{selected_effort}{C_RESET}")
-        print(f"  {C_BOLD}Commit Template:{C_RESET}  {C_WHITE}{selected_tmpl}{C_RESET}")
-        print(f"  {C_BOLD}Auto-Stage:{C_RESET}       {C_WHITE}{selected_stage}{C_RESET}")
-        print(f"  {C_BOLD}RTC Auto-Wake:{C_RESET}    {C_WHITE}{selected_auto_wake} (time: {selected_wake_time}, resuspend: {selected_resuspend}){C_RESET}")
-        print(f"  {C_BOLD}Target File:{C_RESET}      {C_DIM}{CONFIG_FILE}{C_RESET}")
-        print(f"{C_BOLD}{C_GREEN}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+        rev_w = UIBox.get_width(84)
+        print(f"\n{UIBox.top(rev_w, color=C_BOLD_GREEN)}")
+        print(UIBox.line(f"{C_BOLD_WHITE}Configuration Review:{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.mid(rev_w, color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Backend:{C_RESET}          {C_WHITE}{selected_backend}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Model:{C_RESET}            {C_WHITE}{selected_model or '(default)'}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Effort:{C_RESET}           {C_WHITE}{selected_effort}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Commit Template:{C_RESET}  {C_WHITE}{selected_tmpl}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Auto-Stage:{C_RESET}       {C_WHITE}{selected_stage}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}RTC Auto-Wake:{C_RESET}    {C_WHITE}{selected_auto_wake} (time: {selected_wake_time}, resuspend: {selected_resuspend}){C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(UIBox.line(f"{C_BOLD}Target File:{C_RESET}      {C_DIM}{CONFIG_FILE}{C_RESET}", rev_w, border_color=C_BOLD_GREEN))
+        print(f"{UIBox.bottom(rev_w, color=C_BOLD_GREEN)}\n")
 
         confirm = input(f"  Save configuration to {CONFIG_FILE}? [Y/n]: ").strip().lower()
         if confirm in ("", "y", "yes"):
@@ -2225,9 +2351,10 @@ def show_commands() -> None:
     config = load_config()
     custom_cmds = config.get("commands", {})
 
-    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · Available Commands & Declarative AI Pipelines':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    width = UIBox.get_width(84)
+    print(f"\n{UIBox.top(width, color=C_BOLD_BLUE)}")
+    print(UIBox.line(f"{C_BOLD_WHITE}aitools · Available Commands & Declarative AI Pipelines{C_RESET}", width, border_color=C_BOLD_BLUE))
+    print(UIBox.mid(width, color=C_BOLD_BLUE))
     print(f"  {C_BOLD}{'COMMAND':<16} {'TYPE':<12} {'BACKEND':<10} {'DESCRIPTION'}{C_RESET}")
     print(f"  {C_GRAY}{'─'*16} {'─'*12} {'─'*10} {'─'*40}{C_RESET}")
 
@@ -2257,7 +2384,7 @@ def show_commands() -> None:
             desc = spec.get("description", f"Run custom pipeline: {name}")
             print(f"  {C_CYAN}{name:<16}{C_RESET} {C_YELLOW}{itype:<12}{C_RESET} {b:<10} {desc}")
 
-    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+    print(f"{UIBox.bottom(width, color=C_BOLD_BLUE)}\n")
 
 
 # ------------------------------------------------------------------------------
@@ -2390,9 +2517,10 @@ WantedBy=default.target
 # Action: STATUS & DIAGNOSTICS
 # ------------------------------------------------------------------------------
 def show_status() -> None:
-    print(f"\n{C_BOLD}{C_BLUE}╭──────────────────────────────────────────────────────────────────────────────────╮{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}│{C_RESET}  {C_BOLD_WHITE}{'aitools · AI Ecosystem & CLI Status Diagnostics':<62}{C_RESET}  {C_BOLD_BLUE}│{C_RESET}")
-    print(f"{C_BOLD}{C_BLUE}├──────────────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    width = UIBox.get_width(84)
+    print(f"\n{UIBox.top(width, color=C_BOLD_BLUE)}")
+    print(UIBox.line(f"{C_BOLD_WHITE}aitools · AI Ecosystem & CLI Status Diagnostics{C_RESET}", width, border_color=C_BOLD_BLUE))
+    print(UIBox.mid(width, color=C_BOLD_BLUE))
 
     tools = [
         ("agy", "Antigravity CLI (Gemini, Claude, GPT)"),
@@ -2415,7 +2543,7 @@ def show_status() -> None:
         else:
             print(f"  {C_YELLOW}✗{C_RESET} {C_GRAY}{bin_name:<14} (not found in current PATH){C_RESET}")
 
-    print(f"{C_BOLD}{C_BLUE}╰──────────────────────────────────────────────────────────────────────────────────╯{C_RESET}\n")
+    print(f"{UIBox.bottom(width, color=C_BOLD_BLUE)}\n")
 
 
 # ------------------------------------------------------------------------------
