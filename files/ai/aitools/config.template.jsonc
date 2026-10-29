@@ -117,7 +117,7 @@
   },
 
   // ----------------------------------------------------------------------------
-  // Git Conventional Commit Generator Configuration (`aitools commit` / `gcm`)
+  // Git Conventional Commit Generator Configuration (`aitools commit` / `ai-commit` / `ai-cm`)
   // ----------------------------------------------------------------------------
   "commit": {
     // Backend CLI used for commit message generation
@@ -174,7 +174,7 @@
   },
 
   // ----------------------------------------------------------------------------
-  // Pull Request (PR) Description Generator Configuration (`aitools pr` / `gpr`)
+  // Pull Request (PR) Description Generator Configuration (`aitools pr` / `ai-pr`)
   // ----------------------------------------------------------------------------
   "pr": {
     // Backend CLI used for PR description generation (falls back to default_backend)

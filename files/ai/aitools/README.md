@@ -34,7 +34,7 @@ Built in zero-dependency Python 3 (standard library only) for sub-millisecond ex
   5. If `auto_resuspend` is enabled, returns machine to sleep in 12s to protect battery.
 - **Desktop Alerts & Telegram Notifications**: Emits desktop notifications (`notify-send` / `osascript`) and Telegram alerts when quotas are refreshed or before resets.
 
-### 4. AI-Powered Git Conventional Commit Pipeline (`aitools commit` / `gcm`)
+### 4. AI-Powered Git Conventional Commit Pipeline (`aitools commit` / `ai-commit` / `ai-cm`)
 - **Diff Analysis**: Inspects `git diff --cached` (or automatically prompts to stage modified files if unstaged).
 - **Multi-Backend AI Generation**: Queries the selected AI backend (`agy`, `claude`, `codex`, `opencode`, `pi`, or `llm`) with instructions to produce a clean Conventional Commit message without AI fluff or markdown codeblocks. Reuses the unified `aitools llm` engine with `mode: "chat"` and `output_format: "text"`.
 - **Interactive Action Loop**:
@@ -109,7 +109,7 @@ git status | aitools llm "Summarize state" -o json
 # Save output directly to file
 aitools llm "Generate API client stub" -f schema.json -O client.py
 
-# --- Git AI Conventional Commits (aitools commit / gcm) ---
+# --- Git AI Conventional Commits (aitools commit / ai-commit / ai-cm) ---
 
 # Run declarative custom commands (direct invocation or via run)
 aitools review                     # AI code review on current staged diff
@@ -207,19 +207,24 @@ Configured in `~/.base.zsh`:
 | Alias | Command | Purpose |
 | :--- | :--- | :--- |
 | `ait` | `aitools` | Fast CLI prefix |
-| `gcm` | `aitools commit` | AI-powered conventional commit from diff |
-| `gcmk` | `aitools commit --template task` | AI commit with auto-extracted task/ticket ID |
-| `gcmr` | `aitools commit --template repo` | AI commit strictly adhering to repo's `.gitmessage` |
-| `gcmj` | `aitools commit --template task` | Compatibility alias for task ticket commit |
-| `gcmd` | `aitools commit --template detailed` | AI commit with multi-line detailed breakdown |
-| `gpr` | `aitools pr` | AI-powered Pull Request Markdown description from branch diff |
-| `gprr` | `aitools pr --template repo` | PR description strictly following repository PR template |
-| `gprk` | `aitools pr --template task` | PR description structured with Task / Ticket ID |
-| `gprd` | `aitools pr --template detailed` | PR description with deep architectural specification |
+| `ai-commit` | `aitools commit` | AI-powered conventional commit from diff |
+| `ai-commit-task` | `aitools commit --template task` | AI commit with auto-extracted task/ticket ID |
+| `ai-commit-repo` | `aitools commit --template repo` | AI commit strictly adhering to repo's `.gitmessage` |
+| `ai-commit-detailed` | `aitools commit --template detailed` | AI commit with multi-line detailed breakdown |
+| `ai-cm` | `aitools commit` | Short alias for AI conventional commit |
+| `ai-cmk` | `aitools commit --template task` | Short alias for task ticket commit |
+| `ai-cmr` | `aitools commit --template repo` | Short alias for repo-templated commit |
+| `ai-cmd` | `aitools commit --template detailed` | Short alias for detailed commit breakdown |
+| `ai-pr` | `aitools pr` | AI-powered Pull Request Markdown description from branch diff |
+| `ai-pr-task` | `aitools pr --template task` | PR description structured with Task / Ticket ID |
+| `ai-pr-repo` | `aitools pr --template repo` | PR description strictly following repository PR template |
+| `ai-pr-detailed` | `aitools pr --template detailed` | PR description with deep architectural specification |
+| `ai-prk` | `aitools pr --template task` | Short alias for task-linked PR description |
+| `ai-prr` | `aitools pr --template repo` | Short alias for repository-templated PR description |
+| `ai-prd` | `aitools pr --template detailed` | Short alias for detailed PR description |
 | `ai-wake` | `aitools wake` | Quota primer probe |
 | `ai-quota` | `aitools quota` | Quick quota status inspection |
 | `ai-llm` | `aitools llm` | Unified non-interactive AI query wrapper |
-| `ai-pr` | `aitools pr` | Pull Request generator alias |
 
 ---
 
@@ -260,7 +265,7 @@ When defining custom templates in `~/.config/aitools/config.json` or external te
 
 ---
 
-## 6. AI Pull Request (PR) Description Generator (`aitools pr` / `gpr`)
+## 6. AI Pull Request (PR) Description Generator (`aitools pr` / `ai-pr`)
 
 Under the same principles as the commit generator, `aitools pr` analyzes all commits and diffs across a Git branch relative to a target base branch (e.g. `main`, `master`, `develop`) and generates a structured, publication-ready Pull Request Markdown description.
 

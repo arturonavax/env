@@ -368,7 +368,7 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
   - Automatically arms motherboard RTC alarm (`rtcwake -m no -t <04:00 AM>`).
   - Wakes laptop at 04:00 AM, verifies Wi-Fi/Ethernet connectivity, primes expired models, schedules the next day's alarm, and re-suspends in 12s (`systemctl suspend`) to protect battery life.
   - Sends desktop notifications (`notify-send` / `osascript`) and optional Telegram alerts for model resets.
-- **AI Git Conventional Commit Pipeline (`aitools commit` / `gcm`)**:
+- **AI Git Conventional Commit Pipeline (`aitools commit` / `ai-commit` / `ai-cm`)**:
   - Inspects `git diff --cached` (or unstaged changes) and queries the active LLM backend (`agy`, `claude`, `codex`, `llm`, etc.) to produce clean Conventional Commit messages.
   - Interactive loop: accept `[a]`, edit `[e]`, regenerate `[r]`, cancel `[c]`.
   - Fully customizable via `"commit"` block in `~/.config/aitools/config.json` (`prompt_template`, `effort`, `max_diff_length`).
@@ -382,10 +382,13 @@ Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
   - `aitools quota`: Display quota status table and reset timestamps.
   - `aitools watch [--interval SECONDS]`: Continuous terminal TUI monitor.
   - `aitools wake [--force]`: Prime expired or idle rolling quota windows.
-  - `aitools commit [-a] [--backend=<id>]`: Generate conventional commit from diff.
+  - `aitools commit [-a] [--backend=<id>]`: Generate conventional commit from diff (`ai-commit`, `ai-cm`).
+  - `aitools pr [-B <branch>]`: Generate Markdown Pull Request description (`ai-pr`).
+  - `aitools llm "<prompt>"`: Unified non-interactive AI query wrapper (`ai-llm`).
   - `aitools daemon auto-wake [on|off]`: Toggle hardware RTC auto-wake.
   - `aitools status`: Check local presence and paths of all AI CLIs.
   - `aitools config [show|path|init]`: Inspect or initialize configuration.
+  - `clip [file...]` / `clip -p`: Universal multiplatform clipboard manager (`cb`, `copy`, `paste`).
 
 ---
 

@@ -4,7 +4,7 @@ This directory stores transferable configurations, harnesses, optimization proxi
 
 ## Directory Structure
 
-* `aitools/`: Complete multi-model AI productivity CLI suite (`aitools`, `config.default.json`, README). Manages live quota telemetry, smart rolling window wakeups, RTC hardware auto-wake with suspension, and Conventional Git Commit generation (`gcm`, `gcmj`, `gcmd`) with dynamic templates and Jira ticket auto-extraction.
+* `aitools/`: Complete multi-model AI productivity CLI suite (`aitools`, `config.default.json`, README). Manages live quota telemetry, smart rolling window wakeups, RTC hardware auto-wake with suspension, and Conventional Git Commit generation (`ai-commit`, `ai-cm`, `ai-cmk`, `ai-cmd`) with dynamic templates and task ticket auto-extraction.
 * `rtk/`: Rust Token Killer proxy configuration (`config.toml`). Compresses noisy terminal outputs by up to 90% before returning to LLM agent context.
 * `mcp/`: Configuration files, schemas, and server declarations for the Model Context Protocol (MCP).
 * `prompts/`: System instructions, prompt templates, engineering guidelines (`AGENTS.md`), and persona specifications.

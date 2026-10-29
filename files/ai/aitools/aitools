@@ -3120,8 +3120,8 @@ def show_commands() -> None:
         ("quota", "builtin", "local/api", "Inspect rolling quota windows, % and reset times"),
         ("watch", "builtin", "local/tui", "Live-updating TUI dashboard for AI quotas"),
         ("wake", "builtin", "multi-cli", "Evaluate models and prime idle/expired quotas"),
-        ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (gcm)"),
-        ("pr", "builtin", "multi-llm", "Generate Pull Request Markdown descriptions from branch diff (gpr)"),
+        ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (ai-commit / ai-cm)"),
+        ("pr", "builtin", "multi-llm", "Generate Pull Request Markdown descriptions from branch diff (ai-pr)"),
         ("llm", "builtin", "multi-llm", "Unified AI CLI wrapper (stdin streaming, files, modes)"),
         ("backends", "builtin", "inspector", "List all available AI CLI harnesses and strategies"),
         ("setup", "builtin", "wizard", "Interactive setup wizard for harnesses, models & templates"),
@@ -3348,7 +3348,7 @@ def main() -> None:
     p_wake.add_argument("-t", "--target", help="Filter by target ID")
 
     # 4. Commit
-    p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI (gcm)")
+    p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI (ai-commit / ai-cm)")
     p_commit.add_argument("-a", "--all", action="store_true", help="Stage all tracked modified files before diffing")
     p_commit.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi, ollama, or custom harness)")
     p_commit.add_argument("-m", "--model", help="Model override (e.g. gemini-2.5-flash, claude-3-7-sonnet)")
@@ -3361,7 +3361,7 @@ def main() -> None:
     p_commit.add_argument("-d", "--dry-run", action="store_true", help="Preview message without committing")
 
     # 5. Pull Request (PR) Description Generator
-    p_pr = subparsers.add_parser("pr", help="Generate Pull Request Markdown descriptions from branch diff and commits using AI (gpr)")
+    p_pr = subparsers.add_parser("pr", help="Generate Pull Request Markdown descriptions from branch diff and commits using AI (ai-pr)")
     p_pr.add_argument("-B", "--base", help="Target base branch to compare against (e.g. main, master, develop)")
     p_pr.add_argument("-H", "--head", help="Head branch or ref to compare (defaults to current branch / HEAD)")
     p_pr.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi, ollama, or custom harness)")

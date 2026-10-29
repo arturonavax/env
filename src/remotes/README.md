@@ -75,7 +75,7 @@ curl -fsSL "https://env.arturonavax.dev/macos_install_clt.sh" | bash
 
 ## aitools · AI Productivity, Quota Management & Automated Workflows Suite
 
-Unified AI suite providing rolling quota window monitoring, smart wakeup priming (compatible with `agy`, `claude`, `codex`, `opencode`, `pi`, and `llm`), hardware RTC auto-wake (04:00 AM) with auto-resuspend, and AI-powered Conventional Git Commit generation (`aitools commit` / `gcm`).
+Unified AI suite providing rolling quota window monitoring, smart wakeup priming (compatible with `agy`, `claude`, `codex`, `opencode`, `pi`, and `llm`), hardware RTC auto-wake (04:00 AM) with auto-resuspend, and AI-powered Conventional Git Commit generation (`aitools commit` / `ai-commit` / `ai-cm`).
 
 ### Installation
 

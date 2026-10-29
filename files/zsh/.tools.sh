@@ -104,6 +104,153 @@ if [[ -f "$HOME/.env.local" ]]; then
 	source "$HOME/.env.local"
 fi
 
+# 11. Multi-Platform Clipboard Manager (Wayland, X11, macOS, WSL, Termux)
+_detect_clipboard_backend() {
+	if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+		echo "wayland"
+		return 0
+	fi
+	if [[ "${OSTYPE:-}" == darwin* ]] && command -v pbcopy >/dev/null 2>&1; then
+		echo "macos"
+		return 0
+	fi
+	if command -v clip.exe >/dev/null 2>&1 && { grep -qi "microsoft" /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; }; then
+		echo "wsl"
+		return 0
+	fi
+	if command -v termux-clipboard-set >/dev/null 2>&1; then
+		echo "termux"
+		return 0
+	fi
+	if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
+		echo "xclip"
+		return 0
+	fi
+	if [[ -n "${DISPLAY:-}" ]] && command -v xsel >/dev/null 2>&1; then
+		echo "xsel"
+		return 0
+	fi
+	if command -v wl-copy >/dev/null 2>&1; then
+		echo "wayland"
+		return 0
+	fi
+	if command -v xclip >/dev/null 2>&1; then
+		echo "xclip"
+		return 0
+	fi
+	if command -v pbcopy >/dev/null 2>&1; then
+		echo "macos"
+		return 0
+	fi
+	if command -v clip.exe >/dev/null 2>&1; then
+		echo "wsl"
+		return 0
+	fi
+	echo "none"
+	return 1
+}
+
+clip() {
+	local backend
+	backend="$(_detect_clipboard_backend 2>/dev/null || echo "none")"
+
+	if [[ "$backend" == "none" || -z "$backend" ]]; then
+		echo "clip: [ERROR] No supported clipboard tool found (requires wl-copy, xclip, xsel, pbcopy, clip.exe, or termux-clipboard-set)." >&2
+		return 1
+	fi
+
+	local -a copy_cmd=()
+	case "$backend" in
+		wayland) copy_cmd=(wl-copy) ;;
+		macos)   copy_cmd=(pbcopy) ;;
+		wsl)     copy_cmd=(clip.exe) ;;
+		termux)  copy_cmd=(termux-clipboard-set) ;;
+		xclip)   copy_cmd=(xclip -selection clipboard) ;;
+		xsel)    copy_cmd=(xsel --clipboard --input) ;;
+	esac
+
+	# Mode 1: Arguments provided
+	if (( $# > 0 )); then
+		if [[ "$1" == "-p" || "$1" == "--paste" ]]; then
+			shift
+			clip-paste "$@"
+			return $?
+		fi
+		if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+			cat <<'EOF'
+clip - Universal Multi-Platform Clipboard Manager
+
+Usage:
+  clip <file...>       Copy file content(s) to clipboard
+  command | clip       Copy stdout from pipe/stream to clipboard
+  clip "text..."       Copy argument string to clipboard
+  clip -p, --paste     Paste clipboard content to stdout
+  clip -h, --help      Show this help message
+
+Supported backends:
+  Wayland (wl-copy), X11 (xclip/xsel), macOS (pbcopy), WSL (clip.exe), Termux
+EOF
+			return 0
+		fi
+
+		# Check if any argument is an existing file
+		local any_file=0
+		local f
+		for f in "$@"; do
+			if [[ -f "$f" ]]; then
+				any_file=1
+				break
+			fi
+		done
+
+		if (( any_file == 1 )); then
+			for f in "$@"; do
+				if ! [[ -r "$f" ]]; then
+					echo "clip: [ERROR] File cannot be read: $f" >&2
+					return 1
+				fi
+			done
+			cat "$@" | "${copy_cmd[@]}"
+			local ret=$?
+			if (( ret == 0 )); then
+				echo "✓ Copied file content ($# file(s)) to clipboard." >&2
+			fi
+			return $ret
+		else
+			printf '%s' "$*" | "${copy_cmd[@]}"
+			return $?
+		fi
+	fi
+
+	# Mode 2: Piped from stdin
+	if ! [[ -t 0 ]]; then
+		"${copy_cmd[@]}"
+		return $?
+	fi
+
+	echo "clip: Nothing to copy. Pipe standard input (e.g. 'echo text | clip') or pass file path(s) ('clip file.txt')." >&2
+	echo "      Run 'clip --help' for usage options." >&2
+	return 1
+}
+
+clip-paste() {
+	local backend
+	backend="$(_detect_clipboard_backend 2>/dev/null || echo "none")"
+
+	case "$backend" in
+		wayland) wl-paste ;;
+		macos)   pbpaste ;;
+		wsl)     powershell.exe -NoProfile -Command "Get-Clipboard" 2>/dev/null | tr -d '\r' ;;
+		termux)  termux-clipboard-get ;;
+		xclip)   xclip -selection clipboard -o ;;
+		xsel)    xsel --clipboard --output ;;
+		*)
+			echo "clip-paste: [ERROR] No supported clipboard tool found." >&2
+			return 1
+			;;
+	esac
+}
+
 # Export normalized PATH and clean in-memory helper footprint
 export PATH
 unset -f _tools_path_prepend _tools_path_append

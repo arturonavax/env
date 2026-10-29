@@ -89,3 +89,31 @@ if command -v shellcheck >/dev/null 2>&1; then
 	assert_exit_code 0 "$?" "ShellCheck lint of .tools.sh" &&
 		pass ".tools.sh passes ShellCheck with zero warnings"
 fi
+
+# Test 9: Universal Clipboard Manager (clip & clip-paste in .tools.sh)
+clip_test_result=$(bash -c "
+source '${TOOLS_SH}'
+if ! declare -F clip >/dev/null || ! declare -F clip-paste >/dev/null; then
+    echo \"FUNCS_MISSING\"
+    exit 1
+fi
+help_out=\$(clip --help 2>&1)
+if ! echo \"\$help_out\" | grep -q \"Universal Multi-Platform Clipboard Manager\"; then
+    echo \"HELP_FAILED\"
+    exit 1
+fi
+echo \"CLIP_OK\"
+")
+assert_equals "CLIP_OK" "$clip_test_result" "Universal Clipboard Manager functionality in .tools.sh" &&
+	pass ".tools.sh exports functional clip and clip-paste utilities with help support"
+
+# Test 10: Non-conflicting AI aliases in .base.zsh (ai- prefix, no gcm/gpr)
+alias_check_result=$(bash -c "
+if grep -E 'alias gcm=|alias gpr=' '${BASE_ZSH}'; then
+    echo \"CONFLICTING_ALIASES_FOUND\"
+else
+    echo \"SAFE_ALIASES\"
+fi
+")
+assert_equals "SAFE_ALIASES" "$alias_check_result" "No Git/GitHub colliding aliases in .base.zsh" &&
+	pass ".base.zsh strictly avoids gcm and gpr collisions, standardizing on ai- prefix"

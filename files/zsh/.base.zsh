@@ -500,12 +500,7 @@ alias da=darktheme
 
 # Copy current path
 function cpath() {
-    if [[ "$OSTYPE" == linux* && (( $+commands[xclip] )) ]]; then
-        pwd | tr -d '\n' | xclip -selection clipboard
-
-    elif [[ "$OSTYPE" == darwin* ]]; then
-        pwd | tr -d '\n' | pbcopy
-    fi
+    pwd | tr -d '\n' | clip
 }
 
 # Flush the DNS Cache
@@ -598,22 +593,35 @@ fi
 ## Difftastic (Diff estructural AST basado en Tree-sitter)
 (( $+commands[difft] )) && alias dft='difft'
 
+## Universal Clipboard Manager (clip / clip-paste)
+alias cb='clip'
+alias copy='clip'
+alias paste='clip-paste'
+
 ## aitools (AI Productivity, Quota Management & Automated Workflows Suite)
 if (( $+commands[aitools] )); then
     alias ait='aitools'
-    alias gcm='aitools commit'
-    alias gcmk='aitools commit --template task'
-    alias gcmj='aitools commit --template task'
-    alias gcmr='aitools commit --template repo'
-    alias gcmd='aitools commit --template detailed'
-    alias gpr='aitools pr'
-    alias gprr='aitools pr --template repo'
-    alias gprk='aitools pr --template task'
-    alias gprd='aitools pr --template detailed'
+    # AI Conventional Commit Generator (prefixed with ai- to avoid Git / GitHub alias conflicts)
+    alias ai-commit='aitools commit'
+    alias ai-commit-task='aitools commit --template task'
+    alias ai-commit-repo='aitools commit --template repo'
+    alias ai-commit-detailed='aitools commit --template detailed'
+    alias ai-cm='aitools commit'
+    alias ai-cmk='aitools commit --template task'
+    alias ai-cmr='aitools commit --template repo'
+    alias ai-cmd='aitools commit --template detailed'
+    # AI Pull Request Description Generator
+    alias ai-pr='aitools pr'
+    alias ai-pr-task='aitools pr --template task'
+    alias ai-pr-repo='aitools pr --template repo'
+    alias ai-pr-detailed='aitools pr --template detailed'
+    alias ai-prk='aitools pr --template task'
+    alias ai-prr='aitools pr --template repo'
+    alias ai-prd='aitools pr --template detailed'
+    # AI Utilities
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
     alias ai-llm='aitools llm'
-    alias ai-pr='aitools pr'
 fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)
