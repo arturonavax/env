@@ -381,3 +381,92 @@ mkdir -p "$repo_test_dir"
 repo_test_code=$?
 assert_exit_code 0 "$repo_test_code" "Repo template discovery exit code" &&
 	pass "aitools commit auto-discovered repository-level .gitmessage commit template"
+
+# Test 25: aitools pr CLI flags and help interface
+pr_help_output="$("$AITOOLS_BIN" pr --help 2>&1)"
+pr_help_code=$?
+assert_exit_code 0 "$pr_help_code" "aitools pr --help exit code" &&
+	assert_contains "$pr_help_output" "-B BASE" "Base branch flag present" &&
+	assert_contains "$pr_help_output" "-t TEMPLATE" "Template flag present" &&
+	assert_contains "$pr_help_output" "-k TASK_ID" "Task ID flag present" &&
+	assert_contains "$pr_help_output" "-o OUTPUT" "Output file flag present" &&
+	assert_contains "$pr_help_output" "-c" "Copy flag present" &&
+	assert_contains "$pr_help_output" "-p" "Print flag present" &&
+	assert_contains "$pr_help_output" "-d" "Dry run flag present" &&
+	assert_contains "$pr_help_output" "--list-templates" "List templates flag present" &&
+	assert_contains "$pr_help_output" "--list-backends" "List backends flag present" &&
+	pass "aitools pr CLI flags (--base, --template, --task, --output, --copy, --print, --dry-run) verified"
+
+# Test 26: aitools pr --list-templates
+pr_templates_output="$("$AITOOLS_BIN" pr --list-templates 2>&1)"
+pr_templates_code=$?
+assert_exit_code 0 "$pr_templates_code" "aitools pr --list-templates exit code" &&
+	assert_contains "$pr_templates_output" "standard" "Standard PR template listed" &&
+	assert_contains "$pr_templates_output" "task" "Task PR template listed" &&
+	assert_contains "$pr_templates_output" "minimal" "Minimal PR template listed" &&
+	assert_contains "$pr_templates_output" "detailed" "Detailed PR template listed" &&
+	pass "aitools pr --list-templates cleanly displayed built-in PR templates"
+
+# Test 27: Repository PR template auto-discovery (.github/pull_request_template.md) and prioritization
+repo_pr_dir="${TEST_SANDBOX}/git_repo_with_pr_template"
+mkdir -p "$repo_pr_dir/.github"
+(
+	cd "$repo_pr_dir" || exit 1
+	git init -q
+	cat <<'EOF' > .github/pull_request_template.md
+## Summary
+Explain what changed.
+
+## Checklist
+- [ ] Tested
+EOF
+	repo_pr_list="$("$AITOOLS_BIN" pr --list-templates 2>&1)"
+	assert_contains "$repo_pr_list" "repo" "Discovered repo PR template in list" &&
+		assert_contains "$repo_pr_list" ".github/pull_request_template.md" "Found repo template reference" &&
+		assert_contains "$repo_pr_list" "(active repo)" "Marked as active repo template"
+)
+repo_pr_code=$?
+assert_exit_code 0 "$repo_pr_code" "Repo PR template discovery exit code" &&
+	pass "aitools pr auto-discovered and prioritized repository PR template"
+
+# Test 28: Git branch change extraction and Python PR template resolver
+python3 -c "
+from importlib.machinery import SourceFileLoader
+import os
+aitools = SourceFileLoader('aitools', '${REPO_ROOT}/files/ai/aitools/aitools').load_module()
+
+# 1. Test PR template resolution prioritization
+cfg = {'pr': {'auto_detect_repo_template': False, 'default_template': 'task'}}
+tpl, name = aitools.resolve_pr_template(None, cfg)
+assert name == 'task', f'Expected task template, got {name}'
+
+# 2. Test explicit template override
+tpl_min, name_min = aitools.resolve_pr_template('minimal', cfg)
+assert name_min == 'minimal', f'Expected minimal template, got {name_min}'
+
+# 3. Test template rendering with context
+ctx = {
+    'branch': 'feature/PROJ-888-auth',
+    'base': 'main',
+    'task_id': 'PROJ-888',
+    'task_ref': '- **Related Issue / Ticket**: PROJ-888',
+    'commits': '- feat(auth): add jwt validation',
+    'files': 'auth.go, auth_test.go',
+    'stat': '2 files changed, 50 insertions(+)',
+    'diff': '+func ValidateJWT() bool { return true }'
+}
+rendered = aitools.render_pr_template(tpl, ctx)
+assert 'PROJ-888' in rendered, 'Task ID not found in rendered PR template'
+assert 'ValidateJWT' in rendered, 'Diff content not found in rendered PR template'
+"
+assert_exit_code 0 "$?" "Python PR template resolver validation" &&
+	pass "aitools PR template resolver and context renderer passed unit checks"
+
+# Test 29: aitools pr pipeline mode (--print, --output) with mock backend
+pr_out_file="${TEST_SANDBOX}/generated_pr.md"
+pr_print_output="$("$AITOOLS_BIN" pr -B "HEAD~1" -b "cat" -p -o "$pr_out_file" -k "TICKET-77" 2>&1)"
+pr_print_code=$?
+assert_exit_code 0 "$pr_print_code" "aitools pr --print exit code" &&
+	assert_contains "$pr_print_output" "TICKET-77" "Output contains task ID" &&
+	[[ -f "$pr_out_file" ]] && assert_contains "$(<"$pr_out_file")" "TICKET-77" "File written with task ID" &&
+	pass "aitools pr --print routed markdown description directly to stdout and file"

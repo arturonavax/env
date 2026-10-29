@@ -212,9 +212,14 @@ Configured in `~/.base.zsh`:
 | `gcmr` | `aitools commit --template repo` | AI commit strictly adhering to repo's `.gitmessage` |
 | `gcmj` | `aitools commit --template task` | Compatibility alias for task ticket commit |
 | `gcmd` | `aitools commit --template detailed` | AI commit with multi-line detailed breakdown |
+| `gpr` | `aitools pr` | AI-powered Pull Request Markdown description from branch diff |
+| `gprr` | `aitools pr --template repo` | PR description strictly following repository PR template |
+| `gprk` | `aitools pr --template task` | PR description structured with Task / Ticket ID |
+| `gprd` | `aitools pr --template detailed` | PR description with deep architectural specification |
 | `ai-wake` | `aitools wake` | Quota primer probe |
 | `ai-quota` | `aitools quota` | Quick quota status inspection |
 | `ai-llm` | `aitools llm` | Unified non-interactive AI query wrapper |
+| `ai-pr` | `aitools pr` | Pull Request generator alias |
 
 ---
 
@@ -255,7 +260,53 @@ When defining custom templates in `~/.config/aitools/config.json` or external te
 
 ---
 
-## 6. AI Harness Adapters & I/O Protocol Normalization
+## 6. AI Pull Request (PR) Description Generator (`aitools pr` / `gpr`)
+
+Under the same principles as the commit generator, `aitools pr` analyzes all commits and diffs across a Git branch relative to a target base branch (e.g. `main`, `master`, `develop`) and generates a structured, publication-ready Pull Request Markdown description.
+
+### Key Capabilities
+- **Branch Context Extraction**: Gathers commit log (`git log --no-merges base..HEAD`), diff summary (`git diff --stat`), list of modified files, and full diff.
+- **Auto-Detection of Base Branch**: Automatically detects target base branch (`origin/main`, `main`, `master`, or upstream remote branch) or accepts explicit `-B <branch>`.
+- **Repository PR Template Prioritization**: Automatically discovers and fills out repository PR templates (`.github/pull_request_template.md`, `.github/PULL_REQUEST_TEMPLATE/*.md`, `pull_request_template.md`, `.gitlab/merge_request_templates/`, etc.) with highest priority.
+- **Built-in PR Templates**:
+  - `standard` (default): Comprehensive PR with Summary, Key Changes, Architecture Decisions, Verification, and Checklist.
+  - `task`: Task-linked PR format (`[<TASK-ID>] Title`, Problem, Solution, Verification, Checklist).
+  - `minimal`: Terse, high-signal summary with bulleted changes and testing notes.
+  - `detailed`: Deep-dive architectural specification with subsystem walkthrough.
+- **Interactive & Automation Modes**:
+  - Interactive loop: Accept, Copy to clipboard (`wl-copy`/`xclip`/`pbcopy`), Save to file, Edit in `$EDITOR`, Regenerate with AI, or Create PR directly via GitHub CLI (`gh pr create`).
+  - Pipeline mode (`--print` / `-p`): Emits raw Markdown directly to stdout for shell pipelines (e.g. `gh pr create --body "$(aitools pr -p)"`).
+
+### Usage Examples
+
+```bash
+# Generate PR description for current branch against auto-detected base (main/master)
+aitools pr
+
+# Generate PR against specific base branch
+aitools pr -B develop
+
+# Generate and copy directly to clipboard
+aitools pr -c
+
+# Save PR description directly to Markdown file
+aitools pr -o PR_DESCRIPTION.md
+
+# Pipeline directly into GitHub CLI
+gh pr create --title "feat: my new feature" --body "$(aitools pr --print)"
+
+# Force specific template
+aitools pr --template task
+aitools pr --template detailed
+aitools pr --template repo
+
+# List available PR templates
+aitools pr --list-templates
+```
+
+---
+
+## 7. AI Harness Adapters & I/O Protocol Normalization
 
 Different AI CLIs and agent harnesses use incompatible I/O protocols:
 - Some tools support **UNIX stdin pipes** (e.g. `llm`, `ollama`), while others require **CLI argument flags** (e.g. `agy -p`, `claude -p`).

@@ -606,9 +606,14 @@ if (( $+commands[aitools] )); then
     alias gcmj='aitools commit --template task'
     alias gcmr='aitools commit --template repo'
     alias gcmd='aitools commit --template detailed'
+    alias gpr='aitools pr'
+    alias gprr='aitools pr --template repo'
+    alias gprk='aitools pr --template task'
+    alias gprd='aitools pr --template detailed'
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
     alias ai-llm='aitools llm'
+    alias ai-pr='aitools pr'
 fi
 
 ## Eza (Atajos modernos con iconos y clasificacion manteniendo compatibilidad)

@@ -294,6 +294,173 @@ DEFAULT_COMMIT_TEMPLATES = {
     "jira-scope": COMMIT_PROMPT_TASK_SCOPE.strip()
 }
 
+# ------------------------------------------------------------------------------
+# Pull Request (PR) Description Prompt Templates
+# ------------------------------------------------------------------------------
+PR_PROMPT_STANDARD = """You are an expert software developer and technical lead writing a Pull Request (PR) description in GitHub Flavored Markdown.
+Analyze the following branch commits, changed files, and git diff. Generate a comprehensive, professional PR description.
+
+Context:
+- Current Branch: {branch}
+- Target Base Branch: {base}
+- Task / Issue ID: {task_id}
+- Commits on Branch:
+{commits}
+- Modified Files:
+{files}
+- Diff Summary:
+{stat}
+
+Structure the PR description using the following sections:
+## Summary & Motivation
+Provide a clear, high-level overview of what changes are introduced in this pull request and what problem they solve.
+{task_ref}
+
+## Key Changes
+- Group bullet points by component or subsystem highlighting the notable features, fixes, or refactors.
+
+## Architecture & Technical Decisions
+- Summarize design patterns, trade-offs, or architectural choices applied (omit or keep brief if trivial).
+
+## Verification & Testing
+- Document how the changeset was tested (unit test results, linting, manual validation steps, commands executed).
+
+## Checklist
+- [x] Code follows repository conventions and architecture patterns
+- [x] Relevant tests and quality gates pass cleanly
+- [x] Documentation, comments, and configurations updated where appropriate
+
+Requirements:
+1. Provide accurate technical summaries based on the real commits and diff.
+2. Output in English.
+3. Do NOT wrap entire output in a triple backtick code fence.
+4. Output ONLY the raw Markdown PR description.
+
+Git Branch Diff:
+{diff}
+"""
+
+PR_PROMPT_TASK = """You are an expert developer creating a task-linked Pull Request description in GitHub Flavored Markdown.
+Analyze the following branch commits, changed files, and git diff to produce a PR description tightly connected to ticket {task_id}.
+
+Context:
+- Current Branch: {branch}
+- Target Base Branch: {base}
+- Task / Issue ID: {task_id}
+- Commits:
+{commits}
+- Modified Files:
+{files}
+
+Format:
+# [{task_id}] <Descriptive PR Title>
+
+> **Issue / Ticket**: {task_id}
+
+## Problem / Requirement
+Explain the user problem, requirement, or bug that prompted this work.
+
+## Proposed Solution & Architecture
+Explain how the implementation resolves the ticket cleanly and robustly.
+
+## Detailed Changes
+{commits}
+Summary of key logic, API, and file modifications.
+
+## Testing & Verification
+- Test commands executed and validation proof.
+
+## Checklist
+- [x] Resolves ticket requirements
+- [x] Tests added or updated
+- [x] No breaking changes introduced (or documented below)
+
+Requirements:
+1. If Task ID is empty, omit the [{task_id}] prefix in the title.
+2. Output in clean GitHub Flavored Markdown.
+3. Do NOT wrap the entire response in backticks. Output ONLY the PR description.
+
+Git Branch Diff:
+{diff}
+"""
+
+PR_PROMPT_MINIMAL = """You are an expert developer creating a concise, high-signal Pull Request description.
+Analyze the commits and git diff to produce a clean Markdown summary.
+
+Context:
+- Branch: {branch} -> {base}
+- Task: {task_id}
+
+Format:
+## Overview
+1-2 sentences summarizing the change and purpose.
+
+## Changes
+- Concise bullet points of what was added, modified, or removed.
+
+## Verification
+- Note on test suites executed and verification result.
+
+Requirements:
+- Punchy, technical, and to the point.
+- Output ONLY the raw Markdown content.
+
+Git Branch Diff:
+{diff}
+"""
+
+PR_PROMPT_DETAILED = """You are a Principal Architect writing a thorough, production-grade Pull Request description.
+Analyze the following branch commits and git diff to produce a deep-dive Markdown specification.
+
+Context:
+- Branch: {branch} -> {base}
+- Task / Issue ID: {task_id}
+- Commits:
+{commits}
+- Changed Files:
+{files}
+- Diff Stat:
+{stat}
+
+Structure:
+# <Component / Feature Name>: <Summary of Architecture Change>
+
+## 1. Executive Summary
+Clear explanation of the problem, motivation, and scope of this changeset.
+
+## 2. Architecture & Design Patterns
+- Detailed breakdown of patterns, libraries, and design decisions applied.
+- Edge cases considered and trade-offs made.
+
+## 3. Subsystem Changes
+Break down changes by subsystem or folder with rationale for each.
+
+## 4. Breaking Changes & Compatibility
+Explicitly state any breaking changes, environment variables, or schema updates (or "No breaking changes").
+
+## 5. Testing & Verification Gates
+- Unit test coverage details.
+- Integration / verification steps.
+- Security and performance considerations.
+
+## 6. Reviewer Guidance
+Pointers on where to start reviewing and key files to scrutinize.
+
+Requirements:
+- High technical rigor.
+- Output ONLY the Markdown PR description.
+
+Git Branch Diff:
+{diff}
+"""
+
+DEFAULT_PR_TEMPLATES = {
+    "standard": PR_PROMPT_STANDARD.strip(),
+    "task": PR_PROMPT_TASK.strip(),
+    "minimal": PR_PROMPT_MINIMAL.strip(),
+    "detailed": PR_PROMPT_DETAILED.strip(),
+}
+
 DEFAULT_BACKENDS = {
     "agy": {
         "name": "agy",
@@ -423,6 +590,17 @@ DEFAULT_CONFIG = {
         "task_id": None,
         "prompt_template": COMMIT_PROMPT_CONVENTIONAL.strip(),
         "templates": DEFAULT_COMMIT_TEMPLATES
+    },
+    "pr": {
+        "default_backend": "agy",
+        "model": None,
+        "effort": "low",
+        "default_base": None,
+        "default_template": "standard",
+        "auto_detect_repo_template": True,
+        "max_diff_length": 25000,
+        "task_id": None,
+        "templates": DEFAULT_PR_TEMPLATES
     },
     "daemon": {
         "auto_wake": {
@@ -2075,6 +2253,586 @@ def run_commit(
 
 
 # ------------------------------------------------------------------------------
+# Action: PULL REQUEST (PR) DESCRIPTION GENERATION
+# ------------------------------------------------------------------------------
+def wrap_repo_pr_template_as_prompt(raw_template: str, source_desc: str) -> str:
+    """Wraps a repository-level Pull Request template into an LLM instruction prompt."""
+    if "{diff}" in raw_template and ("{commits}" in raw_template or "{branch}" in raw_template):
+        return raw_template
+    return f"""You are an expert developer and technical lead writing a Pull Request (PR) description in GitHub Flavored Markdown.
+Analyze the following branch commits, changed files, and git diff. Fill out the repository's official Pull Request template ({source_desc}) completely, accurately, and professionally.
+
+Context:
+- Current Branch: {{branch}}
+- Target Base Branch: {{base}}
+- Task / Issue ID: {{task_id}}
+- Commits on Branch:
+{{commits}}
+- Modified Files:
+{{files}}
+- Diff Summary:
+{{stat}}
+
+Repository Official PR Template:
+--------------------------------------------------------------------------------
+{raw_template.strip()}
+--------------------------------------------------------------------------------
+
+Instructions:
+1. Maintain every section, heading, and table from the repository template above.
+2. Fill in all details thoroughly based on the branch changes, commits, and diff.
+3. Check relevant checklist boxes with `[x]` (and leave non-applicable ones with `[ ]` or explain).
+4. If a Task or Issue ID is provided ({{task_id}}), reference it in the appropriate issue/ticket field or write "Closes {{task_id}}" or "Fixes {{task_id}}".
+5. For sections that do not apply to this specific change, write "N/A" or a brief explanation rather than omitting the section.
+6. Write in clean, professional English.
+7. Do NOT wrap the entire response in a top-level ```markdown fence. Output ONLY the filled-in Pull Request Markdown body.
+
+Git Branch Diff:
+{{diff}}
+"""
+
+
+def find_git_repo_pr_template() -> tuple[Optional[str], Optional[str]]:
+    """
+    Discovers a Pull Request (or Merge Request) template from the local git repository:
+    1. .github/pull_request_template.md or .github/PULL_REQUEST_TEMPLATE.md
+    2. .github/PULL_REQUEST_TEMPLATE/ (default or first .md)
+    3. Root pull_request_template.md / PULL_REQUEST_TEMPLATE.md
+    4. .gitlab/merge_request_templates/ (default or first .md)
+    5. docs/pull_request_template.md
+    Returns (prompt_template_string, source_description) or (None, None).
+    """
+    try:
+        res = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False)
+        if res.returncode != 0 or not res.stdout.strip():
+            return None, None
+        repo_root = res.stdout.strip()
+    except Exception:
+        return None, None
+
+    candidates = [
+        os.path.join(".github", "pull_request_template.md"),
+        os.path.join(".github", "PULL_REQUEST_TEMPLATE.md"),
+        os.path.join(".github", "PULL_REQUEST_TEMPLATE", "pull_request_template.md"),
+        os.path.join(".github", "PULL_REQUEST_TEMPLATE", "default.md"),
+        "pull_request_template.md",
+        "PULL_REQUEST_TEMPLATE.md",
+        os.path.join(".gitlab", "merge_request_templates", "default.md"),
+        os.path.join(".gitlab", "merge_request_templates", "pull_request_template.md"),
+        os.path.join("docs", "pull_request_template.md"),
+        os.path.join("docs", "PULL_REQUEST_TEMPLATE.md"),
+    ]
+
+    for rel_path in candidates:
+        full_path = os.path.join(repo_root, rel_path)
+        if os.path.isfile(full_path):
+            try:
+                with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                    raw = f.read().strip()
+                    if raw:
+                        return wrap_repo_pr_template_as_prompt(raw, f"repo: {rel_path}"), f"repo:{rel_path}"
+            except Exception:
+                pass
+
+    dir_candidates = [
+        os.path.join(repo_root, ".github", "PULL_REQUEST_TEMPLATE"),
+        os.path.join(repo_root, ".github", "pull_request_template"),
+        os.path.join(repo_root, ".gitlab", "merge_request_templates"),
+    ]
+    for d in dir_candidates:
+        if os.path.isdir(d):
+            try:
+                files = sorted(os.listdir(d))
+                for fname in files:
+                    if fname.endswith((".md", ".txt")) and not fname.startswith("."):
+                        fpath = os.path.join(d, fname)
+                        if os.path.isfile(fpath):
+                            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                                raw = f.read().strip()
+                                if raw:
+                                    rel = os.path.relpath(fpath, repo_root)
+                                    return wrap_repo_pr_template_as_prompt(raw, f"repo: {rel}"), f"repo:{rel}"
+            except Exception:
+                pass
+
+    return None, None
+
+
+def detect_git_base_branch(explicit_base: Optional[str] = None, default_from_cfg: Optional[str] = None) -> str:
+    """
+    Detects target base branch for Pull Request comparison:
+    1. Explicit CLI argument (--base / -B)
+    2. Config default (pr.default_base)
+    3. Auto-detection:
+       - If on feature branch: checks origin/main, main, origin/master, master, origin/develop, develop
+       - If on main/master: checks @{upstream} (e.g. origin/main) to show unpushed branch commits
+    """
+    if explicit_base:
+        return explicit_base
+    if default_from_cfg:
+        return default_from_cfg
+
+    curr_branch = get_git_branch()
+
+    # If currently on main or master, compare against its upstream remote tracking branch
+    if curr_branch in ("main", "master"):
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "@{upstream}"],
+                capture_output=True, text=True, check=False
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return res.stdout.strip()
+        except Exception:
+            pass
+
+    # Check candidates for feature branches
+    for candidate in ("main", "master", "develop", "dev"):
+        if candidate == curr_branch:
+            continue
+        # Check origin ref first for fresh base
+        res_remote = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{candidate}"],
+            capture_output=True, text=True, check=False
+        )
+        if res_remote.returncode == 0:
+            return f"origin/{candidate}"
+
+        # Check local ref
+        res_local = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{candidate}"],
+            capture_output=True, text=True, check=False
+        )
+        if res_local.returncode == 0:
+            return candidate
+
+    return "main" if curr_branch != "main" else "origin/main"
+
+
+def get_git_branch_commits(base_branch: str, head_ref: str = "HEAD") -> tuple[list[str], str]:
+    """Returns list of commit message summaries and multiline string of commits on this branch."""
+    try:
+        res = subprocess.run(
+            ["git", "log", "--no-merges", "--format=- %s (%h)", f"{base_branch}..{head_ref}"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0:
+            lines = [l.strip() for l in res.stdout.splitlines() if l.strip()]
+            return lines, "\n".join(lines)
+    except Exception:
+        pass
+    return [], ""
+
+
+def get_git_branch_stat(base_branch: str, head_ref: str = "HEAD") -> str:
+    """Returns git diff --stat between base and head."""
+    try:
+        res = subprocess.run(
+            ["git", "diff", "--stat", f"{base_branch}...{head_ref}"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0:
+            return res.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
+def get_git_branch_files(base_branch: str, head_ref: str = "HEAD") -> list[str]:
+    """Returns list of files modified between base and head."""
+    try:
+        res = subprocess.run(
+            ["git", "diff", "--name-only", f"{base_branch}...{head_ref}"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0:
+            return [f.strip() for f in res.stdout.splitlines() if f.strip()]
+    except Exception:
+        pass
+    return []
+
+
+def get_git_branch_diff(base_branch: str, head_ref: str = "HEAD") -> tuple[str, bool]:
+    """Returns full git diff between base and head (using three-dot comparison)."""
+    try:
+        res = subprocess.run(
+            ["git", "diff", f"{base_branch}...{head_ref}"],
+            capture_output=True, text=True, check=False
+        )
+        if res.returncode == 0:
+            return res.stdout, True
+        return "", False
+    except Exception as e:
+        return str(e), False
+
+
+def render_pr_template(template: str, context: dict[str, Any]) -> str:
+    """Safely substitutes {key} placeholders in PR template without KeyError on literal braces."""
+    result = template
+    for key, val in context.items():
+        result = result.replace(f"{{{key}}}", str(val))
+    return result
+
+
+def resolve_pr_template(
+    template_name_or_str: Optional[str],
+    config: dict
+) -> tuple[str, str]:
+    """
+    Resolves Pull Request prompt template string and its source identifier.
+    Prioritizes repository PR template when auto_detect_repo_template is true (default).
+    """
+    pr_cfg = config.get("pr", {})
+    configured_templates = {**DEFAULT_PR_TEMPLATES, **pr_cfg.get("templates", {})}
+
+    # 1. Explicit CLI choice
+    if template_name_or_str:
+        if template_name_or_str.lower() in ("repo", "git", "github", "pr_template"):
+            repo_tpl, repo_src = find_git_repo_pr_template()
+            if repo_tpl and repo_src:
+                return repo_tpl, repo_src
+            print(f"{C_YELLOW}⚠️ No PR template found in repository files, falling back to default.{C_RESET}", file=sys.stderr)
+
+        if template_name_or_str in configured_templates:
+            return configured_templates[template_name_or_str], template_name_or_str
+        if "{diff}" in template_name_or_str and ("{commits}" in template_name_or_str or "{branch}" in template_name_or_str):
+            return template_name_or_str, "custom-inline"
+        if os.path.isfile(template_name_or_str):
+            try:
+                with open(template_name_or_str, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                    return wrap_repo_pr_template_as_prompt(raw, os.path.basename(template_name_or_str)), os.path.basename(template_name_or_str)
+            except Exception:
+                pass
+        print(f"{C_YELLOW}⚠️ Unknown PR template '{template_name_or_str}', falling back to default.{C_RESET}", file=sys.stderr)
+
+    # 2. Prioritize repository template if enabled (default: True)
+    auto_detect = pr_cfg.get("auto_detect_repo_template", True)
+    default_tpl_name = pr_cfg.get("default_template", "standard")
+
+    if auto_detect:
+        repo_tpl, repo_src = find_git_repo_pr_template()
+        if repo_tpl and repo_src:
+            return repo_tpl, repo_src
+
+    # 3. Configured default template
+    if default_tpl_name in configured_templates:
+        return configured_templates[default_tpl_name], default_tpl_name
+
+    # 4. Standard fallback
+    return DEFAULT_PR_TEMPLATES["standard"], "standard"
+
+
+def query_llm_for_pr(
+    diff_text: str,
+    backend: str,
+    model: Optional[str] = None,
+    template_str: Optional[str] = None,
+    template_context: Optional[dict] = None,
+    effort: str = "low",
+    max_diff_length: int = 25000
+) -> str:
+    """Executes prompt against chosen AI CLI backend to generate PR description in Markdown."""
+    if max_diff_length and len(diff_text) > max_diff_length:
+        diff_text = diff_text[:max_diff_length] + "\n... [diff truncated for length]"
+
+    context = dict(template_context or {})
+    context["diff"] = diff_text
+    context.setdefault("branch", "")
+    context.setdefault("base", "main")
+    context.setdefault("head", "HEAD")
+    context.setdefault("task_id", "")
+    context.setdefault("issue_id", context.get("task_id", ""))
+    context.setdefault("ticket_id", context.get("task_id", ""))
+    context.setdefault("ticket", context.get("task_id", ""))
+    context.setdefault("task_ref", f"- **Related Issue / Ticket**: {context['task_id']}" if context.get("task_id") else "")
+    context.setdefault("commits", "")
+    context.setdefault("files", "")
+    context.setdefault("stat", "")
+    context.setdefault("model", model or "")
+
+    template = template_str or DEFAULT_PR_TEMPLATES["standard"]
+    prompt = render_pr_template(template, context)
+
+    return query_llm(
+        prompt=prompt,
+        backend=backend,
+        model=model,
+        effort=effort,
+        timeout_sec=60,
+        clean_markdown_fence=True,
+        mode="chat",
+        output_format="text"
+    )
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Copies text to system clipboard across Wayland, X11, and macOS."""
+    if not text:
+        return False
+    # Wayland
+    if shutil.which("wl-copy") and os.environ.get("WAYLAND_DISPLAY"):
+        try:
+            p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
+            p.communicate(text.encode("utf-8"))
+            return p.returncode == 0
+        except Exception:
+            pass
+    # X11
+    if shutil.which("xclip"):
+        try:
+            p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
+            p.communicate(text.encode("utf-8"))
+            return p.returncode == 0
+        except Exception:
+            pass
+    # macOS
+    if shutil.which("pbcopy"):
+        try:
+            p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+            p.communicate(text.encode("utf-8"))
+            return p.returncode == 0
+        except Exception:
+            pass
+    # Fallback wl-copy
+    if shutil.which("wl-copy"):
+        try:
+            p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
+            p.communicate(text.encode("utf-8"))
+            return p.returncode == 0
+        except Exception:
+            pass
+    return False
+
+
+def run_pr(
+    base: Optional[str] = None,
+    head: Optional[str] = None,
+    backend: Optional[str] = None,
+    model: Optional[str] = None,
+    template: Optional[str] = None,
+    task_id: Optional[str] = None,
+    output_file: Optional[str] = None,
+    copy_clipboard: bool = False,
+    print_raw: bool = False,
+    dry_run: bool = False,
+    list_templates: bool = False,
+    list_backends: bool = False
+) -> None:
+    """Generates Pull Request Markdown description from branch diff and commit log using AI."""
+    if list_backends:
+        show_backends()
+        return
+
+    config = load_config()
+    pr_cfg = config.get("pr", {})
+    configured_templates = {**DEFAULT_PR_TEMPLATES, **pr_cfg.get("templates", {})}
+
+    if list_templates:
+        print(f"\n{C_BOLD}{C_CYAN}Available Pull Request (PR) Description Templates:{C_RESET}\n")
+        default_name = pr_cfg.get("default_template", "standard")
+        repo_tpl, repo_src = find_git_repo_pr_template()
+        if repo_src:
+            is_active = " (active repo)" if pr_cfg.get("auto_detect_repo_template", True) else ""
+            print(f"  • {C_BOLD_WHITE}{'repo':<16}{C_RESET}{C_GREEN}{is_active:<15}{C_RESET} {C_CYAN}[{repo_src}]{C_RESET} {C_DIM}Discovered repository PR template{C_RESET}")
+
+        for name in sorted(configured_templates.keys()):
+            is_def = " (default)" if name == default_name and not repo_src else ""
+            desc = name
+            if name == "standard":
+                desc = "Standard PR (Summary, Key Changes, Decisions, Verification, Checklist)"
+            elif name == "task":
+                desc = "Task-linked PR ([TASK-ID] Title, Problem, Solution, Verification)"
+            elif name == "minimal":
+                desc = "Terse high-signal summary, bulleted changes and verification note"
+            elif name == "detailed":
+                desc = "Deep-dive architectural specification with subsystem walkthrough"
+            print(f"  • {C_BOLD_WHITE}{name:<16}{C_RESET}{C_GREEN}{is_def:<15}{C_RESET} {C_DIM}{desc}{C_RESET}")
+        print(f"\n{C_DIM}Select via: aitools pr --template <name|file|repo> (or configure in ~/.config/aitools/config.json){C_RESET}\n")
+        return
+
+    chosen_backend = backend or pr_cfg.get("default_backend") or config.get("default_commit_backend", "agy")
+    chosen_model = model or pr_cfg.get("model")
+    effort = pr_cfg.get("effort", "low")
+    max_len = pr_cfg.get("max_diff_length", 25000)
+
+    # Resolve Git context
+    curr_branch = get_git_branch()
+    base_branch = detect_git_base_branch(base, pr_cfg.get("default_base"))
+    head_ref = head or "HEAD"
+    resolved_task = task_id or pr_cfg.get("task_id") or extract_task_id(curr_branch)
+
+    commit_lines, commits_str = get_git_branch_commits(base_branch, head_ref)
+    stat_str = get_git_branch_stat(base_branch, head_ref)
+    files_list = get_git_branch_files(base_branch, head_ref)
+    diff_text, ok = get_git_branch_diff(base_branch, head_ref)
+
+    if not ok or (not diff_text.strip() and not commits_str.strip()):
+        print(f"{C_RED}✗ No commits or changes found between base '{base_branch}' and '{head_ref}'.{C_RESET}", file=sys.stderr)
+        return
+
+    # Resolve template
+    template_str, template_name = resolve_pr_template(template, config)
+
+    context = {
+        "branch": curr_branch,
+        "base": base_branch,
+        "head": head_ref,
+        "task_id": resolved_task or "",
+        "issue_id": resolved_task or "",
+        "ticket_id": resolved_task or "",
+        "ticket": resolved_task or "",
+        "task_ref": f"- **Related Issue / Ticket**: {resolved_task}" if resolved_task else "",
+        "commits": commits_str or "(No individual commit logs)",
+        "files": ", ".join(files_list[:25]) if files_list else "None",
+        "stat": stat_str or "(No diff stat)",
+        "model": chosen_model or "",
+    }
+
+    if not print_raw:
+        model_display = f" (model: {C_WHITE}{chosen_model}{C_RESET})" if chosen_model else ""
+        task_display = f" [task: {C_YELLOW}{resolved_task}{C_RESET}]" if resolved_task else ""
+        print(f"\n{C_BOLD}{C_CYAN}==> Generating PR Description with AI: {C_WHITE}{chosen_backend}{C_RESET}{model_display} [{base_branch}..{curr_branch}] [template: {C_GREEN}{template_name}{C_RESET}]{task_display}...")
+
+    try:
+        pr_markdown = query_llm_for_pr(
+            diff_text=diff_text,
+            backend=chosen_backend,
+            model=chosen_model,
+            template_str=template_str,
+            template_context=context,
+            effort=effort,
+            max_diff_length=max_len
+        )
+    except Exception as e:
+        print(f"{C_RED}[ERROR] Failed to generate PR description: {e}{C_RESET}", file=sys.stderr)
+        return
+
+    # Fast-path for non-interactive / pipeline usage
+    if print_raw:
+        print(pr_markdown)
+        if output_file:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(pr_markdown + "\n")
+        if copy_clipboard:
+            copy_to_clipboard(pr_markdown)
+        return
+
+    if output_file and dry_run:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(pr_markdown + "\n")
+        print(f"{C_GREEN}✓ PR description written to: {output_file}{C_RESET}")
+
+    if copy_clipboard and dry_run:
+        if copy_to_clipboard(pr_markdown):
+            print(f"{C_GREEN}✓ PR description copied to clipboard.{C_RESET}")
+
+    # Interactive Loop
+    while True:
+        box_w = UIBox.get_width(84)
+        print(f"\n{UIBox.top(box_w, color=C_BOLD_CYAN)}")
+        print(UIBox.line(f"{C_BOLD_CYAN}Proposed Pull Request Description ({template_name}):{C_RESET}", box_w, border_color=C_BOLD_CYAN))
+        print(UIBox.mid(box_w, color=C_BOLD_CYAN))
+        for line in pr_markdown.splitlines():
+            print(UIBox.line(f"{line}", box_w, border_color=C_BOLD_CYAN))
+        print(f"{UIBox.bottom(box_w, color=C_BOLD_CYAN)}")
+
+        if dry_run:
+            print(f"{C_DIM}[Dry Run: not saving or creating PR]{C_RESET}\n")
+            return
+
+        has_gh = bool(shutil.which("gh"))
+        print(f"  {C_YELLOW}[a]{C_RESET} Accept and print to stdout")
+        print(f"  {C_YELLOW}[c]{C_RESET} Copy to clipboard")
+        print(f"  {C_YELLOW}[s]{C_RESET} Save to file (e.g. PR_DESCRIPTION.md)")
+        print(f"  {C_YELLOW}[e]{C_RESET} Edit description manually")
+        print(f"  {C_YELLOW}[r]{C_RESET} Regenerate with AI")
+        if has_gh:
+            print(f"  {C_YELLOW}[p]{C_RESET} Create PR directly via GitHub CLI (gh pr create)")
+        print(f"  {C_YELLOW}[q]{C_RESET} Quit / Cancel")
+
+        choice = input(f"\n  Choose action: ").strip().lower()
+
+        if choice in ("a", "accept", ""):
+            print(f"\n{pr_markdown}\n")
+            if output_file:
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(pr_markdown + "\n")
+                print(f"{C_GREEN}✓ Written to {output_file}{C_RESET}\n")
+            break
+
+        elif choice in ("c", "copy"):
+            if copy_to_clipboard(pr_markdown):
+                print(f"\n{C_GREEN}✓ Successfully copied PR description to clipboard!{C_RESET}")
+            else:
+                print(f"\n{C_YELLOW}⚠️ Clipboard tool (wl-copy, xclip, pbcopy) not available. Output printed above.{C_RESET}")
+
+        elif choice in ("s", "save"):
+            default_out = output_file or "PR_DESCRIPTION.md"
+            dest = input(f"  Save file path [{default_out}]: ").strip() or default_out
+            try:
+                with open(dest, "w", encoding="utf-8") as f:
+                    f.write(pr_markdown + "\n")
+                print(f"\n{C_GREEN}✓ PR description saved to: {dest}{C_RESET}")
+            except Exception as e:
+                print(f"\n{C_RED}✗ Failed to write file: {e}{C_RESET}")
+
+        elif choice in ("e", "edit"):
+            editor = os.getenv("EDITOR", "nvim" if shutil.which("nvim") else "nano")
+            with tempfile.NamedTemporaryFile("w+", suffix=".pr_description.md", delete=False) as tf:
+                tf.write(pr_markdown)
+                tmp_name = tf.name
+
+            subprocess.run([editor, tmp_name])
+            with open(tmp_name, "r", encoding="utf-8") as tf:
+                pr_markdown = tf.read().strip()
+            os.remove(tmp_name)
+
+        elif choice in ("r", "regen", "regenerate"):
+            print(f"\n{C_CYAN}==> Regenerating PR description with {chosen_backend}...{C_RESET}")
+            try:
+                pr_markdown = query_llm_for_pr(
+                    diff_text=diff_text,
+                    backend=chosen_backend,
+                    model=chosen_model,
+                    template_str=template_str,
+                    template_context=context,
+                    effort=effort,
+                    max_diff_length=max_len
+                )
+            except Exception as e:
+                print(f"{C_RED}[ERROR] Regeneration failed: {e}{C_RESET}")
+
+        elif choice in ("p", "gh") and has_gh:
+            title = ""
+            for line in pr_markdown.splitlines():
+                clean_l = line.lstrip("#").strip()
+                if clean_l:
+                    title = clean_l
+                    break
+            if not title:
+                title = f"feat: updates from {curr_branch}"
+
+            gh_title = input(f"  PR Title [{title}]: ").strip() or title
+            with tempfile.NamedTemporaryFile("w+", suffix=".pr_body.md", delete=False) as tf:
+                tf.write(pr_markdown)
+                body_path = tf.name
+
+            cmd = ["gh", "pr", "create", "--base", base_branch, "--title", gh_title, "--body-file", body_path]
+            res = subprocess.run(cmd)
+            os.remove(body_path)
+            if res.returncode == 0:
+                print(f"\n{C_GREEN}✓ Pull Request created successfully via GitHub CLI!{C_RESET}\n")
+                break
+            else:
+                print(f"\n{C_RED}✗ 'gh pr create' exited with code {res.returncode}.{C_RESET}")
+
+        elif choice in ("q", "quit", "cancel"):
+            print(f"{C_DIM}PR generation cancelled.{C_RESET}")
+            break
+
+
+# ------------------------------------------------------------------------------
 # Action: CUSTOM DECLARATIVE COMMANDS & WORKFLOWS
 # ------------------------------------------------------------------------------
 def execute_custom_command(cmd_name: str, cmd_def: dict, extra_args: list[str]) -> None:
@@ -2363,6 +3121,7 @@ def show_commands() -> None:
         ("watch", "builtin", "local/tui", "Live-updating TUI dashboard for AI quotas"),
         ("wake", "builtin", "multi-cli", "Evaluate models and prime idle/expired quotas"),
         ("commit", "builtin", "multi-llm", "Generate Conventional Git Commit messages (gcm)"),
+        ("pr", "builtin", "multi-llm", "Generate Pull Request Markdown descriptions from branch diff (gpr)"),
         ("llm", "builtin", "multi-llm", "Unified AI CLI wrapper (stdin streaming, files, modes)"),
         ("backends", "builtin", "inspector", "List all available AI CLI harnesses and strategies"),
         ("setup", "builtin", "wizard", "Interactive setup wizard for harnesses, models & templates"),
@@ -2589,7 +3348,7 @@ def main() -> None:
     p_wake.add_argument("-t", "--target", help="Filter by target ID")
 
     # 4. Commit
-    p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI")
+    p_commit = subparsers.add_parser("commit", help="Generate Conventional Git Commit messages from diff using AI (gcm)")
     p_commit.add_argument("-a", "--all", action="store_true", help="Stage all tracked modified files before diffing")
     p_commit.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi, ollama, or custom harness)")
     p_commit.add_argument("-m", "--model", help="Model override (e.g. gemini-2.5-flash, claude-3-7-sonnet)")
@@ -2600,6 +3359,21 @@ def main() -> None:
     p_commit.add_argument("--list-templates", action="store_true", help="List all available commit templates")
     p_commit.add_argument("--list-backends", action="store_true", help="List all available AI CLI harnesses and strategies")
     p_commit.add_argument("-d", "--dry-run", action="store_true", help="Preview message without committing")
+
+    # 5. Pull Request (PR) Description Generator
+    p_pr = subparsers.add_parser("pr", help="Generate Pull Request Markdown descriptions from branch diff and commits using AI (gpr)")
+    p_pr.add_argument("-B", "--base", help="Target base branch to compare against (e.g. main, master, develop)")
+    p_pr.add_argument("-H", "--head", help="Head branch or ref to compare (defaults to current branch / HEAD)")
+    p_pr.add_argument("-b", "--backend", help="AI CLI backend (agy, claude, codex, llm, opencode, pi, ollama, or custom harness)")
+    p_pr.add_argument("-m", "--model", help="Model override (e.g. gemini-2.5-flash, claude-3-7-sonnet)")
+    p_pr.add_argument("-t", "--template", help="PR template name (standard, task, minimal, detailed, repo) or custom template file/string")
+    p_pr.add_argument("-k", "--task", "--ticket", "--issue", dest="task_id", help="Task / Issue ticket ID override (e.g. PROJ-1234, #42)")
+    p_pr.add_argument("-o", "--output", help="Write generated Markdown description directly to file")
+    p_pr.add_argument("-c", "--copy", action="store_true", help="Copy generated description to clipboard")
+    p_pr.add_argument("-p", "--print", action="store_true", help="Print raw Markdown output to stdout without interactive UI")
+    p_pr.add_argument("-d", "--dry-run", action="store_true", help="Preview description without prompting for actions")
+    p_pr.add_argument("--list-templates", action="store_true", help="List all available PR templates (including discovered repo template)")
+    p_pr.add_argument("--list-backends", action="store_true", help="List all available AI CLI harnesses and strategies")
 
     # 5. Backends
     subparsers.add_parser("backends", help="List all available AI CLI harnesses and execution strategies")
@@ -2675,6 +3449,21 @@ def main() -> None:
             template=args.template,
             task_id=getattr(args, "task_id", None) or getattr(args, "jira_id", None),
             scope=args.scope,
+            dry_run=args.dry_run,
+            list_templates=args.list_templates,
+            list_backends=args.list_backends
+        )
+    elif args.subcommand == "pr":
+        run_pr(
+            base=args.base,
+            head=args.head,
+            backend=args.backend,
+            model=args.model,
+            template=args.template,
+            task_id=getattr(args, "task_id", None),
+            output_file=args.output,
+            copy_clipboard=args.copy,
+            print_raw=args.print,
             dry_run=args.dry_run,
             list_templates=args.list_templates,
             list_backends=args.list_backends
