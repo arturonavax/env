@@ -11,7 +11,34 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ### Repository Structure
 
 ```text
-├── install.sh              # Primary system installation entry point (--wizard or CLI targets)
+├── cmd/                    # Go application entrypoints
+│   ├── anx/                # Master CLI/TUI entrypoint (multicall binary dispatch)
+│   └── aitools/            # Standalone entrypoint for AI productivity suite
+├── manifests/              # Declarative zero-Go-edit YAML configuration manifests
+│   ├── packages/           # 80 packages with multi-distro translations & fallbacks
+│   ├── configs.yaml        # 23 dotfile configuration assets
+│   └── profiles.yaml       # 8 preset workstation profiles
+├── hacks/                  # Declarative machine- and hardware-specific system hacks
+│   ├── dell-precision-m6800/ # Dell M6800 fan, GPU and power optimizations
+│   └── x11-scroll-lock-led/  # Hardware Scroll Lock LED control
+├── scripts/                # Multi-platform pre-flight & Go bootstrap scripts
+│   ├── bootstrap_anx.sh    # Unix bootstrap (GVM priority -> standalone -> native PM)
+│   └── bootstrap_anx.ps1   # Windows bootstrap (official go.dev archive with SHA-256)
+├── internal/               # Production Go Hexagonal Architecture packages
+│   ├── domain/             # Pure domain models (plans, resources, transactions)
+│   ├── app/                # Application services (Install, Sync, Hacks, Ops, Doctor, Audit)
+│   ├── manifest/           # Manifest loader (embedded + overlay) & DAG solver
+│   ├── catalog/            # Resource registry
+│   ├── providers/          # Dispatcher (native, github_release, script, source, language)
+│   ├── configsync/         # Myers unified diff, bidirectional sync & 3-way merge
+│   ├── snapshot/           # Hierarchical snapshot manager (50MB quota)
+│   ├── hacks/              # DMI/hardware detector & hack runner
+│   ├── ops/                # Multi-runtime rebuilder & Lynis optimizer
+│   ├── ai/                 # Go port of aitools (JSONC, harnesses, gitflow, RTC wake)
+│   ├── tui/                # Modular Bubble Tea v2 TUI (8 tabs, 4 Golden Rules)
+│   └── cli/                # Cobra + Viper CLI commands
+├── install.sh              # Primary system installation entry point (delegates to bootstrap_anx.sh)
+├── install.bat             # Windows installation entry point (delegates to bootstrap_anx.ps1)
 ├── uninstall.sh            # Systematic uninstallation and cache purging entry point
 ├── files/                  # Canonical configuration files deployed to target systems
 │   ├── nvim/               # Neovim (LazyVim) modular configuration and exclusions
@@ -68,19 +95,31 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 
 ### Lifecycle Entry Points
 
-- **`./install.sh [--wizard | -y | args]`**:
-  - Automatically triggers `backup_create` before mutating files.
-  - Interactive mode (`./install.sh --wizard` or `./src/wizard.sh` in TTY): Runs a guided upfront interview collecting all parameters (paths, component selection, GVM/standalone Go strategies, OS tweaks, rollback policies) before beginning autonomous execution.
-  - Non-interactive mode (`./install.sh -y` or `./src/wizard.sh -y [flags]`): Autonomous execution driven by CLI flags (`--components`, `--dest-bin`, `--go-manager`, `--rollback-on-error`, `--skip-backup`) with zero prompts.
-  - Transactional rollback: Operates under `src/lib/transaction.sh` audit journal. Catches SIGINT/Ctrl-C or stage failures to reverse filesystem mutations in LIFO order and restore clean state.
-  - Planning / Dry-run: `./install.sh --plan` (or `plan [components]`, `make plan`) displays native package translations, toolchains, binaries, and all touched/preserved files without modifying the system.
-  - Uninstallation plan: `./install.sh --uninstall-plan` previews teardown manifest.
-  - Sudo privileges are acquired upfront with an active background keep-alive loop.
+- **`./install.sh [args]` / `./scripts/bootstrap_anx.sh [args]`**:
+  - Automatically runs pre-flight checks and ensures Go `>= 1.24` is available using GVM priority (with standalone `install_golang.sh` and native package manager fallbacks).
+  - Compiles the unified `anx` binary to `~/.local/bin/anx` and sets up the `aitools` multicall symlink (`~/.local/bin/aitools -> anx`).
+  - Automatically launches the Bubble Tea v2 interactive wizard (`anx wizard` or `anx dashboard`) when run in an interactive TTY without arguments.
+  - Supports `--legacy-bash` flag to explicitly execute the legacy Bash installer pipeline if needed.
+  - Supports non-interactive execution (`anx apply -y` or `./install.sh -y`).
+- **`./install.bat` / `scripts\bootstrap_anx.ps1` (Windows)**:
+  - Automated Windows pre-flight check and Go bootstrap via official `go.dev` SHA-256 verified archive, compiling `anx.exe` and `aitools.exe` into `%LOCALAPPDATA%\Programs\anx\bin`.
+- **`anx [command]` (Master Environment CLI & TUI)**:
+  - `anx apply [--profile <name>]`: Apply desired state with DAG dependency resolution.
+  - `anx plan [--profile <name>]`: Dry-run preview of planned actions without modifying filesystem.
+  - `anx sync [--dry-run|--push]`: Reconcile dotfiles with Myers diff, 3-way merge, and smart-append markers.
+  - `anx backup [create|list|restore]`: Manage hierarchical snapshots (50MB quota).
+  - `anx hacks [list|detect|info|apply]`: Detect and apply workstation/hardware optimizations.
+  - `anx rebuild [all|go|rust|node|python|nvim]`: Recompile language toolchains.
+  - `anx optimize [--report|--apply]`: Lynis security audit & hardware optimization with 12 security guardrails.
+  - `anx doctor`: Run comprehensive diagnostic health checks.
+  - `anx audit`: Scan installed tools for vulnerabilities against OSV.dev.
+  - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI.
+  - `anx ai [commit|pr|llm|daemon|watch|setup]`: AI productivity suite (also available directly as `aitools`).
 - **`./uninstall.sh [--plan]`**:
-  - Planning / Dry-run: `./uninstall.sh --plan` (or `plan`, `make uninstall-plan`) previews purged packages, binaries, desktop entries, and configuration directories without touching anything.
+  - Planning / Dry-run: `./uninstall.sh --plan` previews purged packages, binaries, desktop entries, and configuration directories without touching anything.
   - Two-phase teardown:
-    1. Uninstalls packages (apt, dnf, pacman, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries.
-    2. Purges configuration directories (`~/.config/nvim`, `~/.config/ghostty`, `~/.config/herdr`), caches (`~/.cache/nvim`), and local states (`~/.local/state/nvim`, `~/.local/share/nvim`).
+    1. Uninstalls packages (apt, dnf, pacman, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries (including `anx` and `aitools`).
+    2. Purges configuration directories (`~/.config/anx`, `~/.config/nvim`, `~/.config/ghostty`, `~/.config/herdr`), caches, and local states.
 - **`./utils/sync_config.sh [target]`**:
   - Selectively applies configuration updates without a complete installation cycle. Targets: `terminal`, `editor`, `plugins`, `plugins-update`, `osconfig`, `vscode`, `cursor`, `devtools`, `all`.
 - **`./utils/backup_config.sh` / `./utils/restore_backup.sh`**:

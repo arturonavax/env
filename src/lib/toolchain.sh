@@ -78,7 +78,9 @@ _install_golang_script_gvm() {
 		# Attempt to install or configure binary Go release via GVM if network permits
 		if command -v gvm >/dev/null 2>&1; then
 			log_step "Configuring default Go environment via GVM..."
-			gvm install go1.4 -B 2>/dev/null || true
+			local target_go="go1.24.0"
+			gvm install "${target_go}" -B 2>/dev/null || gvm install "${target_go}" 2>/dev/null || true
+			gvm use "${target_go}" --default 2>/dev/null || true
 		fi
 		return 0
 	fi

@@ -18,6 +18,21 @@ while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
 	fi
 done
 
+# Check if legacy bash mode was explicitly requested
+LEGACY_BASH=0
+filtered_args=()
+for arg in "$@"; do
+	if [[ "$arg" == "--legacy-bash" ]]; then
+		LEGACY_BASH=1
+	else
+		filtered_args+=("$arg")
+	fi
+done
+
+if [[ "${LEGACY_BASH}" -ne 1 ]]; then
+	exec ./scripts/bootstrap_anx.sh "${filtered_args[@]}"
+fi
+
 source ./src/lib/strict.sh
 source ./src/lib/colors.sh
 source ./src/lib/logging.sh

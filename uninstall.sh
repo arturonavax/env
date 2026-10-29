@@ -127,15 +127,19 @@ fi
 log_step "Phase 2/2: Purging configuration files, local states, and caches..."
 
 rm -rf \
+	"$HOME/.local/bin/anx" \
+	"$HOME/.local/bin/aitools" \
+	"$HOME/.config/anx" \
+	"$HOME/.local/state/anx" \
+	"$HOME/.cache/anx" \
+	"$HOME/.config/aitools" \
 	"$HOME/.config/ghostty" \
 	"$HOME/.config/herdr" \
 	"$HOME/.config/atuin" "$HOME/.local/share/atuin" \
 	"$HOME/.config/nvim" \
 	"$HOME/.local/share/nvim" \
 	"$HOME/.local/state/nvim" \
-	"$HOME/.cache/nvim" \
-	"$HOME/.cache/tmux" \
-	"$HOME/.tmux" 2>/dev/null || true
+	"$HOME/.cache/nvim" 2>/dev/null || true
 
 if command -v golangci-lint >/dev/null 2>&1; then
 	golangci-lint cache clean 2>/dev/null || true

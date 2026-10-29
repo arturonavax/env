@@ -17,3 +17,12 @@ lv-settings.lua
 __pycache__/
 *.py[cod]
 *$py.class
+# Go build binaries
+bin/
+*.exe
+
+# Herdr runtime logs & session state
+files/herdr/*.log
+files/herdr/session.json
+files/herdr/session-snapshots/
+files/herdr/.plugins.lock
