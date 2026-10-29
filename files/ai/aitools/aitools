@@ -45,6 +45,7 @@ CONFIG_DIR = os.path.expanduser("~/.config/aitools")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 STATE_DIR = os.path.expanduser("~/.local/state/aitools")
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
+DAEMON_LOG_FILE = os.path.join(STATE_DIR, "daemon.log")
 SYSTEMD_USER_DIR = os.path.expanduser("~/.config/systemd/user")
 SERVICE_FILE = os.path.join(SYSTEMD_USER_DIR, "aitools-monitor.service")
 WAKE_SERVICE_FILE = os.path.join(SYSTEMD_USER_DIR, "aitools-wake.service")
@@ -809,18 +810,69 @@ def save_state(st: dict) -> None:
 
 
 # ------------------------------------------------------------------------------
-# Networking & Notifications
+# Networking, Daemon Audit Logging & Notifications
 # ------------------------------------------------------------------------------
-def wait_for_internet(timeout_sec: int = 25) -> bool:
+def log_daemon_event(event: str, message: str, level: str = "INFO", details: dict = None) -> None:
+    os.makedirs(STATE_DIR, exist_ok=True)
+    now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    det_str = f" | {json.dumps(details)}" if details else ""
+    line = f"[{now_iso}] [{level:<5}] [{event}] {message}{det_str}\n"
+
+    # Rotate if log exceeds 5MB
+    if os.path.exists(DAEMON_LOG_FILE) and os.path.getsize(DAEMON_LOG_FILE) > 5 * 1024 * 1024:
+        try:
+            prev_log = f"{DAEMON_LOG_FILE}.old"
+            if os.path.exists(prev_log):
+                os.remove(prev_log)
+            os.rename(DAEMON_LOG_FILE, prev_log)
+        except OSError:
+            pass
+
+    try:
+        with open(DAEMON_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
+def wait_for_internet(timeout_sec: int = 45, check_interval: float = 1.5) -> bool:
+    """Waits until internet connectivity and DNS resolution are firmly established."""
     deadline = time.time() + timeout_sec
+    endpoints = [
+        ("1.1.1.1", 443),
+        ("8.8.8.8", 53),
+        ("9.9.9.9", 53),
+    ]
+
+    t0 = time.time()
+    last_log = 0.0
+
     while time.time() < deadline:
-        for host, port in [("1.1.1.1", 443), ("8.8.8.8", 53)]:
+        now = time.time()
+        elapsed = int(now - t0)
+
+        if now - last_log >= 8.0:
+            print(f"  {C_DIM}Awaiting internet reconnection... ({elapsed}s / {timeout_sec}s){C_RESET}")
+            last_log = now
+
+        ip_ok = False
+        for host, port in endpoints:
             try:
-                with socket.create_connection((host, port), timeout=2):
-                    return True
+                with socket.create_connection((host, port), timeout=2.0):
+                    ip_ok = True
+                    break
+            except OSError:
+                continue
+
+        if ip_ok:
+            try:
+                socket.getaddrinfo("dns.google", 443, proto=socket.IPPROTO_TCP)
+                return True
             except OSError:
                 pass
-        time.sleep(1.0)
+
+        time.sleep(check_interval)
+
     return False
 
 
@@ -1070,9 +1122,12 @@ def run_wake(force: bool = False, target_filter: str = None, reason: str = "manu
     state = load_state()
 
     print(f"\n{C_BOLD}{C_CYAN}==> aitools · Model Wakeup & Rolling Quota Priming{C_RESET}")
+    log_daemon_event("WAKE_CYCLE_START", f"Initiating wakeup cycle (reason: {reason}, force: {force})")
     print(f"  {C_DIM}Verifying internet connection...{C_RESET}")
-    if not wait_for_internet(timeout_sec=20):
-        print(f"  {C_RED}✗ No internet connection. Wakeup cycle aborted.{C_RESET}", file=sys.stderr)
+    if not wait_for_internet(timeout_sec=45):
+        err_msg = "No internet connection detected within 45s. Wakeup cycle aborted."
+        print(f"  {C_RED}✗ {err_msg}{C_RESET}", file=sys.stderr)
+        log_daemon_event("NETWORK_TIMEOUT", err_msg, level="ERROR")
         send_notification("aitools: No Network", "Internet offline. Model wakeup skipped.", urgency="critical")
         return False
 
@@ -1080,6 +1135,8 @@ def run_wake(force: bool = False, target_filter: str = None, reason: str = "manu
     target_dict = {t["id"]: t for t in config.get("targets", [])}
 
     any_woken = False
+    any_failed = False
+    failure_details = []
     now_epoch = time.time()
 
     for item in targets:
@@ -1096,18 +1153,31 @@ def run_wake(force: bool = False, target_filter: str = None, reason: str = "manu
 
         if force or item["needs_wake"]:
             print(f"    {C_YELLOW}⚡ Sending minimal wakeup probe...{C_RESET}")
+            log_daemon_event("PROBE_DISPATCH", f"Sending wakeup probe to target '{t_id}'")
             ok, msg = fire_wake_command(raw_target)
             if ok:
                 print(f"    {C_GREEN}✓ {msg}{C_RESET}")
+                log_daemon_event("PROBE_SUCCESS", f"Target '{t_id}' probe successful: {msg}")
                 state.setdefault("targets_last_wake", {})[t_id] = now_epoch
                 any_woken = True
             else:
                 print(f"    {C_RED}✗ {msg}{C_RESET}")
+                log_daemon_event("PROBE_FAILED", f"Target '{t_id}' probe failed: {msg}", level="ERROR")
+                any_failed = True
+                failure_details.append(f"{t_id}: {msg}")
         else:
             print(f"    {C_GREEN}✓ Quota window already active. Skipping probe.{C_RESET}")
+            log_daemon_event("PROBE_SKIPPED", f"Target '{t_id}' quota already active ({item['remaining_percent']}%)")
 
     state["last_wake_epoch"] = now_epoch
     save_state(state)
+
+    if any_failed:
+        err_str = "; ".join(failure_details)
+        log_daemon_event("WAKE_CYCLE_ERROR", f"Wakeup cycle encountered probe failure: {err_str}", level="ERROR")
+        return False
+
+    log_daemon_event("WAKE_CYCLE_SUCCESS", f"Wakeup cycle completed cleanly (woken: {any_woken})")
     return True
 
 
@@ -3167,6 +3237,60 @@ def handle_on_suspend() -> None:
         schedule_next_rtc_alarm(wake_time)
 
 
+def safe_suspend_system() -> tuple[bool, str]:
+    """Suspends the system across Linux, macOS, and Windows safely with robust fallbacks."""
+    platform_name = sys.platform
+
+    if platform_name.startswith("linux"):
+        # 1. systemctl
+        if shutil.which("systemctl"):
+            res = subprocess.run(["systemctl", "suspend"], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                return True, "systemctl suspend succeeded"
+            err = res.stderr.strip() or f"Exit {res.returncode}"
+            log_daemon_event("SUSPEND_WARN", f"systemctl suspend failed ({err}), trying loginctl fallback...", level="WARN")
+
+        # 2. loginctl
+        if shutil.which("loginctl"):
+            res = subprocess.run(["loginctl", "suspend"], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                return True, "loginctl suspend succeeded"
+            err = res.stderr.strip() or f"Exit {res.returncode}"
+            log_daemon_event("SUSPEND_WARN", f"loginctl suspend failed ({err}), trying pm-suspend fallback...", level="WARN")
+
+        # 3. pm-suspend
+        if shutil.which("pm-suspend"):
+            res = subprocess.run(["sudo", "-n", "pm-suspend"], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                return True, "pm-suspend succeeded"
+
+        return False, "All Linux suspend mechanisms (systemctl, loginctl, pm-suspend) failed"
+
+    elif platform_name == "darwin":
+        # 1. pmset
+        if shutil.which("pmset"):
+            res = subprocess.run(["pmset", "sleepnow"], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                return True, "pmset sleepnow succeeded"
+
+        # 2. osascript
+        if shutil.which("osascript"):
+            res = subprocess.run(["osascript", "-e", 'tell application "System Events" to sleep'], capture_output=True, text=True, check=False)
+            if res.returncode == 0:
+                return True, "osascript sleep succeeded"
+
+        return False, "macOS sleep commands (pmset, osascript) failed"
+
+    elif platform_name in ("win32", "cygwin"):
+        cmd = ["powershell", "-Command", "Add-Type -Assembly System.Windows.Forms; [System.Windows.Forms.Application]::SetSuspendState('Suspend', $false, $false)"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if res.returncode == 0:
+            return True, "Windows SetSuspendState succeeded"
+        return False, f"Windows suspend failed: {res.stderr.strip()}"
+
+    return False, f"Unsupported platform for auto-resuspend: {platform_name}"
+
+
 def handle_on_resume() -> None:
     state = load_state()
     config = load_config()
@@ -3185,34 +3309,62 @@ def handle_on_resume() -> None:
 
     if is_rtc_wake:
         print(f"\n{C_BOLD}{C_CYAN}==> Detected scheduled RTC Auto-Wake (04:00 AM window). Initiating activation cycle...{C_RESET}")
+        log_daemon_event("AUTO_WAKE_DETECTED", "RTC Auto-Wake detected (04:00 AM window). Starting verified activation cycle...")
         state["expecting_auto_wake"] = False
         state["last_auto_wake_epoch"] = now_epoch
         save_state(state)
 
-        # 1. Wait for network
-        print(f"  {C_DIM}Awaiting network connectivity (up to 30s)...{C_RESET}")
-        wait_for_internet(timeout_sec=30)
+        # 1. Wait for network reconnect
+        print(f"  {C_CYAN}Awaiting network connectivity (up to 45s)...{C_RESET}")
+        log_daemon_event("NETWORK_WAIT", "Waiting for network connectivity post-resume (timeout: 45s)")
+        if not wait_for_internet(timeout_sec=45):
+            err_msg = "Internet connectivity could not be established within 45s. Wake cycle aborted. System will REMAIN AWAKE for inspection."
+            print(f"  {C_RED}✗ {err_msg}{C_RESET}", file=sys.stderr)
+            log_daemon_event("NETWORK_TIMEOUT", err_msg, level="ERROR")
+            send_notification("aitools: Wakeup Failed", "No internet connection detected after wake. System remained awake.", urgency="critical")
+            # Schedule next day's alarm so future cycles continue, but DO NOT suspend!
+            schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
+            return
 
-        # 2. Wake quotas
-        run_wake(force=False, reason="rtc_04am_auto_wake")
+        log_daemon_event("NETWORK_OK", "Internet connection and DNS verified.")
+
+        # 2. Fire wakeup probe and verify success
+        print(f"  {C_CYAN}Internet confirmed. Executing model wakeup probe...{C_RESET}")
+        log_daemon_event("WAKE_START", "Executing model wakeup probes")
+        wake_success = run_wake(force=False, reason="rtc_04am_auto_wake")
+
+        if not wake_success:
+            err_msg = "Model wakeup probe failed or was rejected. System will REMAIN AWAKE for inspection."
+            print(f"  {C_RED}✗ {err_msg}{C_RESET}", file=sys.stderr)
+            log_daemon_event("WAKE_FAILED", err_msg, level="ERROR")
+            send_notification("aitools: Wakeup Failed", "Target probe failed. System remained awake.", urgency="critical")
+            schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
+            return
 
         # 3. Schedule next day's alarm
         wake_time = auto_wake_cfg.get("time", "04:00")
         schedule_next_rtc_alarm(wake_time)
 
-        # 4. Auto-resuspend if configured
+        # 4. Safely auto-resuspend ONLY after confirmed full success
         if auto_wake_cfg.get("auto_resuspend", True):
             delay = auto_wake_cfg.get("resuspend_delay_seconds", 12)
-            print(f"  {C_YELLOW}💤 Auto-resuspending in {delay} seconds to preserve battery...{C_RESET}")
+            msg = f"Quotas verified and primed. Resuspending in {delay}s to preserve battery..."
+            print(f"  {C_YELLOW}💤 {msg}{C_RESET}")
+            log_daemon_event("SUSPEND_PENDING", msg)
             send_notification(
                 "💤 Auto-Resuspending System",
                 f"Model quotas successfully primed. Suspending in {delay}s...",
                 urgency="normal"
             )
             time.sleep(delay)
-            subprocess.run(["systemctl", "suspend"], check=False)
+            ok_sus, sus_info = safe_suspend_system()
+            if ok_sus:
+                log_daemon_event("SUSPEND_SUCCESS", f"System safely suspended ({sus_info})")
+            else:
+                log_daemon_event("SUSPEND_FAILED", f"System suspension failed: {sus_info}", level="ERROR")
     else:
         print(f"  {C_CYAN}[D-Bus] Manual user resume detected.{C_RESET}")
+        log_daemon_event("USER_RESUME", "Manual user resume detected")
         if auto_wake_cfg.get("enabled", False):
             wake_time = auto_wake_cfg.get("time", "04:00")
             schedule_next_rtc_alarm(wake_time)
@@ -3274,18 +3426,48 @@ def run_daemon_wake_cycle() -> None:
     save_state(state)
 
     print(f"\n{C_BOLD}{C_CYAN}==> aitools: Executing scheduled wake cycle...{C_RESET}")
-    wait_for_internet(timeout_sec=30)
-    run_wake(force=False, reason="systemd_timer_or_cron")
+    log_daemon_event("TIMER_WAKE_START", "Systemd timer or CLI triggered scheduled wake cycle")
 
+    # 1. Wait for network reconnect
+    print(f"  {C_CYAN}Awaiting network connectivity (up to 45s)...{C_RESET}")
+    if not wait_for_internet(timeout_sec=45):
+        err_msg = "Internet connectivity could not be established within 45s. Wake cycle aborted. System will REMAIN AWAKE."
+        print(f"  {C_RED}✗ {err_msg}{C_RESET}", file=sys.stderr)
+        log_daemon_event("NETWORK_TIMEOUT", err_msg, level="ERROR")
+        send_notification("aitools: Wakeup Failed", "No internet connection detected. System remained awake.", urgency="critical")
+        if auto_wake_cfg.get("enabled", False):
+            schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
+        return
+
+    log_daemon_event("NETWORK_OK", "Internet connection verified.")
+
+    # 2. Fire wakeup probe and verify success
+    wake_success = run_wake(force=False, reason="systemd_timer_or_cron")
+    if not wake_success:
+        err_msg = "Model wakeup probe failed. System will REMAIN AWAKE for inspection."
+        print(f"  {C_RED}✗ {err_msg}{C_RESET}", file=sys.stderr)
+        log_daemon_event("WAKE_FAILED", err_msg, level="ERROR")
+        send_notification("aitools: Wakeup Failed", "Target probe failed. System remained awake.", urgency="critical")
+        if auto_wake_cfg.get("enabled", False):
+            schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
+        return
+
+    # 3. Schedule next day's alarm
     if auto_wake_cfg.get("enabled", False):
         schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
 
+    # 4. Safely auto-resuspend ONLY after confirmed full success
     if auto_wake_cfg.get("auto_resuspend", True):
         delay = auto_wake_cfg.get("resuspend_delay_seconds", 12)
         print(f"  {C_YELLOW}Auto-resuspend active. Returning to sleep in {delay}s...{C_RESET}")
+        log_daemon_event("SUSPEND_PENDING", f"Returning to sleep in {delay}s")
         send_notification("aitools: Wake Complete", f"Models primed. Resuspending in {delay}s...", urgency="normal")
         time.sleep(delay)
-        subprocess.run(["systemctl", "suspend"], check=False)
+        ok_sus, sus_info = safe_suspend_system()
+        if ok_sus:
+            log_daemon_event("SUSPEND_SUCCESS", f"System safely suspended ({sus_info})")
+        else:
+            log_daemon_event("SUSPEND_FAILED", f"System suspension failed: {sus_info}", level="ERROR")
 
 
 def handle_daemon_cli(args: argparse.Namespace) -> None:
@@ -3296,6 +3478,32 @@ def handle_daemon_cli(args: argparse.Namespace) -> None:
 
     elif action == "run-wake-cycle":
         run_daemon_wake_cycle()
+
+    elif action in ("log", "logs"):
+        if not os.path.exists(DAEMON_LOG_FILE):
+            print(f"{C_YELLOW}No daemon log file found at {DAEMON_LOG_FILE}{C_RESET}")
+            return
+        lines_count = 50
+        if args.extra_arg and args.extra_arg.isdigit():
+            lines_count = int(args.extra_arg)
+        print(f"\n{C_BOLD}{C_CYAN}aitools Daemon & RTC Wakeup Audit Log ({DAEMON_LOG_FILE}):{C_RESET}")
+        try:
+            with open(DAEMON_LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                recent = lines[-lines_count:]
+                for l in recent:
+                    l_str = l.strip()
+                    if "[ERROR]" in l_str:
+                        print(f"  {C_RED}{l_str}{C_RESET}")
+                    elif "[WARN ]" in l_str or "[WARN]" in l_str:
+                        print(f"  {C_YELLOW}{l_str}{C_RESET}")
+                    elif "SUCCESS" in l_str or "NETWORK_OK" in l_str:
+                        print(f"  {C_GREEN}{l_str}{C_RESET}")
+                    else:
+                        print(f"  {C_DIM}{l_str}{C_RESET}")
+        except Exception as e:
+            print(f"{C_RED}Error reading daemon log: {e}{C_RESET}")
+        print()
 
     elif action == "status":
         cfg = load_config()
@@ -3333,6 +3541,17 @@ def handle_daemon_cli(args: argparse.Namespace) -> None:
             tmr_status = res_tmr.stdout.strip() or "inactive"
             print(f"  Monitor Service:    {C_GREEN if mon_status == 'active' else C_YELLOW}{mon_status}{C_RESET}")
             print(f"  Systemd Timer:      {C_GREEN if tmr_status == 'active' else C_YELLOW}{tmr_status}{C_RESET}")
+
+        if os.path.exists(DAEMON_LOG_FILE):
+            print(f"  Audit Log:          {DAEMON_LOG_FILE}")
+            try:
+                with open(DAEMON_LOG_FILE, "r", encoding="utf-8") as f:
+                    lines = [l.strip() for l in f if l.strip()]
+                    if lines:
+                        last_line = lines[-1]
+                        print(f"  Last Log Event:     {C_DIM}{last_line}{C_RESET}")
+            except Exception:
+                pass
         print()
 
     elif action == "auto-wake":
@@ -3530,8 +3749,8 @@ def main() -> None:
 
     # 6. Daemon
     p_daemon = subparsers.add_parser("daemon", help="Manage background wakeup daemon, RTC alarms, and suspension")
-    p_daemon.add_argument("daemon_action", choices=["status", "install", "uninstall", "run-wake-cycle", "auto-wake", "run-monitor"])
-    p_daemon.add_argument("extra_arg", nargs="?", default="", help="Optional parameter for daemon action (e.g. on/off)")
+    p_daemon.add_argument("daemon_action", choices=["status", "install", "uninstall", "run-wake-cycle", "auto-wake", "run-monitor", "log", "logs"])
+    p_daemon.add_argument("extra_arg", nargs="?", default="", help="Optional parameter for daemon action (e.g. on/off, line count)")
 
     # 7. Status
     subparsers.add_parser("status", help="Check availability and paths of AI tools and runtimes")

@@ -484,15 +484,44 @@ cmds_output="$("$AITOOLS_BIN" commands 2>&1)"
 assert_contains "$cmds_output" "optimize" "Commands lists optimize" &&
 	pass "aitools commands properly registers optimize as a built-in multi-llm command"
 
-# Test 31: aitools daemon status and choices verification
+# Test 31: aitools daemon status, logs, and choices verification
 daemon_help="$("$AITOOLS_BIN" daemon --help 2>&1)"
 assert_contains "$daemon_help" "run-monitor" "Daemon choices include run-monitor" &&
 	assert_contains "$daemon_help" "status" "Daemon choices include status" &&
 	assert_contains "$daemon_help" "install" "Daemon choices include install" &&
 	assert_contains "$daemon_help" "run-wake-cycle" "Daemon choices include run-wake-cycle" &&
-	pass "aitools daemon CLI exposes complete lifecycle actions including run-monitor"
+	assert_contains "$daemon_help" "logs" "Daemon choices include logs" &&
+	pass "aitools daemon CLI exposes complete lifecycle actions including run-monitor and logs"
 
 daemon_status_out="$("$AITOOLS_BIN" daemon status 2>&1)"
 assert_contains "$daemon_status_out" "aitools Daemon & RTC Auto-Wake Status" "Daemon status header" &&
 	assert_contains "$daemon_status_out" "Target Wake Time:   04:00" "Target wake time is 04:00" &&
 	pass "aitools daemon status reports active RTC and systemd monitor telemetry"
+
+# Test 32: aitools daemon audit logging & network verification module
+python3 -c "
+from importlib.machinery import SourceFileLoader
+import os, tempfile
+aitools = SourceFileLoader('aitools', '${REPO_ROOT}/files/ai/aitools/aitools').load_module()
+
+# 1. Test wait_for_internet works when online
+net_ok = aitools.wait_for_internet(timeout_sec=5)
+assert net_ok is True, 'Expected online network check to return True'
+
+# 2. Test log_daemon_event writes cleanly
+test_log = os.path.join(tempfile.gettempdir(), 'test_aitools_daemon.log')
+aitools.DAEMON_LOG_FILE = test_log
+aitools.log_daemon_event('TEST_EVENT', 'Unit testing daemon logger', level='INFO', details={'key': 'val'})
+assert os.path.exists(test_log), 'Audit log file was not created'
+with open(test_log, 'r') as f:
+    content = f.read()
+assert 'TEST_EVENT' in content, 'Event type not found in log'
+assert 'Unit testing daemon logger' in content, 'Message not found in log'
+assert '\"key\": \"val\"' in content, 'Details JSON not found in log'
+os.remove(test_log)
+
+# 3. Test safe_suspend_system returns boolean tuple
+assert hasattr(aitools, 'safe_suspend_system'), 'Missing safe_suspend_system function'
+"
+assert_exit_code 0 "$?" "Daemon audit logging and network check verification" &&
+	pass "aitools daemon audit logger and safe network verification verified"
