@@ -93,7 +93,8 @@ data = json.loads(clean)
 assert 'commit' in data, 'Missing commit section'
 assert 'commands' in data, 'Missing commands section'
 assert 'review' in data['commands'], 'Missing review command'
-assert len(data['targets']) >= 5, 'Insufficient targets'
+assert len(data['targets']) >= 1, 'Insufficient targets'
+assert any(t.get('id') == 'gemini' for t in data['targets']), 'Missing gemini target'
 sys.exit(0)
 " >/dev/null 2>&1
 jsonc_exit_code=$?
@@ -482,3 +483,16 @@ assert_exit_code 0 "$?" "aitools optimize --help exit code" &&
 cmds_output="$("$AITOOLS_BIN" commands 2>&1)"
 assert_contains "$cmds_output" "optimize" "Commands lists optimize" &&
 	pass "aitools commands properly registers optimize as a built-in multi-llm command"
+
+# Test 31: aitools daemon status and choices verification
+daemon_help="$("$AITOOLS_BIN" daemon --help 2>&1)"
+assert_contains "$daemon_help" "run-monitor" "Daemon choices include run-monitor" &&
+	assert_contains "$daemon_help" "status" "Daemon choices include status" &&
+	assert_contains "$daemon_help" "install" "Daemon choices include install" &&
+	assert_contains "$daemon_help" "run-wake-cycle" "Daemon choices include run-wake-cycle" &&
+	pass "aitools daemon CLI exposes complete lifecycle actions including run-monitor"
+
+daemon_status_out="$("$AITOOLS_BIN" daemon status 2>&1)"
+assert_contains "$daemon_status_out" "aitools Daemon & RTC Auto-Wake Status" "Daemon status header" &&
+	assert_contains "$daemon_status_out" "Target Wake Time:   04:00" "Target wake time is 04:00" &&
+	pass "aitools daemon status reports active RTC and systemd monitor telemetry"

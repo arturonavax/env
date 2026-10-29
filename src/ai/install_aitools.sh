@@ -82,7 +82,7 @@ if [[ ! -f "${CONFIG_DIR}/config.json" ]]; then
 	fi
 fi
 
-# 4. Clean up legacy quota-primer systemd units if found
+# 4. Clean up legacy quota-primer systemd units, binaries, and state if found
 if command -v systemctl >/dev/null 2>&1; then
 	systemctl --user stop quota-monitor.service quota-primer.timer quota-primer.service 2>/dev/null || true
 	systemctl --user disable quota-monitor.service quota-primer.timer quota-primer.service 2>/dev/null || true
@@ -91,5 +91,7 @@ if command -v systemctl >/dev/null 2>&1; then
 		"$HOME/.config/systemd/user/quota-primer.timer" 2>/dev/null || true
 	systemctl --user daemon-reload 2>/dev/null || true
 fi
+rm -f "$DEST_USER_BIN/quota-ctl" "/usr/local/bin/quota-ctl" 2>/dev/null || true
+rm -rf "$HOME/.config/quota-primer" "$HOME/.local/state/quota_primer" 2>/dev/null || true
 
 log_success "aitools installed successfully: ${DEST_USER_BIN}/aitools"

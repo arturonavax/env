@@ -47,6 +47,8 @@ STATE_DIR = os.path.expanduser("~/.local/state/aitools")
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
 SYSTEMD_USER_DIR = os.path.expanduser("~/.config/systemd/user")
 SERVICE_FILE = os.path.join(SYSTEMD_USER_DIR, "aitools-monitor.service")
+WAKE_SERVICE_FILE = os.path.join(SYSTEMD_USER_DIR, "aitools-wake.service")
+WAKE_TIMER_FILE = os.path.join(SYSTEMD_USER_DIR, "aitools-wake.timer")
 SUDOERS_FILE = "/etc/sudoers.d/aitools-rtcwake"
 
 # ANSI Terminal Colors
@@ -604,7 +606,7 @@ DEFAULT_CONFIG = {
     },
     "daemon": {
         "auto_wake": {
-            "enabled": False,
+            "enabled": True,
             "time": "04:00",
             "auto_resuspend": True,
             "resuspend_delay_seconds": 12,
@@ -635,79 +637,6 @@ DEFAULT_CONFIG = {
             "status_command": ["agy", "-p", "/usage", "--output-format", "json"],
             "fallback_interval_hours": 5,
             "timeout_sec": 20
-        },
-        {
-            "id": "claude-gpt-agy",
-            "name": "Claude & GPT (Antigravity)",
-            "tool": "agy",
-            "account": "default",
-            "enabled": True,
-            "telemetry_type": "agy_usage",
-            "bucket_id": "3p-5h",
-            "wake_command": ["agy", "-p", "Reply with: 1", "--model", "claude-sonnet-5-5-low", "--effort", "low"],
-            "status_command": ["agy", "-p", "/usage", "--output-format", "json"],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 25
-        },
-        {
-            "id": "claude-cli",
-            "name": "Anthropic Claude Code CLI",
-            "tool": "claude",
-            "account": "default",
-            "enabled": False,
-            "telemetry_type": "claude_status",
-            "wake_command": ["claude", "-p", "Reply with: 1"],
-            "status_command": ["claude", "status", "--json"],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 25
-        },
-        {
-            "id": "codex-cli",
-            "name": "OpenAI Codex CLI",
-            "tool": "codex",
-            "account": "default",
-            "enabled": False,
-            "telemetry_type": "timed_fallback",
-            "wake_command": ["codex", "exec", "echo 1"],
-            "status_command": [],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 20
-        },
-        {
-            "id": "opencode-cli",
-            "name": "OpenCode CLI",
-            "tool": "opencode",
-            "account": "default",
-            "enabled": False,
-            "telemetry_type": "timed_fallback",
-            "wake_command": ["opencode", "run", "echo 1"],
-            "status_command": [],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 20
-        },
-        {
-            "id": "pi-cli",
-            "name": "Inflection Pi CLI",
-            "tool": "pi",
-            "account": "default",
-            "enabled": False,
-            "telemetry_type": "timed_fallback",
-            "wake_command": ["pi", "ask", "hi"],
-            "status_command": [],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 20
-        },
-        {
-            "id": "llm-datasette",
-            "name": "Datasette LLM CLI",
-            "tool": "llm",
-            "account": "default",
-            "enabled": False,
-            "telemetry_type": "timed_fallback",
-            "wake_command": ["llm", "prompt", "1"],
-            "status_command": [],
-            "fallback_interval_hours": 5,
-            "timeout_sec": 15
         }
     ],
     "commands": {
@@ -3210,6 +3139,7 @@ def schedule_next_rtc_alarm(wake_time_str: str) -> bool:
             print(f"  {C_GREEN}✓ Hardware RTC alarm set for {target_dt.strftime('%Y-%m-%d %H:%M:%S')}{C_RESET}")
             state = load_state()
             state["scheduled_wake_epoch"] = epoch
+            state["expecting_auto_wake"] = True
             save_state(state)
             return True
         else:
@@ -3217,20 +3147,139 @@ def schedule_next_rtc_alarm(wake_time_str: str) -> bool:
     return False
 
 
+def disable_rtc_alarm() -> bool:
+    state = load_state()
+    state["expecting_auto_wake"] = False
+    state["scheduled_wake_epoch"] = None
+    save_state(state)
+    if shutil.which("rtcwake"):
+        res = subprocess.run(["sudo", "-n", "rtcwake", "-m", "disable"], capture_output=True, text=True, check=False)
+        return res.returncode == 0
+    return False
+
+
+def handle_on_suspend() -> None:
+    config = load_config()
+    auto_wake = config.get("daemon", {}).get("auto_wake", {})
+    if auto_wake.get("enabled", False):
+        wake_time = auto_wake.get("time", "04:00")
+        print(f"  {C_CYAN}[D-Bus] Pre-sleep detected. Arming RTC hardware alarm for {wake_time}...{C_RESET}")
+        schedule_next_rtc_alarm(wake_time)
+
+
+def handle_on_resume() -> None:
+    state = load_state()
+    config = load_config()
+    now_epoch = time.time()
+    scheduled_epoch = state.get("scheduled_wake_epoch", 0) or 0
+    expecting = state.get("expecting_auto_wake", False)
+    auto_wake_cfg = config.get("daemon", {}).get("auto_wake", {})
+    max_window_sec = auto_wake_cfg.get("max_wake_window_minutes", 15) * 60
+
+    last_auto_wake = state.get("last_auto_wake_epoch", 0)
+    if now_epoch - last_auto_wake < 300:
+        print(f"  {C_DIM}[D-Bus] Post-sleep: Recent auto-wake cycle executed {int(now_epoch - last_auto_wake)}s ago. Skipping redundant run.{C_RESET}")
+        return
+
+    is_rtc_wake = expecting and abs(now_epoch - scheduled_epoch) < max_window_sec
+
+    if is_rtc_wake:
+        print(f"\n{C_BOLD}{C_CYAN}==> Detected scheduled RTC Auto-Wake (04:00 AM window). Initiating activation cycle...{C_RESET}")
+        state["expecting_auto_wake"] = False
+        state["last_auto_wake_epoch"] = now_epoch
+        save_state(state)
+
+        # 1. Wait for network
+        print(f"  {C_DIM}Awaiting network connectivity (up to 30s)...{C_RESET}")
+        wait_for_internet(timeout_sec=30)
+
+        # 2. Wake quotas
+        run_wake(force=False, reason="rtc_04am_auto_wake")
+
+        # 3. Schedule next day's alarm
+        wake_time = auto_wake_cfg.get("time", "04:00")
+        schedule_next_rtc_alarm(wake_time)
+
+        # 4. Auto-resuspend if configured
+        if auto_wake_cfg.get("auto_resuspend", True):
+            delay = auto_wake_cfg.get("resuspend_delay_seconds", 12)
+            print(f"  {C_YELLOW}💤 Auto-resuspending in {delay} seconds to preserve battery...{C_RESET}")
+            send_notification(
+                "💤 Auto-Resuspending System",
+                f"Model quotas successfully primed. Suspending in {delay}s...",
+                urgency="normal"
+            )
+            time.sleep(delay)
+            subprocess.run(["systemctl", "suspend"], check=False)
+    else:
+        print(f"  {C_CYAN}[D-Bus] Manual user resume detected.{C_RESET}")
+        if auto_wake_cfg.get("enabled", False):
+            wake_time = auto_wake_cfg.get("time", "04:00")
+            schedule_next_rtc_alarm(wake_time)
+
+
+def run_monitor_daemon() -> None:
+    print(f"{C_BOLD}{C_CYAN}==> Starting aitools D-Bus sleep & resume monitor daemon...{C_RESET}")
+    config = load_config()
+    auto_wake_cfg = config.get("daemon", {}).get("auto_wake", {})
+    if auto_wake_cfg.get("enabled", False):
+        wake_time = auto_wake_cfg.get("time", "04:00")
+        schedule_next_rtc_alarm(wake_time)
+
+    if not shutil.which("gdbus"):
+        print(f"{C_RED}Error: gdbus command not found. D-Bus monitor cannot run.{C_RESET}", file=sys.stderr)
+        sys.exit(1)
+
+    cmd = ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"]
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    except Exception as e:
+        print(f"{C_RED}Failed to spawn gdbus monitor: {e}{C_RESET}", file=sys.stderr)
+        sys.exit(1)
+
+    def sig_handler(sig, frame):
+        proc.terminate()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+
+    try:
+        while True:
+            line = proc.stdout.readline()
+            if not line:
+                break
+            if "PrepareForSleep: <true>" in line:
+                handle_on_suspend()
+            elif "PrepareForSleep: <false>" in line:
+                time.sleep(2)
+                handle_on_resume()
+    except KeyboardInterrupt:
+        proc.terminate()
+
+
 def run_daemon_wake_cycle() -> None:
     config = load_config()
+    state = load_state()
     daemon_cfg = config.get("daemon", {})
     auto_wake_cfg = daemon_cfg.get("auto_wake", {})
 
-    print(f"\n{C_BOLD}{C_CYAN}==> aitools: Executing scheduled wake cycle...{C_RESET}")
-    # Run wake
-    run_wake(force=False, reason="rtc_auto_wake")
+    now_epoch = time.time()
+    last_auto_wake = state.get("last_auto_wake_epoch", 0)
+    if now_epoch - last_auto_wake < 300:
+        print(f"  {C_DIM}aitools: Wake cycle already ran {int(now_epoch - last_auto_wake)}s ago. Skipping.{C_RESET}")
+        return
 
-    # Schedule next day's alarm
+    state["last_auto_wake_epoch"] = now_epoch
+    save_state(state)
+
+    print(f"\n{C_BOLD}{C_CYAN}==> aitools: Executing scheduled wake cycle...{C_RESET}")
+    wait_for_internet(timeout_sec=30)
+    run_wake(force=False, reason="systemd_timer_or_cron")
+
     if auto_wake_cfg.get("enabled", False):
         schedule_next_rtc_alarm(auto_wake_cfg.get("time", "04:00"))
 
-    # Auto-resuspend if configured
     if auto_wake_cfg.get("auto_resuspend", True):
         delay = auto_wake_cfg.get("resuspend_delay_seconds", 12)
         print(f"  {C_YELLOW}Auto-resuspend active. Returning to sleep in {delay}s...{C_RESET}")
@@ -3242,7 +3291,10 @@ def run_daemon_wake_cycle() -> None:
 def handle_daemon_cli(args: argparse.Namespace) -> None:
     action = args.daemon_action
 
-    if action == "run-wake-cycle":
+    if action == "run-monitor":
+        run_monitor_daemon()
+
+    elif action == "run-wake-cycle":
         run_daemon_wake_cycle()
 
     elif action == "status":
@@ -3250,16 +3302,37 @@ def handle_daemon_cli(args: argparse.Namespace) -> None:
         st = load_state()
         print(f"\n{C_BOLD}{C_CYAN}aitools Daemon & RTC Auto-Wake Status:{C_RESET}")
         auto_wake = cfg.get("daemon", {}).get("auto_wake", {})
-        print(f"  Auto-Wake Enabled:  {auto_wake.get('enabled')}")
-        print(f"  Target Wake Time:   {auto_wake.get('time')}")
+        wake_time = auto_wake.get("time", "04:00")
+        is_enabled = auto_wake.get("enabled", False)
+        print(f"  Auto-Wake Enabled:  {is_enabled}")
+        print(f"  Target Wake Time:   {wake_time}")
         print(f"  Auto-Resuspend:     {auto_wake.get('auto_resuspend')} (delay: {auto_wake.get('resuspend_delay_seconds')}s)")
         if st.get("scheduled_wake_epoch"):
             wake_dt = datetime.fromtimestamp(st["scheduled_wake_epoch"]).strftime("%Y-%m-%d %H:%M:%S")
             print(f"  Next Scheduled RTC: {wake_dt}")
 
+        hw_alarm = None
+        if os.path.exists("/sys/class/rtc/rtc0/wakealarm"):
+            try:
+                with open("/sys/class/rtc/rtc0/wakealarm", "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        hw_epoch = int(content)
+                        hw_alarm = datetime.fromtimestamp(hw_epoch).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+        if hw_alarm:
+            print(f"  Hardware Alarm:     {C_GREEN}{hw_alarm} (armed){C_RESET}")
+        else:
+            print(f"  Hardware Alarm:     {C_YELLOW}none (disarmed){C_RESET}")
+
         if shutil.which("systemctl"):
-            res = subprocess.run(["systemctl", "--user", "is-active", "aitools-monitor.service"], capture_output=True, text=True)
-            print(f"  Systemd Service:    {res.stdout.strip()}")
+            res_mon = subprocess.run(["systemctl", "--user", "is-active", "aitools-monitor.service"], capture_output=True, text=True)
+            res_tmr = subprocess.run(["systemctl", "--user", "is-active", "aitools-wake.timer"], capture_output=True, text=True)
+            mon_status = res_mon.stdout.strip() or "inactive"
+            tmr_status = res_tmr.stdout.strip() or "inactive"
+            print(f"  Monitor Service:    {C_GREEN if mon_status == 'active' else C_YELLOW}{mon_status}{C_RESET}")
+            print(f"  Systemd Timer:      {C_GREEN if tmr_status == 'active' else C_YELLOW}{tmr_status}{C_RESET}")
         print()
 
     elif action == "auto-wake":
@@ -3269,47 +3342,83 @@ def handle_daemon_cli(args: argparse.Namespace) -> None:
             cfg.setdefault("daemon", {}).setdefault("auto_wake", {})["enabled"] = True
             save_config(cfg)
             schedule_next_rtc_alarm(cfg["daemon"]["auto_wake"].get("time", "04:00"))
-            print(f"{C_GREEN}✓ RTC Auto-wake enabled.{C_RESET}")
+            print(f"{C_GREEN}✓ RTC Auto-wake enabled for {cfg['daemon']['auto_wake'].get('time', '04:00')}.{C_RESET}")
         else:
             cfg.setdefault("daemon", {}).setdefault("auto_wake", {})["enabled"] = False
             save_config(cfg)
-            subprocess.run(["sudo", "-n", "rtcwake", "-m", "disable"], check=False)
+            disable_rtc_alarm()
             print(f"{C_YELLOW}✓ RTC Auto-wake disabled.{C_RESET}")
 
     elif action == "install":
-        print(f"{C_BOLD}{C_CYAN}==> Installing aitools systemd user service...{C_RESET}")
+        print(f"{C_BOLD}{C_CYAN}==> Installing aitools systemd user services and timers...{C_RESET}")
         os.makedirs(SYSTEMD_USER_DIR, exist_ok=True)
         bin_path = os.path.expanduser("~/.local/bin/aitools")
+        bin_dir = os.path.expanduser("~/.local/bin")
 
-        service_content = f"""[Unit]
-Description=aitools AI Quota & Wakeup Monitor
-After=network-online.target
+        monitor_content = f"""[Unit]
+Description=aitools AI Quota & D-Bus Sleep/Resume Monitor
+After=graphical-session.target network.target
 
 [Service]
 Type=simple
 ExecStart={bin_path} daemon run-monitor
 Restart=always
-RestartSec=60
-Environment=PATH={os.path.expanduser('~/.local/bin')}:/usr/local/bin:/usr/bin:/bin
+RestartSec=10
+Environment=PATH={bin_dir}:/usr/local/bin:/usr/bin:/bin
+Environment=DISPLAY=:0
 
 [Install]
 WantedBy=default.target
 """
+        wake_service_content = f"""[Unit]
+Description=aitools 04:00 AM Quota Wakeup & Rolling Refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={bin_path} daemon run-wake-cycle
+Environment=PATH={bin_dir}:/usr/local/bin:/usr/bin:/bin
+"""
+        wake_timer_content = f"""[Unit]
+Description=aitools Daily 04:00 AM Quota Wakeup Timer
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
         with open(SERVICE_FILE, "w", encoding="utf-8") as f:
-            f.write(service_content)
+            f.write(monitor_content)
+        with open(WAKE_SERVICE_FILE, "w", encoding="utf-8") as f:
+            f.write(wake_service_content)
+        with open(WAKE_TIMER_FILE, "w", encoding="utf-8") as f:
+            f.write(wake_timer_content)
 
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
         subprocess.run(["systemctl", "--user", "enable", "--now", "aitools-monitor.service"], check=False)
-        print(f"{C_GREEN}✓ Service installed and started: aitools-monitor.service{C_RESET}")
+        subprocess.run(["systemctl", "--user", "enable", "--now", "aitools-wake.timer"], check=False)
+        print(f"{C_GREEN}✓ Systemd units installed and active: aitools-monitor.service, aitools-wake.timer{C_RESET}")
+
+        cfg = load_config()
+        if cfg.get("daemon", {}).get("auto_wake", {}).get("enabled", False):
+            schedule_next_rtc_alarm(cfg["daemon"]["auto_wake"].get("time", "04:00"))
 
     elif action == "uninstall":
-        print(f"{C_YELLOW}==> Stopping and removing aitools systemd service...{C_RESET}")
-        subprocess.run(["systemctl", "--user", "stop", "aitools-monitor.service"], check=False)
-        subprocess.run(["systemctl", "--user", "disable", "aitools-monitor.service"], check=False)
-        if os.path.exists(SERVICE_FILE):
-            os.remove(SERVICE_FILE)
+        print(f"{C_YELLOW}==> Stopping and removing aitools systemd services and timers...{C_RESET}")
+        subprocess.run(["systemctl", "--user", "stop", "aitools-monitor.service", "aitools-wake.timer", "aitools-wake.service"], check=False)
+        subprocess.run(["systemctl", "--user", "disable", "aitools-monitor.service", "aitools-wake.timer", "aitools-wake.service"], check=False)
+        for unit_path in [SERVICE_FILE, WAKE_SERVICE_FILE, WAKE_TIMER_FILE]:
+            if os.path.exists(unit_path):
+                try:
+                    os.remove(unit_path)
+                except OSError:
+                    pass
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
-        print(f"{C_GREEN}✓ Service uninstalled cleanly.{C_RESET}")
+        disable_rtc_alarm()
+        print(f"{C_GREEN}✓ Services and timers uninstalled cleanly.{C_RESET}")
 
 
 # ------------------------------------------------------------------------------
@@ -3421,7 +3530,7 @@ def main() -> None:
 
     # 6. Daemon
     p_daemon = subparsers.add_parser("daemon", help="Manage background wakeup daemon, RTC alarms, and suspension")
-    p_daemon.add_argument("daemon_action", choices=["status", "install", "uninstall", "run-wake-cycle", "auto-wake"])
+    p_daemon.add_argument("daemon_action", choices=["status", "install", "uninstall", "run-wake-cycle", "auto-wake", "run-monitor"])
     p_daemon.add_argument("extra_arg", nargs="?", default="", help="Optional parameter for daemon action (e.g. on/off)")
 
     # 7. Status
