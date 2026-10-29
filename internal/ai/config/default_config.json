@@ -1,0 +1,287 @@
+{
+  "version": "1.0.0",
+  "default_commit_backend": "agy",
+  "backends": {
+    "agy": {
+      "name": "agy",
+      "description": "Google Antigravity CLI (Gemini, Claude, GPT)",
+      "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "effort_flag": "--effort",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 60,
+      "mode_flags": {
+        "chat": ["--mode", "plan"],
+        "ask": ["--mode", "plan"],
+        "action": ["--mode", "accept-edits"],
+        "simple-agent": ["--mode", "accept-edits"],
+        "agent": []
+      },
+      "format_flags": {
+        "json": ["--output-format", "json"],
+        "text": ["--output-format", "text"]
+      }
+    },
+    "llm": {
+      "name": "llm",
+      "description": "Datasette LLM CLI (Simon Willison)",
+      "command": ["llm", "{prompt}"],
+      "input_mode": "stdin",
+      "output_mode": "stdout",
+      "model_flag": "-m",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 45
+    },
+    "claude": {
+      "name": "claude",
+      "description": "Anthropic Claude Code CLI",
+      "command": ["claude", "-p", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 45,
+      "mode_flags": {
+        "chat": ["--allowed-tools", ""],
+        "ask": ["--allowed-tools", ""],
+        "action": [],
+        "simple-agent": [],
+        "agent": []
+      }
+    },
+    "codex": {
+      "name": "codex",
+      "description": "OpenAI Codex CLI",
+      "command": ["codex", "exec", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "-m",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 45,
+      "mode_flags": {
+        "chat": ["-s", "read-only"],
+        "ask": ["-s", "read-only"],
+        "action": ["-s", "workspace-write"],
+        "simple-agent": ["-s", "workspace-write"],
+        "agent": []
+      }
+    },
+    "opencode": {
+      "name": "opencode",
+      "description": "OpenCode CLI",
+      "command": ["opencode", "run", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "-m",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 45
+    },
+    "pi": {
+      "name": "pi",
+      "description": "Inflection Pi CLI",
+      "command": ["pi", "ask", "{prompt}"],
+      "input_mode": "arg",
+      "output_mode": "stdout",
+      "model_flag": "--model",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 45
+    },
+    "ollama": {
+      "name": "ollama",
+      "description": "Ollama Local LLM Runner",
+      "command": ["ollama", "run", "{model}"],
+      "default_model": "codellama",
+      "input_mode": "stdin",
+      "output_mode": "stdout",
+      "clean_ansi": true,
+      "clean_markdown": true,
+      "timeout_sec": 60
+    }
+  },
+  "llm": {
+    "default_backend": "agy",
+    "default_model": null,
+    "default_effort": "low",
+    "default_mode": "agent",
+    "default_output_format": "text",
+    "timeout_sec": 60
+  },
+  "commit": {
+    "default_backend": "agy",
+    "model": null,
+    "effort": "low",
+    "default_stage_all": false,
+    "max_diff_length": 15000,
+    "default_template": "conventional",
+    "auto_detect_repo_template": true,
+    "task_id": null,
+    "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add \"Co-Authored-By\", AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}",
+    "templates": {}
+  },
+  "pr": {
+    "default_backend": "agy",
+    "model": null,
+    "effort": "low",
+    "default_base": null,
+    "max_diff_length": 25000,
+    "default_template": "standard",
+    "auto_detect_repo_template": true,
+    "task_id": null,
+    "templates": {}
+  },
+  "daemon": {
+    "auto_wake": {
+      "enabled": true,
+      "time": "04:00",
+      "auto_resuspend": true,
+      "resuspend_delay_seconds": 12,
+      "max_wake_window_minutes": 15
+    },
+    "active_hours": {
+      "start": "03:55",
+      "end": "22:00"
+    },
+    "reset_alert_lead_minutes": 5,
+    "desktop_notifications": true,
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    }
+  },
+  "notifications": {
+    "desktop": true,
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    }
+  },
+  "targets": [
+    {
+      "id": "gemini",
+      "name": "Google Gemini (Antigravity)",
+      "tool": "agy",
+      "account": "default",
+      "enabled": true,
+      "telemetry_type": "agy_usage",
+      "bucket_id": "gemini-5h",
+      "wake_command": [
+        "agy",
+        "-p",
+        "Reply with: 1",
+        "--model",
+        "gemini-3.8-flash-low",
+        "--effort",
+        "low"
+      ],
+      "status_command": [
+        "agy",
+        "-p",
+        "/usage",
+        "--output-format",
+        "json"
+      ],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 20
+    }
+  ],
+  "commands": {
+    "review": {
+      "description": "Perform an AI code review on current staged git diff",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "git_staged_diff",
+      "prompt_template": "You are a Principal Software Architect. Review the following git diff for logical bugs, security vulnerabilities, edge cases, and performance regressions. Be concise, actionable, and prioritize findings by severity:\n\n{input}"
+    },
+    "explain": {
+      "description": "Explain a code snippet, error message, or technical concept",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "You are an expert technical instructor. Explain the following code, error trace, or concept clearly with a focus on fundamentals and concise practical examples:\n\n{input}"
+    },
+    "ask": {
+      "description": "Quick one-line question to the default AI assistant",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "args",
+      "prompt_template": "Answer the following question concisely and technically without introductory conversational fluff:\n\n{input}"
+    },
+    "optimize": {
+      "description": "Suggest performance optimizations for code provided via stdin or argument",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Analyze the following code for memory allocations, CPU complexity, and latency bottlenecks. Suggest optimal refactoring with concrete code diffs:\n\n{input}"
+    },
+    "refactor": {
+      "description": "Refactor code for clarity, idiomatic patterns, and maintainability",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Refactor the following code to improve readability, modularity, and idiomatic style while preserving exact runtime behavior:\n\n{input}"
+    },
+    "fix": {
+      "description": "Diagnose and fix a bug or compiler/runtime error",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Diagnose the root cause of the bug or error in the following input and provide the minimal, accurate fix:\n\n{input}"
+    },
+    "doc": {
+      "description": "Generate clear technical documentation and docstrings for code",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Write concise, accurate technical documentation and doc comments for the following code:\n\n{input}"
+    },
+    "test": {
+      "description": "Generate table-driven unit tests covering edge cases and failure modes",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "stdin_or_args",
+      "prompt_template": "Write comprehensive, deterministic unit tests (including edge cases and error paths) for the following code:\n\n{input}"
+    },
+    "changelog": {
+      "description": "Generate a categorized Keep-a-Changelog summary from recent git log",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "git_log",
+      "prompt_template": "Group and summarize the following git commit history into a clean Markdown changelog (Added, Changed, Fixed, Performance):\n\n{input}"
+    },
+    "regex": {
+      "description": "Construct and explain a regular expression for a natural-language spec",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "args",
+      "prompt_template": "Create a safe, linear-time regular expression matching the following requirement, and briefly explain each token:\n\n{input}"
+    },
+    "cmd": {
+      "description": "Translate a natural-language task into a safe POSIX/Unix shell command",
+      "backend": "agy",
+      "model": null,
+      "effort": "low",
+      "input_type": "args",
+      "prompt_template": "Output ONLY the exact POSIX/Unix CLI command to accomplish the following task (no markdown fences, no commentary):\n\n{input}"
+    }
+  }
+}
