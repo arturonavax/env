@@ -137,27 +137,36 @@
 
     // Default commit template to use. Built-in options:
     // - "conventional" : Standard Conventional Commits (<type>(<scope>): <summary>)
-    // - "jira"         : Jira-prefixed commit ([<JIRA-ID>] <type>(<scope>): <summary>)
-    // - "jira-scope"   : Jira issue as commit scope (<type>(<JIRA-ID>): <summary>)
+    // - "task"         : Task-prefixed commit ([<TASK-ID>] <type>(<scope>): <summary>)
+    // - "task-scope"   : Task issue as commit scope (<type>(<TASK-ID>): <summary>)
     // - "detailed"     : Multi-line commit with WHAT/WHY paragraph and bullet points
-    // Or specify any custom key defined under "templates" below.
+    // - "repo"         : Discovered repository commit template (.gitmessage / commit.template)
+    // Or specify any custom key defined under "templates" below, or a file path.
     "default_template": "conventional",
 
-    // Optional manual Jira issue ticket ID (e.g. "PROJ-1234").
+    // Automatically detect and honor repository commit templates when inside a git repo.
+    // Discovers: git config commit.template, .gitmessage, .github/commit_template.md, etc.
+    "auto_detect_repo_template": true,
+
+    // Optional manual Task / Issue ticket ID (e.g. "PROJ-1234", "#42").
     // If null, aitools automatically extracts ticket patterns from the current Git branch name.
-    "jira_id": null,
+    "task_id": null,
 
     // Optional custom commit message templates.
     // Available placeholders for dynamic string interpolation:
     //   {diff}     : Git staged diff
     //   {branch}   : Current Git branch name
-    //   {jira_id}  : Jira ticket ID (auto-extracted from branch or CLI/config override)
+    //   {task_id}  : Task/Issue ticket ID (auto-extracted from branch or CLI/config override)
+    //   {issue_id} : Alias for {task_id}
+    //   {ticket}   : Alias for {task_id}
     //   {files}    : Comma-separated list of modified/staged files
     //   {scope}    : Scope override passed via CLI --scope
     //   {model}    : Active model name
     "templates": {
-      // Example of custom team template:
-      // "org-custom": "Write a commit for branch {branch} (Ticket: {jira_id}).\nFormat: {jira_id}: <type>: <summary>\nDiff:\n{diff}"
+      // Example 1: Organization format with ticket prefix:
+      // "org-custom": "Write a commit for branch {branch} (Task: {task_id}).\nFormat: [{task_id}] <type>: <summary>\nDiff:\n{diff}",
+      // Example 2: Linear / GitHub style:
+      // "linear-style": "Generate a concise conventional commit with issue ref: <type>(<scope>): <summary>\nFixes {task_id}\n\nDiff:\n{diff}"
     },
 
     // Legacy default prompt template (used if no named template is chosen)

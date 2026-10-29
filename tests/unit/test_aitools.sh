@@ -125,58 +125,71 @@ tmpl_list_code=$?
 assert_exit_code 0 "$tmpl_list_code" "aitools commit --list-templates exit code" &&
 	assert_contains "$tmpl_list_output" "Available Commit Message Templates" "Templates header" &&
 	assert_contains "$tmpl_list_output" "conventional" "Template conventional listed" &&
-	assert_contains "$tmpl_list_output" "jira" "Template jira listed" &&
-	assert_contains "$tmpl_list_output" "jira-scope" "Template jira-scope listed" &&
+	assert_contains "$tmpl_list_output" "task" "Template task listed" &&
+	assert_contains "$tmpl_list_output" "task-scope" "Template task-scope listed" &&
 	assert_contains "$tmpl_list_output" "detailed" "Template detailed listed" &&
 	pass "aitools commit --list-templates cleanly listed all available templates"
 
-# Test 12: Jira ticket extraction and safe template rendering
+# Test 12: Agnostic task/ticket extraction, repo templates, and safe rendering
 python3 -c "
 from importlib.machinery import SourceFileLoader
 import sys
 aitools = SourceFileLoader('aitools', '${REPO_ROOT}/files/ai/aitools/aitools').load_module()
 
-# Test Jira extraction
-assert aitools.extract_jira_id('feature/ENG-942-auth-flow') == 'ENG-942', 'Failed to extract ENG-942'
-assert aitools.extract_jira_id('fix/CORE-105-checkout') == 'CORE-105', 'Failed to extract CORE-105'
-assert aitools.extract_jira_id('hotfix/ABC-1_urgent') == 'ABC-1', 'Failed to extract ABC-1'
-assert aitools.extract_jira_id('chore/clean-tests') == '', 'Non-jira branch should return empty string'
+# 1. Test task ID extraction (standard project keys and issue numbers)
+assert aitools.extract_task_id('feature/ENG-942-auth-flow') == 'ENG-942', 'Failed to extract ENG-942'
+assert aitools.extract_task_id('fix/CORE-105-checkout') == 'CORE-105', 'Failed to extract CORE-105'
+assert aitools.extract_task_id('hotfix/ABC-1_urgent') == 'ABC-1', 'Failed to extract ABC-1'
+assert aitools.extract_task_id('issue/42-fix-login') == '#42', 'Failed to extract #42'
+assert aitools.extract_task_id('feat/gh-101-cache') == 'GH-101', 'Failed to extract GH-101'
+assert aitools.extract_task_id('chore/clean-tests') == '', 'Non-ticket branch should return empty string'
 
-# Test render_commit_template does not crash with KeyError on arbitrary braces
-tmpl = 'Format: <type>({scope}): <summary>\nJira: {jira_id}\nBranch: {branch}\nDiff:\n{diff}'
+# 2. Test backwards compatibility alias
+assert aitools.extract_jira_id('feature/ENG-942-auth-flow') == 'ENG-942', 'Failed alias extract_jira_id'
+
+# 3. Test render_commit_template does not crash with KeyError on arbitrary braces
+tmpl = 'Format: <type>({scope}): <summary>\nTask: {task_id}\nBranch: {branch}\nDiff:\n{diff}'
 ctx = {
-    'jira_id': 'PROJ-1234',
+    'task_id': 'PROJ-1234',
     'branch': 'feature/PROJ-1234-login',
     'diff': 'sample diff content',
     'scope': 'auth'
 }
 rendered = aitools.render_commit_template(tmpl, ctx)
 assert 'Format: <type>(auth): <summary>' in rendered, 'Failed to replace scope'
-assert 'Jira: PROJ-1234' in rendered, 'Failed to replace jira_id'
+assert 'Task: PROJ-1234' in rendered, 'Failed to replace task_id'
 assert 'Branch: feature/PROJ-1234-login' in rendered, 'Failed to replace branch'
 assert 'sample diff content' in rendered, 'Failed to replace diff'
 
-# Test built-in template resolution
-t_str, t_name = aitools.resolve_commit_template('jira', {})
-assert t_name == 'jira', 'Failed to resolve jira template'
-assert '{jira_id}' in t_str or '[{jira_id}]' in t_str, 'Jira placeholder missing in template'
+# 4. Test built-in task template resolution
+t_str, t_name = aitools.resolve_commit_template('task', {})
+assert t_name == 'task', f'Failed to resolve task template: {t_name}'
+assert '{task_id}' in t_str or '[{task_id}]' in t_str, 'Task placeholder missing in template'
+
+# 5. Test repo template wrapper
+repo_msg = '# [<type>]: <subject>\n# Why this change is needed\n'
+wrapped = aitools.wrap_repo_template_as_prompt(repo_msg, '.gitmessage')
+assert '{diff}' in wrapped, 'Missing {diff} in wrapped repo template'
+assert '{task_id}' in wrapped, 'Missing {task_id} in wrapped repo template'
+assert 'Repository Commit Template & Guidelines:' in wrapped, 'Header missing'
+
 sys.exit(0)
 " >/dev/null 2>&1
-jira_test_code=$?
-assert_exit_code 0 "$jira_test_code" "Jira extraction and template rendering assertions" &&
-	pass "Jira ticket extraction and safe template rendering validated with 100% precision"
+task_test_code=$?
+assert_exit_code 0 "$task_test_code" "Task extraction and template rendering assertions" &&
+	pass "Agnostic task/ticket extraction, repo template wrapping, and safe rendering validated with 100% precision"
 
 # Test 13: aitools commit options verification
 commit_help_output="$("$AITOOLS_BIN" commit --help 2>&1)"
 commit_help_code=$?
 assert_exit_code 0 "$commit_help_code" "aitools commit --help exit code" &&
 	assert_contains "$commit_help_output" "--template" "Template flag present" &&
-	assert_contains "$commit_help_output" "--jira" "Jira flag present" &&
+	assert_contains "$commit_help_output" "--task" "Task flag present" &&
 	assert_contains "$commit_help_output" "--scope" "Scope flag present" &&
 	assert_contains "$commit_help_output" "--model" "Model flag present" &&
 	assert_contains "$commit_help_output" "--list-templates" "List templates flag present" &&
 	assert_contains "$commit_help_output" "--list-backends" "List backends flag present" &&
-	pass "aitools commit CLI flags (--template, --jira, --scope, --model, --list-templates, --list-backends) verified"
+	pass "aitools commit CLI flags (--template, --task, --scope, --model, --list-templates, --list-backends) verified"
 
 # Test 14: aitools backends and commit --list-backends
 backends_output="$("$AITOOLS_BIN" backends 2>&1)"
@@ -352,3 +365,19 @@ if [[ "$llm_empty_code" -ne 0 ]]; then
 else
 	fail "aitools llm empty prompt" "Expected non-zero exit code but got 0"
 fi
+
+# Test 24: Repository-level commit template auto-discovery (.gitmessage)
+repo_test_dir="${TEST_SANDBOX}/git_repo_with_msg"
+mkdir -p "$repo_test_dir"
+(
+	cd "$repo_test_dir" || exit 1
+	git init -q
+	echo "# Custom repo gitmessage template" > .gitmessage
+	echo "# [<type>]: <subject>" >> .gitmessage
+	repo_list_out="$("$AITOOLS_BIN" commit --list-templates 2>&1)"
+	assert_contains "$repo_list_out" "repo" "Discovered repo template in list" &&
+		assert_contains "$repo_list_out" ".gitmessage" "Found .gitmessage reference"
+)
+repo_test_code=$?
+assert_exit_code 0 "$repo_test_code" "Repo template discovery exit code" &&
+	pass "aitools commit auto-discovered repository-level .gitmessage commit template"

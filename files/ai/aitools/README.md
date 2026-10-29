@@ -132,14 +132,17 @@ aitools wake --force
 # Generate Conventional Commit from staged changes
 aitools commit
 
-# List available commit prompt templates
+# List available commit prompt templates (including discovered repo template)
 aitools commit --list-templates
 
-# Commit using Jira ticket convention (auto-extracted from branch e.g. feature/PROJ-123-auth)
-aitools commit --template jira
+# Commit using task ticket convention (auto-extracted from branch e.g. feature/PROJ-123-auth, fix/#42)
+aitools commit --template task
 
-# Commit with manual Jira ID and specific model override
-aitools commit -t jira -j PROJ-999 --model gemini-2.5-flash
+# Commit with manual Task ID and specific model override
+aitools commit -t task -k PROJ-999 --model gemini-2.5-flash
+
+# Commit strictly adhering to the repository's own commit template (.gitmessage / commit.template)
+aitools commit --template repo
 
 # Multi-line detailed commit with scope override
 aitools commit --template detailed --scope auth
@@ -205,35 +208,47 @@ Configured in `~/.base.zsh`:
 | :--- | :--- | :--- |
 | `ait` | `aitools` | Fast CLI prefix |
 | `gcm` | `aitools commit` | AI-powered conventional commit from diff |
-| `gcmj` | `aitools commit --template jira` | AI commit with auto-extracted Jira ticket ID |
+| `gcmk` | `aitools commit --template task` | AI commit with auto-extracted task/ticket ID |
+| `gcmr` | `aitools commit --template repo` | AI commit strictly adhering to repo's `.gitmessage` |
+| `gcmj` | `aitools commit --template task` | Compatibility alias for task ticket commit |
 | `gcmd` | `aitools commit --template detailed` | AI commit with multi-line detailed breakdown |
 | `ai-wake` | `aitools wake` | Quota primer probe |
 | `ai-quota` | `aitools quota` | Quick quota status inspection |
+| `ai-llm` | `aitools llm` | Unified non-interactive AI query wrapper |
 
 ---
 
-## 5. Commit Templates & Jira Integration
+## 5. Versatile Commit Templates & Repository Integration
 
-`aitools commit` supports dynamic templates for organizations requiring specific commit structures (e.g. Jira issue IDs, branch names, scopes).
+`aitools commit` provides a versatile, fully configurable template engine designed to be completely agnostic to issue trackers (Jira, GitHub Issues, Linear, GitLab, etc.) and seamlessly integrates with repository-level commit standards.
 
 ### Built-in Templates
 
 - **`conventional`**: Standard Conventional Commits: `<type>(<scope>): <summary>`
-- **`jira`**: Jira-prefixed format: `[<JIRA-ID>] <type>(<scope>): <summary>`
-- **`jira-scope`**: Jira ticket as scope: `<type>(<JIRA-ID>): <summary>`
+- **`task`**: Task-prefixed format: `[<TASK-ID>] <type>(<scope>): <summary>`
+- **`task-scope`**: Task issue as scope: `<type>(<TASK-ID>): <summary>`
 - **`detailed`**: Multi-line commit with summary, WHAT/WHY paragraph, bullets, and ticket
+- **`repo`**: Repository commit template (automatically discovered from git config or repository files)
 
-### Ticket Auto-Detection
+### Automatic Repository Template Discovery
 
-If your current Git branch follows ticket naming conventions (e.g. `feature/PROJ-123-auth`, `fix/CORE-942_login`), `aitools` automatically extracts the Jira ID (`PROJ-123`, `CORE-942`) and injects it into `{jira_id}` without requiring manual input. You can override it anytime with `--jira <ID>` or `-j <ID>`.
+When operating inside a Git repository, `aitools` automatically checks for repository-level commit guidelines and templates:
+1. `git config commit.template`: Defined locally or globally in git.
+2. Well-known template files in the repository root: `.gitmessage`, `.gitmessage.txt`, `.github/commit-template.md`, `.github/commit_template.md`, `.commit-template`.
+
+If detected and `auto_detect_repo_template` is enabled (default: `true`), `aitools` uses the repository's guidelines directly, translating comments and placeholders into an instruction prompt without requiring any manual setup.
+
+### Agnostic Task / Ticket Auto-Detection
+
+If your current Git branch follows ticket naming conventions (e.g. `feature/PROJ-123-auth`, `fix/CORE-942_login`, `issue/42-fix`), `aitools` automatically extracts the task identifier (`PROJ-123`, `CORE-942`, `#42`) and injects it into `{task_id}`. You can override it anytime with `--task <ID>`, `-k <ID>`, or `--ticket <ID>`.
 
 ### Template Placeholders
 
-When defining custom templates in `~/.config/aitools/config.json`, the following placeholders are available:
+When defining custom templates in `~/.config/aitools/config.json` or external template files, the following placeholders are available:
 
 - `{diff}`: Git staged diff
 - `{branch}`: Active Git branch name
-- `{jira_id}`: Auto-detected or overridden Jira ticket ID
+- `{task_id}`: Auto-detected or overridden Task/Issue ID (also available via `{issue_id}` or `{ticket}`)
 - `{files}`: Comma-separated list of modified files
 - `{model}`: Active LLM model name
 - `{scope}`: Scope passed via `--scope` / `-s`
@@ -310,10 +325,11 @@ Supports **JSON with Comments (JSONC)** including `//`, `/* */`, `#`, and traili
     "default_stage_all": false,
     "max_diff_length": 15000,
     "default_template": "conventional",
-    "jira_id": null,
+    "auto_detect_repo_template": true,
+    "task_id": null,
     "templates": {
       // Custom templates can be registered here:
-      // "my-team": "Write commit for {jira_id}...\n{diff}"
+      // "my-team": "Write commit for {task_id}...\n{diff}"
     }
   },
   "daemon": {

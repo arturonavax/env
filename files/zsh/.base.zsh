@@ -602,7 +602,9 @@ fi
 if (( $+commands[aitools] )); then
     alias ait='aitools'
     alias gcm='aitools commit'
-    alias gcmj='aitools commit --template jira'
+    alias gcmk='aitools commit --template task'
+    alias gcmj='aitools commit --template task'
+    alias gcmr='aitools commit --template repo'
     alias gcmd='aitools commit --template detailed'
     alias ai-wake='aitools wake'
     alias ai-quota='aitools quota'
