@@ -1,0 +1,62 @@
+# Declarative AI Harnesses, Token Optimizers & Agent Tooling
+packages:
+  - id: rtk
+    name: RTK (Rust Token Killer)
+    category: ai
+    description: High-speed Rust CLI output compressor saving up to 90% LLM context tokens
+    binary_name: rtk
+    ecosystem: crates.io
+    osv_package: rtk
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh
+          interpreter: sh
+          creates: "~/.local/bin/rtk"
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: rtk
+
+  - id: claude-code
+    name: Claude Code CLI
+    category: ai
+    description: Anthropic terminal coding agent harness
+    binary_name: claude
+    depends_on: [pnpm]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: pnpm
+          package: "@anthropic-ai/claude-code"
+
+  - id: codex-cli
+    name: OpenAI Codex CLI
+    category: ai
+    description: Lightweight terminal coding agent from OpenAI
+    binary_name: codex
+    depends_on: [pnpm]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: pnpm
+          package: "@openai/codex"
+
+  - id: opencode
+    name: OpenCode CLI
+    category: ai
+    description: Open-source terminal AI coding assistant
+    binary_name: opencode
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://opencode.ai/install
+          interpreter: bash
+      - type: native
+        packages:
+          brew: [opencode]
+          scoop: [opencode]

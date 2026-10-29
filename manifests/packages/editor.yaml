@@ -1,0 +1,217 @@
+# Declarative Neovim, LSP, Formatter & Linter Stack
+packages:
+  - id: neovim
+    name: Neovim
+    category: editor
+    description: Hyperextensible Vim-based text editor with native Lua & LSP support
+    binary_name: nvim
+    strategies:
+      - type: github_release
+        when:
+          os: [linux]
+        github_release:
+          repo: neovim/neovim
+          asset_patterns:
+            linux/amd64: "nvim-linux-x86_64.tar.gz"
+            linux/arm64: "nvim-linux-arm64.tar.gz"
+          extract_dir_to: "~/.local/opt/nvim"
+          symlink_binary: "bin/nvim"
+          install_to: "~/.local/bin/nvim"
+      - type: native
+        packages:
+          pacman: [neovim]
+          dnf: [neovim]
+          zypper: [neovim]
+          apk: [neovim]
+          brew: [neovim]
+          apt: [neovim]
+          pkg: [neovim]
+          winget: [Neovim.Neovim]
+          scoop: [neovim]
+      - type: source
+        when:
+          os: [linux, darwin]
+        source:
+          git_url: https://github.com/neovim/neovim.git
+          ref: stable
+          build_deps: [cmake, gettext, curl, git, make, gcc]
+          steps:
+            - ["make", "CMAKE_BUILD_TYPE=RelWithDebInfo", "CMAKE_INSTALL_PREFIX={{.Home}}/.local"]
+            - ["make", "install"]
+          uninstall_paths:
+            - "~/.local/bin/nvim"
+            - "~/.local/share/nvim/runtime"
+
+  - id: stylua
+    name: StyLua
+    category: editor-tools
+    description: Opinionated Lua code formatter for Neovim configurations
+    binary_name: stylua
+    ecosystem: crates.io
+    osv_package: stylua
+    strategies:
+      - type: native
+        packages:
+          pacman: [stylua]
+          brew: [stylua]
+          scoop: [stylua]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: stylua
+
+  - id: shfmt
+    name: shfmt
+    category: editor-tools
+    description: Shell parser, formatter, and interpreter supporting POSIX, Bash, and mksh
+    binary_name: shfmt
+    ecosystem: Go
+    osv_package: mvdan.cc/sh/v3
+    strategies:
+      - type: native
+        packages:
+          apt: [shfmt]
+          dnf: [shfmt]
+          pacman: [shfmt]
+          zypper: [shfmt]
+          apk: [shfmt]
+          brew: [shfmt]
+          pkg: [shfmt]
+          winget: [mvdan.shfmt]
+          scoop: [shfmt]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "mvdan.cc/sh/v3/cmd/shfmt@latest"
+
+  - id: actionlint
+    name: actionlint
+    category: editor-tools
+    description: Static checker for GitHub Actions workflow files
+    binary_name: actionlint
+    ecosystem: Go
+    osv_package: github.com/rhysd/actionlint
+    strategies:
+      - type: native
+        packages:
+          pacman: [actionlint]
+          brew: [actionlint]
+          scoop: [actionlint]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/rhysd/actionlint/cmd/actionlint@latest"
+
+  - id: tree-sitter-cli
+    name: Tree-sitter CLI
+    category: editor-tools
+    description: Parser generator CLI used by Neovim nvim-treesitter
+    binary_name: tree-sitter
+    ecosystem: crates.io
+    osv_package: tree-sitter-cli
+    strategies:
+      - type: native
+        packages:
+          pacman: [tree-sitter-cli]
+          brew: [tree-sitter]
+          scoop: [tree-sitter]
+      - type: language_pkg
+        language_pkg:
+          manager: pnpm
+          package: tree-sitter-cli
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: tree-sitter-cli
+
+  - id: shellharden
+    name: Shellharden
+    category: editor-tools
+    description: Syntax-highlighting Bash/POSIX variable quoting and hardening tool
+    binary_name: shellharden
+    ecosystem: crates.io
+    osv_package: shellharden
+    strategies:
+      - type: native
+        packages:
+          pacman: [shellharden]
+          brew: [shellharden]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: shellharden
+
+  - id: gopls
+    name: gopls
+    category: editor-lsp
+    description: Official Go language server
+    binary_name: gopls
+    ecosystem: Go
+    osv_package: golang.org/x/tools/gopls
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "golang.org/x/tools/gopls@latest"
+
+  - id: gofumpt
+    name: gofumpt
+    category: editor-tools
+    description: Stricter gofmt formatter for Go codebases
+    binary_name: gofumpt
+    ecosystem: Go
+    osv_package: mvdan.cc/gofumpt
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "mvdan.cc/gofumpt@latest"
+
+  - id: revive
+    name: revive
+    category: editor-tools
+    description: Fast, configurable, extensible, and flexible linter for Go
+    binary_name: revive
+    ecosystem: Go
+    osv_package: github.com/mgechev/revive
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/mgechev/revive@latest"
+
+  - id: golangci-lint
+    name: golangci-lint
+    category: editor-tools
+    description: Fast parallel linters runner for Go
+    binary_name: golangci-lint
+    ecosystem: Go
+    osv_package: github.com/golangci/golangci-lint
+    strategies:
+      - type: native
+        packages:
+          pacman: [golangci-lint]
+          brew: [golangci-lint]
+          winget: [GolangCI.golangci-lint]
+          scoop: [golangci-lint]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"
+
+  - id: delve
+    name: Delve (dlv)
+    category: editor-tools
+    description: Debugger for the Go programming language
+    binary_name: dlv
+    ecosystem: Go
+    osv_package: github.com/go-delve/delve
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/go-delve/delve/cmd/dlv@latest"

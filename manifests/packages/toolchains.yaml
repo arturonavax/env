@@ -1,0 +1,184 @@
+# Declarative Language Runtimes & Version Managers
+packages:
+  - id: golang
+    name: Go (GVM Primary + Personal Standalone Fallback)
+    category: toolchains
+    description: Go programming language provisioned via GVM with personal install_golang.sh fallback
+    binary_name: go
+    depends_on: [curl, git]
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          local_script: scripts/bootstrap_anx.sh
+          interpreter: bash
+          args: ["--ensure-go-only"]
+          creates: "~/.gvm/scripts/gvm"
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          local_script: src/remotes/install_golang.sh
+          interpreter: bash
+          args: ["-i"]
+      - type: native
+        packages:
+          apt: [golang-go]
+          dnf: [golang]
+          pacman: [go]
+          zypper: [go]
+          apk: [go]
+          brew: [go]
+          pkg: [golang]
+          winget: [GoLang.Go]
+          scoop: [go]
+
+  - id: rust
+    name: Rust & Cargo (rustup)
+    category: toolchains
+    description: Rust compiler toolchain and Cargo package manager
+    binary_name: cargo
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://sh.rustup.rs
+          interpreter: sh
+          args: ["-y", "--no-modify-path", "--default-toolchain", "stable"]
+          creates: "~/.cargo/bin/cargo"
+      - type: native
+        packages:
+          pacman: [rustup]
+          brew: [rustup]
+          apk: [rust, cargo]
+          pkg: [rust]
+          winget: [Rustlang.Rustup]
+          scoop: [rustup]
+
+  - id: fnm
+    name: Fast Node Manager (fnm)
+    category: toolchains
+    description: Fast and simple Node.js version manager built in Rust
+    binary_name: fnm
+    ecosystem: crates.io
+    osv_package: fnm
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://fnm.vercel.app/install
+          interpreter: bash
+          args: ["--skip-shell"]
+          creates: "~/.local/share/fnm/fnm"
+      - type: native
+        packages:
+          pacman: [fnm]
+          brew: [fnm]
+          winget: [Schniz.fnm]
+          scoop: [fnm]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: fnm
+
+  - id: pnpm
+    name: pnpm
+    category: toolchains
+    description: Fast, disk-space efficient Node.js package manager
+    binary_name: pnpm
+    ecosystem: npm
+    osv_package: pnpm
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://get.pnpm.io/install.sh
+          interpreter: sh
+          env:
+            SHELL: bash
+      - type: language_pkg
+        language_pkg:
+          manager: npm
+          package: pnpm
+      - type: native
+        packages:
+          pacman: [pnpm]
+          brew: [pnpm]
+          winget: [pnpm.pnpm]
+          scoop: [pnpm]
+
+  - id: pyenv
+    name: pyenv
+    category: toolchains
+    description: Simple Python version management
+    binary_name: pyenv
+    os: [linux, darwin]
+    depends_on: [git, curl]
+    strategies:
+      - type: native
+        when:
+          os: [darwin]
+        packages:
+          brew: [pyenv]
+      - type: script
+        script:
+          url: https://pyenv.run
+          interpreter: bash
+          creates: "~/.pyenv/bin/pyenv"
+
+  - id: python3
+    name: Python 3
+    category: toolchains
+    description: Python 3 runtime and virtual environment support
+    binary_name: python3
+    binary_aliases: [python]
+    strategies:
+      - type: native
+        packages:
+          apt: [python3, python3-pip, python3-venv]
+          dnf: [python3, python3-pip]
+          pacman: [python, python-pip]
+          zypper: [python3, python3-pip]
+          apk: [python3, py3-pip]
+          brew: ["python@3"]
+          pkg: [python]
+          winget: ["Python.Python.3.12"]
+          scoop: [python]
+
+  - id: pipx
+    name: pipx
+    category: toolchains
+    description: Install and run Python CLI applications in isolated environments
+    binary_name: pipx
+    depends_on: [python3]
+    strategies:
+      - type: native
+        packages:
+          apt: [pipx]
+          dnf: [pipx]
+          pacman: [python-pipx]
+          zypper: [python3-pipx]
+          brew: [pipx]
+          pkg: [pipx]
+          scoop: [pipx]
+
+  - id: zig
+    name: Zig
+    category: toolchains
+    description: General-purpose systems programming language and C/C++ cross-compiler (required for Ghostty source builds)
+    binary_name: zig
+    strategies:
+      - type: native
+        packages:
+          pacman: [zig]
+          dnf: [zig]
+          zypper: [zig]
+          apk: [zig]
+          brew: [zig]
+          pkg: [zig]
+          winget: [zig.zig]
+          scoop: [zig]

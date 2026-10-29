@@ -1,0 +1,153 @@
+# Declarative Environment Profiles
+profiles:
+  - name: minimal
+    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq)
+    packages:
+      - git
+      - curl
+      - jq
+      - fzf
+      - ripgrep
+      - fd
+      - bat
+      - eza
+      - starship
+    configurations:
+      - starship-config
+      - zsh-lscolors
+      - zsh-base
+      - zsh-tools
+      - zshrc-loader
+
+  - name: terminal
+    description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)
+    extends: minimal
+    packages:
+      - zsh
+      - atuin
+      - herdr
+      - zoxide
+      - delta
+      - difftastic
+      - tealdeer
+      - lazygit
+      - ghostty
+    config_groups:
+      - terminal
+
+  - name: editor
+    description: Neovim (LazyVim) with core formatters, linters, and Tree-sitter CLI
+    extends: minimal
+    packages:
+      - neovim
+      - stylua
+      - shfmt
+      - actionlint
+      - tree-sitter-cli
+      - shellcheck
+    config_groups:
+      - editor
+
+  - name: developer
+    description: Default full-stack engineering environment (Toolchains, Terminal, Neovim, Go/Rust/Node/Python tools)
+    extends: terminal
+    packages:
+      - build-essential
+      - cmake
+      - pkg-config
+      - golang
+      - rust
+      - fnm
+      - pnpm
+      - pyenv
+      - python3
+      - pipx
+      - neovim
+      - stylua
+      - shfmt
+      - actionlint
+      - tree-sitter-cli
+      - shellcheck
+      - gopls
+      - gofumpt
+      - revive
+      - golangci-lint
+      - delve
+      - govulncheck
+      - gosec
+      - usql
+      - just
+      - fx
+      - direnv
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+
+  - name: ai-workstation
+    description: Developer workstation plus full AI CLI harnesses, RTK token compressor, and OS window switcher
+    extends: developer
+    packages:
+      - rtk
+      - opencode
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: workstation
+    description: Alias for complete workstation profile (Developer + AI + Desktop OS integrations)
+    extends: ai-workstation
+    packages:
+      - wmctrl
+      - xdotool
+      - xclip
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: full
+    description: Complete ecosystem including optional CLI harnesses and live-reload utilities
+    extends: workstation
+    packages:
+      - air
+      - shellharden
+      - claude-code
+      - codex-cli
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: headless
+    description: Remote SSH/server developer profile without GUI emulators or X11 dependencies
+    extends: minimal
+    packages:
+      - zsh
+      - herdr
+      - atuin
+      - zoxide
+      - delta
+      - difftastic
+      - tealdeer
+      - neovim
+      - ripgrep
+      - fd
+      - lazygit
+      - htop
+      - rsync
+    configurations:
+      - atuin-config
+      - starship-config
+      - zsh-lscolors
+      - zsh-base
+      - zsh-tools
+      - zshrc-loader
+      - nvim-config

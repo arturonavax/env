@@ -1,0 +1,317 @@
+# Declarative Terminal, Shell, Multiplexer & Modern CLI Stack
+packages:
+  - id: zsh
+    name: Zsh
+    category: shell
+    description: Z shell interactive command interpreter
+    binary_name: zsh
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [zsh]
+          dnf: [zsh]
+          pacman: [zsh]
+          zypper: [zsh]
+          apk: [zsh]
+          brew: [zsh]
+          pkg: [zsh]
+
+  - id: fzf
+    name: fzf
+    category: cli-tools
+    description: Command-line fuzzy finder with native Zsh integration
+    binary_name: fzf
+    ecosystem: Go
+    osv_package: github.com/junegunn/fzf
+    strategies:
+      - type: github_release
+        github_release:
+          repo: junegunn/fzf
+          asset_patterns:
+            linux/amd64: "fzf-{version}-linux_amd64.tar.gz"
+            linux/arm64: "fzf-{version}-linux_arm64.tar.gz"
+            darwin/arm64: "fzf-{version}-darwin_arm64.tar.gz"
+            darwin/amd64: "fzf-{version}-darwin_amd64.tar.gz"
+            windows/amd64: "fzf-{version}-windows_amd64.zip"
+          binary_in_archive: fzf
+          install_to: "~/.local/bin/fzf"
+      - type: native
+        packages:
+          apt: [fzf]
+          dnf: [fzf]
+          pacman: [fzf]
+          zypper: [fzf]
+          apk: [fzf]
+          brew: [fzf]
+          pkg: [fzf]
+          winget: [junegunn.fzf]
+          scoop: [fzf]
+
+  - id: ripgrep
+    name: ripgrep
+    category: cli-tools
+    description: Recursively searches directories for a regex pattern (rg)
+    binary_name: rg
+    ecosystem: crates.io
+    osv_package: ripgrep
+    strategies:
+      - type: native
+        packages:
+          apt: [ripgrep]
+          dnf: [ripgrep]
+          pacman: [ripgrep]
+          zypper: [ripgrep]
+          apk: [ripgrep]
+          brew: [ripgrep]
+          pkg: [ripgrep]
+          winget: [BurntSushi.ripgrep.MSVC]
+          scoop: [ripgrep]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: ripgrep
+
+  - id: fd
+    name: fd
+    category: cli-tools
+    description: Simple, fast, and user-friendly alternative to find
+    binary_name: fd
+    binary_aliases: [fdfind]
+    ecosystem: crates.io
+    osv_package: fd-find
+    strategies:
+      - type: native
+        packages:
+          apt: [fd-find]
+          dnf: [fd-find]
+          pacman: [fd]
+          zypper: [fd]
+          apk: [fd]
+          brew: [fd]
+          pkg: [fd]
+          winget: [sharkdp.fd]
+          scoop: [fd]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: fd-find
+
+  - id: bat
+    name: bat
+    category: cli-tools
+    description: Syntax-highlighting file viewer with Git integration
+    binary_name: bat
+    binary_aliases: [batcat]
+    ecosystem: crates.io
+    osv_package: bat
+    strategies:
+      - type: native
+        packages:
+          apt: [bat]
+          dnf: [bat]
+          pacman: [bat]
+          zypper: [bat]
+          apk: [bat]
+          brew: [bat]
+          pkg: [bat]
+          winget: [sharkdp.bat]
+          scoop: [bat]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: bat
+
+  - id: eza
+    name: eza
+    category: cli-tools
+    description: Modern, maintained replacement for ls with icons and Git status
+    binary_name: eza
+    ecosystem: crates.io
+    osv_package: eza
+    strategies:
+      - type: github_release
+        when:
+          os: [linux]
+        github_release:
+          repo: eza-community/eza
+          asset_patterns:
+            linux/amd64: "eza_x86_64-unknown-linux-musl.tar.gz"
+            linux/arm64: "eza_aarch64-unknown-linux-gnu.tar.gz"
+          binary_in_archive: eza
+          install_to: "~/.local/bin/eza"
+      - type: native
+        packages:
+          apt: [eza]
+          dnf: [eza]
+          pacman: [eza]
+          zypper: [eza]
+          apk: [eza]
+          brew: [eza]
+          pkg: [eza]
+          winget: [eza-community.eza]
+          scoop: [eza]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: eza
+
+  - id: starship
+    name: Starship
+    category: shell
+    description: Minimal, blazing-fast, and infinitely customizable cross-shell prompt
+    binary_name: starship
+    ecosystem: crates.io
+    osv_package: starship
+    strategies:
+      - type: native
+        when:
+          os: [darwin, windows]
+        packages:
+          brew: [starship]
+          winget: [Starship.Starship]
+          scoop: [starship]
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://starship.rs/install.sh
+          interpreter: sh
+          args: ["-y", "-b", "{{.LocalBin}}"]
+          creates: "~/.local/bin/starship"
+      - type: native
+        packages:
+          pacman: [starship]
+          dnf: [starship]
+          zypper: [starship]
+          apk: [starship]
+          pkg: [starship]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: starship
+
+  - id: atuin
+    name: Atuin
+    category: shell
+    description: Offline SQLite-backed shell history engine with directory scoping
+    binary_name: atuin
+    ecosystem: crates.io
+    osv_package: atuin
+    strategies:
+      - type: native
+        when:
+          os: [darwin]
+        packages:
+          brew: [atuin]
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://setup.atuin.sh
+          interpreter: sh
+          creates: "~/.atuin/bin/atuin"
+      - type: native
+        packages:
+          pacman: [atuin]
+          dnf: [atuin]
+          zypper: [atuin]
+          apk: [atuin]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: atuin
+          args: ["--locked"]
+
+  - id: herdr
+    name: Herdr
+    category: terminal
+    description: Statically-linked terminal and AI agent workspace multiplexer
+    binary_name: herdr
+    os: [linux, darwin]
+    strategies:
+      - type: script
+        script:
+          url: https://herdr.dev/install.sh
+          interpreter: bash
+          creates: "~/.local/bin/herdr"
+
+  - id: zoxide
+    name: zoxide
+    category: shell
+    description: Smarter cd command inspired by z and autojump
+    binary_name: zoxide
+    ecosystem: crates.io
+    osv_package: zoxide
+    strategies:
+      - type: script
+        when:
+          os: [linux]
+        script:
+          url: https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh
+          interpreter: sh
+          creates: "~/.local/bin/zoxide"
+      - type: native
+        packages:
+          apt: [zoxide]
+          dnf: [zoxide]
+          pacman: [zoxide]
+          zypper: [zoxide]
+          apk: [zoxide]
+          brew: [zoxide]
+          pkg: [zoxide]
+          winget: [ajeetdsouza.zoxide]
+          scoop: [zoxide]
+
+  - id: lazygit
+    name: Lazygit
+    category: devtools
+    description: Simple terminal UI for Git commands
+    binary_name: lazygit
+    ecosystem: Go
+    osv_package: github.com/jesseduffield/lazygit
+    strategies:
+      - type: github_release
+        github_release:
+          repo: jesseduffield/lazygit
+          asset_patterns:
+            linux/amd64: "lazygit_{version}_Linux_x86_64.tar.gz"
+            linux/arm64: "lazygit_{version}_Linux_arm64.tar.gz"
+            darwin/arm64: "lazygit_{version}_Darwin_arm64.tar.gz"
+            darwin/amd64: "lazygit_{version}_Darwin_x86_64.tar.gz"
+            windows/amd64: "lazygit_{version}_Windows_x86_64.zip"
+          binary_in_archive: lazygit
+          install_to: "~/.local/bin/lazygit"
+      - type: native
+        packages:
+          pacman: [lazygit]
+          dnf: [lazygit]
+          brew: [lazygit]
+          winget: [JesseDuffield.lazygit]
+          scoop: [lazygit]
+
+  - id: ghostty
+    name: Ghostty
+    category: terminal
+    description: Fast, native, GPU-accelerated terminal emulator built in Zig
+    binary_name: ghostty
+    os: [linux, darwin]
+    depends_on: [zig]
+    strategies:
+      - type: native
+        packages:
+          pacman: [ghostty]
+          brew: ["--cask", "ghostty"]
+      - type: source
+        when:
+          os: [linux, darwin]
+          requires_binary: zig
+        source:
+          git_url: https://github.com/ghostty-org/ghostty.git
+          ref: v1.1.3
+          build_deps: [gtk4-dev, adwaita-dev, gettext, pkg-config]
+          steps:
+            - ["zig", "build", "-Doptimize=ReleaseFast", "-p", "{{.Home}}/.local"]
+          uninstall_paths:
+            - "~/.local/bin/ghostty"
+            - "~/.local/share/ghostty"

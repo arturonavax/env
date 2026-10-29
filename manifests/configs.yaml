@@ -1,0 +1,259 @@
+# Declarative Dotfiles, Directories & Configuration Targets
+# Groups mirror and extend utils/sync_config.sh: terminal, editor, devtools, ai, osconfig, vscode, cursor
+configurations:
+  - id: ghostty-config
+    name: Ghostty Terminal Configuration
+    group: terminal
+    description: Ghostty configuration launching Herdr workspace multiplexer and theme definitions
+    source: files/ghostty
+    target: "~/.config/ghostty"
+    targets_by_os:
+      darwin: "~/Library/Application Support/com.mitchellh.ghostty"
+    os: [linux, darwin]
+    strategy: directory_sync
+    backup: true
+
+  - id: herdr-config
+    name: Herdr Agent Multiplexer Configuration
+    group: terminal
+    description: Herdr workspace and pane keybindings configuration
+    source: files/herdr/config.toml
+    target: "~/.config/herdr/config.toml"
+    os: [linux, darwin]
+    strategy: three_way
+    backup: true
+
+  - id: atuin-config
+    name: Atuin Offline SQLite History Configuration
+    group: terminal
+    description: Offline directory-scoped SQLite shell history settings
+    source: files/atuin/config.toml
+    target: "~/.config/atuin/config.toml"
+    strategy: three_way
+    backup: true
+
+  - id: starship-config
+    name: Starship Prompt Configuration
+    group: terminal
+    description: Lean two-line Starship prompt with AGENTS.md workspace indicator
+    source: files/starship/starship.toml
+    target: "~/.config/starship.toml"
+    strategy: three_way
+    backup: true
+
+  - id: zsh-lscolors
+    name: Zsh LS_COLORS Palette
+    group: terminal
+    description: Terminal file type ANSI color definitions
+    source: files/zsh/.lscolors.sh
+    target: "~/.lscolors.sh"
+    os: [linux, darwin]
+    strategy: three_way
+    backup: true
+
+  - id: zsh-base
+    name: Zsh Base Runtime (.base.zsh)
+    group: terminal
+    description: Lean cached compinit, fzf-tab, zcompile helpers, and non-destructive CLI shortcuts
+    source: files/zsh/.base.zsh
+    target: "~/.base.zsh"
+    os: [linux, darwin]
+    strategy: three_way
+    backup: true
+
+  - id: zsh-tools
+    name: Zsh Development Toolchains (.tools.sh)
+    group: terminal
+    description: GVM, Cargo, fnm, pnpm, pyenv, Atuin, multiplatform clipboard, and AI aliases
+    source: files/zsh/.tools.sh
+    target: "~/.tools.sh"
+    os: [linux, darwin]
+    strategy: three_way
+    backup: true
+
+  - id: zshrc-loader
+    name: Zsh User Loader Block (.zshrc)
+    group: terminal
+    description: Non-destructive marker block importing arturonavax/env while preserving user customizations
+    source: files/zsh/.zshrc
+    target: "~/.zshrc"
+    os: [linux, darwin]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: nvim-config
+    name: Neovim (LazyVim) Modular Configuration
+    group: editor
+    description: Modular LazyVim configuration with centralized exclusions engine
+    source: files/nvim
+    target: "~/.config/nvim"
+    targets_by_os:
+      windows: "~/AppData/Local/nvim"
+    strategy: directory_sync
+    excludes:
+      - ".git"
+      - "*.zwc"
+    backup: true
+
+  - id: golangci-config
+    name: golangci-lint Configuration
+    group: devtools
+    description: Canonical Go linter ruleset
+    source: files/golangci-lint/.golangci.yml
+    target: "~/.golangci.yml"
+    strategy: three_way
+    backup: true
+
+  - id: eslint-config
+    name: ESLint Default Configuration
+    group: devtools
+    description: Baseline ESLint rules
+    source: files/eslint/.eslintrc.json
+    target: "~/.eslintrc.json"
+    strategy: three_way
+    backup: true
+
+  - id: prettier-config
+    name: Prettier Default Configuration
+    group: devtools
+    description: Baseline Prettier formatting configuration
+    source: files/prettier/.prettierrc.json
+    target: "~/.prettierrc.json"
+    strategy: three_way
+    backup: true
+
+  - id: stylelint-config
+    name: Stylelint Default Configuration
+    group: devtools
+    description: Baseline CSS/SCSS Stylelint configuration
+    source: files/stylelint/.stylelintrc.json
+    target: "~/.stylelintrc.json"
+    strategy: three_way
+    backup: true
+
+  - id: sql-formatter-config
+    name: SQL Formatter Configuration
+    group: devtools
+    description: Baseline SQL formatting preferences
+    source: files/sql-formatter/.sql-formatter.json
+    target: "~/.sql-formatter.json"
+    strategy: three_way
+    backup: true
+
+  - id: rtk-config
+    name: RTK Token Compressor Configuration
+    group: ai
+    description: RTK output filtering and token compression settings
+    source: files/ai/rtk/config.toml
+    target: "~/.config/rtk/config.toml"
+    strategy: three_way
+    backup: true
+
+  - id: aitools-config
+    name: aitools JSONC Configuration
+    group: ai
+    description: Declarative AI harnesses, commit/PR templates, quota buckets, and custom commands
+    source: files/ai/aitools/config.template.jsonc
+    target: "~/.config/aitools/config.json"
+    strategy: three_way
+    backup: true
+
+  - id: rcmd-bin
+    name: rcmd Multi-Backend Window Switcher
+    group: osconfig
+    description: Instant Right-Alt application switcher binary for GNOME, Hyprland, Sway, KDE, X11
+    source: files/rcmd/rcmd
+    target: "~/.local/bin/rcmd"
+    os: [linux]
+    strategy: replace
+    backup: true
+
+  - id: rcmd-backends
+    name: rcmd Backend Adapters
+    group: osconfig
+    description: Window manager backend scripts for rcmd
+    source: files/rcmd/backends
+    target: "~/.local/lib/rcmd/backends"
+    os: [linux]
+    strategy: directory_sync
+    backup: false
+
+  - id: gnome-rcmd-extension
+    name: GNOME Shell rcmd Extension
+    group: osconfig
+    description: D-Bus window focus extension rcmd-shell@arturonavax.dev
+    source: files/gnome/extensions/rcmd-shell@arturonavax.dev
+    target: "~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev"
+    os: [linux]
+    strategy: directory_sync
+    backup: false
+
+  - id: amethyst-config
+    name: Amethyst Tiling Manager Configuration
+    group: osconfig
+    description: macOS tiling window manager settings
+    source: files/amethyst/.amethyst.yml
+    target: "~/.amethyst.yml"
+    os: [darwin]
+    strategy: three_way
+    backup: true
+
+  - id: karabiner-config
+    name: Karabiner-Elements Configuration
+    group: osconfig
+    description: macOS keyboard remapping rules
+    source: files/karabiner/karabiner.json
+    target: "~/.config/karabiner/karabiner.json"
+    os: [darwin]
+    strategy: three_way
+    backup: true
+
+  - id: vscode-settings
+    name: VS Code User Settings
+    group: vscode
+    description: Visual Studio Code settings (synced only when explicitly requested)
+    source: files/vscode/settings.json
+    target: "~/.config/Code/User/settings.json"
+    targets_by_os:
+      darwin: "~/Library/Application Support/Code/User/settings.json"
+      windows: "~/AppData/Roaming/Code/User/settings.json"
+    strategy: three_way
+    backup: true
+
+  - id: vscode-keybindings
+    name: VS Code Keybindings
+    group: vscode
+    description: Visual Studio Code keybindings (synced only when explicitly requested)
+    source: files/vscode/keybindings.json
+    target: "~/.config/Code/User/keybindings.json"
+    targets_by_os:
+      darwin: "~/Library/Application Support/Code/User/keybindings.json"
+      windows: "~/AppData/Roaming/Code/User/keybindings.json"
+    strategy: three_way
+    backup: true
+
+  - id: cursor-settings
+    name: Cursor IDE User Settings
+    group: cursor
+    description: Cursor IDE settings (synced only when explicitly requested)
+    source: files/cursor/settings.json
+    target: "~/.config/Cursor/User/settings.json"
+    targets_by_os:
+      darwin: "~/Library/Application Support/Cursor/User/settings.json"
+      windows: "~/AppData/Roaming/Cursor/User/settings.json"
+    strategy: three_way
+    backup: true
+
+  - id: cursor-keybindings
+    name: Cursor IDE Keybindings
+    group: cursor
+    description: Cursor IDE keybindings (synced only when explicitly requested)
+    source: files/cursor/keybindings.json
+    target: "~/.config/Cursor/User/keybindings.json"
+    targets_by_os:
+      darwin: "~/Library/Application Support/Cursor/User/keybindings.json"
+      windows: "~/AppData/Roaming/Cursor/User/keybindings.json"
+    strategy: three_way
+    backup: true

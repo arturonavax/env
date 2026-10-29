@@ -1,0 +1,207 @@
+# Declarative Developer Tools, Structural Differs, SQL & Security Scanners
+packages:
+  - id: delta
+    name: git-delta
+    category: cli-tools
+    description: Syntax-highlighting side-by-side pager for git, diff, and grep output
+    binary_name: delta
+    ecosystem: crates.io
+    osv_package: git-delta
+    strategies:
+      - type: github_release
+        when:
+          os: [linux]
+        github_release:
+          repo: dandavison/delta
+          asset_patterns:
+            linux/amd64: "delta-{version}-x86_64-unknown-linux-musl.tar.gz"
+            linux/arm64: "delta-{version}-aarch64-unknown-linux-gnu.tar.gz"
+          binary_in_archive: delta
+          install_to: "~/.local/bin/delta"
+      - type: native
+        packages:
+          apt: [git-delta]
+          dnf: [git-delta]
+          pacman: [git-delta]
+          zypper: [git-delta]
+          apk: [git-delta]
+          brew: [git-delta]
+          pkg: [git-delta]
+          winget: [dandavison.delta]
+          scoop: [delta]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: git-delta
+
+  - id: difftastic
+    name: difftastic
+    category: cli-tools
+    description: Tree-sitter structural diff tool comparing AST syntax rather than raw lines
+    binary_name: difft
+    ecosystem: crates.io
+    osv_package: difftastic
+    strategies:
+      - type: github_release
+        when:
+          os: [linux]
+        github_release:
+          repo: Wilfred/difftastic
+          asset_patterns:
+            linux/amd64: "difft-x86_64-unknown-linux-gnu.tar.gz"
+            linux/arm64: "difft-aarch64-unknown-linux-gnu.tar.gz"
+          binary_in_archive: difft
+          install_to: "~/.local/bin/difft"
+      - type: native
+        packages:
+          pacman: [difftastic]
+          dnf: [difftastic]
+          zypper: [difftastic]
+          apk: [difftastic]
+          brew: [difftastic]
+          winget: [Wilfred.difftastic]
+          scoop: [difftastic]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: difftastic
+
+  - id: usql
+    name: usql
+    category: devtools
+    description: Universal static Go CLI for PostgreSQL, SQLite3, MySQL, Redis, SQL Server, and ClickHouse
+    binary_name: usql
+    ecosystem: Go
+    osv_package: github.com/xo/usql
+    strategies:
+      - type: github_release
+        when:
+          os: [linux]
+        github_release:
+          repo: xo/usql
+          asset_patterns:
+            linux/amd64: "usql-{version}-linux-amd64.tar.bz2"
+            linux/arm64: "usql-{version}-linux-arm64.tar.bz2"
+          binary_in_archive: usql
+          install_to: "~/.local/bin/usql"
+      - type: native
+        packages:
+          brew: [xo/xo/usql]
+          scoop: [usql]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/xo/usql@latest"
+
+  - id: tealdeer
+    name: tealdeer (tldr)
+    category: cli-tools
+    description: Fast native Rust implementation of tldr practical command examples
+    binary_name: tldr
+    ecosystem: crates.io
+    osv_package: tealdeer
+    strategies:
+      - type: native
+        packages:
+          apt: [tealdeer]
+          dnf: [tealdeer]
+          pacman: [tealdeer]
+          zypper: [tealdeer]
+          apk: [tealdeer]
+          brew: [tealdeer]
+          winget: [tealdeer-rs.tealdeer]
+          scoop: [tealdeer]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: tealdeer
+
+  - id: govulncheck
+    name: govulncheck
+    category: security
+    description: Official Go vulnerability scanner backed by the Go vulnerability database
+    binary_name: govulncheck
+    ecosystem: Go
+    osv_package: golang.org/x/vuln
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "golang.org/x/vuln/cmd/govulncheck@latest"
+
+  - id: gosec
+    name: gosec
+    category: security
+    description: Go AST security checker scanning source code for security problems
+    binary_name: gosec
+    ecosystem: Go
+    osv_package: github.com/securego/gosec/v2
+    depends_on: [golang]
+    strategies:
+      - type: native
+        packages:
+          pacman: [gosec]
+          brew: [gosec]
+          scoop: [gosec]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/securego/gosec/v2/cmd/gosec@latest"
+
+  - id: air
+    name: Air
+    category: devtools
+    description: Live-reload utility for Go applications
+    binary_name: air
+    ecosystem: Go
+    osv_package: github.com/air-verse/air
+    depends_on: [golang]
+    strategies:
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/air-verse/air@latest"
+
+  - id: just
+    name: just
+    category: devtools
+    description: Handy project command runner saving and running project-specific recipes
+    binary_name: just
+    ecosystem: crates.io
+    osv_package: just
+    strategies:
+      - type: native
+        packages:
+          apt: [just]
+          dnf: [just]
+          pacman: [just]
+          zypper: [just]
+          apk: [just]
+          brew: [just]
+          pkg: [just]
+          winget: [Casey.Just]
+          scoop: [just]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: just
+
+  - id: fx
+    name: fx
+    category: cli-tools
+    description: Terminal JSON viewer and processor built in Go
+    binary_name: fx
+    ecosystem: Go
+    osv_package: github.com/antonmedv/fx
+    strategies:
+      - type: native
+        packages:
+          pacman: [fx]
+          brew: [fx]
+          winget: [antonmedv.fx]
+          scoop: [fx]
+      - type: language_pkg
+        language_pkg:
+          manager: go
+          package: "github.com/antonmedv/fx@latest"

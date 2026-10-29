@@ -1,0 +1,622 @@
+# Declarative Core System & Build Packages Manifest
+# Add or customize multi-distro / multi-OS package mappings here without modifying Go source code.
+packages:
+  - id: build-essential
+    name: Build Essential Toolchain
+    category: core-build
+    description: C/C++ compiler suite, make, and standard system headers
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [build-essential]
+          dnf: ["@development-tools"]
+          pacman: [base-devel]
+          zypper: [devel_basis]
+          apk: [build-base]
+          pkg: [build-essential]
+
+  - id: git
+    name: Git
+    category: core
+    description: Distributed version control system
+    binary_name: git
+    strategies:
+      - type: native
+        packages:
+          apt: [git]
+          dnf: [git]
+          pacman: [git]
+          zypper: [git]
+          apk: [git]
+          brew: [git]
+          pkg: [git]
+          winget: [Git.Git]
+          scoop: [git]
+
+  - id: curl
+    name: cURL
+    category: core
+    description: Command-line tool for transferring data with URLs
+    binary_name: curl
+    strategies:
+      - type: native
+        packages:
+          apt: [curl]
+          dnf: [curl]
+          pacman: [curl]
+          zypper: [curl]
+          apk: [curl]
+          brew: [curl]
+          pkg: [curl]
+          winget: [cURL.cURL]
+          scoop: [curl]
+
+  - id: wget
+    name: GNU Wget
+    category: core
+    description: Network utility to retrieve files using HTTP, HTTPS, and FTP
+    binary_name: wget
+    strategies:
+      - type: native
+        packages:
+          apt: [wget]
+          dnf: [wget]
+          pacman: [wget]
+          zypper: [wget]
+          apk: [wget]
+          brew: [wget]
+          pkg: [wget]
+          winget: [JernejSimoncic.Wget]
+          scoop: [wget]
+
+  - id: tar
+    name: GNU Tar
+    category: core
+    description: Tape archive utility
+    binary_name: tar
+    strategies:
+      - type: native
+        packages:
+          apt: [tar]
+          dnf: [tar]
+          pacman: [tar]
+          zypper: [tar]
+          apk: [tar]
+          brew: [gnu-tar]
+          pkg: [tar]
+
+  - id: unzip
+    name: UnZip
+    category: core
+    description: Decompressor for .zip archives
+    binary_name: unzip
+    strategies:
+      - type: native
+        packages:
+          apt: [unzip]
+          dnf: [unzip]
+          pacman: [unzip]
+          zypper: [unzip]
+          apk: [unzip]
+          brew: [unzip]
+          pkg: [unzip]
+          scoop: [unzip]
+
+  - id: gzip
+    name: GNU Gzip
+    category: core
+    description: Standard file compression utility
+    binary_name: gzip
+    strategies:
+      - type: native
+        packages:
+          apt: [gzip]
+          dnf: [gzip]
+          pacman: [gzip]
+          zypper: [gzip]
+          apk: [gzip]
+          brew: [gzip]
+          pkg: [gzip]
+
+  - id: zstd
+    name: Zstandard
+    category: core
+    description: Fast lossless compression algorithm
+    binary_name: zstd
+    strategies:
+      - type: native
+        packages:
+          apt: [zstd]
+          dnf: [zstd]
+          pacman: [zstd]
+          zypper: [zstd]
+          apk: [zstd]
+          brew: [zstd]
+          pkg: [zstd]
+          winget: [Facebook.Zstandard]
+          scoop: [zstd]
+
+  - id: make
+    name: GNU Make
+    category: core-build
+    description: Build automation tool
+    binary_name: make
+    strategies:
+      - type: native
+        packages:
+          apt: [make]
+          dnf: [make]
+          pacman: [make]
+          zypper: [make]
+          apk: [make]
+          brew: [make]
+          pkg: [make]
+          winget: [ezwinports.make]
+          scoop: [make]
+
+  - id: gcc
+    name: GNU Compiler Collection
+    category: core-build
+    description: C and C++ compiler toolchain
+    binary_name: gcc
+    strategies:
+      - type: native
+        packages:
+          apt: [gcc]
+          dnf: [gcc, gcc-c++]
+          pacman: [gcc]
+          zypper: [gcc, gcc-c++]
+          apk: [gcc, g++]
+          brew: [gcc]
+          pkg: [clang]
+
+  - id: clang
+    name: Clang / LLVM
+    category: core-build
+    description: LLVM native C/C++/Objective-C compiler
+    binary_name: clang
+    strategies:
+      - type: native
+        packages:
+          apt: [clang]
+          dnf: [clang]
+          pacman: [clang]
+          zypper: [clang]
+          apk: [clang]
+          pkg: [clang]
+          winget: [LLVM.LLVM]
+
+  - id: bison
+    name: GNU Bison
+    category: core-build
+    description: General-purpose parser generator required by GVM
+    binary_name: bison
+    strategies:
+      - type: native
+        packages:
+          apt: [bison]
+          dnf: [bison]
+          pacman: [bison]
+          zypper: [bison]
+          apk: [bison]
+          brew: [bison]
+          pkg: [bison]
+
+  - id: binutils
+    name: GNU Binutils
+    category: core-build
+    description: Binary linker, assembler, and inspection utilities
+    binary_name: ld
+    strategies:
+      - type: native
+        packages:
+          apt: [binutils]
+          dnf: [binutils]
+          pacman: [binutils]
+          zypper: [binutils]
+          apk: [binutils]
+          brew: [binutils]
+          pkg: [binutils]
+
+  - id: cmake
+    name: CMake
+    category: core-build
+    description: Cross-platform build system generator
+    binary_name: cmake
+    strategies:
+      - type: native
+        packages:
+          apt: [cmake]
+          dnf: [cmake]
+          pacman: [cmake]
+          zypper: [cmake]
+          apk: [cmake]
+          brew: [cmake]
+          pkg: [cmake]
+          winget: [Kitware.CMake]
+          scoop: [cmake]
+
+  - id: pkg-config
+    name: pkg-config
+    category: core-build
+    description: Compiler and linker flag helper tool
+    binary_name: pkg-config
+    strategies:
+      - type: native
+        packages:
+          apt: [pkg-config]
+          dnf: [pkgconf, pkgconf-pkg-config]
+          pacman: [pkgconf]
+          zypper: [pkg-config]
+          apk: [pkgconf]
+          brew: [pkg-config]
+          pkg: [pkg-config]
+
+  - id: fontconfig
+    name: Fontconfig
+    category: core
+    description: Font discovery and configuration library (fc-cache)
+    binary_name: fc-cache
+    strategies:
+      - type: native
+        packages:
+          apt: [fontconfig]
+          dnf: [fontconfig, fontconfig-devel]
+          pacman: [fontconfig]
+          zypper: [fontconfig, fontconfig-devel]
+          apk: [fontconfig]
+          brew: [fontconfig]
+          pkg: [fontconfig]
+
+  - id: ca-certificates
+    name: CA Certificates
+    category: core
+    description: Common TLS root certificate authorities
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [ca-certificates]
+          dnf: [ca-certificates]
+          pacman: [ca-certificates]
+          zypper: [ca-certificates]
+          apk: [ca-certificates]
+          brew: [ca-certificates]
+          pkg: [ca-certificates]
+
+  - id: gnupg
+    name: GnuPG
+    category: core
+    description: OpenPGP encryption and signing tool
+    binary_name: gpg
+    strategies:
+      - type: native
+        packages:
+          apt: [gnupg]
+          dnf: [gnupg2]
+          pacman: [gnupg]
+          zypper: [gpg2]
+          apk: [gnupg]
+          brew: [gnupg]
+          pkg: [gnupg]
+          winget: [GnuPG.Gpg4win]
+
+  - id: ssl-dev
+    name: OpenSSL Development Headers
+    category: core-libs
+    description: TLS and cryptography headers for native builds
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libssl-dev]
+          dnf: [openssl-devel]
+          pacman: [openssl]
+          zypper: [libopenssl-devel]
+          apk: [openssl-dev]
+          brew: ["openssl@3"]
+          pkg: [openssl]
+
+  - id: zlib-dev
+    name: Zlib Development Headers
+    category: core-libs
+    description: Compression library headers for Python/Ruby/Rust builds
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [zlib1g-dev]
+          dnf: [zlib, zlib-devel]
+          pacman: [zlib]
+          zypper: [zlib-devel]
+          apk: [zlib-dev]
+          brew: [zlib]
+          pkg: [zlib]
+
+  - id: sqlite-dev
+    name: SQLite3 Development Headers
+    category: core-libs
+    description: Embedded SQLite3 C library and headers
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libsqlite3-dev]
+          dnf: [sqlite, sqlite-devel]
+          pacman: [sqlite]
+          zypper: [sqlite3-devel]
+          apk: [sqlite-dev]
+          brew: [sqlite]
+          pkg: [sqlite]
+
+  - id: readline-dev
+    name: GNU Readline Headers
+    category: core-libs
+    description: Line-editing library headers for pyenv and REPL builds
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libreadline-dev]
+          dnf: [readline, readline-devel]
+          pacman: [readline]
+          zypper: [readline-devel]
+          apk: [readline-dev]
+          brew: [readline]
+          pkg: [readline]
+
+  - id: ffi-dev
+    name: libffi Headers
+    category: core-libs
+    description: Foreign Function Interface headers
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libffi-dev]
+          dnf: [libffi, libffi-devel]
+          pacman: [libffi]
+          zypper: [libffi-devel]
+          apk: [libffi-dev]
+          brew: [libffi]
+          pkg: [libffi]
+
+  - id: bz2-dev
+    name: bzip2 Headers
+    category: core-libs
+    description: bzip2 compression headers for pyenv builds
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libbz2-dev]
+          dnf: [bzip2, bzip2-devel]
+          pacman: [bzip2]
+          zypper: [libbz2-devel]
+          apk: [bzip2-dev]
+          brew: [bzip2]
+          pkg: [bzip2]
+
+  - id: xz-dev
+    name: LZMA / XZ Headers
+    category: core-libs
+    description: LZMA compression headers and utilities
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [liblzma-dev, xz-utils]
+          dnf: [xz, xz-devel]
+          pacman: [xz]
+          zypper: [xz-devel]
+          apk: [xz-dev]
+          brew: [xz]
+          pkg: [xz-utils]
+
+  - id: ncurses-dev
+    name: ncurses Headers
+    category: core-libs
+    description: Terminal handling library headers and terminfo definitions
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [libncurses5-dev, libncursesw5-dev, ncurses-term]
+          dnf: [ncurses, ncurses-devel, ncurses-term]
+          pacman: [ncurses]
+          zypper: [ncurses-devel, terminfo]
+          apk: [ncurses-dev]
+          brew: [ncurses]
+          pkg: [ncurses]
+
+  - id: gtk4-dev
+    name: GTK 4 Development Headers
+    category: desktop-libs
+    description: GTK 4 widget toolkit headers required for Ghostty Linux builds
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [libgtk-4-dev]
+          dnf: [gtk4-devel]
+          pacman: [gtk4]
+          zypper: [gtk4-devel]
+          apk: [gtk4.0-dev]
+
+  - id: adwaita-dev
+    name: Libadwaita Development Headers
+    category: desktop-libs
+    description: GNOME Adwaita building blocks required for Ghostty Linux builds
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [libadwaita-1-dev]
+          dnf: [libadwaita-devel]
+          pacman: [libadwaita]
+          zypper: [libadwaita-devel]
+          apk: [libadwaita-dev]
+
+  - id: gettext
+    name: GNU Gettext
+    category: core-build
+    description: Internationalization and localization utilities
+    binary_name: msgfmt
+    strategies:
+      - type: native
+        packages:
+          apt: [gettext]
+          dnf: [gettext]
+          pacman: [gettext]
+          zypper: [gettext-tools]
+          apk: [gettext]
+          brew: [gettext]
+          pkg: [gettext]
+
+  - id: jq
+    name: jq
+    category: cli-tools
+    description: Lightweight and flexible command-line JSON processor
+    binary_name: jq
+    strategies:
+      - type: native
+        packages:
+          apt: [jq]
+          dnf: [jq]
+          pacman: [jq]
+          zypper: [jq]
+          apk: [jq]
+          brew: [jq]
+          pkg: [jq]
+          winget: [jqlang.jq]
+          scoop: [jq]
+
+  - id: tree
+    name: tree
+    category: cli-tools
+    description: Recursive directory listing utility
+    binary_name: tree
+    strategies:
+      - type: native
+        packages:
+          apt: [tree]
+          dnf: [tree]
+          pacman: [tree]
+          zypper: [tree]
+          apk: [tree]
+          brew: [tree]
+          pkg: [tree]
+
+  - id: htop
+    name: htop
+    category: cli-tools
+    description: Interactive process viewer
+    binary_name: htop
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [htop]
+          dnf: [htop]
+          pacman: [htop]
+          zypper: [htop]
+          apk: [htop]
+          brew: [htop]
+          pkg: [htop]
+
+  - id: rsync
+    name: rsync
+    category: cli-tools
+    description: Fast incremental file transfer tool
+    binary_name: rsync
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        packages:
+          apt: [rsync]
+          dnf: [rsync]
+          pacman: [rsync]
+          zypper: [rsync]
+          apk: [rsync]
+          brew: [rsync]
+          pkg: [rsync]
+
+  - id: direnv
+    name: direnv
+    category: cli-tools
+    description: Unclutter your .profile with directory-scoped environment variables
+    binary_name: direnv
+    strategies:
+      - type: native
+        packages:
+          apt: [direnv]
+          dnf: [direnv]
+          pacman: [direnv]
+          zypper: [direnv]
+          apk: [direnv]
+          brew: [direnv]
+          pkg: [direnv]
+          winget: [direnv.direnv]
+          scoop: [direnv]
+
+  - id: shellcheck
+    name: ShellCheck
+    category: devtools
+    description: Static analysis tool for shell scripts
+    binary_name: shellcheck
+    strategies:
+      - type: native
+        packages:
+          apt: [shellcheck]
+          dnf: [ShellCheck]
+          pacman: [shellcheck]
+          zypper: [ShellCheck]
+          apk: [shellcheck]
+          brew: [shellcheck]
+          pkg: [shellcheck]
+          winget: [koalaman.shellcheck]
+          scoop: [shellcheck]
+
+  - id: xclip
+    name: xclip
+    category: desktop
+    description: Command-line interface to X11 clipboard selections
+    binary_name: xclip
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [xclip]
+          dnf: [xclip]
+          pacman: [xclip]
+          zypper: [xclip]
+          apk: [xclip]
+
+  - id: wmctrl
+    name: wmctrl
+    category: desktop
+    description: EWMH/NetWM X11 window manager control utility used by rcmd
+    binary_name: wmctrl
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [wmctrl]
+          dnf: [wmctrl]
+          pacman: [wmctrl]
+          zypper: [wmctrl]
+
+  - id: xdotool
+    name: xdotool
+    category: desktop
+    description: X11 keyboard, mouse, and window automation tool used by rcmd
+    binary_name: xdotool
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [xdotool]
+          dnf: [xdotool]
+          pacman: [xdotool]
+          zypper: [xdotool]
