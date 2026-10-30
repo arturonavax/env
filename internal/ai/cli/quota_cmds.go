@@ -82,7 +82,7 @@ func newWatchCmd(rt *runtimeEnv) *cobra.Command {
 			)
 		},
 	}
-	cmd.Flags().IntVarP(&interval, "interval", "i", 30, "Refresh interval in seconds")
+	cmd.Flags().IntVar(&interval, "interval", 30, "Refresh interval in seconds")
 	cmd.Flags().StringVarP(&target, "target", "t", "", "Filter by target ID")
 	return cmd
 }
@@ -219,7 +219,7 @@ func newOptimizeCmd(rt *runtimeEnv) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.BoolVarP(&p.DryRun, "dry-run", "d", false, "Audit and validate without applying (default)")
-	f.BoolVarP(&p.Apply, "apply", "y", false, "Execute the validated optimization script")
+	f.BoolVar(&p.Apply, "apply", false, "Execute the validated optimization script")
 	f.BoolVarP(&p.AuditOnly, "audit-only", "a", false, "Print the actionable audit report and exit")
 	f.BoolVar(&p.SkipLynis, "skip-lynis", false, "Bypass the Lynis audit scan")
 	f.BoolVarP(&p.Wizard, "wizard", "w", false, "Launch interactive step-by-step wizard")

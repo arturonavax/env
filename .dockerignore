@@ -1,0 +1,11 @@
+.git
+.gemini
+.atl
+.engram
+bin
+node_modules
+*.log
+*.tmp
+.cache
+state
+*.zwc

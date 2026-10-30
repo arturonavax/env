@@ -116,3 +116,23 @@ func (r *Registry) ResolveInstallOrder(ids []string) ([]domain.ManagedResource, 
 	}
 	return res, nil
 }
+
+// ListArchives returns all retired or deprecated component archive records.
+func (r *Registry) ListArchives() []manifest.ArchiveRecord {
+	return r.cat.ListArchives()
+}
+
+// GetArchive returns an archive record by component ID.
+func (r *Registry) GetArchive(id string) (manifest.ArchiveRecord, bool) {
+	return r.cat.GetArchive(id)
+}
+
+// ListHacks returns all declarative hack profiles.
+func (r *Registry) ListHacks() []domain.HackProfile {
+	return r.cat.ListHacks()
+}
+
+// GetHack returns a hack profile by ID.
+func (r *Registry) GetHack(id string) (domain.HackProfile, bool) {
+	return r.cat.GetHack(id)
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -30,6 +31,7 @@ func metaCommands(appCtx *AppContext) []*cobra.Command {
 		newAuditCmd(appCtx),
 		newThemeCmd(appCtx),
 		newConfigShowCmd(appCtx),
+		newAliasCmd(appCtx),
 		newVersionCmd(appCtx),
 	}
 	for _, c := range cmds {
@@ -38,10 +40,7 @@ func metaCommands(appCtx *AppContext) []*cobra.Command {
 	return cmds
 }
 
-func aiCommands(appCtx *AppContext) []*cobra.Command {
-	aiRoot := cli.NewCommand(cli.WithUse("ai"), cli.WithOptimizeFunc(aiOptimizeFunc(appCtx)))
-	aiRoot.GroupID = "ai"
-
+func interactiveCommands(appCtx *AppContext) []*cobra.Command {
 	dash := &cobra.Command{
 		Use:   "dashboard",
 		Short: "Launch the full-screen interactive dashboard",
@@ -54,8 +53,8 @@ func aiCommands(appCtx *AppContext) []*cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, _ []string) error { return runWizard(cmd, appCtx) },
 	}
-	dash.GroupID, wiz.GroupID = "ai", "ai"
-	return []*cobra.Command{aiRoot, dash, wiz}
+	dash.GroupID, wiz.GroupID = "meta", "meta"
+	return []*cobra.Command{dash, wiz}
 }
 
 func runDashboard(cmd *cobra.Command, appCtx *AppContext) error {
@@ -77,7 +76,24 @@ func runWizard(cmd *cobra.Command, appCtx *AppContext) error {
 		fmt.Fprintln(cmd.OutOrStdout(), "ANX Setup (autonomous mode)")
 		return runApply(cmd, appCtx, appCtx.Flags.Profile, nil)
 	}
-	p := tea.NewProgram(tui.NewWizardModel(appCtx.Platform, appCtx.Catalog, appCtx.InstallSvc), tea.WithContext(cmd.Context()))
+	var matchedHacks []domain.HackProfile
+	if appCtx.HacksSvc != nil {
+		_, matchedHacks = appCtx.HacksSvc.Detect(cmd.Context())
+	}
+	var diffs []app.ConfigDiff
+	if appCtx.SyncSvc != nil {
+		diffs, _ = appCtx.SyncSvc.Diff(cmd.Context(), "all")
+	}
+	p := tea.NewProgram(tui.NewWizardModel(
+		appCtx.Platform,
+		appCtx.Catalog,
+		appCtx.InstallSvc,
+		tui.WithWizardMatchedHacks(matchedHacks),
+		tui.WithWizardIncludeHacks(appCtx.Flags.IncludeHacks),
+		tui.WithWizardConfigDiffs(diffs),
+		tui.WithWizardSyncService(appCtx.SyncSvc),
+		tui.WithWizardHacksService(appCtx.HacksSvc),
+	), tea.WithContext(cmd.Context()))
 	_, err := p.Run()
 	return err
 }
@@ -228,6 +244,7 @@ func newThemeCmd(appCtx *AppContext) *cobra.Command {
 
 func newConfigShowCmd(appCtx *AppContext) *cobra.Command {
 	cmd := &cobra.Command{Use: "config", Short: "Show effective anx configuration and paths"}
+	cmd.AddCommand(newAliasCmd(appCtx))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "show",
 		Short: "Print the effective settings (flags > ANX_* env > config.yaml > defaults)",
@@ -254,6 +271,56 @@ func newConfigShowCmd(appCtx *AppContext) *cobra.Command {
 	return cmd
 }
 
+func newAliasCmd(appCtx *AppContext) *cobra.Command {
+	return &cobra.Command{
+		Use:   "alias <name>",
+		Short: "Create a custom binary alias/symlink for anx (e.g. for forks or personal naming)",
+		Long: `Create a custom command alias pointing to the anx binary in ~/.local/bin/<name>.
+This allows forks or users desiring custom command names (e.g. 'myenv', 'envcli', 'dot')
+to execute anx transparently under their preferred alias.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := strings.TrimSpace(args[0])
+			if name == "" || name == "anx" {
+				return domain.NewExitError(domain.ExitUsageError, fmt.Errorf("invalid alias name %q", name))
+			}
+			for _, r := range name {
+				if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+					return domain.NewExitError(domain.ExitUsageError, fmt.Errorf("alias %q contains invalid characters (allowed: a-z, 0-9, -, _)", name))
+				}
+			}
+
+			execPath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("failed to determine executable path: %w", err)
+			}
+			execPath, err = filepath.EvalSymlinks(execPath)
+			if err != nil {
+				return fmt.Errorf("failed to resolve executable symlinks: %w", err)
+			}
+
+			destDir := filepath.Dir(execPath)
+			if destDir == "" || destDir == "." {
+				destDir = filepath.Join(appCtx.Platform.HomeDir(), ".local", "bin")
+			}
+			aliasPath := filepath.Join(destDir, name)
+
+			if err := os.Remove(aliasPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to remove existing alias %s: %w", aliasPath, err)
+			}
+
+			if err := os.Symlink(execPath, aliasPath); err != nil {
+				return fmt.Errorf("failed to create symlink %s -> %s: %w", aliasPath, execPath, err)
+			}
+
+			st := styles(appCtx)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s Created binary alias %s -> %s\n", st.Success.Render("✓"), aliasPath, execPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "  You can now execute '%s' anywhere in your terminal.\n", name)
+			return nil
+		},
+	}
+}
+
 func newVersionCmd(appCtx *AppContext) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
@@ -272,26 +339,96 @@ func newVersionCmd(appCtx *AppContext) *cobra.Command {
 	}
 }
 
-func newCompletionCmd(root *cobra.Command) *cobra.Command {
-	return &cobra.Command{
+func newCompletionCmd(root *cobra.Command, appCtx *AppContext) *cobra.Command {
+	var install bool
+
+	cmd := &cobra.Command{
 		Use:       "completion <bash|zsh|fish|powershell>",
-		Short:     "Generate a shell completion script",
+		Short:     "Generate or install shell completion script",
+		Long: `Generate or install automatic completion scripts for bash, zsh, fish, or powershell.
+
+Pass --install to write the completion file directly to your shell's user completion path.`,
+		Example: `  # Load zsh completion in current shell
+  source <(anx completion zsh)
+
+  # Permanently install zsh completion for current user
+  anx completion zsh --install
+
+  # Install bash completion
+  anx completion bash --install`,
 		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
 		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			shell := args[0]
 			out := cmd.OutOrStdout()
-			switch args[0] {
-			case "bash":
-				return root.GenBashCompletionV2(out, true)
-			case "zsh":
-				return root.GenZshCompletion(out)
-			case "fish":
-				return root.GenFishCompletion(out, true)
-			default:
-				return root.GenPowerShellCompletionWithDesc(out)
+			st := styles(appCtx)
+
+			if !install {
+				switch shell {
+				case "bash":
+					return root.GenBashCompletionV2(out, true)
+				case "zsh":
+					return root.GenZshCompletion(out)
+				case "fish":
+					return root.GenFishCompletion(out, true)
+				default:
+					return root.GenPowerShellCompletionWithDesc(out)
+				}
 			}
+
+			// Install flow
+			home := appCtx.Platform.HomeDir()
+			var targetDir, targetFile string
+			switch shell {
+			case "bash":
+				targetDir = filepath.Join(home, ".local", "share", "bash-completion", "completions")
+				targetFile = filepath.Join(targetDir, "anx")
+			case "zsh":
+				targetDir = filepath.Join(home, ".zsh", "completions")
+				targetFile = filepath.Join(targetDir, "_anx")
+			case "fish":
+				targetDir = filepath.Join(home, ".config", "fish", "completions")
+				targetFile = filepath.Join(targetDir, "anx.fish")
+			default:
+				targetDir = filepath.Join(home, ".config", "powershell")
+				targetFile = filepath.Join(targetDir, "anx.ps1")
+			}
+
+			if err := os.MkdirAll(targetDir, 0o755); err != nil {
+				return fmt.Errorf("creating completion directory %q: %w", targetDir, err)
+			}
+
+			f, err := os.OpenFile(targetFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+			if err != nil {
+				return fmt.Errorf("writing completion file %q: %w", targetFile, err)
+			}
+			defer f.Close()
+
+			switch shell {
+			case "bash":
+				err = root.GenBashCompletionV2(f, true)
+			case "zsh":
+				err = root.GenZshCompletion(f)
+			case "fish":
+				err = root.GenFishCompletion(f, true)
+			default:
+				err = root.GenPowerShellCompletionWithDesc(f)
+			}
+			if err != nil {
+				return fmt.Errorf("generating %s completion: %w", shell, err)
+			}
+
+			fmt.Fprintf(out, "%s Installed %s completion to %s\n", st.Success.Render("✓"), shell, targetFile)
+			if shell == "zsh" {
+				fmt.Fprintln(out, "  Run 'source ~/.zshrc' or ensure ~/.zsh/completions is in your $fpath.")
+			}
+			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&install, "install", false, "Install completion script into user shell completions directory")
+
+	return cmd
 }
 
 // aiPromptFunc builds an ops.PromptFunc backed by the aitools harness registry.

@@ -62,7 +62,7 @@ func (d *Dispatcher) isNativeInstalled(ctx context.Context, matrix map[string][]
 	return true, "installed"
 }
 
-func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]string) error {
+func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]string, repos map[string][]string) error {
 	pm, pkgs := d.selectNativePackages(matrix)
 	if pm == "" {
 		return fmt.Errorf("no matching native package manager available on host")
@@ -71,6 +71,31 @@ func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]stri
 	env := d.buildSubprocessEnv(map[string]string{
 		"DEBIAN_FRONTEND": "noninteractive",
 	})
+
+	if len(repos) > 0 {
+		if repoList, ok := repos[pm]; ok && len(repoList) > 0 {
+			switch pm {
+			case "apt":
+				for _, r := range repoList {
+					if strings.HasPrefix(r, "ppa:") {
+						cmd, args := d.maybeSudo("add-apt-repository", "-y", r)
+						_, _ = d.runner.RunWithOptions(ctx, "", env, cmd, args...)
+					}
+				}
+				updateCmd, updateArgs := d.maybeSudo("apt-get", "update")
+				_, _ = d.runner.RunWithOptions(ctx, "", env, updateCmd, updateArgs...)
+			case "dnf":
+				for _, r := range repoList {
+					cmd, args := d.maybeSudo("dnf", "copr", "enable", "-y", r)
+					_, _ = d.runner.RunWithOptions(ctx, "", env, cmd, args...)
+				}
+			case "brew":
+				for _, r := range repoList {
+					_, _ = d.runner.RunWithOptions(ctx, "", env, "brew", "tap", r)
+				}
+			}
+		}
+	}
 
 	switch pm {
 	case "apt":

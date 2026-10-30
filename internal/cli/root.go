@@ -27,16 +27,17 @@ import (
 
 // GlobalFlagState holds parsed persistent flags.
 type GlobalFlagState struct {
-	Interactive bool
-	Yes         bool
-	DryRun      bool
-	Format      string
-	Quiet       bool
-	Verbose     bool
-	NoColor     bool
-	Theme       string
-	Offline     bool
-	Profile     string
+	Interactive  bool
+	Yes          bool
+	DryRun       bool
+	Format       string
+	Quiet        bool
+	Verbose      bool
+	NoColor      bool
+	Theme        string
+	Offline      bool
+	Profile      string
+	IncludeHacks bool
 }
 
 // AppContext holds shared domain services injected into CLI commands.
@@ -54,6 +55,7 @@ type AppContext struct {
 	AuditSvc   *app.AuditService
 	HacksSvc   *app.HacksService
 	OpsSvc     *app.OpsService
+	ToolsSvc   *app.ToolsService
 	RepoRoot   string
 	Viper      *viper.Viper
 	Flags      GlobalFlagState
@@ -67,6 +69,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "anx",
 		Short:         "Unified declarative environment, dotfiles and personal tooling manager",
+		Version:       appCtx.Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
@@ -96,6 +99,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	pf.StringVar(&appCtx.Flags.Theme, "theme", "tokyo-night", "UI theme (see 'anx theme list')")
 	pf.BoolVar(&appCtx.Flags.Offline, "offline", false, "Disable network queries")
 	pf.StringVar(&appCtx.Flags.Profile, "profile", "developer", "Target profile name")
+	pf.BoolVar(&appCtx.Flags.IncludeHacks, "include-hacks", false, "Include matched hardware workstation hacks during apply")
 	_ = rootCmd.RegisterFlagCompletionFunc("format", staticCompletion("text", "json", "yaml"))
 	_ = rootCmd.RegisterFlagCompletionFunc("profile", profileCompletion(appCtx))
 	_ = rootCmd.RegisterFlagCompletionFunc("theme", staticCompletion(themeNames()...))
@@ -104,16 +108,18 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 		&cobra.Group{ID: "packages", Title: "Packages & Profiles:"},
 		&cobra.Group{ID: "config", Title: "Dotfiles & Backups:"},
 		&cobra.Group{ID: "system", Title: "System, Hacks & Maintenance:"},
-		&cobra.Group{ID: "ai", Title: "AI & Interactive:"},
+		&cobra.Group{ID: "tools", Title: "Personal Tools & AI Suite:"},
 		&cobra.Group{ID: "meta", Title: "Diagnostics & Meta:"},
 	)
 
 	rootCmd.AddCommand(packageCommands(appCtx)...)
 	rootCmd.AddCommand(configCommands(appCtx)...)
 	rootCmd.AddCommand(systemCommands(appCtx)...)
-	rootCmd.AddCommand(aiCommands(appCtx)...)
+	rootCmd.AddCommand(toolsCommands(appCtx)...)
+	rootCmd.AddCommand(interactiveCommands(appCtx)...)
 	rootCmd.AddCommand(metaCommands(appCtx)...)
-	rootCmd.AddCommand(newCompletionCmd(rootCmd))
+	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
+	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
 
 	return rootCmd
 }

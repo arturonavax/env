@@ -38,7 +38,7 @@ steps:
 	}
 
 	reg, err := hacks.LoadRegistry(
-		hacks.WithRepoHacksDir("../../hacks"),
+		hacks.WithRepoHacksDir("../../manifests/hacks"),
 		hacks.WithUserHacksDir(userDropIn),
 	)
 	if err != nil {
@@ -67,8 +67,8 @@ steps:
 
 	// Verify bundled canonical scripts pass security guardrails cleanly.
 	for _, scriptRel := range []string{
-		"../../hacks/dell-precision-m6800/apply_hacks.sh",
-		"../../hacks/x11-scroll-lock-led/activate_scroll_lock.sh",
+		"../../manifests/hacks/dell-precision-m6800/apply_hacks.sh",
+		"../../manifests/hacks/x11-scroll-lock-led/activate_scroll_lock.sh",
 	} {
 		raw, err := os.ReadFile(scriptRel)
 		if err != nil {

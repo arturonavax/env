@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/state"
 )
 
 // CheckVerdict represents the result of an individual health diagnostic.
@@ -29,15 +31,32 @@ type DoctorCheck struct {
 	Remediation string       `json:"remediation,omitempty"`
 }
 
+// DoctorOption configures optional DoctorService dependencies.
+type DoctorOption func(*DoctorService)
+
+// WithDoctorStore injects state.Store for orphaned resource detection.
+func WithDoctorStore(store *state.Store) DoctorOption {
+	return func(d *DoctorService) {
+		d.store = store
+	}
+}
+
 // DoctorService evaluates system health, missing tools, and configuration drift.
 type DoctorService struct {
 	platform *platform.Info
 	catalog  *catalog.Registry
+	store    *state.Store
 }
 
 // NewDoctorService creates a DoctorService.
-func NewDoctorService(plat *platform.Info, cat *catalog.Registry) *DoctorService {
-	return &DoctorService{platform: plat, catalog: cat}
+func NewDoctorService(plat *platform.Info, cat *catalog.Registry, opts ...DoctorOption) *DoctorService {
+	d := &DoctorService{platform: plat, catalog: cat}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(d)
+		}
+	}
+	return d
 }
 
 // Diagnose executes diagnostic evaluations across environment, directories, and tools.
@@ -107,6 +126,70 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 			Message:     "~/.zshrc not found",
 			Remediation: "Run 'anx sync' to initialize shell integration",
 		})
+	}
+
+	// 5. Orphaned Components Detection (state.json vs active catalog)
+	if d.store != nil && d.catalog != nil {
+		allPkgs := d.catalog.ListPackages()
+		desiredIDs := make([]string, 0, len(allPkgs))
+		for _, p := range allPkgs {
+			desiredIDs = append(desiredIDs, p.ID)
+		}
+		for _, c := range d.catalog.ListConfigurations() {
+			desiredIDs = append(desiredIDs, c.ID)
+		}
+		orphans := d.store.DetectOrphaned(desiredIDs)
+		if len(orphans) > 0 {
+			orphanNames := make([]string, 0, len(orphans))
+			for _, o := range orphans {
+				orphanNames = append(orphanNames, o.ResourceID)
+			}
+			checks = append(checks, DoctorCheck{
+				Name:        "Orphaned Components",
+				Verdict:     VerdictWarn,
+				Message:     fmt.Sprintf("%d installed resource(s) are no longer declared in manifests or active profile: %s", len(orphans), strings.Join(orphanNames, ", ")),
+				Remediation: "Run 'anx cleanup' (or 'anx prune') to safely uninstall orphaned packages",
+			})
+		}
+	}
+
+	// 6. Deprecated / Purge-Recommended Components
+	if d.catalog != nil {
+		for _, pkg := range d.catalog.ListPackages() {
+			if pkg.Deprecated && pkg.RecommendPurge {
+				checks = append(checks, DoctorCheck{
+					Name:        fmt.Sprintf("Deprecated Package: %s", pkg.ID),
+					Verdict:     VerdictWarn,
+					Message:     fmt.Sprintf("%s is deprecated: %s", pkg.Name, pkg.DeprecatedReason),
+					Remediation: fmt.Sprintf("Run 'anx cleanup' to purge deprecated components (recommended replacement: %s)", pkg.Replacement),
+				})
+			}
+		}
+	}
+
+	// 7. Archived Component Legacy Remnants on Host Filesystem
+	if d.catalog != nil {
+		home := d.platform.HomeDir()
+		for _, arc := range d.catalog.ListArchives() {
+			for _, cleanPath := range arc.CleanupPaths {
+				expanded := cleanPath
+				if strings.HasPrefix(expanded, "~/") {
+					expanded = filepath.Join(home, expanded[2:])
+				}
+				if info, err := os.Stat(expanded); err == nil {
+					fileType := "file"
+					if info.IsDir() {
+						fileType = "directory"
+					}
+					checks = append(checks, DoctorCheck{
+						Name:        fmt.Sprintf("Legacy Archive Remnant: %s", arc.ID),
+						Verdict:     VerdictWarn,
+						Message:     fmt.Sprintf("Found %s %s from decommissioned component %s (%s)", fileType, expanded, arc.Name, arc.Reason),
+						Remediation: fmt.Sprintf("Run 'anx cleanup' to safely purge decommissioned remnants (replaced by %s)", arc.Replacement),
+					})
+				}
+			}
+		}
 	}
 
 	return checks, nil

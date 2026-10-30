@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/configsync"
@@ -19,10 +21,12 @@ import (
 
 // SyncOptions tunes a synchronization run.
 type SyncOptions struct {
-	Group  string
-	DryRun bool
-	Force  bool // incoming (repo) wins on conflicts
-	Push   bool // capture from $HOME back into the repository instead
+	Group    string
+	DryRun   bool
+	Force    bool   // incoming (repo) wins on conflicts
+	Push     bool   // capture from $HOME back into the repository instead
+	Shell    string // override shell for filtering configs (defaults to platform shell)
+	Terminal string // override terminal for filtering configs (defaults to platform terminal)
 }
 
 // SyncResult reports what happened for one configuration.
@@ -40,6 +44,7 @@ type ConfigDiff struct {
 	ConfigID string `json:"config_id"`
 	Target   string `json:"target"`
 	State    string `json:"state"` // clean|missing|drift|conflict
+	Summary  string `json:"summary,omitempty"`
 	Unified  string `json:"unified,omitempty"`
 }
 
@@ -63,13 +68,37 @@ func NewSyncService(
 	return &SyncService{platform: plat, catalog: cat, snapshots: snap, store: store, repoRoot: repoRoot}
 }
 
-func (s *SyncService) selectConfigs(group string) []domain.ConfigurationResource {
+func (s *SyncService) selectConfigs(group string, overrideShell, overrideTerminal string) []domain.ConfigurationResource {
 	all := s.catalog.ListConfigurationsByGroup(group)
 	out := make([]domain.ConfigurationResource, 0, len(all))
+	sh := s.platform.CurrentShell()
+	if overrideShell != "" {
+		sh = overrideShell
+	}
+	if sh == "" {
+		sh = "zsh"
+	}
+	term := s.platform.CurrentTerminal()
+	if overrideTerminal != "" {
+		term = overrideTerminal
+	}
+	if term == "" {
+		term = "ghostty"
+	}
 	for _, c := range all {
-		if c.SupportsOS(s.platform.OS()) {
-			out = append(out, c)
+		if !c.SupportsOS(s.platform.OS()) {
+			continue
 		}
+		if !c.SupportsDesktop(s.platform.DesktopEnv()) {
+			continue
+		}
+		if !c.SupportsShell(sh) {
+			continue
+		}
+		if !c.SupportsTerminal(term) {
+			continue
+		}
+		out = append(out, c)
 	}
 	return out
 }
@@ -85,7 +114,7 @@ func (s *SyncService) paths(cfg domain.ConfigurationResource) (source, target st
 
 // Diff compares each selected configuration with its live target.
 func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error) {
-	cfgs := s.selectConfigs(group)
+	cfgs := s.selectConfigs(group, "", "")
 	diffs := make([]ConfigDiff, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		source, target, err := s.paths(cfg)
@@ -116,6 +145,11 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 				d.State = "drift"
 				d.Unified += fmt.Sprintf("%s: %s\n", fd.Status, fd.RelPath)
 			}
+			if len(fds) == 0 {
+				d.Summary = "up to date"
+			} else {
+				d.Summary = fmt.Sprintf("%d file(s) differ", len(fds))
+			}
 			diffs = append(diffs, d)
 			continue
 		}
@@ -125,16 +159,19 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 		if cfg.Strategy == domain.StrategyMarkerBlock || cfg.Strategy == domain.StrategySmartAppend {
 			block, ok := configsync.ExtractMarkerBlock(string(local), markerStart(cfg), markerEnd(cfg))
 			if ok && bytes.Equal(bytes.TrimSpace([]byte(block)), bytes.TrimSpace(incoming)) {
+				d.Summary = "up to date"
 				diffs = append(diffs, d)
 				continue
 			}
 			d.State = "drift"
 			d.Unified = configsync.UnifiedDiff("live", "repo", block, string(incoming), 3)
+			d.Summary = summarizeDiffLines(d.Unified)
 			diffs = append(diffs, d)
 			continue
 		}
 
 		if bytes.Equal(local, incoming) {
+			d.Summary = "up to date"
 			diffs = append(diffs, d)
 			continue
 		}
@@ -145,18 +182,41 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 				d.State = "conflict"
 			}
 		}
+		d.Summary = summarizeDiffLines(d.Unified)
 		diffs = append(diffs, d)
 	}
 	return diffs, nil
 }
 
+func summarizeDiffLines(unified string) string {
+	added, removed := 0, 0
+	for _, line := range strings.Split(unified, "\n") {
+		if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+			continue
+		}
+		if strings.HasPrefix(line, "+") {
+			added++
+		} else if strings.HasPrefix(line, "-") {
+			removed++
+		}
+	}
+	if added == 0 && removed == 0 {
+		return "drift detected"
+	}
+	return fmt.Sprintf("+%d / -%d lines", added, removed)
+}
+
 // Sync deploys (or with Push captures) every selected configuration.
 func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult, error) {
-	cfgs := s.selectConfigs(opts.Group)
+	cfgs := s.selectConfigs(opts.Group, opts.Shell, opts.Terminal)
 	results := make([]SyncResult, 0, len(cfgs))
 
 	if opts.Push {
 		for _, cfg := range cfgs {
+			if opts.DryRun {
+				results = append(results, SyncResult{ConfigID: cfg.ID, Action: "captured", Files: 1})
+				continue
+			}
 			n, err := configsync.CaptureToRepo(s.platform.HomeDir(), s.repoRoot, cfg, s.platform.OS())
 			if err != nil {
 				return results, fmt.Errorf("capturing %s: %w", cfg.ID, err)
@@ -245,21 +305,47 @@ func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOpti
 		return res, nil
 	}
 
+	var r SyncResult
+	var syncErr error
+
 	switch {
 	case info.IsDir():
-		return s.syncDirectory(cfg, source, target, opts, res)
+		r, syncErr = s.syncDirectory(cfg, source, target, opts, res)
 	case cfg.Strategy == domain.StrategyMarkerBlock || cfg.Strategy == domain.StrategySmartAppend:
-		return s.syncMarker(cfg, source, target, opts, res)
+		r, syncErr = s.syncMarker(cfg, source, target, opts, res)
 	case cfg.Strategy == domain.StrategySymlink:
 		if !opts.DryRun {
 			if err := configsync.NewDeployer().Deploy(source, target, configsync.ModeSymlink); err != nil {
 				return res, err
 			}
 		}
-		res.Action = "updated"
-		return res, nil
+		r = res
+		r.Action = "updated"
 	default:
-		return s.syncFile(cfg, source, target, opts, res)
+		r, syncErr = s.syncFile(cfg, source, target, opts, res)
+	}
+
+	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated") {
+		s.runPostSync(cfg)
+	}
+	return r, syncErr
+}
+
+func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) {
+	for _, cmdArgs := range cfg.PostSyncCmds {
+		if len(cmdArgs) > 0 {
+			_ = exec.Command(cmdArgs[0], cmdArgs[1:]...).Run()
+		}
+	}
+	if s.platform != nil && len(cfg.PostSyncByDesktop) > 0 {
+		de := s.platform.DesktopEnv()
+		if deCmds, ok := cfg.PostSyncByDesktop[de]; ok {
+			for _, cmdArgs := range deCmds {
+				if len(cmdArgs) > 0 {
+					_ = exec.Command(cmdArgs[0], cmdArgs[1:]...).Run()
+				}
+			}
+		}
 	}
 }
 

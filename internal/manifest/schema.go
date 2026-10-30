@@ -7,6 +7,20 @@ type CatalogDocument struct {
 	Packages       []PackageSpec                  `json:"packages,omitempty" yaml:"packages,omitempty"`
 	Configurations []domain.ConfigurationResource `json:"configurations,omitempty" yaml:"configurations,omitempty"`
 	Profiles       []domain.Profile               `json:"profiles,omitempty" yaml:"profiles,omitempty"`
+	Archives       []ArchiveRecord                `json:"archives,omitempty" yaml:"archives,omitempty"`
+	Hacks          []domain.HackProfile           `json:"hacks,omitempty" yaml:"hacks,omitempty"`
+}
+
+// ArchiveRecord represents a retired, decommissioned, or deprecated component tracked historically.
+type ArchiveRecord struct {
+	ID             string   `json:"id" yaml:"id"`
+	Name           string   `json:"name" yaml:"name"`
+	Category       string   `json:"category" yaml:"category"`
+	RetiredAt      string   `json:"retired_at,omitempty" yaml:"retired_at,omitempty"`
+	Reason         string   `json:"reason" yaml:"reason"`
+	RecommendPurge bool     `json:"recommend_purge" yaml:"recommend_purge"`
+	Replacement    string   `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	CleanupPaths   []string `json:"cleanup_paths,omitempty" yaml:"cleanup_paths,omitempty"`
 }
 
 // PackageSpec defines a declarative multi-platform package or tool and its ordered installation strategies.
@@ -24,6 +38,11 @@ type PackageSpec struct {
 	DependsOn      []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
 	OS             []string       `json:"os,omitempty" yaml:"os,omitempty"`
 	DesiredVersion string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
+	Deprecated     bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason string       `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement    string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived       bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
 	Strategies     []StrategySpec `json:"strategies" yaml:"strategies"`
 }
 
@@ -60,18 +79,23 @@ func (p PackageSpec) ToManagedResource() domain.ManagedResource {
 	copy(supportedOS, p.OS)
 
 	return domain.ManagedResource{
-		ID:             p.ID,
-		Name:           p.Name,
-		Category:       p.Category,
-		Description:    p.Description,
-		BinaryName:     p.BinaryName,
-		Ecosystem:      p.Ecosystem,
-		OSVPackage:     p.OSVPackage,
-		Tags:           tags,
-		DependsOn:      deps,
-		SupportedOS:    supportedOS,
-		DesiredVersion: p.DesiredVersion,
-		Strategy:       p.PrimaryStrategy(),
+		ID:               p.ID,
+		Name:             p.Name,
+		Category:         p.Category,
+		Description:      p.Description,
+		BinaryName:       p.BinaryName,
+		Ecosystem:        p.Ecosystem,
+		OSVPackage:       p.OSVPackage,
+		Tags:             tags,
+		DependsOn:        deps,
+		SupportedOS:      supportedOS,
+		DesiredVersion:   p.DesiredVersion,
+		Strategy:         p.PrimaryStrategy(),
+		Deprecated:       p.Deprecated,
+		DeprecatedReason: p.DeprecatedReason,
+		RecommendPurge:   p.RecommendPurge,
+		Replacement:      p.Replacement,
+		Archived:         p.Archived,
 	}
 }
 
@@ -80,6 +104,7 @@ type StrategySpec struct {
 	Type          string              `json:"type" yaml:"type"`
 	When          *StrategyCondition  `json:"when,omitempty" yaml:"when,omitempty"`
 	Packages      map[string][]string `json:"packages,omitempty" yaml:"packages,omitempty"`
+	Repositories  map[string][]string `json:"repositories,omitempty" yaml:"repositories,omitempty"`
 	GitHubRelease *GitHubReleaseSpec  `json:"github_release,omitempty" yaml:"github_release,omitempty"`
 	Script        *ScriptSpec         `json:"script,omitempty" yaml:"script,omitempty"`
 	Source        *SourceSpec         `json:"source,omitempty" yaml:"source,omitempty"`
@@ -91,6 +116,8 @@ type StrategyCondition struct {
 	OS             []string `json:"os,omitempty" yaml:"os,omitempty"`
 	Arch           []string `json:"arch,omitempty" yaml:"arch,omitempty"`
 	Distros        []string `json:"distros,omitempty" yaml:"distros,omitempty"`
+	Desktops       []string `json:"desktops,omitempty" yaml:"desktops,omitempty"`
+	DisplayServers []string `json:"display_servers,omitempty" yaml:"display_servers,omitempty"`
 	RequiresBinary string   `json:"requires_binary,omitempty" yaml:"requires_binary,omitempty"`
 }
 

@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 // ResourceStatus represents the operational state of a managed resource.
 type ResourceStatus int
 
@@ -11,6 +13,9 @@ const (
 	StatusFailed
 	StatusUnsupported
 	StatusUnmanaged
+	StatusDeprecated
+	StatusOrphaned
+	StatusArchived
 )
 
 func (s ResourceStatus) String() string {
@@ -27,6 +32,12 @@ func (s ResourceStatus) String() string {
 		return "unsupported"
 	case StatusUnmanaged:
 		return "unmanaged"
+	case StatusDeprecated:
+		return "deprecated"
+	case StatusOrphaned:
+		return "orphaned"
+	case StatusArchived:
+		return "archived"
 	default:
 		return "unknown"
 	}
@@ -98,24 +109,38 @@ type ManagedResource struct {
 	AdvisoriesCount  int            `json:"advisories_count" yaml:"-"`
 	TargetPath       string         `json:"target_path,omitempty" yaml:"target_path,omitempty"`
 	SourcePath       string         `json:"source_path,omitempty" yaml:"source_path,omitempty"`
+	Deprecated       bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason string         `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge   bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement      string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived         bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
 }
 
 // ConfigurationResource represents a managed dotfile, directory tree, or shell marker block.
 type ConfigurationResource struct {
-	ID           string            `json:"id" yaml:"id"`
-	Name         string            `json:"name" yaml:"name"`
-	Group        string            `json:"group,omitempty" yaml:"group,omitempty"`
-	Description  string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Source       string            `json:"source" yaml:"source"`
-	Target       string            `json:"target" yaml:"target"`
-	TargetsByOS  map[string]string `json:"targets_by_os,omitempty" yaml:"targets_by_os,omitempty"`
-	Strategy     StrategyType      `json:"strategy" yaml:"strategy"`
-	MarkerStart  string            `json:"marker_start,omitempty" yaml:"marker_start,omitempty"`
-	MarkerEnd    string            `json:"marker_end,omitempty" yaml:"marker_end,omitempty"`
-	Excludes     []string          `json:"excludes,omitempty" yaml:"excludes,omitempty"`
-	SupportedOS  []string          `json:"supported_os,omitempty" yaml:"os,omitempty"`
-	PostSyncCmds [][]string        `json:"post_sync_cmds,omitempty" yaml:"post_sync_cmds,omitempty"`
-	Backup       bool              `json:"backup" yaml:"backup"`
+	ID                 string              `json:"id" yaml:"id"`
+	Name               string              `json:"name" yaml:"name"`
+	Group              string              `json:"group,omitempty" yaml:"group,omitempty"`
+	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
+	Source             string              `json:"source" yaml:"source"`
+	Target             string              `json:"target" yaml:"target"`
+	TargetsByOS        map[string]string   `json:"targets_by_os,omitempty" yaml:"targets_by_os,omitempty"`
+	Strategy           StrategyType        `json:"strategy" yaml:"strategy"`
+	MarkerStart        string              `json:"marker_start,omitempty" yaml:"marker_start,omitempty"`
+	MarkerEnd          string              `json:"marker_end,omitempty" yaml:"marker_end,omitempty"`
+	Excludes           []string            `json:"excludes,omitempty" yaml:"excludes,omitempty"`
+	SupportedOS        []string            `json:"supported_os,omitempty" yaml:"os,omitempty"`
+	SupportedDesktops  []string            `json:"supported_desktops,omitempty" yaml:"desktops,omitempty"`
+	SupportedShells    []string            `json:"supported_shells,omitempty" yaml:"shells,omitempty"`
+	SupportedTerminals []string            `json:"supported_terminals,omitempty" yaml:"terminals,omitempty"`
+	PostSyncCmds       [][]string          `json:"post_sync_cmds,omitempty" yaml:"post_sync_cmds,omitempty"`
+	PostSyncByDesktop  map[string][][]string `json:"post_sync_by_desktop,omitempty" yaml:"post_sync_by_desktop,omitempty"`
+	Backup             bool                `json:"backup" yaml:"backup"`
+	Deprecated         bool                `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason   string              `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge     bool                `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement        string              `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived           bool                `json:"archived,omitempty" yaml:"archived,omitempty"`
 }
 
 // TargetForOS resolves the OS-specific target path, falling back to Target.
@@ -135,6 +160,54 @@ func (c ConfigurationResource) SupportsOS(goos string) bool {
 	}
 	for _, allowed := range c.SupportedOS {
 		if allowed == goos || allowed == "all" {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsDesktop reports whether the configuration applies to the active desktop environment.
+func (c ConfigurationResource) SupportsDesktop(de string) bool {
+	if len(c.SupportedDesktops) == 0 {
+		return true
+	}
+	if de == "" {
+		return false
+	}
+	for _, allowed := range c.SupportedDesktops {
+		if strings.EqualFold(allowed, de) || allowed == "all" {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsShell reports whether the configuration applies to the specified shell.
+func (c ConfigurationResource) SupportsShell(sh string) bool {
+	if len(c.SupportedShells) == 0 {
+		return true
+	}
+	if sh == "" {
+		return false
+	}
+	for _, allowed := range c.SupportedShells {
+		if strings.EqualFold(allowed, sh) || allowed == "all" {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsTerminal reports whether the configuration applies to the active terminal.
+func (c ConfigurationResource) SupportsTerminal(term string) bool {
+	if len(c.SupportedTerminals) == 0 {
+		return true
+	}
+	if term == "" {
+		return false
+	}
+	for _, allowed := range c.SupportedTerminals {
+		if strings.EqualFold(allowed, term) || allowed == "all" {
 			return true
 		}
 	}

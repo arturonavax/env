@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Canonical CLI exit codes matching Unix conventions and specs/anx/cli-contract.md.
+// Canonical CLI exit codes matching Unix conventions and odd/specs/anx/cli-contract.md.
 const (
 	ExitSuccess           = 0
 	ExitGeneralError      = 1

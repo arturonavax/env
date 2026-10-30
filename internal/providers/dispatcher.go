@@ -193,7 +193,7 @@ func (d *Dispatcher) Install(ctx context.Context, pkg domain.ManagedResource) er
 				continue
 			}
 			attempted++
-			err = d.installNative(ctx, st.Packages)
+			err = d.installNative(ctx, st.Packages, st.Repositories)
 		case string(domain.StrategyGitHubRelease):
 			if st.GitHubRelease == nil {
 				continue
@@ -365,6 +365,32 @@ func (d *Dispatcher) matchesCondition(cond *manifest.StrategyCondition) bool {
 		distro := d.platform.Distribution()
 		family := d.platform.DistroFamily()
 		if !slices.Contains(cond.Distros, distro) && !slices.Contains(cond.Distros, family) {
+			return false
+		}
+	}
+	if len(cond.Desktops) > 0 {
+		de := d.platform.DesktopEnv()
+		matched := false
+		for _, allowed := range cond.Desktops {
+			if strings.EqualFold(allowed, de) || allowed == "all" {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	if len(cond.DisplayServers) > 0 {
+		ds := d.platform.DisplayServer()
+		matched := false
+		for _, allowed := range cond.DisplayServers {
+			if strings.EqualFold(allowed, ds) || allowed == "all" {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return false
 		}
 	}

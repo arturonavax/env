@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1
+# ==============================================================================
+# tests/e2e/Dockerfile.debian
+# Multi-stage lightweight Debian test harness for ANX E2E verification
+# ==============================================================================
+
+# Stage 1: Pre-compiled builder for Go tools and test assets
+FROM golang:1.24-bookworm AS builder
+ENV GOTOOLCHAIN=auto
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /build/bin/anx ./cmd/anx
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /build/bin/mock-server ./tests/e2e/mock_server/main.go
+RUN mkdir -p /build/releases && tar -czf /build/releases/anx_linux_amd64.tar.gz -C /build/bin anx
+
+# Stage 2: Minimal runtime testing harness
+FROM debian:bookworm-slim AS runtime
+
+# Install core runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    curl \
+    ca-certificates \
+    git \
+    tar \
+    gzip \
+    sudo \
+    python3 \
+    util-linux
+
+# Hardened security: create non-root developer user with sudo permissions
+RUN groupadd -g 1000 dev && \
+    useradd -u 1000 -g dev -m -s /bin/bash dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev && \
+    chmod 0440 /etc/sudoers.d/dev
+
+# Copy Go runtime, cached modules, binaries and mock releases from builder stage
+COPY --from=builder /usr/local/go /usr/local/go
+COPY --chown=dev:dev --from=builder /go/pkg/mod /go/pkg/mod
+COPY --from=builder /build/bin/mock-server /usr/local/bin/mock-server
+COPY --chown=dev:dev --from=builder /build/releases/ /tmp/mock-releases/
+
+WORKDIR /repo
+COPY --chown=dev:dev . /repo
+RUN mkdir -p /repo/bin
+COPY --chown=dev:dev --from=builder /build/bin/anx /repo/bin/anx
+
+USER dev
+ENV HOME=/home/dev
+ENV GOPATH=/go
+ENV PATH=/home/dev/.local/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin
+WORKDIR /home/dev
+
+CMD ["/repo/tests/e2e/scripts/run_all.sh"]

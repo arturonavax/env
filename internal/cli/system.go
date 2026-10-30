@@ -14,9 +14,12 @@ import (
 
 func systemCommands(appCtx *AppContext) []*cobra.Command {
 	cmds := []*cobra.Command{
+		newUpdateCmd(appCtx),
+		newUpgradeCmd(appCtx),
 		newHacksCmd(appCtx),
 		newRebuildCmd(appCtx),
 		newOptimizeCmd(appCtx),
+		newCleanupCmd(appCtx),
 	}
 	for _, c := range cmds {
 		c.GroupID = "system"

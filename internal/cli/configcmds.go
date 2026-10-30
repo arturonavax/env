@@ -70,7 +70,11 @@ func newDiffCmd(appCtx *AppContext) *cobra.Command {
 					case "conflict":
 						tag = st.Error.Render("[CONFLICT]")
 					}
-					fmt.Fprintf(w, "  %-34s %s\n", d.ConfigID, tag)
+					summary := d.Summary
+					if summary != "" {
+						summary = " (" + summary + ")"
+					}
+					fmt.Fprintf(w, "  %-30s %s%s\n", d.ConfigID, tag, summary)
 					if patch && d.Unified != "" {
 						fmt.Fprintln(w, d.Unified)
 					}
@@ -114,23 +118,6 @@ func newSyncCmd(appCtx *AppContext) *cobra.Command {
 	cmd.Flags().BoolVar(&push, "push", false, "Capture live dotfiles back into the repository")
 	cmd.Flags().BoolVar(&force, "force", false, "Repository version wins on conflicts")
 	return cmd
-}
-
-func newCaptureCmd(appCtx *AppContext) *cobra.Command {
-	return &cobra.Command{
-		Use:               "capture [group|config-id]",
-		Short:             "Ingest live dotfiles back into the repository (alias of sync --push)",
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: groupCompletion(appCtx),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts := appSyncOptions(appCtx, args, true, false)
-			results, err := appCtx.SyncSvc.Sync(cmd.Context(), opts)
-			if err != nil {
-				return err
-			}
-			return renderSync(cmd, appCtx, results)
-		},
-	}
 }
 
 func renderSync(cmd *cobra.Command, appCtx *AppContext, results []app.SyncResult) error {

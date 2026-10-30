@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -87,6 +90,16 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 	if len(pkgs) == 0 {
 		_ = appCtx.Store.SetActiveProfile(plan.Profile)
 	}
+
+	if appCtx.Flags.IncludeHacks && appCtx.HacksSvc != nil {
+		_, matched := appCtx.HacksSvc.Detect(cmd.Context())
+		for _, hk := range matched {
+			if !appCtx.Flags.Quiet {
+				fmt.Fprintf(cmd.OutOrStdout(), "Applying matched hardware workstation hack: %s (%s)...\n", hk.ID, hk.Name)
+			}
+			_, _ = appCtx.HacksSvc.Apply(cmd.Context(), hk.ID)
+		}
+	}
 	return nil
 }
 
@@ -103,13 +116,28 @@ func newInstallCmd(appCtx *AppContext) *cobra.Command {
 }
 
 func newUninstallCmd(appCtx *AppContext) *cobra.Command {
-	return &cobra.Command{
-		Use:               "uninstall <package...>",
+	var (
+		systemUninstall bool
+		purgeConfigs    bool
+	)
+	cmd := &cobra.Command{
+		Use:               "uninstall [package...]",
 		Aliases:           []string{"remove"},
-		Short:             "Remove managed packages",
-		Args:              cobra.MinimumNArgs(1),
+		Short:             "Remove managed packages (or --system to teardown the anx platform)",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if systemUninstall {
+				return nil
+			}
+			if len(args) == 0 {
+				return errors.New("requires at least 1 arg(s), or --system for full teardown")
+			}
+			return nil
+		},
 		ValidArgsFunction: packageCompletion(appCtx),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if systemUninstall {
+				return runSystemUninstall(cmd, appCtx, purgeConfigs)
+			}
 			if appCtx.Flags.DryRun {
 				fmt.Fprintf(cmd.OutOrStdout(), "dry-run: would uninstall %s\n", strings.Join(args, ", "))
 				return nil
@@ -121,6 +149,77 @@ func newUninstallCmd(appCtx *AppContext) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&systemUninstall, "system", false, "Teardown and uninstall the anx platform and binaries from this machine")
+	cmd.Flags().BoolVar(&purgeConfigs, "purge", false, "Purge configuration directories during system uninstallation")
+	return cmd
+}
+
+func runSystemUninstall(cmd *cobra.Command, appCtx *AppContext, purge bool) error {
+	ctx := cmd.Context()
+	out := cmd.OutOrStdout()
+	st := styles(appCtx)
+
+	if appCtx.Flags.DryRun {
+		fmt.Fprintln(out, st.Header.Render("ANX System Uninstallation Plan (Dry-Run):"))
+		fmt.Fprintf(out, "  • Binaries:       %s (anx, aitools, aliases)\n", appCtx.Platform.LocalBinDir())
+		fmt.Fprintf(out, "  • State & tools:  %s\n", appCtx.Platform.StateDir())
+		if purge {
+			fmt.Fprintf(out, "  • Configurations: %s (purge requested)\n", appCtx.Platform.ConfigDir())
+		} else {
+			fmt.Fprintf(out, "  • Configurations: %s (preserved)\n", appCtx.Platform.ConfigDir())
+		}
+		return nil
+	}
+
+	if !appCtx.Flags.Yes && isTerminal(cmd) {
+		fmt.Fprintf(out, "%s Are you sure you want to completely uninstall ANX from this system? (y/N): ", st.Warning.Render("!"))
+		var confirm string
+		_, _ = fmt.Scanln(&confirm)
+		confirm = strings.TrimSpace(strings.ToLower(confirm))
+		if confirm != "y" && confirm != "yes" {
+			fmt.Fprintln(out, "Uninstallation cancelled.")
+			return nil
+		}
+	}
+
+	repo := appCtx.RepoRoot
+	if appCtx.Platform.OS() == "windows" {
+		psScript := filepath.Join(repo, "scripts", "uninstall_anx.ps1")
+		if isFile(psScript) {
+			args := []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", psScript, "-Yes"}
+			if purge {
+				args = append(args, "-PurgeConfigs")
+			}
+			c := exec.CommandContext(ctx, "powershell.exe", args...)
+			c.Stdout, c.Stderr = out, cmd.ErrOrStderr()
+			return c.Run()
+		}
+	} else {
+		shScript := filepath.Join(repo, "uninstall.sh")
+		if isFile(shScript) {
+			c := exec.CommandContext(ctx, "bash", shScript)
+			c.Stdout, c.Stderr = out, cmd.ErrOrStderr()
+			return c.Run()
+		}
+	}
+
+	binDir := appCtx.Platform.LocalBinDir()
+	for _, b := range []string{"anx", "aitools"} {
+		target := filepath.Join(binDir, b)
+		_ = os.Remove(target)
+	}
+	_ = os.RemoveAll(appCtx.Platform.StateDir())
+	if purge {
+		_ = os.RemoveAll(appCtx.Platform.ConfigDir())
+	}
+
+	fmt.Fprintf(out, "%s Successfully uninstalled ANX from this system.\n", st.Success.Render("✓"))
+	return nil
+}
+
+func isFile(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && !st.IsDir()
 }
 
 func newResumeCmd(appCtx *AppContext) *cobra.Command {
@@ -151,11 +250,17 @@ type packageRow struct {
 	Version     string `json:"version,omitempty" yaml:"version,omitempty"`
 	Strategy    string `json:"strategy" yaml:"strategy"`
 	Description string `json:"description" yaml:"description"`
+	Deprecated  bool   `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	Orphaned    bool   `json:"orphaned,omitempty" yaml:"orphaned,omitempty"`
+	Replacement string `json:"replacement,omitempty" yaml:"replacement,omitempty"`
 }
 
 func collectPackages(cmd *cobra.Command, appCtx *AppContext, filter func(string, string, string) bool) []packageRow {
 	rows := []packageRow{}
+	catalogIDs := make(map[string]bool)
+
 	for _, p := range appCtx.Catalog.ListPackages() {
+		catalogIDs[p.ID] = true
 		if filter != nil && !filter(p.ID, p.Name, p.Description+" "+p.Category) {
 			continue
 		}
@@ -163,8 +268,29 @@ func collectPackages(cmd *cobra.Command, appCtx *AppContext, filter func(string,
 		rows = append(rows, packageRow{
 			ID: p.ID, Category: p.Category, Installed: installed, Version: ver,
 			Strategy: string(p.Strategy), Description: p.Description,
+			Deprecated: p.Deprecated, Replacement: p.Replacement,
 		})
 	}
+
+	// Also surface orphaned packages tracked in state.json
+	if appCtx.Store != nil {
+		desiredIDs := make([]string, 0, len(catalogIDs))
+		for id := range catalogIDs {
+			desiredIDs = append(desiredIDs, id)
+		}
+		orphans := appCtx.Store.DetectOrphaned(desiredIDs)
+		for _, o := range orphans {
+			if filter != nil && !filter(o.ResourceID, o.ResourceID, "orphaned") {
+				continue
+			}
+			rows = append(rows, packageRow{
+				ID: o.ResourceID, Category: "orphaned", Installed: true, Version: o.Version,
+				Strategy: o.Strategy, Description: "Orphaned package tracked in state.json",
+				Orphaned: true,
+			})
+		}
+	}
+
 	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 	return rows
 }
@@ -176,24 +302,41 @@ func printRows(w io.Writer, appCtx *AppContext, rows []packageRow) {
 		if r.Installed {
 			state = st.Success.Render("installed " + r.Version)
 		}
-		fmt.Fprintf(w, "  %-18s %-14s %s\n", r.ID, r.Category, state)
+		badge := ""
+		if r.Orphaned {
+			badge = " " + st.Error.Render("[orphaned]")
+		} else if r.Deprecated {
+			badge = " " + st.Warning.Render("[deprecated]")
+		}
+		fmt.Fprintf(w, "  %-18s %-14s %s%s\n", r.ID, r.Category, state, badge)
 	}
 }
 
 func newListCmd(appCtx *AppContext) *cobra.Command {
-	var onlyMissing bool
+	var (
+		onlyMissing    bool
+		onlyDeprecated bool
+		onlyOrphaned   bool
+	)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List catalog packages with their installation state",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			rows := collectPackages(cmd, appCtx, nil)
-			if onlyMissing {
+			if onlyMissing || onlyDeprecated || onlyOrphaned {
 				filtered := rows[:0]
 				for _, r := range rows {
-					if !r.Installed {
-						filtered = append(filtered, r)
+					if onlyMissing && r.Installed {
+						continue
 					}
+					if onlyDeprecated && !r.Deprecated {
+						continue
+					}
+					if onlyOrphaned && !r.Orphaned {
+						continue
+					}
+					filtered = append(filtered, r)
 				}
 				rows = filtered
 			}
@@ -201,6 +344,8 @@ func newListCmd(appCtx *AppContext) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&onlyMissing, "missing", false, "Show only packages that are not installed")
+	cmd.Flags().BoolVar(&onlyDeprecated, "deprecated", false, "Show only deprecated packages")
+	cmd.Flags().BoolVar(&onlyOrphaned, "orphaned", false, "Show only orphaned packages tracked in state")
 	return cmd
 }
 

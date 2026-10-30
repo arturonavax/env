@@ -52,6 +52,8 @@ type Catalog struct {
 	packages       map[string]PackageSpec
 	configurations map[string]domain.ConfigurationResource
 	profiles       map[string]domain.Profile
+	archives       map[string]ArchiveRecord
+	hacks          map[string]domain.HackProfile
 }
 
 // LoadCatalog loads embedded YAML manifests and overlays optional repository and user drop-in YAML files.
@@ -67,6 +69,8 @@ func LoadCatalog(opts ...Option) (*Catalog, error) {
 		packages:       make(map[string]PackageSpec, 64),
 		configurations: make(map[string]domain.ConfigurationResource, 32),
 		profiles:       make(map[string]domain.Profile, 12),
+		archives:       make(map[string]ArchiveRecord, 16),
+		hacks:          make(map[string]domain.HackProfile, 8),
 	}
 
 	if err := c.loadFromFS(manifests.EmbeddedFS, "."); err != nil {
@@ -212,6 +216,29 @@ func (c *Catalog) mergeYAML(source string, data []byte) error {
 			prof.Hacks = []string{}
 		}
 		c.profiles[prof.Name] = prof
+	}
+
+	for _, arc := range doc.Archives {
+		if strings.TrimSpace(arc.ID) == "" {
+			continue
+		}
+		if arc.CleanupPaths == nil {
+			arc.CleanupPaths = []string{}
+		}
+		c.archives[arc.ID] = arc
+	}
+
+	for _, hk := range doc.Hacks {
+		if strings.TrimSpace(hk.ID) == "" {
+			continue
+		}
+		if hk.BackupPaths == nil {
+			hk.BackupPaths = []string{}
+		}
+		if hk.Steps == nil {
+			hk.Steps = []domain.HackStep{}
+		}
+		c.hacks[hk.ID] = hk
 	}
 
 	return nil
@@ -419,4 +446,56 @@ func (c *Catalog) resolveProfileChainLocked(name string) ([]domain.Profile, erro
 
 	slices.Reverse(reversed)
 	return reversed, nil
+}
+
+// GetArchive returns a retired or decommissioned component archive record by ID.
+func (c *Catalog) GetArchive(id string) (ArchiveRecord, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	arc, ok := c.archives[id]
+	return arc, ok
+}
+
+// ListArchives returns all archive records sorted deterministically by ID.
+func (c *Catalog) ListArchives() []ArchiveRecord {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.archives))
+	for k := range c.archives {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	result := make([]ArchiveRecord, 0, len(keys))
+	for _, k := range keys {
+		result = append(result, c.archives[k])
+	}
+	return result
+}
+
+// GetHack returns a declarative HackProfile by ID.
+func (c *Catalog) GetHack(id string) (domain.HackProfile, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	hk, ok := c.hacks[id]
+	return hk, ok
+}
+
+// ListHacks returns all declarative hack profiles sorted deterministically by ID.
+func (c *Catalog) ListHacks() []domain.HackProfile {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.hacks))
+	for k := range c.hacks {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	result := make([]domain.HackProfile, 0, len(keys))
+	for _, k := range keys {
+		result = append(result, c.hacks[k])
+	}
+	return result
 }

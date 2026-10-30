@@ -53,6 +53,70 @@ if [[ ":${PATH}:" != *":${DEST_BIN}:"* ]]; then
 fi
 
 # ------------------------------------------------------------------------------
+# Pre-Compiled GitHub Release Binary
+# ------------------------------------------------------------------------------
+detect_os_arch() {
+	local os arch
+	os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch="$(uname -m)"
+	case "${arch}" in
+		x86_64|amd64) arch="amd64" ;;
+		aarch64|arm64) arch="arm64" ;;
+		*) arch="amd64" ;;
+	esac
+	echo "${os}_${arch}"
+}
+
+try_download_release_binary() {
+	if [[ "${ANX_FORCE_SOURCE:-0}" -eq 1 ]]; then
+		log_info "ANX_FORCE_SOURCE=1: Skipping release download, building from source."
+		return 1
+	fi
+
+	local os_arch
+	os_arch="$(detect_os_arch)"
+	local release_url="${ANX_RELEASE_URL:-https://github.com/arturonavax/env/releases/latest/download/anx_${os_arch}.tar.gz}"
+
+	log_step "Checking for pre-compiled ANX release binary (${os_arch})..."
+	if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+		return 1
+	fi
+
+	local tmp_dir
+	tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t anx-release)"
+	local tarball="${tmp_dir}/anx.tar.gz"
+
+	local dl_ok=0
+	if command -v curl >/dev/null 2>&1; then
+		if curl -fsSL --connect-timeout 4 --max-time 30 -o "${tarball}" "${release_url}" 2>/dev/null; then
+			dl_ok=1
+		fi
+	elif command -v wget >/dev/null 2>&1; then
+		if wget -q -T 30 -O "${tarball}" "${release_url}" 2>/dev/null; then
+			dl_ok=1
+		fi
+	fi
+
+	if [[ "${dl_ok}" -eq 1 && -s "${tarball}" ]]; then
+		log_info "Extracting release binary to ${DEST_BIN}..."
+		if tar -xzf "${tarball}" -C "${DEST_BIN}" 2>/dev/null; then
+			chmod +x "${DEST_BIN}/anx"
+			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+			if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
+				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
+			fi
+			rm -rf "${tmp_dir}"
+			log_success "ANX release binary successfully deployed to ${DEST_BIN}/anx"
+			return 0
+		fi
+	fi
+
+	rm -rf "${tmp_dir}"
+	log_info "Pre-compiled release not available or download skipped. Proceeding to source build."
+	return 1
+}
+
+# ------------------------------------------------------------------------------
 # Version Validation
 # ------------------------------------------------------------------------------
 check_go_version() {
@@ -197,6 +261,11 @@ build_anx() {
 	# Multicall compatibility symlink
 	ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
 	log_success "ANX binary built and deployed to ${DEST_BIN}/anx (multicall symlink: ${DEST_BIN}/aitools)"
+
+	if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
+		ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
+		log_success "Created custom binary alias: ${DEST_BIN}/${BIN_NAME} -> anx"
+	fi
 }
 
 # ------------------------------------------------------------------------------
@@ -207,14 +276,59 @@ main() {
 	echo -e "${BOLD_WHITE}  ANX Platform Bootstrap & Environment Pre-Flight${RESET}"
 	echo -e "${BOLD_WHITE}==============================================================================${RESET}"
 
+	BIN_NAME="${ANX_BIN_NAME:-}"
+	local forward_args=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--bin-name|-n|--name)
+				BIN_NAME="$2"
+				shift 2
+				;;
+			--bin-name=*)
+				BIN_NAME="${1#*=}"
+				shift
+				;;
+			--from-source|--force-source)
+				ANX_FORCE_SOURCE=1
+				shift
+				;;
+			*)
+				forward_args+=("$1")
+				shift
+				;;
+		esac
+	done
+
+	# Tier 0: Attempt pre-compiled GitHub release download if not forcing source build
+	if try_download_release_binary; then
+		if [[ -x "${DEST_BIN}/anx" ]]; then
+			if [[ ${#forward_args[@]} -gt 0 ]]; then
+				log_info "Delegating execution to: ${DEST_BIN}/anx ${forward_args[*]}"
+				exec "${DEST_BIN}/anx" "${forward_args[@]}"
+			else
+				local alias_hint=""
+				if [[ -n "${BIN_NAME}" && "${BIN_NAME}" != "anx" ]]; then
+					alias_hint=" (or '${BIN_NAME}')"
+				fi
+				log_success "Bootstrap complete! You can now run 'anx'${alias_hint} or 'anx wizard'."
+				return 0
+			fi
+		fi
+	fi
+
 	ensure_go_runtime
 	build_anx
 
-	if [[ $# -gt 0 ]]; then
-		log_info "Delegating execution to: ${DEST_BIN}/anx $*"
-		exec "${DEST_BIN}/anx" "$@"
+	if [[ ${#forward_args[@]} -gt 0 ]]; then
+		log_info "Delegating execution to: ${DEST_BIN}/anx ${forward_args[*]}"
+		exec "${DEST_BIN}/anx" "${forward_args[@]}"
 	else
-		log_success "Bootstrap complete! You can now run 'anx' or 'anx wizard'."
+		local alias_hint=""
+		if [[ -n "${BIN_NAME}" && "${BIN_NAME}" != "anx" ]]; then
+			alias_hint=" (or '${BIN_NAME}')"
+		fi
+		log_success "Bootstrap complete! You can now run 'anx'${alias_hint} or 'anx wizard'."
 	fi
 }
 

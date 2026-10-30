@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	embeddedhacks "github.com/arturonavax/env/hacks"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/snapshot"
 	"github.com/arturonavax/env/internal/state"
+	"github.com/arturonavax/env/manifests"
 )
 
 // ErrHackGuardrailViolation indicates a hack script violated static security guardrails.
@@ -282,25 +282,43 @@ func prepareAndValidateStep(
 
 func resolveHackScript(profile domain.HackProfile, relScript string) (string, string, string, error) {
 	if profile.Dir != "" {
-		safePath, err := security.SafePath(profile.Dir, relScript)
-		if err != nil {
-			return "", "", "", err
+		candidates := []string{
+			relScript,
+			strings.TrimPrefix(relScript, "manifests/hacks/"),
+			strings.TrimPrefix(relScript, "hacks/"),
 		}
-		raw, err := os.ReadFile(safePath)
-		if err != nil {
-			return "", "", "", err
+		for _, cand := range candidates {
+			safePath, err := security.SafePath(profile.Dir, cand)
+			if err == nil {
+				if raw, err := os.ReadFile(safePath); err == nil {
+					return safePath, string(raw), "", nil
+				}
+			}
 		}
-		return safePath, string(raw), "", nil
 	}
 
 	cleanRel := path.Clean(strings.TrimLeft(filepath.ToSlash(relScript), "/"))
 	if strings.HasPrefix(cleanRel, "..") {
 		return "", "", "", security.ErrPathTraversal
 	}
-	embedPath := path.Join(profile.ID, cleanRel)
-	raw, err := fs.ReadFile(embeddedhacks.EmbeddedFS, embedPath)
-	if err != nil {
-		return "", "", "", fmt.Errorf("reading embedded hack script %q: %w", embedPath, err)
+
+	embedCandidates := []string{
+		path.Join("hacks", profile.ID, path.Base(cleanRel)),
+		path.Join("hacks", cleanRel),
+		path.Join("manifests", "hacks", cleanRel),
+		cleanRel,
+		path.Join("hacks", profile.ID, cleanRel),
+	}
+	var raw []byte
+	var readErr error
+	for _, cand := range embedCandidates {
+		raw, readErr = fs.ReadFile(manifests.EmbeddedFS, cand)
+		if readErr == nil {
+			break
+		}
+	}
+	if readErr != nil {
+		return "", "", "", fmt.Errorf("reading embedded hack script %q: %w", cleanRel, readErr)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "anx-hack-*")

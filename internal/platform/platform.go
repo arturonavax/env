@@ -26,6 +26,11 @@ type Info struct {
 	stateDir        string
 	cacheDir        string
 	localBinDir     string
+	toolsBinDir     string
+	desktopEnv      string
+	displayServer   string
+	currentShell    string
+	currentTerminal string
 }
 
 // TestInfoParams specifies overrides for deterministic unit testing of platform-dependent services.
@@ -44,6 +49,11 @@ type TestInfoParams struct {
 	StateDir        string
 	CacheDir        string
 	LocalBinDir     string
+	ToolsBinDir     string
+	DesktopEnv      string
+	DisplayServer   string
+	CurrentShell    string
+	CurrentTerminal string
 }
 
 // NewTestInfo builds an isolated Info without probing host filesystems.
@@ -97,6 +107,11 @@ func NewTestInfo(p TestInfoParams) *Info {
 		stateDir:        stateDir,
 		cacheDir:        cacheDir,
 		localBinDir:     binDir,
+		toolsBinDir:     p.ToolsBinDir,
+		desktopEnv:      p.DesktopEnv,
+		displayServer:   p.DisplayServer,
+		currentShell:    p.CurrentShell,
+		currentTerminal: p.CurrentTerminal,
 	}
 }
 
@@ -111,15 +126,20 @@ func (p *Info) PrimaryPackageManager() string {
 	}
 	return p.packageManagers[0]
 }
-func (p *Info) IsWSL() bool         { return p.isWSL }
-func (p *Info) IsTermux() bool      { return p.isTermux }
-func (p *Info) IsRoot() bool        { return p.isRoot }
-func (p *Info) HasSudo() bool       { return p.hasSudo }
-func (p *Info) HomeDir() string     { return p.homeDir }
-func (p *Info) ConfigDir() string   { return p.configDir }
-func (p *Info) StateDir() string    { return p.stateDir }
-func (p *Info) CacheDir() string    { return p.cacheDir }
-func (p *Info) LocalBinDir() string { return p.localBinDir }
+func (p *Info) IsWSL() bool             { return p.isWSL }
+func (p *Info) IsTermux() bool          { return p.isTermux }
+func (p *Info) IsRoot() bool            { return p.isRoot }
+func (p *Info) HasSudo() bool           { return p.hasSudo }
+func (p *Info) HomeDir() string         { return p.homeDir }
+func (p *Info) ConfigDir() string       { return p.configDir }
+func (p *Info) StateDir() string        { return p.stateDir }
+func (p *Info) CacheDir() string        { return p.cacheDir }
+func (p *Info) LocalBinDir() string     { return p.localBinDir }
+func (p *Info) ToolsBinDir() string     { return p.toolsBinDir }
+func (p *Info) DesktopEnv() string      { return p.desktopEnv }
+func (p *Info) DisplayServer() string   { return p.displayServer }
+func (p *Info) CurrentShell() string    { return p.currentShell }
+func (p *Info) CurrentTerminal() string { return p.currentTerminal }
 
 // ExpandPath expands leading "~/" or "$HOME/" against Info.HomeDir().
 func (p *Info) ExpandPath(raw string) string {
@@ -215,7 +235,126 @@ func Detect() *Info {
 		info.localBinDir = filepath.Join(home, ".local", "bin")
 	}
 
+	customToolsBin := os.Getenv("ANX_TOOLS_BIN")
+	if customToolsBin != "" {
+		info.toolsBinDir = customToolsBin
+	} else if goos == "windows" {
+		info.toolsBinDir = filepath.Join(info.stateDir, "tools", "bin")
+	} else {
+		xdgData := os.Getenv("XDG_DATA_HOME")
+		if xdgData == "" || info.isTermux {
+			xdgData = filepath.Join(home, ".local", "share")
+		}
+		info.toolsBinDir = filepath.Join(xdgData, "anx", "bin")
+	}
+
+	info.desktopEnv = detectDesktopEnv(goos)
+	info.displayServer = detectDisplayServer(goos)
+	info.currentShell = detectShell(goos)
+	info.currentTerminal = detectTerminal()
+
 	return info
+}
+
+func detectDesktopEnv(goos string) string {
+	if goos == "darwin" {
+		return "macos"
+	}
+	if goos == "windows" {
+		return "windows"
+	}
+	raw := strings.ToLower(os.Getenv("XDG_CURRENT_DESKTOP"))
+	if raw == "" {
+		raw = strings.ToLower(os.Getenv("DESKTOP_SESSION"))
+	}
+	switch {
+	case strings.Contains(raw, "gnome") || strings.Contains(raw, "unity"):
+		return "gnome"
+	case strings.Contains(raw, "xfce"):
+		return "xfce"
+	case strings.Contains(raw, "hyprland"):
+		return "hyprland"
+	case strings.Contains(raw, "sway"):
+		return "sway"
+	case strings.Contains(raw, "kde") || strings.Contains(raw, "plasma"):
+		return "kde"
+	case raw != "":
+		return raw
+	default:
+		return "headless"
+	}
+}
+
+func detectDisplayServer(goos string) string {
+	if goos == "darwin" {
+		return "quartz"
+	}
+	if goos == "windows" {
+		return "win32"
+	}
+	sess := strings.ToLower(os.Getenv("XDG_SESSION_TYPE"))
+	if sess == "wayland" || os.Getenv("WAYLAND_DISPLAY") != "" {
+		return "wayland"
+	}
+	if sess == "x11" || os.Getenv("DISPLAY") != "" {
+		return "x11"
+	}
+	return "headless"
+}
+
+func detectShell(goos string) string {
+	raw := os.Getenv("SHELL")
+	if raw != "" {
+		base := strings.ToLower(filepath.Base(raw))
+		for _, s := range []string{"zsh", "bash", "fish", "nu"} {
+			if strings.Contains(base, s) {
+				return s
+			}
+		}
+	}
+	if goos == "windows" {
+		return "powershell"
+	}
+	return "zsh"
+}
+
+func detectTerminal() string {
+	if os.Getenv("WT_SESSION") != "" {
+		return "windows-terminal"
+	}
+	if os.Getenv("GHOSTTY_RESOURCES_DIR") != "" {
+		return "ghostty"
+	}
+	if os.Getenv("KITTY_WINDOW_ID") != "" {
+		return "kitty"
+	}
+	if os.Getenv("WEZTERM_PANE") != "" {
+		return "wezterm"
+	}
+	if os.Getenv("ALACRITTY_LOG") != "" || os.Getenv("ALACRITTY_WINDOW_ID") != "" {
+		return "alacritty"
+	}
+	if os.Getenv("WARP_IS_LOCAL_SHELL_SESSION") != "" {
+		return "warp"
+	}
+
+	tp := strings.ToLower(os.Getenv("TERM_PROGRAM"))
+	switch {
+	case strings.Contains(tp, "ghostty"):
+		return "ghostty"
+	case strings.Contains(tp, "kitty"):
+		return "kitty"
+	case strings.Contains(tp, "wezterm"):
+		return "wezterm"
+	case strings.Contains(tp, "alacritty"):
+		return "alacritty"
+	case strings.Contains(tp, "warp"):
+		return "warp"
+	case strings.Contains(tp, "windowsterminal"):
+		return "windows-terminal"
+	default:
+		return "unknown"
+	}
 }
 
 func inferDistroFamily(goos, distro string, isTermux bool) string {
@@ -259,12 +398,18 @@ func detectPackageManagers(goos string, isTermux bool) []string {
 
 	found := make([]string, 0, len(candidates))
 	for _, bin := range candidates {
+		canonical := bin
+		if bin == "apt-get" {
+			canonical = "apt"
+		}
 		if _, err := exec.LookPath(bin); err == nil {
-			canonical := bin
-			if bin == "apt-get" {
-				canonical = "apt"
-			}
 			found = append(found, canonical)
+		} else if bin == "apk" {
+			if _, sErr := os.Stat("/sbin/apk"); sErr == nil {
+				found = append(found, "apk")
+			} else if _, sErr := os.Stat("/usr/sbin/apk"); sErr == nil {
+				found = append(found, "apk")
+			}
 		}
 	}
 	return found

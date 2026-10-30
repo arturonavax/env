@@ -11,7 +11,7 @@ set -euo pipefail
 
 if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
 	SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-	CANONICAL_HACK="${SCRIPT_DIR}/../../hacks/x11-scroll-lock-led/activate_scroll_lock.sh"
+	CANONICAL_HACK="${SCRIPT_DIR}/../../manifests/hacks/x11-scroll-lock-led/activate_scroll_lock.sh"
 	if [[ -f "${CANONICAL_HACK}" ]]; then
 		exec bash "${CANONICAL_HACK}" "$@"
 	fi

@@ -66,7 +66,7 @@ func newConfigCmd(rt *runtimeEnv) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Launch interactive configuration wizard")
+	cmd.Flags().BoolVar(&interactive, "interactive", false, "Launch interactive configuration wizard")
 	cmd.Flags().BoolVarP(&forceInit, "force", "f", false, "Overwrite existing configuration file on 'config init'")
 	return cmd
 }

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	embeddedhacks "github.com/arturonavax/env/hacks"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/manifests"
 	"gopkg.in/yaml.v3"
 )
 
@@ -69,8 +69,13 @@ func LoadRegistry(opts ...RegistryOption) (*Registry, error) {
 	}
 
 	if !cfg.skipEmbedded {
-		if err := reg.loadFromFS(embeddedhacks.EmbeddedFS, "."); err != nil {
-			return nil, fmt.Errorf("loading embedded hack profiles: %w", err)
+		if sub, err := fs.Sub(manifests.EmbeddedFS, "hacks"); err == nil {
+			if err := reg.loadFromFS(sub, "."); err != nil {
+				return nil, fmt.Errorf("loading embedded hack profiles: %w", err)
+			}
+		}
+		if data, err := fs.ReadFile(manifests.EmbeddedFS, "hacks.yaml"); err == nil {
+			_ = reg.parseAndUpsert("embedded:manifests/hacks.yaml", "", data)
 		}
 	}
 

@@ -5,6 +5,7 @@
 
 [CmdletBinding()]
 param(
+    [string]$BinName = $env:ANX_BIN_NAME,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ForwardArgs
 )
@@ -163,6 +164,12 @@ try {
     & go build -ldflags "-s -w -X main.Version=$ver -X main.Commit=$commit -X main.Date=$date" -o $anxExe .\cmd\anx
     Copy-Item $anxExe $aitoolsExe -Force
     Write-Success "Built $anxExe and $aitoolsExe"
+
+    if ($BinName -and $BinName -ne "anx") {
+        $customExe = Join-Path $DestDir "$BinName.exe"
+        Copy-Item $anxExe $customExe -Force
+        Write-Success "Created custom binary alias: $customExe -> $anxExe"
+    }
 } finally {
     Pop-Location
 }
@@ -177,5 +184,9 @@ if ($userPath -notlike "*$DestDir*") {
 if ($ForwardArgs.Count -gt 0) {
     & (Join-Path $DestDir "anx.exe") @ForwardArgs
 } else {
-    Write-Success "Bootstrap complete! You can now run 'anx' or 'anx wizard'."
+    $aliasHint = ""
+    if ($BinName -and $BinName -ne "anx") {
+        $aliasHint = " (or '$BinName')"
+    }
+    Write-Success "Bootstrap complete! You can now run 'anx'$aliasHint or 'anx wizard'."
 }

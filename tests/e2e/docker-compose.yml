@@ -1,0 +1,53 @@
+services:
+  mock-server:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/Dockerfile.debian
+      target: runtime
+    command: ["mock-server"]
+    environment:
+      - PORT=8080
+      - REPO_DIR=/repo
+      - STATIC_DIR=/tmp/mock-releases
+    networks:
+      - e2e-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 1s
+      timeout: 2s
+      retries: 15
+      start_period: 2s
+
+  test-debian:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/Dockerfile.debian
+      target: runtime
+    depends_on:
+      mock-server:
+        condition: service_healthy
+    environment:
+      - MOCK_SERVER_URL=http://mock-server:8080
+      - REPO_ROOT=/repo
+    networks:
+      - e2e-net
+    command: ["/repo/tests/e2e/scripts/run_all.sh"]
+
+  test-alpine:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/Dockerfile.alpine
+      target: runtime
+    depends_on:
+      mock-server:
+        condition: service_healthy
+    environment:
+      - MOCK_SERVER_URL=http://mock-server:8080
+      - REPO_ROOT=/repo
+    networks:
+      - e2e-net
+    command: ["/repo/tests/e2e/scripts/run_all.sh"]
+
+networks:
+  e2e-net:
+    driver: bridge
