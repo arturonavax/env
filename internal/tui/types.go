@@ -7,9 +7,7 @@ import (
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
-	"github.com/arturonavax/env/internal/journal"
 	"github.com/arturonavax/env/internal/platform"
-	"github.com/arturonavax/env/internal/providers"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -43,12 +41,10 @@ var TabNames = []string{
 type Deps struct {
 	Platform *platform.Info
 	Catalog  *catalog.Registry
-	Provider providers.Provider
-	Sync     *app.SyncService
+	Query    app.QueryService
 	Doctor   *app.DoctorService
 	Audit    *app.AuditService
 	Hacks    *app.HacksService
-	Journal  *journal.FileJournal
 	Theme    *theme.Palette
 	Styles   *theme.Styles
 }

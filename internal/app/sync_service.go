@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/configsync"
@@ -187,6 +188,11 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 			diffs = append(diffs, d)
 			continue
 		}
+		if semEq, err := configsync.IsSemanticEqual(target, string(local), string(incoming)); err == nil && semEq {
+			d.Summary = "semantically up to date"
+			diffs = append(diffs, d)
+			continue
+		}
 		d.State = "drift"
 		d.Unified = configsync.UnifiedDiff(target, cfg.Source, string(local), string(incoming), 3)
 		if base, ok := s.getBase(cfg.ID); ok {
@@ -337,12 +343,14 @@ func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOpti
 		r, syncErr = s.syncFile(cfg, source, target, opts, res)
 	}
 
-	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated") {
+	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated" || r.Action == "merged") {
 		if err := s.runPostSync(cfg); err != nil {
+			r.Action = "partial"
 			if r.Detail != "" {
 				r.Detail += "; "
 			}
 			r.Detail += fmt.Sprintf("post-sync error: %v", err)
+			syncErr = fmt.Errorf("post-sync failed for config %q: %w", cfg.ID, err)
 		}
 	}
 	return r, syncErr
@@ -350,22 +358,34 @@ func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOpti
 
 func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) error {
 	var errs []error
-	for _, cmdArgs := range cfg.PostSyncCmds {
-		if len(cmdArgs) > 0 {
-			if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Run(); err != nil {
-				errs = append(errs, fmt.Errorf("post-sync cmd %v: %w", cmdArgs, err))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	runCmd := func(cmdArgs []string, prefix string) {
+		if len(cmdArgs) == 0 {
+			return
+		}
+		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			errOutput := strings.TrimSpace(stderr.String())
+			if errOutput != "" {
+				errs = append(errs, fmt.Errorf("%scmd %v failed: %w (stderr: %s)", prefix, cmdArgs, err, errOutput))
+			} else {
+				errs = append(errs, fmt.Errorf("%scmd %v failed: %w", prefix, cmdArgs, err))
 			}
 		}
+	}
+
+	for _, cmdArgs := range cfg.PostSyncCmds {
+		runCmd(cmdArgs, "post-sync ")
 	}
 	if s.platform != nil && len(cfg.PostSyncByDesktop) > 0 {
 		de := s.platform.DesktopEnv()
 		if deCmds, ok := cfg.PostSyncByDesktop[de]; ok {
 			for _, cmdArgs := range deCmds {
-				if len(cmdArgs) > 0 {
-					if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Run(); err != nil {
-						errs = append(errs, fmt.Errorf("post-sync desktop cmd %v: %w", cmdArgs, err))
-					}
-				}
+				runCmd(cmdArgs, fmt.Sprintf("post-sync desktop (%s) ", de))
 			}
 		}
 	}

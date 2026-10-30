@@ -64,9 +64,13 @@ func runDashboard(cmd *cobra.Command, appCtx *AppContext) error {
 	}
 	pal := theme.ByName(appCtx.Flags.Theme)
 	p := tea.NewProgram(tui.NewModel(tui.Deps{
-		Platform: appCtx.Platform, Catalog: appCtx.Catalog, Provider: appCtx.Provider,
-		Sync: appCtx.SyncSvc, Doctor: appCtx.DoctorSvc, Audit: appCtx.AuditSvc, Hacks: appCtx.HacksSvc,
-		Journal: appCtx.Journal, Theme: &pal,
+		Platform: appCtx.Platform,
+		Catalog:  appCtx.Catalog,
+		Query:    appCtx.ControlPlane,
+		Doctor:   appCtx.DoctorSvc,
+		Audit:    appCtx.AuditSvc,
+		Hacks:    appCtx.HacksSvc,
+		Theme:    &pal,
 	}), tea.WithContext(cmd.Context()))
 	_, err := p.Run()
 	return err
@@ -151,15 +155,18 @@ func runStatus(cmd *cobra.Command, appCtx *AppContext) error {
 
 func newExplainCmd(appCtx *AppContext) *cobra.Command {
 	return &cobra.Command{
-		Use:   "explain <resource-id>",
-		Short: "Explain origin, winning policy, conditions, and provenance of a resource",
-		Long: `Inspect and explain why a package, dotfile configuration, personal tool, or hardware hack
+		Use:   "explain [kind] <resource-id>",
+		Short: "Explain origin, winning policy, conditions, and provenance of a resource or capability",
+		Long: `Inspect and explain why a package, dotfile configuration, personal tool, hardware hack, or capability
 was selected, including its origin manifest, active profile, dependencies, and winning policy.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			st := styles(appCtx)
 			rawID := args[0]
+			if len(args) == 2 {
+				rawID = args[1]
+			}
 
 			if appCtx.ControlPlane == nil {
 				return errors.New("control plane service not available")
@@ -355,12 +362,46 @@ to execute anx transparently under their preferred alias.`,
 			}
 			aliasPath := filepath.Join(destDir, name)
 
-			if err := os.Remove(aliasPath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to remove existing alias %s: %w", aliasPath, err)
+			// Safely inspect destination using Lstat without following symlinks
+			if fi, err := os.Lstat(aliasPath); err == nil {
+				// Destination exists. Check if it's already a symlink pointing to our executable.
+				if fi.Mode()&os.ModeSymlink != 0 {
+					target, rErr := os.Readlink(aliasPath)
+					if rErr == nil {
+						absTarget := target
+						if !filepath.IsAbs(absTarget) {
+							absTarget = filepath.Join(destDir, target)
+						}
+						absTarget, _ = filepath.EvalSymlinks(absTarget)
+						if absTarget == execPath {
+							st := styles(appCtx)
+							fmt.Fprintf(cmd.OutOrStdout(), "%s Alias %s already exists and points to %s (idempotent).\n", st.Success.Render("✓"), aliasPath, execPath)
+							return nil
+						}
+					}
+					// Existing symlink points elsewhere: remove only if verified as a symlink
+					if err := os.Remove(aliasPath); err != nil {
+						return fmt.Errorf("failed to replace existing alias symlink %s: %w", aliasPath, err)
+					}
+				} else {
+					// Not a symlink: refuse to delete non-symlink arbitrary files!
+					return domain.NewExitError(domain.ExitConflictOrAudit, fmt.Errorf("refusing to overwrite existing file %s: destination is not an anx symlink", aliasPath))
+				}
 			}
 
+			// Create symlink with Windows fallback
 			if err := os.Symlink(execPath, aliasPath); err != nil {
-				return fmt.Errorf("failed to create symlink %s -> %s: %w", aliasPath, execPath, err)
+				if runtime.GOOS == "windows" {
+					// Windows fallback: create .cmd wrapper script
+					cmdScript := filepath.Join(destDir, name+".cmd")
+					scriptContent := fmt.Sprintf("@echo off\r\n\"%s\" %%*\r\n", execPath)
+					if wErr := os.WriteFile(cmdScript, []byte(scriptContent), 0o755); wErr != nil {
+						return fmt.Errorf("failed to create Windows alias script %s: %w (symlink error: %v)", cmdScript, wErr, err)
+					}
+					aliasPath = cmdScript
+				} else {
+					return fmt.Errorf("failed to create symlink %s -> %s: %w", aliasPath, execPath, err)
+				}
 			}
 
 			st := styles(appCtx)

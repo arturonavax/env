@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/domain"
 )
 
 // UpdateCheckSummary holds the status of updates across repo, tools, and configs.
@@ -159,14 +160,25 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 			st := styles(appCtx)
 			repo := appCtx.RepoRoot
 
-			fmt.Fprintln(out, st.Header.Render("Starting ANX Environment Upgrade..."))
+			isDryRun := appCtx.Flags.DryRun
+			var stepErrors []error
+
+			if isDryRun {
+				fmt.Fprintln(out, st.Highlight.Render("Previewing ANX Environment Upgrade (Dry-Run Mode)..."))
+			} else {
+				fmt.Fprintln(out, st.Header.Render("Starting ANX Environment Upgrade..."))
+			}
 
 			// Step 1: Git Pull (if in git and clean)
 			if !skipPull && isGitRepo(repo) && !appCtx.Flags.Offline {
-				if isGitClean(ctx, repo) {
+				if isDryRun {
+					fmt.Fprintf(out, "  [1/4] %s Dry-run: would fast-forward pull repository (%s)\n", st.Highlight.Render("ℹ"), repo)
+				} else if isGitClean(ctx, repo) {
 					fmt.Fprintf(out, "  [1/4] Pulling latest repository changes (%s)...\n", repo)
 					pullCmd := exec.CommandContext(ctx, "git", "-C", repo, "pull", "--ff-only")
 					if pOut, err := pullCmd.CombinedOutput(); err != nil {
+						errMsg := fmt.Errorf("git pull: %s", strings.TrimSpace(string(pOut)))
+						stepErrors = append(stepErrors, errMsg)
 						fmt.Fprintf(out, "    %s git pull warning: %s\n", st.Warning.Render("!"), strings.TrimSpace(string(pOut)))
 					} else {
 						fmt.Fprintf(out, "    %s Repository updated: %s\n", st.Success.Render("✓"), strings.TrimSpace(string(pOut)))
@@ -180,17 +192,27 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 
 			// Step 2: Personal Tools Upgrade
 			if !skipTools && appCtx.ToolsSvc != nil && appCtx.ToolsSvc.Registry() != nil {
-				fmt.Fprintln(out, "  [2/4] Updating decoupled personal tools...")
-				for _, t := range appCtx.ToolsSvc.Registry().List() {
-					r, err := appCtx.ToolsSvc.Update(ctx, t.ID)
-					if err != nil {
-						fmt.Fprintf(out, "    • %-16s [%s] %v\n", t.ID, st.Error.Render("failed"), err)
-					} else {
-						status := st.Success.Render(r.Status)
-						if r.Status == "error" || r.Status == "failed" {
-							status = st.Error.Render(r.Status)
+				if isDryRun {
+					fmt.Fprintln(out, "  [2/4] Dry-run: previewing personal tools update...")
+					for _, t := range appCtx.ToolsSvc.Registry().List() {
+						tStat, _ := appCtx.ToolsSvc.Get(ctx, t.ID)
+						fmt.Fprintf(out, "    • %-16s [%s] current target: %s\n", t.ID, st.Highlight.Render("dry-run"), tStat.ActiveTarget)
+					}
+				} else {
+					fmt.Fprintln(out, "  [2/4] Updating decoupled personal tools...")
+					for _, t := range appCtx.ToolsSvc.Registry().List() {
+						r, err := appCtx.ToolsSvc.Update(ctx, t.ID)
+						if err != nil {
+							stepErrors = append(stepErrors, fmt.Errorf("tool %s update: %w", t.ID, err))
+							fmt.Fprintf(out, "    • %-16s [%s] %v\n", t.ID, st.Error.Render("failed"), err)
+						} else {
+							status := st.Success.Render(r.Status)
+							if r.Status == "error" || r.Status == "failed" {
+								stepErrors = append(stepErrors, fmt.Errorf("tool %s update reported: %s", r.ToolID, r.Message))
+								status = st.Error.Render(r.Status)
+							}
+							fmt.Fprintf(out, "    • %-16s [%s] %s\n", r.ToolID, status, r.Message)
 						}
-						fmt.Fprintf(out, "    • %-16s [%s] %s\n", r.ToolID, status, r.Message)
 					}
 				}
 			} else {
@@ -256,6 +278,19 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 				fmt.Fprintf(out, "    %s Dotfiles synchronized successfully.\n", st.Success.Render("✓"))
 			} else {
 				fmt.Fprintln(out, "  [4/4] Skipping dotfiles synchronization.")
+			}
+
+			if len(stepErrors) > 0 {
+				fmt.Fprintln(out, st.Warning.Render(fmt.Sprintf("\n⚠ ANX Upgrade Finished with %d partial error(s):", len(stepErrors))))
+				for _, err := range stepErrors {
+					fmt.Fprintf(out, "  • %v\n", err)
+				}
+				return domain.NewExitError(domain.ExitRollbackOrPartial, fmt.Errorf("upgrade completed with %d errors", len(stepErrors)))
+			}
+
+			if isDryRun {
+				fmt.Fprintln(out, st.Highlight.Render("\n✓ Dry-Run Upgrade Preview Completed (No changes applied)."))
+				return nil
 			}
 
 			fmt.Fprintln(out, st.Success.Render("\n✓ ANX Environment Upgrade Completed Successfully!"))

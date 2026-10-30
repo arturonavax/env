@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -294,8 +296,8 @@ func TestCLIUpgradeDryRun(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
 	}
 	out := outBuf.String()
-	if !strings.Contains(out, "ANX Environment Upgrade") {
-		t.Fatalf("expected upgrade header, got: %s", out)
+	if !strings.Contains(out, "Dry-Run Mode") && !strings.Contains(out, "Dry-Run Upgrade Preview") {
+		t.Fatalf("expected upgrade dry-run header, got: %s", out)
 	}
 }
 
@@ -394,5 +396,88 @@ func TestCLIExplain(t *testing.T) {
 	}
 	if prov["resource_id"] != "ripgrep" || prov["kind"] != "package" {
 		t.Fatalf("unexpected json fields: %v", prov)
+	}
+}
+
+func TestLazyBootstrapNoStateDirectoryCreated(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"version"}, &outBuf, &errBuf, "1.0.0-test", "abcdef", "2026-10-29")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+
+	stateDir := tempHome + "/.local/state/anx"
+	if _, err := os.Stat(stateDir); err == nil {
+		t.Fatalf("expected lazy command 'version' NOT to create state directory %s", stateDir)
+	}
+}
+
+func TestCLICapabilities(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. anx ls <tempdir>
+	var lsOut, lsErr bytes.Buffer
+	code := cli.ExecuteCLI([]string{"ls", tempDir}, &lsOut, &lsErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for anx ls, got %d (err: %s)", code, lsErr.String())
+	}
+
+	// 2. anx what ls
+	var whatOut, whatErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"what", "ls"}, &whatOut, &whatErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for anx what, got %d (err: %s)", code, whatErr.String())
+	}
+	if !strings.Contains(whatOut.String(), "Capability Resolution: files.list") {
+		t.Fatalf("expected capability resolution header, got: %s", whatOut.String())
+	}
+
+	// 3. anx explain capability files.list
+	var expOut, expErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"explain", "capability", "files.list"}, &expOut, &expErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for explain capability, got %d (err: %s)", code, expErr.String())
+	}
+	if !strings.Contains(expOut.String(), "Kind:           capability") {
+		t.Fatalf("expected kind capability, got: %s", expOut.String())
+	}
+}
+
+func TestCLISelfUpdate(t *testing.T) {
+	// 1. Check mode
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"self", "update", "--check"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for self update --check, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "Current ANX version: 1.0.0-test") {
+		t.Fatalf("expected current version output, got: %s", outBuf.String())
+	}
+
+	// 2. Offline rejection
+	var offOut, offErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"self", "update", "--offline"}, &offOut, &offErr, "1.0.0-test", "", "")
+	if code == 0 {
+		t.Fatalf("expected non-zero exit code when offline, got 0")
+	}
+	if !strings.Contains(offErr.String(), "offline mode is active") {
+		t.Fatalf("expected offline error message, got: %s", offErr.String())
+	}
+
+	// 3. VerifyBinaryChecksum
+	tempFile := filepath.Join(t.TempDir(), "dummy-bin")
+	if err := os.WriteFile(tempFile, []byte("binary payload content"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Correct checksum:
+	expected := "ee055d9c16c607501c23e7946730120a285e14d0ad91bc79ce62b6d376911146"
+	if err := cli.VerifyBinaryChecksum(tempFile, expected); err != nil {
+		t.Fatalf("expected valid checksum check, got: %v", err)
+	}
+	if err := cli.VerifyBinaryChecksum(tempFile, "bad-checksum"); err == nil {
+		t.Fatalf("expected checksum failure for bad hash, got nil")
 	}
 }

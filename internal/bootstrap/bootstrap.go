@@ -83,6 +83,33 @@ func WithOffline(offline bool) Option {
 	}
 }
 
+// NewLazyContainer constructs a lightweight Container without touching the filesystem,
+// opening state databases, initializing journals, or creating snapshot directories.
+// This is used for commands like version, completion, and help queries.
+func NewLazyContainer(opts ...Option) (*Container, error) {
+	cfg := Config{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	plat := platform.Detect()
+	v := viper.New()
+	v.SetEnvPrefix("ANX")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.AutomaticEnv()
+
+	cat := catalog.NewDefaultRegistry()
+
+	return &Container{
+		Platform: plat,
+		Catalog:  cat,
+		Viper:    v,
+		Version:  cfg.Version,
+		Commit:   cfg.Commit,
+		Date:     cfg.Date,
+	}, nil
+}
+
 // NewContainer initializes and wires the production dependency graph.
 func NewContainer(opts ...Option) (*Container, error) {
 	cfg := Config{}

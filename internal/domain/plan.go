@@ -61,6 +61,8 @@ type PlanStep struct {
 	Strategy      string     `json:"strategy,omitempty"`
 	TargetPath    string     `json:"target_path,omitempty"`
 	SourcePath    string     `json:"source_path,omitempty"`
+	DependsOn     []int      `json:"depends_on,omitempty"`
+	Locks         []string   `json:"locks,omitempty"`
 	IsPrivileged  bool       `json:"is_privileged"`
 	IsDestructive bool       `json:"is_destructive"`
 	IsExclusive   bool       `json:"is_exclusive"`
@@ -116,6 +118,8 @@ func (p *ExecutionPlan) ToSpec() *PlanSpec {
 			Strategy:      s.Strategy,
 			TargetPath:    s.TargetPath,
 			SourcePath:    s.SourcePath,
+			DependsOn:     s.DependsOn,
+			Locks:         s.Locks,
 			IsPrivileged:  s.IsPrivileged,
 			IsDestructive: s.IsDestructive,
 			IsExclusive:   s.IsExclusive,

@@ -17,6 +17,24 @@ import (
 	"github.com/arturonavax/env/internal/theme"
 )
 
+// BuildLazyAppContext constructs a lightweight AppContext for read-only or meta commands
+// without touching the filesystem, initializing state, journals, or requiring a repository root.
+func BuildLazyAppContext(version, commit, date string) (*AppContext, error) {
+	container, err := bootstrap.NewLazyContainer(bootstrap.WithVersion(version, commit, date))
+	if err != nil {
+		return nil, err
+	}
+
+	return &AppContext{
+		Platform: container.Platform,
+		Catalog:  container.Catalog,
+		Viper:    container.Viper,
+		Version:  version,
+		Commit:   commit,
+		Date:     date,
+	}, nil
+}
+
 // BuildAppContext constructs the runtime AppContext by delegating to the reusable bootstrap container.
 func BuildAppContext(version, commit, date string) (*AppContext, error) {
 	container, err := bootstrap.NewContainer(bootstrap.WithVersion(version, commit, date))

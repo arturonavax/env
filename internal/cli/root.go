@@ -119,6 +119,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd.AddCommand(toolsCommands(appCtx)...)
 	rootCmd.AddCommand(interactiveCommands(appCtx)...)
 	rootCmd.AddCommand(metaCommands(appCtx)...)
+	rootCmd.AddCommand(newLsCmd(appCtx))
+	rootCmd.AddCommand(newWhatCmd(appCtx))
+	rootCmd.AddCommand(newSelfCmd(appCtx))
 	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
 
@@ -154,12 +157,32 @@ func applyConfigLayering(cmd *cobra.Command, appCtx *AppContext) error {
 	return nil
 }
 
+func isLazyCommand(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	first := args[0]
+	if first == "version" || first == "completion" || first == "--version" || first == "-v" || first == "help" {
+		return true
+	}
+	if len(args) == 1 && (first == "--help" || first == "-h") {
+		return true
+	}
+	return false
+}
+
 // ExecuteCLI runs the root Cobra command with signal handling and maps errors to spec exit codes.
 func ExecuteCLI(args []string, out, errOut io.Writer, version, commit, date string) int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	appCtx, err := BuildAppContext(version, commit, date)
+	var appCtx *AppContext
+	var err error
+	if isLazyCommand(args) {
+		appCtx, err = BuildLazyAppContext(version, commit, date)
+	} else {
+		appCtx, err = BuildAppContext(version, commit, date)
+	}
 	if err != nil {
 		fmt.Fprintf(errOut, "Initialization error: %v\n", err)
 		return domain.ExitPreflightFailed

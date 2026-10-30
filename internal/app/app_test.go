@@ -197,3 +197,27 @@ func TestControlPlaneServiceExplainAndInventory(t *testing.T) {
 		t.Errorf("expected error explaining non-existent artifact")
 	}
 }
+
+func TestSyncPostSyncErrorSurfacesAsPartial(t *testing.T) {
+	fx := newFixture(t)
+	// Register a test config with a failing post-sync command
+	testCfg := domain.ConfigurationResource{
+		ID:           "test-post-sync-fail",
+		Source:       "files/test/fail.txt",
+		Target:       "~/.config/test/fail.txt",
+		PostSyncCmds: [][]string{{"sh", "-c", "echo 'critical post-sync hook failure' >&2; exit 1"}},
+	}
+	fx.cat.AddConfiguration(testCfg)
+
+	svc := app.NewSyncService(fx.plat, fx.cat, fx.snap, fx.store, fx.repo)
+	src := filepath.Join(fx.repo, "files/test/fail.txt")
+	write(t, src, "hello world")
+
+	_, err := svc.SyncOne(context.Background(), "test-post-sync-fail", app.SyncOptions{})
+	if err == nil {
+		t.Fatalf("expected non-nil error when post-sync fails, got nil")
+	}
+	if !contains(err.Error(), "critical post-sync hook failure") {
+		t.Fatalf("expected error to capture stderr, got: %v", err)
+	}
+}

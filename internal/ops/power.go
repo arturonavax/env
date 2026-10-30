@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/arturonavax/env/internal/platform"
@@ -296,7 +295,7 @@ func (pm *PowerManager) LockScreen(ctx context.Context) error {
 	pm.log("Entering Safe Screen Standby...")
 	pm.logStep("Flushing filesystem buffers to disk...")
 	if !pm.dryRun {
-		syscall.Sync()
+		syncFilesystems()
 	}
 
 	pm.logStep("Locking desktop session...")
@@ -331,7 +330,7 @@ func (pm *PowerManager) SuspendToIdle(ctx context.Context) error {
 
 	pm.logStep("Flushing filesystem caches...")
 	if !pm.dryRun {
-		syscall.Sync()
+		syncFilesystems()
 	}
 
 	pm.logStep("Locking desktop session...")
@@ -370,7 +369,7 @@ func (pm *PowerManager) DeepVTSuspend(ctx context.Context) error {
 
 	pm.logStep("Flushing disk caches...")
 	if !pm.dryRun {
-		syscall.Sync()
+		syncFilesystems()
 	}
 
 	pm.logStep("Locking desktop session...")
@@ -431,7 +430,7 @@ func (pm *PowerManager) Hibernate(ctx context.Context) error {
 
 	pm.logStep("Flushing disks and initiating hibernation...")
 	if !pm.dryRun {
-		syscall.Sync()
+		syncFilesystems()
 		if err := exec.CommandContext(ctx, "systemctl", "hibernate").Run(); err != nil {
 			return exec.CommandContext(ctx, "sudo", "systemctl", "hibernate").Run()
 		}

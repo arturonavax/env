@@ -233,6 +233,13 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 			return nil
 		}
 		task.Compensate = func(ctx context.Context) error {
+			// Only compensate if ANX recorded the package as managed by ANX
+			if s.store != nil {
+				rec, exists := s.store.GetResource(pkg.ID)
+				if !exists || !rec.ManagedByAnx {
+					return nil
+				}
+			}
 			if err := s.provider.Uninstall(ctx, pkg); err != nil {
 				return err
 			}
@@ -281,6 +288,15 @@ func (s *InstallService) Uninstall(ctx context.Context, ids []string) error {
 	defer func() { _ = lock.Release() }()
 
 	for _, id := range ids {
+		// Strict ownership check: only uninstall resources recorded as ManagedByAnx
+		if s.store != nil {
+			rec, exists := s.store.GetResource(id)
+			if !exists || !rec.ManagedByAnx {
+				// Resource was pre-existing or not managed by ANX; protect user/system state
+				continue
+			}
+		}
+
 		pkg, ok := s.catalog.GetPackage(id)
 		if !ok {
 			pkg = domain.ManagedResource{ID: id, Name: id}

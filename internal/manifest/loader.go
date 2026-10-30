@@ -301,6 +301,13 @@ func (c *Catalog) GetConfiguration(id string) (domain.ConfigurationResource, boo
 	return cfg, ok
 }
 
+// AddConfiguration registers or updates a configuration in the catalog.
+func (c *Catalog) AddConfiguration(cfg domain.ConfigurationResource) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.configurations[cfg.ID] = cfg
+}
+
 // ListConfigurations returns all configurations sorted deterministically by ID.
 func (c *Catalog) ListConfigurations() []domain.ConfigurationResource {
 	c.mu.RLock()

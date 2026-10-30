@@ -15,7 +15,8 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent $ScriptDir
 $MinMajor = 1
-$MinMinor = 24
+$MinMinor = 27
+$MinPatch = 3
 
 $DestDir = Join-Path $env:LOCALAPPDATA "Programs\anx\bin"
 if (-not (Test-Path $DestDir)) {
@@ -50,12 +51,13 @@ function Test-GoVersion {
 
     try {
         $raw = (& go version)
-        if ($raw -match "go(\d+)\.(\d+)") {
+        if ($raw -match "go(\d+)\.(\d+)(?:\.(\d+))?") {
             $major = [int]$matches[1]
             $minor = [int]$matches[2]
-            if ($major -gt $MinMajor -or ($major -eq $MinMajor -and $minor -ge $MinMinor)) {
-                return $true
-            }
+            $patch = if ($matches[3]) { [int]$matches[3] } else { 0 }
+            if ($major -gt $MinMajor) { return $true }
+            if ($major -eq $MinMajor -and $minor -gt $MinMinor) { return $true }
+            if ($major -eq $MinMajor -and $minor -eq $MinMinor -and $patch -ge $MinPatch) { return $true }
         }
     } catch {
         return $false
@@ -70,7 +72,8 @@ function Install-GoWindowsArchive {
         $rel = $json | Where-Object { $_.stable -eq $true } | Select-Object -First 1
         if (-not $rel) { return $false }
 
-        $file = $rel.files | Where-Object { $_.os -eq "windows" -and $_.arch -eq "amd64" -and $_.kind -eq "archive" } | Select-Object -First 1
+        $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+        $file = $rel.files | Where-Object { $_.os -eq "windows" -and $_.arch -eq $arch -and $_.kind -eq "archive" } | Select-Object -First 1
         if (-not $file) { return $false }
 
         $url = "https://go.dev/dl/" + $file.filename

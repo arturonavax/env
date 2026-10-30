@@ -22,8 +22,9 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly REPO_ROOT
 
 MIN_GO_MAJOR=1
-MIN_GO_MINOR=24
-TARGET_GO_VER="go1.24.0"
+MIN_GO_MINOR=27
+MIN_GO_PATCH=3
+TARGET_GO_VER="go1.27.3"
 DEST_BIN="${HOME}/.local/bin"
 
 # ANSI Colors
@@ -126,15 +127,23 @@ check_go_version() {
 	fi
 	local raw_ver
 	raw_ver=$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')
-	local major minor
+	local major minor patch
 	major=$(echo "${raw_ver}" | cut -d. -f1)
 	minor=$(echo "${raw_ver}" | cut -d. -f2)
+	patch=$(echo "${raw_ver}" | cut -d. -f3 | sed 's/[^0-9].*$//')
+	patch="${patch:-0}"
 
 	if [[ -z "${major}" || -z "${minor}" ]]; then
 		return 1
 	fi
 
-	if [[ "${major}" -gt "${MIN_GO_MAJOR}" ]] || { [[ "${major}" -eq "${MIN_GO_MAJOR}" ]] && [[ "${minor}" -ge "${MIN_GO_MINOR}" ]]; }; then
+	if [[ "${major}" -gt "${MIN_GO_MAJOR}" ]]; then
+		return 0
+	fi
+	if [[ "${major}" -eq "${MIN_GO_MAJOR}" && "${minor}" -gt "${MIN_GO_MINOR}" ]]; then
+		return 0
+	fi
+	if [[ "${major}" -eq "${MIN_GO_MAJOR}" && "${minor}" -eq "${MIN_GO_MINOR}" && "${patch}" -ge "${MIN_GO_PATCH}" ]]; then
 		return 0
 	fi
 	return 1
@@ -223,7 +232,7 @@ ensure_go_runtime() {
 		return 0
 	fi
 
-	log_warn "Go runtime (>= 1.24) not detected. Initiating multi-tier bootstrap..."
+	log_warn "Go runtime (>= 1.27.3) not detected. Initiating multi-tier bootstrap..."
 
 	if install_go_tier1_gvm; then
 		return 0
@@ -239,7 +248,7 @@ ensure_go_runtime() {
 		return 0
 	fi
 
-	log_error "Could not bootstrap Go (>= 1.24) on this platform. Please install Go manually from https://go.dev/dl/."
+	log_error "Could not bootstrap Go (>= 1.27.3) on this platform. Please install Go manually from https://go.dev/dl/."
 	exit 1
 }
 

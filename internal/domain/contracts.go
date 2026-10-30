@@ -4,10 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 )
+
+// ErrPlanDigest indicates an error computing the canonical digest of a PlanSpec.
+var ErrPlanDigest = errors.New("computing canonical plan digest failed")
 
 // ResourceID uniquely identifies a resource across kinds (e.g. "package.ghostty", "config.zshrc").
 type ResourceID string
@@ -95,14 +99,32 @@ type PlanSpec struct {
 	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
-// Digest computes a deterministic SHA-256 fingerprint over the canonical content of PlanSpec.
-func (p *PlanSpec) Digest() string {
+// ComputeDigest computes a deterministic SHA-256 fingerprint over the canonical content of PlanSpec,
+// returning a typed error on nil input or serialization failure.
+func (p *PlanSpec) ComputeDigest() (string, error) {
 	if p == nil {
-		return ""
+		return "", fmt.Errorf("%w: plan is nil", ErrPlanDigest)
 	}
-	// Copy to ensure canonical ordering and omit timestamps
+
+	// Canonical deep copy of actions
 	actionsCopy := make([]PlanAction, len(p.Actions))
-	copy(actionsCopy, p.Actions)
+	for i, a := range p.Actions {
+		act := a
+		if len(act.DependsOn) > 1 {
+			act.DependsOn = append([]int(nil), act.DependsOn...)
+			sort.Ints(act.DependsOn)
+		}
+		if len(act.Locks) > 1 {
+			act.Locks = append([]string(nil), act.Locks...)
+			sort.Strings(act.Locks)
+		}
+		if len(act.Preconditions) > 1 {
+			act.Preconditions = append([]string(nil), act.Preconditions...)
+			sort.Strings(act.Preconditions)
+		}
+		actionsCopy[i] = act
+	}
+
 	sort.Slice(actionsCopy, func(i, j int) bool {
 		if actionsCopy[i].ID != actionsCopy[j].ID {
 			return actionsCopy[i].ID < actionsCopy[j].ID
@@ -110,24 +132,51 @@ func (p *PlanSpec) Digest() string {
 		return actionsCopy[i].ResourceID < actionsCopy[j].ResourceID
 	})
 
+	// Canonical sorted metadata
+	metaKV := make([][2]string, 0, len(p.Metadata))
+	if len(p.Metadata) > 0 {
+		keys := make([]string, 0, len(p.Metadata))
+		for k := range p.Metadata {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			metaKV = append(metaKV, [2]string{k, p.Metadata[k]})
+		}
+	}
+
 	canonical := struct {
 		SchemaVersion string       `json:"schema_version"`
 		Platform      string       `json:"platform"`
 		Profile       string       `json:"profile"`
 		Actions       []PlanAction `json:"actions"`
+		Metadata      [][2]string  `json:"metadata,omitempty"`
 	}{
 		SchemaVersion: p.SchemaVersion,
 		Platform:      p.Platform,
 		Profile:       p.Profile,
 		Actions:       actionsCopy,
+		Metadata:      metaKV,
 	}
 
-	bytes, err := json.Marshal(canonical)
+	data, err := json.Marshal(canonical)
 	if err != nil {
-		return fmt.Sprintf("digest-error-%d", len(p.Actions))
+		return "", fmt.Errorf("%w: %v", ErrPlanDigest, err)
 	}
-	h := sha256.Sum256(bytes)
-	return hex.EncodeToString(h[:])
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:]), nil
+}
+
+// Digest computes a deterministic SHA-256 fingerprint over the canonical content of PlanSpec.
+func (p *PlanSpec) Digest() string {
+	d, err := p.ComputeDigest()
+	if err != nil {
+		if p == nil {
+			return ""
+		}
+		panic(err)
+	}
+	return d
 }
 
 // Job represents an execution job tracking progress of an applied PlanSpec.

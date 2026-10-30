@@ -3,6 +3,7 @@ package journal
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,10 +13,13 @@ import (
 	"github.com/arturonavax/env/internal/domain"
 )
 
+// ErrCorruptedJournal indicates a corrupted or truncated entry was encountered in the journal file.
+var ErrCorruptedJournal = errors.New("corrupted journal entry")
+
 // FileJournal manages persistent append-only logging of transaction steps.
 type FileJournal struct {
 	path string
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
 // NewFileJournal creates or opens a FileJournal at stateDir/journal.jsonl.
@@ -51,13 +55,17 @@ func (j *FileJournal) Append(entry domain.JournalEntry) error {
 		return fmt.Errorf("writing journal entry: %w", err)
 	}
 
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("syncing journal entry: %w", err)
+	}
+
 	return nil
 }
 
 // ReadEntries reads all entries from the journal.
 func (j *FileJournal) ReadEntries() ([]domain.JournalEntry, error) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
+	j.mu.RLock()
+	defer j.mu.RUnlock()
 
 	f, err := os.Open(j.path)
 	if err != nil {
@@ -70,18 +78,25 @@ func (j *FileJournal) ReadEntries() ([]domain.JournalEntry, error) {
 
 	entries := make([]domain.JournalEntry, 0, 64)
 	scanner := bufio.NewScanner(f)
+	lineNum := 0
 	for scanner.Scan() {
+		lineNum++
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
 		var entry domain.JournalEntry
-		if err := json.Unmarshal(line, &entry); err == nil {
-			entries = append(entries, entry)
+		if err := json.Unmarshal(line, &entry); err != nil {
+			return nil, fmt.Errorf("%w at line %d: %v", ErrCorruptedJournal, lineNum, err)
 		}
+		entries = append(entries, entry)
 	}
 
-	return entries, scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning journal file: %w", err)
+	}
+
+	return entries, nil
 }
 
 // GetLastPendingTx scans the journal to check if the last transaction was interrupted before commit/rollback.

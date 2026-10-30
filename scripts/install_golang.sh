@@ -9,7 +9,7 @@
 #   This script serves as a standalone system-wide Go runtime provider.
 #
 # Usage:
-#   ./src/remotes/install_golang.sh [-i] [-c]
+#   ./scripts/install_golang.sh [-i] [-c]
 # Remote:
 #   bash <(curl -fsSL "https://env.arturonavax.dev/install_golang.sh") -i
 #
@@ -213,7 +213,7 @@ if [[ -z "$current_version" ]]; then
 		fi
 		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Installation completed successfully!${fcr}"
 	else
-		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically install: ${fccb}./src/remotes/install_golang.sh -i${fcr}"
+		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically install: ${fccb}./scripts/install_golang.sh -i${fcr}"
 	fi
 elif [[ "$current_version" != "$latest_version" ]]; then
 	echo -e "${fcwb}[Golang Installer]: ${fcyb}⚠️ Installed version (${current_version#go}) differs from latest (${latest_version#go}).${fcr}"
@@ -226,7 +226,7 @@ elif [[ "$current_version" != "$latest_version" ]]; then
 		fi
 		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Update completed successfully!${fcr}"
 	else
-		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically update: ${fccb}./src/remotes/install_golang.sh -i${fcr}"
+		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically update: ${fccb}./scripts/install_golang.sh -i${fcr}"
 	fi
 else
 	echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Golang is up to date: ${current_version#go}${fcr}"

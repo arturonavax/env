@@ -79,7 +79,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ### Lifecycle Entry Points
 
 - **`./install.sh [args]` / `./scripts/bootstrap_anx.sh [args]`**:
-  - Automatically runs pre-flight checks and ensures Go `>= 1.24` is available using GVM priority (with standalone `install_golang.sh` and native package manager fallbacks).
+  - Automatically runs pre-flight checks and ensures Go `>= 1.27.3` is available using GVM priority (with standalone `install_golang.sh` and native package manager fallbacks).
   - Compiles the unified `anx` binary to `~/.local/bin/anx` and sets up the `aitools` multicall symlink (`~/.local/bin/aitools -> anx`).
   - Automatically launches the Bubble Tea v2 interactive wizard (`anx wizard` or `anx dashboard`) when run in an interactive TTY without arguments.
   - Supports `--legacy-bash` flag to explicitly execute the legacy Bash installer pipeline if needed.
@@ -99,6 +99,10 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - `anx optimize [--report|--apply]`: Lynis security audit & hardware optimization with 12 security guardrails.
   - `anx cleanup` / `anx prune [--dry-run|-y]`: Safely detect and prune orphaned, deprecated, and archived components.
   - `anx alias <name>`: Create custom command alias/symlink in `~/.local/bin/<name>` (supported via `--bin-name` in bootstrap).
+  - `anx ls [flags] [path...]`: List directory contents via capability abstraction (`eza` with `ls` fallback).
+  - `anx what <capability>`: Inspect which binary and provider resolves an abstract capability.
+  - `anx explain <resource-id>`: Multi-layered provenance inspection with winning policies and origins.
+  - `anx self update [--check|--dry-run]`: Check for and securely update the ANX binary to the latest release with SHA-256 verification.
   - `anx doctor`: Run comprehensive diagnostic health checks (including orphan, deprecation, and archive remnant checks).
   - `anx audit`: Scan installed tools for vulnerabilities against OSV.dev.
   - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges and hardware hack indicators.

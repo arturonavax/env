@@ -43,8 +43,16 @@ func NewModel(deps Deps) Model {
 
 	var pkgs []domain.ManagedResource
 	var cfgs []domain.ConfigurationResource
-	if deps.Catalog != nil {
+	if deps.Query != nil {
+		if inv, err := deps.Query.Inventory(context.Background(), app.InventoryFilter{}); err == nil && inv != nil {
+			pkgs = inv.Packages
+			cfgs = inv.Configurations
+		}
+	}
+	if len(pkgs) == 0 && deps.Catalog != nil {
 		pkgs = deps.Catalog.ListPackages()
+	}
+	if len(cfgs) == 0 && deps.Catalog != nil {
 		cfgs = deps.Catalog.ListConfigurations()
 	}
 

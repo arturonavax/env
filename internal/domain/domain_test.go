@@ -127,4 +127,40 @@ func TestPlanSpecDeterministicDigest(t *testing.T) {
 	if digestA == digestC {
 		t.Fatalf("expected different digest when actions differ, got identical %q", digestA)
 	}
+
+	// Canonical PlanSpec with metadata
+	spec1 := &domain.PlanSpec{
+		SchemaVersion: "v1",
+		Platform:      "linux",
+		Profile:       "developer",
+		Actions: []domain.PlanAction{
+			{ID: 1, ResourceID: "ripgrep", Action: domain.ActionInstall, Preconditions: []string{"b", "a"}},
+		},
+		Metadata: map[string]string{"foo": "1", "bar": "2"},
+	}
+	spec2 := &domain.PlanSpec{
+		SchemaVersion: "v1",
+		Platform:      "linux",
+		Profile:       "developer",
+		Actions: []domain.PlanAction{
+			{ID: 1, ResourceID: "ripgrep", Action: domain.ActionInstall, Preconditions: []string{"a", "b"}},
+		},
+		Metadata: map[string]string{"bar": "2", "foo": "1"},
+	}
+
+	d1, err1 := spec1.ComputeDigest()
+	d2, err2 := spec2.ComputeDigest()
+	if err1 != nil || err2 != nil {
+		t.Fatalf("unexpected error computing digest: %v / %v", err1, err2)
+	}
+	if d1 != d2 {
+		t.Fatalf("expected identical digest for canonical metadata/slices, got %s vs %s", d1, d2)
+	}
+
+	// Nil plan check
+	var nilPlan *domain.PlanSpec
+	_, errNil := nilPlan.ComputeDigest()
+	if errNil == nil || !errors.Is(errNil, domain.ErrPlanDigest) {
+		t.Fatalf("expected ErrPlanDigest for nil plan, got: %v", errNil)
+	}
 }

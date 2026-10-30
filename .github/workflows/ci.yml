@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go: ['1.26', '1.27']
+        go: ['1.27.3']
 
     steps:
       - name: Check out repository
@@ -40,8 +40,13 @@ jobs:
         if: runner.os == 'Windows'
         run: go test -v -timeout 10m ./...
 
-      - name: Build ANX binary
-        run: go build -v -ldflags "-X main.Version=ci -X main.Commit=${{ github.sha }} -X main.Date=$(date -u +%Y-%m-%d 2>/dev/null || echo ci)" -o bin/ ./cmd/anx
+      - name: Build ANX binary (Unix)
+        if: runner.os != 'Windows'
+        run: go build -v -ldflags "-X main.Version=ci -X main.Commit=${{ github.sha }} -X main.Date=$(date -u +%Y-%m-%d)" -o bin/ ./cmd/anx
+
+      - name: Build ANX binary (Windows)
+        if: runner.os == 'Windows'
+        run: go build -v -ldflags "-X main.Version=ci -X main.Commit=${{ github.sha }} -X main.Date=ci" -o bin\anx.exe .\cmd\anx
 
   lint:
     name: Shell & Code Linting

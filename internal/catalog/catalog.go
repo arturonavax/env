@@ -74,6 +74,11 @@ func (r *Registry) GetConfiguration(id string) (domain.ConfigurationResource, bo
 	return r.cat.GetConfiguration(id)
 }
 
+// AddConfiguration registers or updates a configuration in the registry.
+func (r *Registry) AddConfiguration(cfg domain.ConfigurationResource) {
+	r.cat.AddConfiguration(cfg)
+}
+
 // ListConfigurations returns all managed configurations sorted deterministically by ID.
 func (r *Registry) ListConfigurations() []domain.ConfigurationResource {
 	return r.cat.ListConfigurations()

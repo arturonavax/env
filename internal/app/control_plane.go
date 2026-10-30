@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/arturonavax/env/internal/capability"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
@@ -43,8 +45,12 @@ type PlanRequest struct {
 
 // ApplyRequest specifies options to apply a plan.
 type ApplyRequest struct {
-	PlanDigest string `json:"plan_digest"`
-	DryRun     bool   `json:"dry_run"`
+	Plan           *domain.ExecutionPlan `json:"-"`
+	PlanDigest     string                `json:"plan_digest"`
+	Profile        string                `json:"profile,omitempty"`
+	Requested      []string              `json:"requested,omitempty"`
+	DryRun         bool                  `json:"dry_run"`
+	IdempotencyKey string                `json:"idempotency_key,omitempty"`
 }
 
 // CommandService defines the mutation contract of the ANX control plane.
@@ -56,13 +62,16 @@ type CommandService interface {
 
 // ControlPlaneService coordinates queries and commands across domain services.
 type ControlPlaneService struct {
-	platform   *platform.Info
-	catalog    *catalog.Registry
-	installSvc *InstallService
-	syncSvc    *SyncService
-	hacksSvc   *HacksService
-	toolsSvc   *ToolsService
-	store      *state.Store
+	platform     *platform.Info
+	catalog      *catalog.Registry
+	installSvc   *InstallService
+	syncSvc      *SyncService
+	hacksSvc     *HacksService
+	toolsSvc     *ToolsService
+	capabilities *capability.Registry
+	store        *state.Store
+	mu           sync.Mutex
+	activeJobs   map[string]context.CancelFunc
 }
 
 // NewControlPlaneService creates a unified ControlPlaneService.
@@ -76,14 +85,21 @@ func NewControlPlaneService(
 	store *state.Store,
 ) *ControlPlaneService {
 	return &ControlPlaneService{
-		platform:   plat,
-		catalog:    cat,
-		installSvc: installSvc,
-		syncSvc:    syncSvc,
-		hacksSvc:   hacksSvc,
-		toolsSvc:   toolsSvc,
-		store:      store,
+		platform:     plat,
+		catalog:      cat,
+		installSvc:   installSvc,
+		syncSvc:      syncSvc,
+		hacksSvc:     hacksSvc,
+		toolsSvc:     toolsSvc,
+		capabilities: capability.NewRegistry(),
+		store:        store,
+		activeJobs:   make(map[string]context.CancelFunc),
 	}
+}
+
+// Capabilities returns the registered capability registry.
+func (c *ControlPlaneService) Capabilities() *capability.Registry {
+	return c.capabilities
 }
 
 // Inventory queries catalogued resources by optional filter.
@@ -263,7 +279,15 @@ func (c *ControlPlaneService) Explain(ctx context.Context, rawID domain.Resource
 		}
 	}
 
-	return nil, fmt.Errorf("resource %q not found in packages, configurations, tools, or hacks", rawID)
+	// 5. Check Capabilities
+	if c.capabilities != nil {
+		if prov, err := c.capabilities.Explain(id); err == nil {
+			prov.ActiveProfile = activeProfile
+			return prov, nil
+		}
+	}
+
+	return nil, fmt.Errorf("resource %q not found in packages, configurations, tools, hacks, or capabilities", rawID)
 }
 
 // BuildPlan produces an immutable PlanSpec.
@@ -279,27 +303,56 @@ func (c *ControlPlaneService) BuildPlan(ctx context.Context, req PlanRequest) (*
 	return execPlan.ToSpec(), nil
 }
 
-// Apply executes a planned change.
+// Apply executes a planned change without regenerating an arbitrary unverified plan.
 func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (string, error) {
 	if c.installSvc == nil {
 		return "", fmt.Errorf("install service not available")
 	}
-	// Verify digest if supplied
-	plan, err := c.installSvc.Plan(ctx, "", nil)
-	if err != nil {
-		return "", err
+
+	plan := req.Plan
+	if plan == nil {
+		var err error
+		plan, err = c.installSvc.Plan(ctx, req.Profile, req.Requested)
+		if err != nil {
+			return "", fmt.Errorf("building execution plan: %w", err)
+		}
 	}
+
+	// Verify digest if supplied (rejects stale plans and TOCTOU)
 	if req.PlanDigest != "" && plan.Digest() != req.PlanDigest {
-		return "", fmt.Errorf("plan digest mismatch: expected %s, computed %s", req.PlanDigest, plan.Digest())
+		return "", fmt.Errorf("plan digest mismatch: expected %s, computed %s (rejecting stale or unauthorized plan)", req.PlanDigest, plan.Digest())
 	}
+
 	plan.DryRun = req.DryRun
-	err = c.installSvc.Apply(ctx, plan)
+
+	if len(plan.Steps) == 0 || req.DryRun {
+		return plan.ID, nil
+	}
+
+	jobCtx, cancel := context.WithCancel(ctx)
+	c.mu.Lock()
+	c.activeJobs[plan.ID] = cancel
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(c.activeJobs, plan.ID)
+		c.mu.Unlock()
+	}()
+
+	err := c.installSvc.Apply(jobCtx, plan)
 	return plan.ID, err
 }
 
 // Cancel interrupts an active job.
 func (c *ControlPlaneService) Cancel(_ context.Context, jobID string) error {
-	return fmt.Errorf("job %s cancellation not implemented for synchronous runner", jobID)
+	c.mu.Lock()
+	cancel, ok := c.activeJobs[jobID]
+	c.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("job %s not found or already completed", jobID)
+	}
+	cancel()
+	return nil
 }
 
 func normalizeResourceID(id domain.ResourceID) string {

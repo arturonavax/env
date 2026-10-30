@@ -1,14 +1,14 @@
 ## anx explain
 
-Explain origin, winning policy, conditions, and provenance of a resource
+Explain origin, winning policy, conditions, and provenance of a resource or capability
 
 ### Synopsis
 
-Inspect and explain why a package, dotfile configuration, personal tool, or hardware hack
+Inspect and explain why a package, dotfile configuration, personal tool, hardware hack, or capability
 was selected, including its origin manifest, active profile, dependencies, and winning policy.
 
 ```
-anx explain <resource-id> [flags]
+anx explain [kind] <resource-id> [flags]
 ```
 
 ### Options
