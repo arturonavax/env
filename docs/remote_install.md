@@ -8,31 +8,61 @@ Comprehensive guide for deploying and configuring the zero-dependency remote boo
 
 `arturonavax/env` provides native, zero-dependency remote bootstrap pipelines tailored to each operating system's canonical shell.
 
-### Linux, macOS, BSD & Raspberry Pi (POSIX sh / bash / zsh / ash / dash)
+### Linux, macOS, BSD & Raspberry Pi (POSIX sh)
 
-```bash
-# Interactive guided setup (reconnects /dev/tty automatically when piped; works with pure POSIX sh)
+#### Interactive Guided Setup (Recommended)
+
+Connects standard input to controlling terminal (`/dev/tty`) automatically when piped, enabling the full interactive Bubble Tea wizard:
+
+```sh
 curl -fsSL https://env.arturonavax.dev/install.sh | sh
+```
 
-# Shorthand via Cloudflare Edge Worker
+#### Shorthand via Cloudflare Edge Worker
+
+```sh
 curl -fsSL https://env.arturonavax.dev | sh
+```
 
-# Unattended non-interactive automated provisioning
+#### Autonomous Unattended Provisioning
+
+Applies desired state non-interactively for CI/CD runners or headless cloud workstations:
+
+```sh
 curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
+```
 
-# Safe dry-run preview (shows planned packages and touched files)
+#### Safe Dry-Run Execution Plan Preview
+
+Inspects the DAG execution plan and reports planned actions without touching the filesystem:
+
+```sh
 curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
-### Windows (PowerShell)
+---
+
+### Windows 10 / 11 (PowerShell)
+
+#### Interactive Guided Setup
 
 ```powershell
-# Interactive Windows setup
 irm https://env.arturonavax.dev/install.ps1 | iex
+```
 
-# Unattended automated setup
+#### Shorthand via Cloudflare Edge Worker
+
+```powershell
+irm https://env.arturonavax.dev | iex
+```
+
+#### Autonomous Unattended Provisioning
+
+```powershell
 & ([scriptblock]::Create((irm https://env.arturonavax.dev/install.ps1))) -Yes -Profile developer
 ```
+
+---
 
 ### Windows (Command Prompt - CMD)
 
@@ -70,14 +100,14 @@ flowchart TD
 
 In previous iterations, the subdomain pointed to the legacy `src/remotes/` folder. With the unified ANX Platform, all bootstrap entry points reside cleanly at the repository root.
 
-### Method A: Cloudflare URL Redirect Rule (Recommended - Zero Maintenance)
+### Method A: Cloudflare URL Redirect Rule (Zero Maintenance)
 
 In your Cloudflare dashboard (or DNS provider):
 1. Navigate to **Rules** -> **Redirect Rules** (or **Page Rules**).
 2. Configure rule:
    - **Incoming Request**: `Hostname equals env.arturonavax.dev`
    - **Target URL**: `https://raw.githubusercontent.com/arturonavax/env/main/${1}`
-   - **Status Code**: `302 Temporary Redirect` (or `301 Permanent`)
+   - **Status Code**: `302 Temporary Redirect`
 
 This enables:
 - `https://env.arturonavax.dev/install.sh` -> points to `/install.sh`
@@ -87,13 +117,13 @@ This enables:
 
 ---
 
-### Method B: Universal Cloudflare Worker (Ultimate UX with OS Detection)
+### Method B: Universal Cloudflare Worker (Edge Routing & OS Detection)
 
-If you want users to be able to run `curl -fsSL https://env.arturonavax.dev | sh` without even typing `/install.sh`:
+If you want users to be able to run `curl -fsSL https://env.arturonavax.dev | sh` without typing `/install.sh`:
 
-Deploy the production Cloudflare Edge Worker on `env.arturonavax.dev/*` documented in detail in [docs/cloudflare_worker.md](file:///home/arthurnavah/repos/github.com/arturonavax/env/docs/cloudflare_worker.md).
+Deploy the production Cloudflare Edge Worker on `env.arturonavax.dev/*` documented in detail in [docs/cloudflare_worker.md](cloudflare_worker.md).
 
 With this Worker active:
-- **Linux/macOS/BSD/Raspberry Pi/Android Termux**: `curl -fsSL https://env.arturonavax.dev | sh`
+- **Linux/macOS/BSD/Raspberry Pi**: `curl -fsSL https://env.arturonavax.dev | sh`
 - **Windows (PowerShell)**: `irm https://env.arturonavax.dev | iex`
-- **Desktop/Mobile Browsers**: Opens responsive HTML dashboard with one-click copy buttons.
+- **Web Browsers**: Automatically redirects visitors to `https://arturonavax.dev/env`

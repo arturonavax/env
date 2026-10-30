@@ -207,3 +207,44 @@ func TestStateStoreAndAuditLogConcurrency(t *testing.T) {
 		}
 	}
 }
+
+func TestStateStore_LegacyPythonFloatUnmarshal(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	store := config.NewStateStore(tmpDir)
+
+	legacyJSON := `{
+  "scheduled_wake_epoch": 1793350800.123,
+  "expecting_auto_wake": true,
+  "last_wake_epoch": 1793278668.9726114,
+  "last_auto_wake_epoch": "1793270000",
+  "targets_last_wake": {
+    "gemini": 1793278668.55
+  },
+  "notified_resets": {
+    "gemini": 1793278600.0
+  }
+}`
+	if err := os.WriteFile(store.StateFilePath(), []byte(legacyJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	st, err := store.Load()
+	if err != nil {
+		t.Fatalf("expected state store to decode legacy Python float timestamps without error: %v", err)
+	}
+
+	if st.LastWakeEpoch != 1793278668 {
+		t.Errorf("LastWakeEpoch = %d, want 1793278668", st.LastWakeEpoch)
+	}
+	if st.ScheduledWakeEpoch != 1793350800 {
+		t.Errorf("ScheduledWakeEpoch = %d, want 1793350800", st.ScheduledWakeEpoch)
+	}
+	if st.LastAutoWakeEpoch != 1793270000 {
+		t.Errorf("LastAutoWakeEpoch = %d, want 1793270000", st.LastAutoWakeEpoch)
+	}
+	if st.TargetsLastWake["gemini"] != 1793278668 {
+		t.Errorf("TargetsLastWake[gemini] = %d, want 1793278668", st.TargetsLastWake["gemini"])
+	}
+}

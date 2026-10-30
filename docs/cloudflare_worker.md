@@ -13,7 +13,7 @@ By placing a Cloudflare Worker on `env.arturonavax.dev/*`:
 1. **Intelligent User-Agent Detection**:
    - `curl` or `wget` without path -> automatically delivers `install.sh` (`text/plain; charset=utf-8`).
    - PowerShell (`irm`) without path -> automatically delivers `install.ps1`.
-   - Web Browsers -> serves a responsive, dark-mode terminal dashboard with single-click command copy buttons.
+   - Web Browsers -> redirects automatically to `https://arturonavax.dev/env` to share primary site styles and branding.
    - Discord / Slack / Telegram crawlers -> serves rich OpenGraph metadata preview cards.
 2. **Edge Caching & Resiliency**:
    - Eliminates GitHub raw rate limits by caching upstream script responses in Cloudflare's global edge network for 1 hour with `stale-while-revalidate`.
@@ -31,7 +31,7 @@ flowchart TD
     B -- No --> D{"Analyze User-Agent"}
     D -- "PowerShell / WindowsPowerShell / pwsh" --> E["Serve install.ps1 (text/plain)"]
     D -- "curl / wget / httpie / fetch / sh" --> F["Serve install.sh (text/plain)"]
-    D -- "Browser (Mozilla, Chrome, Safari, etc.)" --> G["Serve Responsive HTML Landing Dashboard"]
+    D -- "Browser (Mozilla, Chrome, Safari, etc.)" --> G["Redirect 302 to https://arturonavax.dev/env"]
     D -- "Social Bot (Discord, Slack, Twitter, Telegram)" --> H["Serve OpenGraph Preview Metadata"]
 ```
 
@@ -39,7 +39,7 @@ flowchart TD
 
 ## 3. Production Worker Implementation (`worker.ts`)
 
-Create this file in your Cloudflare Worker project:
+Create this file in your Cloudflare Worker project (`src/worker.ts`):
 
 ```typescript
 /**
@@ -51,12 +51,14 @@ interface Env {
   GITHUB_USER?: string;
   GITHUB_REPO?: string;
   DEFAULT_BRANCH?: string;
+  PERSONAL_WEBSITE_URL?: string;
 }
 
 const GITHUB_USER = "arturonavax";
 const GITHUB_REPO = "env";
 const DEFAULT_BRANCH = "main";
 const UPSTREAM_RAW_BASE = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${DEFAULT_BRANCH}`;
+const PERSONAL_WEBSITE_URL = "https://arturonavax.dev/env";
 
 // Cache TTL: 5 minutes edge cache, 1 hour s-maxage, stale-while-revalidate for 24h
 const CACHE_CONTROL_HEADER = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
@@ -92,7 +94,7 @@ export default {
       return fetchUpstreamRaw(request, ctx, `${UPSTREAM_RAW_BASE}/install.sh`);
     }
 
-    // 4. Social crawlers (OpenGraph cards)
+    // 4. Social crawlers (OpenGraph preview cards)
     if (
       lowerUA.includes("discordbot") ||
       lowerUA.includes("slackbot") ||
@@ -102,8 +104,8 @@ export default {
       return serveSocialMetadata();
     }
 
-    // 5. Interactive Desktop / Mobile Web Browsers -> HTML Dashboard
-    return serveHTMLDashboard();
+    // 5. Interactive Desktop / Mobile Web Browsers -> Redirect to personal website (/env)
+    return Response.redirect(PERSONAL_WEBSITE_URL, 302);
   },
 };
 
@@ -174,218 +176,6 @@ function serveSocialMetadata(): Response {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
-
-/**
- * Serves a responsive modern terminal-inspired dashboard for human visitors
- */
-function serveHTMLDashboard(): Response {
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ANX Platform — Developer Environment</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0d1117;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --accent: #58a6ff;
-      --accent-hover: #79c0ff;
-      --text: #c9d1d9;
-      --text-dim: #8b949e;
-      --code-bg: #090d13;
-      --green: #3fb950;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      padding: 40px 20px;
-      display: flex;
-      justify-content: center;
-    }
-    .container {
-      max-width: 840px;
-      width: 100%;
-    }
-    header {
-      margin-bottom: 32px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 24px;
-    }
-    .badge {
-      display: inline-block;
-      background: rgba(88, 166, 255, 0.15);
-      color: var(--accent);
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      border: 1px solid rgba(88, 166, 255, 0.3);
-    }
-    h1 {
-      font-size: 2.2rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.5px;
-      margin-bottom: 8px;
-    }
-    p.lead {
-      color: var(--text-dim);
-      font-size: 1.1rem;
-    }
-    .section-title {
-      font-size: 1.2rem;
-      color: #fff;
-      margin: 32px 0 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .card-title {
-      font-weight: 600;
-      color: #fff;
-      font-size: 1rem;
-    }
-    .code-block {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 14px 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: relative;
-    }
-    .code-text {
-      color: var(--accent-hover);
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-    .copy-btn {
-      background: var(--card-bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-left: 12px;
-      flex-shrink: 0;
-    }
-    .copy-btn:hover {
-      background: var(--border);
-      color: #fff;
-    }
-    .copy-btn.copied {
-      background: var(--green);
-      color: #fff;
-      border-color: var(--green);
-    }
-    footer {
-      margin-top: 48px;
-      text-align: center;
-      color: var(--text-dim);
-      font-size: 13px;
-      border-top: 1px solid var(--border);
-      padding-top: 24px;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="badge">ANX Platform v1.0</div>
-      <h1>arturonavax/env</h1>
-      <p class="lead">Declarative developer environment, modular dotfiles, hardware-safe power management, and AI productivity tools.</p>
-    </header>
-
-    <div class="section-title">⚡ Quick Remote Installation</div>
-
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Linux, macOS, BSD & Raspberry Pi (POSIX sh / bash)</span>
-      </div>
-      <div class="code-block">
-        <span class="code-text" id="cmd-sh">curl -fsSL https://env.arturonavax.dev | sh</span>
-        <button class="copy-btn" onclick="copyCode('cmd-sh', this)">Copy</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Windows 10 / 11 (PowerShell)</span>
-      </div>
-      <div class="code-block">
-        <span class="code-text" id="cmd-ps">irm https://env.arturonavax.dev | iex</span>
-        <button class="copy-btn" onclick="copyCode('cmd-ps', this)">Copy</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Windows Command Prompt (CMD)</span>
-      </div>
-      <div class="code-block">
-        <span class="code-text" id="cmd-bat">curl -fsSL https://env.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat</span>
-        <button class="copy-btn" onclick="copyCode('cmd-bat', this)">Copy</button>
-      </div>
-    </div>
-
-    <footer>
-      <p>Source code available on <a href="https://github.com/arturonavax/env" target="_blank" rel="noopener">GitHub</a> &bull; Managed with ANX Platform Orchestrator</p>
-    </footer>
-  </div>
-
-  <script>
-    function copyCode(id, btn) {
-      const el = document.getElementById(id);
-      navigator.clipboard.writeText(el.innerText).then(() => {
-        btn.innerText = "Copied!";
-        btn.classList.add("copied");
-        setTimeout(() => {
-          btn.innerText = "Copy";
-          btn.classList.remove("copied");
-        }, 2000);
-      });
-    }
-  </script>
-</body>
-</html>`;
-
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
-}
 ```
 
 ---
@@ -416,15 +206,22 @@ Place this configuration file at the root of your Cloudflare Worker project:
 
 ## 5. Deployment Instructions
 
+Authenticate with your Cloudflare account:
+
 ```bash
-# 1. Authenticate with Cloudflare
 npx wrangler login
+```
 
-# 2. Test locally
+Test worker routing locally:
+
+```bash
 npx wrangler dev
+```
 
-# 3. Deploy to production edge
+Deploy the worker to the production edge:
+
+```bash
 npx wrangler deploy
 ```
 
-Once deployed, all users accessing `env.arturonavax.dev` receive optimal, operating-system-tailored installer streams with zero friction and maximum speed.
+Once deployed, all users accessing `env.arturonavax.dev` receive optimal, operating-system-tailored installer streams with zero friction and maximum speed, while browser visitors land directly on `https://arturonavax.dev/env`.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,76 @@ func newDefaultState() *State {
 		Targets:         map[string]TargetWindowState{},
 		NotifiedResets:  map[string]int64{},
 	}
+}
+
+// UnmarshalJSON provides backward compatibility for legacy Python float timestamps and json.Number.
+func (s *State) UnmarshalJSON(data []byte) error {
+	type rawTargetWindowState TargetWindowState
+	type rawState struct {
+		ScheduledWakeEpoch any                             `json:"scheduled_wake_epoch"`
+		ExpectingAutoWake  bool                            `json:"expecting_auto_wake"`
+		AutoWakeEnabled    *bool                           `json:"auto_wake_enabled,omitempty"`
+		LastWakeEpoch      any                             `json:"last_wake_epoch"`
+		LastAutoWakeEpoch  any                             `json:"last_auto_wake_epoch"`
+		TargetsLastWake    map[string]any                  `json:"targets_last_wake"`
+		Targets            map[string]rawTargetWindowState `json:"targets"`
+		NotifiedResets     map[string]any                  `json:"notified_resets"`
+	}
+
+	var raw rawState
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	s.ScheduledWakeEpoch = parseEpochAny(raw.ScheduledWakeEpoch)
+	s.ExpectingAutoWake = raw.ExpectingAutoWake
+	s.AutoWakeEnabled = raw.AutoWakeEnabled
+	s.LastWakeEpoch = parseEpochAny(raw.LastWakeEpoch)
+	s.LastAutoWakeEpoch = parseEpochAny(raw.LastAutoWakeEpoch)
+
+	s.TargetsLastWake = make(map[string]int64, len(raw.TargetsLastWake))
+	for k, v := range raw.TargetsLastWake {
+		s.TargetsLastWake[k] = parseEpochAny(v)
+	}
+
+	s.Targets = make(map[string]TargetWindowState, len(raw.Targets))
+	for k, v := range raw.Targets {
+		s.Targets[k] = TargetWindowState(v)
+	}
+
+	s.NotifiedResets = make(map[string]int64, len(raw.NotifiedResets))
+	for k, v := range raw.NotifiedResets {
+		s.NotifiedResets[k] = parseEpochAny(v)
+	}
+
+	return nil
+}
+
+func parseEpochAny(val any) int64 {
+	switch v := val.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return i
+		}
+		if f, err := v.Float64(); err == nil {
+			return int64(f)
+		}
+	case string:
+		s := strings.TrimSpace(v)
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return i
+		}
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return int64(f)
+		}
+	}
+	return 0
 }
 
 func (s *State) normalize() {

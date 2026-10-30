@@ -340,6 +340,15 @@ Persistent=true
 WantedBy=timers.target
 `, wakeTime, wakeTime)
 
+	// Clean up legacy unit names if present
+	if _, err := m.lookPath("systemctl"); err == nil {
+		for _, leg := range []string{"aitools-wake.service", "aitools-wake.timer"} {
+			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "stop", leg)
+			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "disable", leg)
+			_ = os.Remove(filepath.Join(dir, leg))
+		}
+	}
+
 	files := map[string]string{
 		filepath.Join(dir, UnitMonitorService): monitorUnit,
 		filepath.Join(dir, UnitWakeupService):  wakeupService,
@@ -523,8 +532,15 @@ func (m *Manager) Status(ctx context.Context) (*StatusReport, error) {
 			}
 		}
 		if tmrOut, tErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 5 * time.Second}, "systemctl", "--user", "is-active", UnitWakeupTimer); tErr == nil {
-			if s := strings.TrimSpace(tmrOut); s != "" {
+			if s := strings.TrimSpace(tmrOut); s != "" && s != "inactive" && s != "failed" {
 				rep.WakeupTimerStatus = s
+			}
+		}
+		if rep.WakeupTimerStatus == "inactive" {
+			if tmrOut, tErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 5 * time.Second}, "systemctl", "--user", "is-active", "aitools-wake.timer"); tErr == nil {
+				if s := strings.TrimSpace(tmrOut); s != "" {
+					rep.WakeupTimerStatus = s
+				}
 			}
 		}
 	}

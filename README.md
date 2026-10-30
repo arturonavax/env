@@ -1,144 +1,276 @@
-# 🦊 arturonavax/env (`anx`)
+# arturonavax/env
 
-High-performance, modular dotfiles repository and multi-platform development environment powered by the **`anx`** unified Go CLI/TUI orchestrator.
+High-performance, modular dotfiles repository and multi-platform development environment supporting Linux (Debian/Ubuntu, Arch, Fedora), macOS, and Windows (PowerShell/Windows Terminal).
 
-Designed for software engineers, architects, and AI developers who demand near-instant startup times, rock-solid stability, declarative configurations, and ergonomic command-line workflows across Linux, macOS, and Windows.
-
----
-
-## Table of Contents
-
-1. [Architectural Principles & Philosophy](#1-architectural-principles--philosophy)
-2. [Quick Start & Installation](#2-quick-start--installation)
-   - [Unix Bootstrap (`install.sh` / `scripts/bootstrap_anx.sh`)](#unix-bootstrap)
-   - [Windows Bootstrap (`install.bat` / `scripts/bootstrap_anx.ps1`)](#windows-bootstrap)
-   - [Interactive Bubble Tea v2 TUI Dashboard & Wizard](#interactive-tui-dashboard--wizard)
-   - [Autonomous Headless Provisioning & Dry-Run Planning](#headless-provisioning--dry-run-planning)
-3. [Declarative Zero-Go-Edit Manifest Architecture](#3-declarative-zero-go-edit-manifest-architecture)
-4. [The `anx` Command Hierarchy](#4-the-anx-command-hierarchy)
-5. [Decoupled Personal Tools Subsystem & AI Suite](#5-decoupled-personal-tools-subsystem--ai-suite)
-   - [Path Isolation Architecture](#path-isolation-architecture)
-   - [Tool Lifecycle Updaters](#tool-lifecycle-updaters)
-   - [AI Suite (`aitools`) Integration & Ergonomic Shortcuts](#ai-suite-integration--shortcuts)
-6. [Lifecycle Memory, Deprecation & Cleanup Engine](#6-lifecycle-memory-deprecation--cleanup-engine)
-   - [State Tracking & Orphan Detection](#state-tracking--orphan-detection)
-   - [Declarative Archives Registry](#declarative-archives-registry)
-   - [The `anx cleanup` / `anx prune` Command](#the-anx-cleanup--prune-command)
-7. [Offline Man Pages & Shell Autocompletion](#7-offline-man-pages--shell-autocompletion)
-8. [Workstation Hardware Hacks & Security Optimizer](#8-workstation-hardware-hacks--security-optimizer)
-9. [Subsystems & Tooling Stack](#9-subsystems--tooling-stack)
-10. [Modern CLI Tool Replacements & Non-Destructive Aliases](#10-modern-cli-tool-replacements--non-destructive-aliases)
+Orchestrated by the unified Go CLI/TUI platform **ANX** (`anx`) and powered by a declarative zero-Go-edit YAML manifest architecture, Bubble Tea v2 full-screen TUI, and decoupled personal tooling engine.
 
 ---
 
-## 1. Architectural Principles & Philosophy
+## 1. System Architecture
 
-- **Zero-Friction Performance**: Sub-millisecond terminal startup. Startup scripts (`.zshrc`, `.base.zsh`, `.tools.sh`) are compiled into `.zwc` word-code binaries via `zcompile` and memory-mapped by Zsh. Completion caches (`compinit -C`) bypass costly disk audits if validated within 24 hours.
-- **Declarative Zero-Go-Edit Engine**: All packages, configurations, profiles, tools, and decommissioned archives are declared in YAML under `manifests/`. Modify behavior without touching Go code.
-- **Strict Path Isolation**: Personal developer tools (`ai`, `rtk`, `herdr`) are installed to an isolated directory (`~/.local/share/anx/bin` on Unix, `%LOCALAPPDATA%\anx\tools\bin` on Windows) to prevent collisions with system binaries in `~/.local/bin/`.
-- **Environment Memory & Deprecation Tracking**: Tracks historical state in `state.json` with advisory file locking (`flock`). Automatically detects orphaned packages, deprecated components, and legacy archive remnants (e.g. `tmux`), providing safe pruning via `anx cleanup`.
-- **Non-Destructive Alias Architecture**: Standard Unix utilities (`grep`, `find`, `cat`, `less`) **are NEVER hijacked or aliased** to modern tools (`rg`, `fd`, `bat`). POSIX purity and muscle memory for remote SSH production environments are strictly preserved, while dedicated shortcuts (`rgh`, `fdh`, `preview`, `dft`, `l`) provide ergonomic speed.
-- **True 3-Way Dotfile Reconciliation**: Dotfiles are deployed using Myers unified diffs, ancestor tracking for true 3-way merge, and non-destructive `# >>> arturonavax/env >>>` SmartAppend marker preservation.
-- **Offline & Private**: Embedded SQLite shell history (`atuin`) with directory scoping and zero remote sync or telemetry. Offline manual pages (`man anx`) generated directly from Cobra definitions.
+```text
+├── cmd/
+│   ├── anx/                # Master multicall CLI & TUI entrypoint
+│   └── aitools/            # Standalone multicall symlink entrypoint
+├── manifests/              # Declarative zero-Go-edit YAML manifests
+│   ├── packages/           # 80 packages with multi-distro translations & fallbacks
+│   ├── configs.yaml        # 23 managed dotfile configuration assets
+│   ├── profiles.yaml       # 8 workstation profiles with multi-level inheritance
+│   ├── hacks.yaml          # Declarative hardware optimization definitions
+│   ├── hacks/              # Machine- and hardware-specific system optimizations
+│   │   ├── dell-precision-m6800/ # Dell M6800 fan, GPU and power optimizations
+│   │   └── x11-scroll-lock-led/  # Hardware Scroll Lock LED control
+│   ├── tools.yaml          # Decoupled personal tools engine registry
+│   └── archives.yaml       # Decommissioned legacy tools (tmux, wdiff, litecli)
+├── scripts/                # Multi-platform pre-flight & Go bootstrap scripts
+│   ├── bootstrap_anx.sh    # Unix bootstrap (GVM priority -> standalone -> native PM)
+│   ├── bootstrap_anx.ps1   # Windows bootstrap (official go.dev archive with SHA-256)
+│   └── safe_suspend.sh     # Standalone hardware-safe power management utility
+├── internal/               # Production Go Hexagonal Architecture packages
+│   ├── domain/             # Pure domain models (plans, resources, transactions)
+│   ├── app/                # Application services (Install, Sync, Hacks, Ops, Doctor, Audit)
+│   ├── manifest/           # Manifest loader (embedded + overlay) & DAG solver
+│   ├── catalog/            # Resource registry
+│   ├── providers/          # Dispatcher (native, github_release, script, source, language)
+│   ├── configsync/         # Myers unified diff, bidirectional sync & 3-way merge
+│   ├── snapshot/           # Hierarchical snapshot manager (50MB quota)
+│   ├── hacks/              # DMI/hardware detector & hack runner
+│   ├── ops/                # Multi-runtime rebuilder, power manager & Lynis optimizer
+│   ├── ai/                 # Go port of aitools (JSONC, harnesses, gitflow, RTC wake)
+│   ├── tui/                # Modular Bubble Tea v2 TUI (8 tabs, 4 Golden Rules)
+│   └── cli/                # Cobra + Viper CLI commands
+├── install.sh              # Primary POSIX sh installation entry point
+├── install.bat             # Windows installation entry point
+├── uninstall.sh            # Systematic uninstallation and cache purging entry point
+└── files/                  # Canonical configuration files deployed to target systems
+```
 
 ---
 
 ## 2. Quick Start & Installation
 
-### One-Line Remote Installation (curl / PowerShell)
+### One-Line Remote Installation
 
-Bootstrap directly from the `env.arturonavax.dev` subdomain:
+Bootstrap directly from `env.arturonavax.dev`:
+
+#### Linux, macOS, BSD & Raspberry Pi (POSIX sh)
+
+Interactive guided installation (default in interactive terminal):
 
 ```sh
-# Linux, macOS, BSD, Raspberry Pi & Android Termux (pure POSIX sh)
 curl -fsSL https://env.arturonavax.dev/install.sh | sh
+```
 
-# Shorthand via Cloudflare Edge Worker
+Shorthand via Cloudflare Edge Worker:
+
+```sh
 curl -fsSL https://env.arturonavax.dev | sh
+```
 
-# Autonomous unattended provisioning
+Autonomous unattended provisioning (zero prompts):
+
+```sh
 curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
+```
 
-# Safe dry-run preview
+Safe dry-run preview (previews touched files without modifying the system):
+
+```sh
 curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
+#### Windows 10 / 11 (PowerShell)
+
+Interactive installation:
+
 ```powershell
-# Windows (Native PowerShell)
 irm https://env.arturonavax.dev/install.ps1 | iex
 ```
 
+Autonomous unattended provisioning:
+
+```powershell
+& ([scriptblock]::Create((irm https://env.arturonavax.dev/install.ps1))) -Yes -Profile developer
+```
+
+#### Windows (Command Prompt - CMD)
+
+```bat
+curl -fsSL https://env.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
+```
+
 See [docs/remote_install.md](docs/remote_install.md) and [docs/cloudflare_worker.md](docs/cloudflare_worker.md) for full subdomain configuration and Cloudflare Edge Worker deployment.
+
+---
 
 ### Local Unix Bootstrap
 
 Bootstrap the environment on Linux or macOS. The bootstrap script automatically checks system prerequisites and guarantees Go `>= 1.24` using a resilient 3-tier strategy (**Tier 1 GVM priority** -> **Tier 2 standalone Go release** -> **Tier 3 native package manager**), compiles `bin/anx`, and launches the interactive setup wizard:
 
+Clone repository:
+
 ```sh
-# Clone repository
 git clone https://github.com/arturonavax/env.git ~/repos/github.com/arturonavax/env
+```
+
+Navigate to repository root:
+
+```sh
 cd ~/repos/github.com/arturonavax/env
+```
 
-# Interactive bootstrap (compiles anx and launches TUI wizard)
+Interactive bootstrap (compiles anx and launches TUI wizard):
+
+```sh
 ./install.sh
+```
 
-# Autonomous non-interactive installation
+Autonomous non-interactive installation:
+
+```sh
 ./install.sh -y
 ```
+
+---
 
 ### Windows Bootstrap
 
 Run the native PowerShell preflight and bootstrap script via `install.bat` or `scripts/bootstrap_anx.ps1`. Automatically downloads the official SHA-256 verified Go archive from `go.dev` if missing, compiles `anx.exe` and `aitools.exe` into `%LOCALAPPDATA%\Programs\anx\bin`, and registers user PATH:
 
-```cmd
+```bat
 install.bat
 ```
+
+---
 
 ### Interactive TUI Dashboard & Wizard
 
 Run the full-screen terminal user interface powered by [Bubble Tea v2](https://github.com/charmbracelet/bubbletea):
 
-```sh
-# Interactive full-screen workstation dashboard (8 tabs, keyboard/mouse navigation)
-anx dashboard
+Interactive full-screen workstation dashboard (8 tabs, keyboard and mouse navigation):
 
-# Step-by-step interactive configuration & package selection wizard
+```sh
+anx dashboard
+```
+
+Step-by-step interactive configuration & package selection wizard:
+
+```sh
 anx wizard
 ```
+
+---
 
 ### Headless Provisioning & Dry-Run Planning
 
 For automated CI/CD pipelines, container builds, or previewing changes without touching the filesystem:
 
+Dry-run execution plan for the active workstation profile:
+
 ```sh
-# Dry-run execution plan for the active workstation profile
 anx plan
+```
 
-# Preview execution plan for a specific profile (minimal, developer, full, etc.)
+Preview execution plan for a specific profile:
+
+```sh
 anx plan --profile minimal
+```
 
-# Apply configuration autonomously
+Apply configuration autonomously:
+
+```sh
 anx apply --yes --profile developer
 ```
+
+---
+
+### Hardware-Safe Power Management & Suspend (`anx sleep`)
+
+Hardware-safe power transitions designed to eliminate GPU driver deadlocks (Nouveau Kepler with `nouveau.pstate=1`) and Xfce video crashes:
+
+Display diagnostic health check of power states, GPU driver, active VT, and swap space:
+
+```sh
+anx sleep status
+```
+
+Lock desktop session and enter DPMS low-power screen standby (zero crash risk, instant wake):
+
+```sh
+anx sleep lock
+```
+
+Suspend CPU to idle states without cutting GPU PLL power:
+
+```sh
+anx sleep s2idle
+```
+
+Deep S3 sleep with automatic VT switch to release X11 DRM master:
+
+```sh
+anx sleep deep
+```
+
+Suspend to disk (validates Swap >= RAM):
+
+```sh
+anx sleep hibernate
+```
+
+---
 
 ### Multi-Platform System Uninstallation & Teardown
 
 Cleanly remove compiled binaries, system PATH modifications, and caches, with optional configuration purging:
 
+#### Unix / macOS Teardown
+
+Preview uninstallation teardown plan:
+
 ```sh
-# Unix / macOS teardown
-./uninstall.sh --plan           # Dry-run preview of components to be removed
-./uninstall.sh                  # Interactive teardown
-./uninstall.sh -y --purge       # Autonomous teardown including configuration directories
+./uninstall.sh --plan
+```
 
-# Windows teardown
-uninstall.bat                   # Native entrypoint delegating to scripts\uninstall_anx.ps1
-uninstall.bat -Plan             # Preview dry-run on Windows
+Interactive uninstallation:
+
+```sh
+./uninstall.sh
+```
+
+Autonomous uninstallation including configuration purge:
+
+```sh
+./uninstall.sh -y --purge
+```
+
+#### Windows Teardown
+
+Preview uninstallation teardown plan on Windows:
+
+```bat
+uninstall.bat -Plan
+```
+
+Autonomous uninstallation including configuration purge on Windows:
+
+```bat
 uninstall.bat -Yes -PurgeConfigs
+```
 
-# Unified CLI teardown from anx itself
-anx uninstall --system          # Teardown platform binaries and system integrations
-anx uninstall --system --purge  # Complete purge including ~/.config/anx
+#### Unified CLI Teardown
+
+Teardown platform binaries and system integrations via `anx`:
+
+```sh
+anx uninstall --system
+```
+
+Complete purge including configurations via `anx`:
+
+```sh
+anx uninstall --system --purge
 ```
 
 ---
@@ -201,6 +333,7 @@ System, Hacks & Maintenance:
   hacks       Machine-specific hardware/OS optimizations (opt-in, never applied implicitly)
   optimize    Audit hardware/kernel/security and produce a guardrail-validated optimization script
   rebuild     Rebuild global tools after toolchain upgrades (Go, Rust, Node, Python, Neovim)
+  sleep       Hardware-safe power transitions, screen standby via DPMS, and hibernation diagnostics
   update      Inspect repository, personal tools, and dotfiles for available updates
   upgrade     End-to-end upgrade: pull repo, update tools, apply package plans, and sync dotfiles
 
@@ -244,17 +377,27 @@ System utilities like `difftastic`, `delta`, and `tealdeer` declare `allow_globa
 
 Update decoupled tools using their declarative update strategies:
 
+List all registered personal and external tools:
+
 ```sh
-# List all registered personal and external tools
 anx tools list
+```
 
-# Inspect runtime status and execution target for a tool
+Inspect runtime status and execution target for a tool:
+
+```sh
 anx tools info rtk
+```
 
-# Execute a tool through the decoupled runner
+Execute a tool through the decoupled runner:
+
+```sh
 anx tools run rtk --version
+```
 
-# Update a specific tool according to its declared strategy
+Update a specific tool according to its declared strategy:
+
+```sh
 anx tools update rtk
 ```
 
@@ -268,20 +411,33 @@ Supported update strategies:
 
 `aitools` is fully ported to Go and integrated natively under `anx tools ai`:
 
+AI Conventional Commit generation from git diff:
+
 ```sh
-# AI Conventional Commit generation
-anx tools ai commit      # Shortcut: anx tools commit, alias: ai-commit / ai-cm
+anx tools ai commit
+```
 
-# AI Pull Request description generation
-anx tools ai pr          # Shortcut: anx tools pr
+AI Pull Request description generation:
 
-# Direct non-interactive LLM query
-anx tools ai llm "query" # Shortcut: anx tools llm, top-level alias: anx llm
+```sh
+anx tools ai pr
+```
 
-# 5-hour rolling quota telemetry inspection
-anx tools ai quota       # Shortcut: anx tools quota
+Direct non-interactive LLM query:
 
-# Motherboard 04:00 AM RTC hardware alarm wakeup daemon
+```sh
+anx tools ai llm "query"
+```
+
+5-hour rolling quota telemetry inspection:
+
+```sh
+anx tools ai quota
+```
+
+Hardware RTC auto-wake daemon and power scheduler:
+
+```sh
 anx tools ai daemon
 ```
 
@@ -304,23 +460,33 @@ Decommissioned components are tracked historically in `manifests/archives.yaml`:
 
 Detects and cleans up stale remnants across three memory tiers:
 
+Preview all cleanup candidates without modifying anything (dry-run):
+
 ```sh
-# Preview all cleanup candidates without modifying anything (dry-run)
 anx cleanup --dry-run
+```
 
-# Interactively review and prune stale components
+Interactively review and prune stale components:
+
+```sh
 anx cleanup
+```
 
-# Autonomously confirm cleanup of orphaned packages only
+Autonomously confirm cleanup of orphaned packages only:
+
+```sh
 anx cleanup --yes --orphans-only
 ```
 
-Filtering in package listings:
-```sh
-# View all deprecated packages with their recommended replacements
-anx list --deprecated
+View all deprecated packages with their recommended replacements:
 
-# View all orphaned packages tracked in state.json
+```sh
+anx list --deprecated
+```
+
+View all orphaned packages tracked in state.json:
+
+```sh
 anx list --orphaned
 ```
 
@@ -330,13 +496,15 @@ anx list --orphaned
 
 ### Standard Troff Man Pages (`man anx`)
 
-Generate and install standard Unix troff section 1 man pages using `github.com/spf13/cobra/doc`:
+Install man pages directly for the active user (`~/.local/share/man/man1`):
 
 ```sh
-# Install man pages directly for the active user (~/.local/share/man/man1)
 anx doc man --install
+```
 
-# View manual directly
+View manual directly:
+
+```sh
 man anx
 ```
 
@@ -350,13 +518,27 @@ anx doc markdown --dir docs/cli
 
 ### Shell Autocompletion
 
-Generate or permanently install tab-completions for your shell:
+Install completion script directly for Zsh:
 
 ```sh
-# Install completion script directly to shell completions folder
 anx completion zsh --install
+```
+
+Install completion script directly for Bash:
+
+```sh
 anx completion bash --install
+```
+
+Install completion script directly for Fish:
+
+```sh
 anx completion fish --install
+```
+
+Install completion script directly for PowerShell:
+
+```powershell
 anx completion powershell --install
 ```
 
@@ -365,17 +547,25 @@ anx completion powershell --install
 ## 8. Workstation Hardware Hacks & Security Optimizer
 
 ### Hardware Hacks Registry (`manifests/hacks/` & `manifests/hacks.yaml`)
+
 Workstation-specific hardware and kernel tweaks with DMI hardware auto-detection:
 - **`dell-precision-m6800`**: Quad-core i7, NVIDIA Quadro Kepler fan curve overrides, GPU power profiles, and thermal mitigations.
 - **`x11-scroll-lock-led`**: Controls physical hardware Scroll Lock LED on modern desktop environments.
 
+Detect hardware optimizations matching the current machine:
+
 ```sh
-# List and detect hardware optimizations for the current machine
 anx hacks detect
+```
+
+Apply a specific hardware hack:
+
+```sh
 anx hacks apply dell-precision-m6800
 ```
 
 ### System Security & Hardware Optimizer (`anx optimize`)
+
 Runs Lynis security audits and profiles CPU, NVMe/SSD, and kernel parameters, enforcing 12 strict automated security guardrails before applying reversible optimization scripts.
 
 ---
@@ -418,27 +608,39 @@ Standard Unix utilities (`grep`, `find`, `cat`, `less`) **remain completely unto
 `arturonavax/env` includes a comprehensive multi-platform automated testing harness covering unit tests, integration tests, and containerized end-to-end (E2E) verification:
 
 ### Native Go Test Suite
+
+Run full unit and integration test suite with race detector:
+
 ```sh
-# Run full unit and integration test suite with race detector
 go test -v -race ./...
 ```
 
 ### Hermetic Docker E2E Testing Suite
+
 The Docker E2E test harness (`tests/e2e/`) validates the complete lifecycle inside isolated, multi-stage containers across multiple Linux environments (Debian Bookworm and Alpine Linux):
 
-- **Remote Installer Pipeline**: Tests `curl -fsSL ... | bash` remote execution without pre-installed repositories.
+- **Remote Installer Pipeline**: Tests `curl -fsSL ... | sh` remote execution without pre-installed repositories.
 - **GitHub Release Binary**: Tests pre-compiled binary download and multicall dispatch in a pure zero-Go environment.
 - **Build From Source**: Verifies Go toolchain bootstrapping and compilation from repository source.
 - **CLI & TUI Interactivity**: Tests unattended batch automation (`anx apply -y`) and full Bubble Tea v2 interactive wizard stages via pseudo-terminal emulation (`tests/e2e/scripts/run_wizard_pty.py`).
 - **Concurrent Execution**: Validates DAG solver resolution and tool inspections under parallel workloads.
 - **Dotfile Reconciliation & Doctor**: Tests Myers 3-way dotfile merge, hierarchical snapshot rotation (50MB quota), personal tools path isolation, and comprehensive diagnostic health checks.
 
-```sh
-# Run full E2E suite across both Debian and Alpine
-./scripts/test_e2e_docker.sh all
+Run full E2E suite across both Debian and Alpine:
 
-# Or run specific target environments
+```sh
+./scripts/test_e2e_docker.sh all
+```
+
+Run specifically for Debian:
+
+```sh
 ./scripts/test_e2e_docker.sh debian
+```
+
+Run specifically for Alpine:
+
+```sh
 ./scripts/test_e2e_docker.sh alpine
 ```
 
