@@ -42,3 +42,22 @@ alias la='eza -lah --group-directories-first --icons'
 alias l='eza -lah --group-directories-first --icons'
 alias cat='bat --paging=never'
 alias diff='difft'
+
+# 8. Safe Suspend & Power Management
+safe-suspend() {
+    if command -v anx >/dev/null 2>&1; then
+        anx sleep "$@"
+    elif command -v safe-suspend >/dev/null 2>&1; then
+        command safe-suspend "$@"
+    else
+        local script_path="${REPO_ROOT:-$HOME/repos/github.com/arturonavax/env}/scripts/safe_suspend.sh"
+        if [ -f "$script_path" ]; then
+            bash "$script_path" "$@"
+        else
+            echo "safe-suspend command not found" >&2
+            return 1
+        fi
+    fi
+}
+alias suspend-safe='safe-suspend'
+alias sleep-safe='safe-suspend'

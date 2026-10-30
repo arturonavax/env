@@ -193,6 +193,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"uninstall.sh"
 			"scripts/bootstrap_anx.sh"
 			"scripts/install_golang.sh"
+			"scripts/safe_suspend.sh"
 			"scripts/test_e2e_docker.sh"
 			"manifests/hacks/dell-precision-m6800/apply_hacks.sh"
 			"manifests/hacks/x11-scroll-lock-led/activate_scroll_lock.sh"

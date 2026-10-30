@@ -12,6 +12,8 @@ alias ll = eza -lh --group-directories-first --icons
 alias la = eza -lah --group-directories-first --icons
 alias cat = bat --paging=never
 alias diff = difft
+alias suspend-safe = safe-suspend
+alias sleep-safe = safe-suspend
 
 # Shell Integrations
 if (which starship | is-not-empty) {

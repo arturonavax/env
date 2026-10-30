@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,11 +23,41 @@ func systemCommands(appCtx *AppContext) []*cobra.Command {
 		newRebuildCmd(appCtx),
 		newOptimizeCmd(appCtx),
 		newCleanupCmd(appCtx),
+		newSleepCmd(appCtx),
 	}
 	for _, c := range cmds {
 		c.GroupID = "system"
 	}
 	return cmds
+}
+
+func newSleepCmd(appCtx *AppContext) *cobra.Command {
+	return &cobra.Command{
+		Use:       "sleep [lock|s2idle|deep|hibernate|status]",
+		Aliases:   []string{"suspend", "safe-suspend"},
+		Short:     "Execute hardware-safe suspend, screen standby, or hibernation",
+		ValidArgs: []string{"lock", "s2idle", "deep", "hibernate", "status"},
+		Args:      cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode := ""
+			if len(args) > 0 {
+				mode = args[0]
+			}
+			scriptPath := filepath.Join(appCtx.RepoRoot, "scripts", "safe_suspend.sh")
+			if !isFile(scriptPath) {
+				binPath, err := exec.LookPath("safe-suspend")
+				if err != nil {
+					return fmt.Errorf("safe-suspend script not found in repo or PATH: %w", err)
+				}
+				scriptPath = binPath
+			}
+			c := exec.CommandContext(cmd.Context(), "bash", scriptPath, mode)
+			c.Stdout = cmd.OutOrStdout()
+			c.Stderr = cmd.ErrOrStderr()
+			c.Stdin = os.Stdin
+			return c.Run()
+		},
+	}
 }
 
 func hackCompletion(appCtx *AppContext) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {

@@ -23,6 +23,8 @@ end
 if type -q difft
     alias diff="difft"
 end
+alias suspend-safe="safe-suspend"
+alias sleep-safe="safe-suspend"
 
 # Interactive Integrations
 if status is-interactive

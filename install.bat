@@ -8,8 +8,14 @@ setlocal EnableDelayedExpansion
 
 where powershell.exe >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\bootstrap_anx.ps1" %*
-    exit /b %ERRORLEVEL%
+    if exist "%~dp0install.ps1" (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" %*
+        exit /b %ERRORLEVEL%
+    )
+    if exist "%~dp0scripts\bootstrap_anx.ps1" (
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\bootstrap_anx.ps1" %*
+        exit /b %ERRORLEVEL%
+    )
 )
 
 echo [WARN] PowerShell not detected. Falling back to basic Go build...

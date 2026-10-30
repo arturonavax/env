@@ -3,10 +3,17 @@
 # install.sh
 # Primary multi-platform installation entry point for arturonavax/env.
 # Bootstraps Go if needed and executes the ANX Platform orchestrator.
-# Run: ./install.sh --help
+# Supports both local invocation and remote piped execution:
+#   curl -fsSL https://env.arturonavax.dev/install.sh | bash
 # ==============================================================================
 
 set -euo pipefail
+
+# If running through a pipe (e.g. curl ... | bash) and a controlling TTY exists,
+# reconnect standard input so interactive wizards (Bubble Tea) can operate.
+if [[ ! -t 0 ]] && [[ -r /dev/tty && -w /dev/tty ]]; then
+	exec </dev/tty
+fi
 
 # Anchoring: locate repository root or clone on remote curl execution
 REPO_ROOT=""
@@ -32,8 +39,16 @@ if [[ -z "${REPO_ROOT}" ]]; then
 			cp -r "${GIT_REMOTE_URL}/." "${TARGET_REPO}/"
 		elif command -v git >/dev/null 2>&1; then
 			git clone --depth 1 "${GIT_REMOTE_URL}" "${TARGET_REPO}"
+		elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+			echo "  [INFO] 'git' not found; fetching repository archive via curl & tar..."
+			mkdir -p "${TARGET_REPO}"
+			curl -fsSL "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
+		elif command -v wget >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+			echo "  [INFO] 'git' not found; fetching repository archive via wget & tar..."
+			mkdir -p "${TARGET_REPO}"
+			wget -qO- "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
 		else
-			echo "[Installer Error]: 'git' is required to clone repository for installation." >&2
+			echo "[Installer Error]: 'git' or 'curl'+'tar' is required to clone repository for installation." >&2
 			exit 1
 		fi
 	fi

@@ -340,6 +340,25 @@ function rebuild-tools() {
 }
 alias rbt=rebuild-tools
 
+## Safe Suspend & Power Management (Hardware-Aware for Kepler/Nouveau/Xfce)
+function safe-suspend() {
+    if command -v anx >/dev/null 2>&1; then
+        anx sleep "$@"
+    elif command -v safe-suspend >/dev/null 2>&1; then
+        command safe-suspend "$@"
+    else
+        local script_path="${REPO_ROOT:-$HOME/repos/github.com/arturonavax/env}/scripts/safe_suspend.sh"
+        if [[ -f "$script_path" ]]; then
+            bash "$script_path" "$@"
+        else
+            echo "safe-suspend command not found" >&2
+            return 1
+        fi
+    fi
+}
+alias suspend-safe='safe-suspend'
+alias sleep-safe='safe-suspend'
+
 # Update
 function update() {
     fcwb='\033[1;37m'

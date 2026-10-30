@@ -45,7 +45,29 @@ Designed for software engineers, architects, and AI developers who demand near-i
 
 ## 2. Quick Start & Installation
 
-### Unix Bootstrap
+### One-Line Remote Installation (curl / PowerShell)
+
+Bootstrap directly from the `env.arturonavax.dev` subdomain:
+
+```sh
+# Linux & macOS (reconnects TTY automatically when piped)
+curl -fsSL https://env.arturonavax.dev/install.sh | bash
+
+# Autonomous unattended provisioning
+curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- -y --profile developer
+
+# Safe dry-run preview
+curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- --plan
+```
+
+```powershell
+# Windows (Native PowerShell)
+irm https://env.arturonavax.dev/install.ps1 | iex
+```
+
+See [docs/remote_install.md](docs/remote_install.md) for full subdomain configuration and Cloudflare Worker setup.
+
+### Local Unix Bootstrap
 
 Bootstrap the environment on Linux or macOS. The bootstrap script automatically checks system prerequisites and guarantees Go `>= 1.24` using a resilient 3-tier strategy (**Tier 1 GVM priority** -> **Tier 2 standalone Go release** -> **Tier 3 native package manager**), compiles `bin/anx`, and launches the interactive setup wizard:
 
