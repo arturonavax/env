@@ -10,7 +10,7 @@
 #      - Tier 2: Personal standalone installer (src/remotes/install_golang.sh -i)
 #      - Tier 3: Native package manager (brew, pacman, dnf, apt, apk)
 #   3. Compile ANX binary with embedded version metadata.
-#   4. Symlink 'aitools' -> 'anx' for multicall binary compatibility.
+#   4. Symlink 'safe-suspend' -> 'anx' for multicall binary compatibility.
 #   5. Delegate forwarded arguments to ANX CLI.
 # ==============================================================================
 
@@ -101,7 +101,7 @@ try_download_release_binary() {
 		log_info "Extracting release binary to ${DEST_BIN}..."
 		if tar -xzf "${tarball}" -C "${DEST_BIN}" 2>/dev/null; then
 			chmod +x "${DEST_BIN}/anx"
-			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+			rm -f "${DEST_BIN}/aitools"
 			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
 			if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
 				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
@@ -260,9 +260,9 @@ build_anx() {
 	)
 
 	# Multicall compatibility symlinks
-	ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+	rm -f "${DEST_BIN}/aitools"
 	ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
-	log_success "ANX binary built and deployed to ${DEST_BIN}/anx (multicall symlinks: aitools, safe-suspend)"
+	log_success "ANX binary built and deployed to ${DEST_BIN}/anx (multicall symlink: safe-suspend)"
 
 	if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
 		ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"

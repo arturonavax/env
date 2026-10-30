@@ -159,11 +159,12 @@ try {
     }
 
     $anxExe = Join-Path $DestDir "anx.exe"
-    $aitoolsExe = Join-Path $DestDir "aitools.exe"
+    $safeSuspendExe = Join-Path $DestDir "safe-suspend.exe"
 
     & go build -ldflags "-s -w -X main.Version=$ver -X main.Commit=$commit -X main.Date=$date" -o $anxExe .\cmd\anx
-    Copy-Item $anxExe $aitoolsExe -Force
-    Write-Success "Built $anxExe and $aitoolsExe"
+    Copy-Item $anxExe $safeSuspendExe -Force
+    Remove-Item (Join-Path $DestDir "aitools.exe") -ErrorAction SilentlyContinue
+    Write-Success "Built $anxExe (alias: safe-suspend.exe)"
 
     if ($BinName -and $BinName -ne "anx") {
         $customExe = Join-Path $DestDir "$BinName.exe"

@@ -217,7 +217,7 @@ func TestSystemdUnitAndLaunchdGenerationInTempDir(t *testing.T) {
 		store,
 		nil,
 		daemon.WithPlatform(platform.NewTestInfo(platform.TestInfoParams{OS: "linux", HomeDir: linuxHome})),
-		daemon.WithBinaryPath(filepath.Join(linuxHome, ".local", "bin", "aitools")),
+		daemon.WithBinaryPath(filepath.Join(linuxHome, ".local", "bin", "anx")),
 		daemon.WithLookPath(func(string) (string, error) { return "", errors.New("no systemctl in unit test") }),
 	)
 

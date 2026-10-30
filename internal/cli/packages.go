@@ -161,7 +161,7 @@ func runSystemUninstall(cmd *cobra.Command, appCtx *AppContext, purge bool) erro
 
 	if appCtx.Flags.DryRun {
 		fmt.Fprintln(out, st.Header.Render("ANX System Uninstallation Plan (Dry-Run):"))
-		fmt.Fprintf(out, "  • Binaries:       %s (anx, aitools, aliases)\n", appCtx.Platform.LocalBinDir())
+		fmt.Fprintf(out, "  • Binaries:       %s (anx, safe-suspend, aliases)\n", appCtx.Platform.LocalBinDir())
 		fmt.Fprintf(out, "  • State & tools:  %s\n", appCtx.Platform.StateDir())
 		if purge {
 			fmt.Fprintf(out, "  • Configurations: %s (purge requested)\n", appCtx.Platform.ConfigDir())

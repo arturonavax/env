@@ -78,16 +78,10 @@ assert_exit_code 0 "$anx_ai_code" "anx tools ai --help exit status" &&
 	assert_contains "$anx_ai_help" "Multi-harness AI CLI suite" "AI suite description" &&
 	pass "anx tools ai displayed AI command suite"
 
-# Test 7: aitools standalone binary
-aitools_bin="${REPO_ROOT}/bin/aitools"
-if [[ ! -x "$aitools_bin" ]]; then
-	go build -o "$aitools_bin" "${REPO_ROOT}/cmd/aitools"
-fi
-
-aitools_smoke="$("$aitools_bin" --help 2>&1)"
-aitools_smoke_code=$?
-assert_exit_code 0 "$aitools_smoke_code" "aitools --help exit status" &&
-	assert_contains "$aitools_smoke" "Multi-harness AI CLI suite" "aitools description" &&
-	assert_contains "$aitools_smoke" "commit" "aitools commit command" &&
-	assert_contains "$aitools_smoke" "quota" "aitools quota command" &&
-	pass "aitools CLI verified with full subcommands suite"
+# Test 7: anx ai command suite
+ai_smoke="$("$anx_bin" ai --help 2>&1)"
+ai_smoke_code=$?
+assert_exit_code 0 "$ai_smoke_code" "anx ai --help exit status" &&
+	assert_contains "$ai_smoke" "commit" "anx ai commit command" &&
+	assert_contains "$ai_smoke" "quota" "anx ai quota command" &&
+	pass "anx ai CLI verified with full subcommands suite"

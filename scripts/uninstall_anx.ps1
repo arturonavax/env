@@ -35,7 +35,7 @@ if ($PurgeConfigs -and (Test-Path $ConfigDir)) { $Targets += $ConfigDir }
 
 if ($IsPlan) {
     Write-Host "`nUninstallation Plan (Dry-Run Preview):" -ForegroundColor Cyan
-    Write-Host "  • Binaries to purge:    $ProgramsDir (anx.exe, aitools.exe, aliases)"
+    Write-Host "  • Binaries to purge:    $ProgramsDir (anx.exe, safe-suspend.exe, aliases)"
     Write-Host "  • State & tools cache:  $StateDir"
     if ($PurgeConfigs) {
         Write-Host "  • User configurations:  $ConfigDir (purge requested)"

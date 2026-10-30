@@ -493,7 +493,7 @@ func FormatJSON(evals []TargetEvaluation) (string, error) {
 // FormatTable renders evaluations as an aligned terminal table with ASCII/Unicode progress bars.
 func FormatTable(evals []TargetEvaluation) string {
 	var sb strings.Builder
-	sb.WriteString("aitools · AI Models Rolling Quota & Reset Timers\n")
+	sb.WriteString("ANX AI · Models Rolling Quota & Reset Timers\n")
 	sb.WriteString(strings.Repeat("─", 86) + "\n")
 	fmt.Fprintf(&sb, "%-14s %-8s %-10s %-19s %-10s %s\n", "ID", "TOOL", "ACCOUNT", "QUOTA", "RESETS AT", "STATUS")
 	sb.WriteString(strings.Repeat("─", 86) + "\n")

@@ -252,7 +252,7 @@ func (rt *runtimeEnv) isStdinTTY(cmd *cobra.Command) bool {
 // or mounted as `anx ai`.
 func NewCommand(opts ...Option) *cobra.Command {
 	o := options{
-		use:     "aitools",
+		use:     "ai",
 		version: DefaultVersion,
 	}
 	for _, opt := range opts {
@@ -282,7 +282,7 @@ func NewCommand(opts ...Option) *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringVar(&rt.cfgFlag, "config", "", "Path to aitools JSON/JSONC configuration file")
+	root.PersistentFlags().StringVar(&rt.cfgFlag, "config", "", "Path to ANX AI JSON/JSONC configuration file")
 
 	root.AddGroup(
 		&cobra.Group{ID: "workflows", Title: "AI Workflows & Pipelines:"},

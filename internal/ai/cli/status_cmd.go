@@ -68,7 +68,7 @@ func newStatusCmd(rt *runtimeEnv) *cobra.Command {
 				return nil
 			}
 
-			fmt.Fprintln(out, "aitools · AI Ecosystem & CLI Status Diagnostics")
+			fmt.Fprintln(out, "ANX AI · Ecosystem & CLI Status Diagnostics")
 			fmt.Fprintln(out, strings.Repeat("─", 78))
 			for _, e := range entries {
 				if e.Available {
@@ -116,7 +116,7 @@ func renderBackends(cmd *cobra.Command, rt *runtimeEnv, asJSON bool) error {
 		return nil
 	}
 
-	fmt.Fprintln(out, "aitools · Available AI Harness Backends & Execution Strategies")
+	fmt.Fprintln(out, "ANX AI · Available AI Harness Backends & Execution Strategies")
 	fmt.Fprintln(out, strings.Repeat("─", 86))
 	fmt.Fprintf(out, "  %-16s %-14s %-11s %-11s %s\n", "BACKEND", "STATUS", "INPUT", "OUTPUT", "DESCRIPTION")
 	fmt.Fprintln(out, strings.Repeat("─", 86))

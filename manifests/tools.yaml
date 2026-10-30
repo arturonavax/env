@@ -3,13 +3,13 @@
 # and discovered dynamically without recompiling anx. Drop custom tool manifests in ~/.config/anx/tools.d/*.yaml.
 tools:
   - id: ai
-    name: "AI Productivity Suite (aitools)"
+    name: "AI Productivity Suite (anx ai)"
     category: "ai"
     description: "Multi-harness AI CLI suite, rolling quota tracker, and gitflow automation"
-    executable: "aitools"
+    executable: "anx"
     fallback_builtin: true
     language: "go"
-    version_args: ["--version"]
+    version_args: ["ai", "--version"]
     repo_url: "https://github.com/arturonavax/env"
     update_strategy: "anx_self"
 

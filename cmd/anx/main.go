@@ -1,17 +1,11 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 
-	aicli "github.com/arturonavax/env/internal/ai/cli"
 	"github.com/arturonavax/env/internal/cli"
-	"github.com/arturonavax/env/internal/domain"
 )
 
 var (
@@ -24,23 +18,8 @@ var (
 )
 
 func main() {
-	// Multicall dispatch: if binary is invoked as "aitools" (symlink or hardlink),
-	// route execution directly to the AI productivity suite CLI tree.
 	base := filepath.Base(os.Args[0])
 	base = strings.TrimSuffix(base, ".exe")
-	if base == "aitools" {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
-
-		cmd := aicli.NewCommand(aicli.WithUse("aitools"))
-		cmd.SetArgs(os.Args[1:])
-		if err := cmd.ExecuteContext(ctx); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			stop()
-			os.Exit(domain.ResolveExitCode(err))
-		}
-		return
-	}
 
 	if base == "safe-suspend" || base == "suspend" {
 		exitCode := cli.ExecuteCLI(append([]string{"sleep"}, os.Args[1:]...), os.Stdout, os.Stderr, Version, Commit, Date)

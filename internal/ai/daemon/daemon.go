@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	UnitMonitorService = "aitools-monitor.service"
-	UnitWakeupService  = "aitools-wakeup.service"
-	UnitWakeupTimer    = "aitools-wakeup.timer"
-	LaunchdLabel       = "dev.arturonavax.aitools.wakeup"
+	UnitMonitorService = "anx-ai-monitor.service"
+	UnitWakeupService  = "anx-ai-wakeup.service"
+	UnitWakeupTimer    = "anx-ai-wakeup.timer"
+	LaunchdLabel       = "dev.arturonavax.anx.ai.wakeup"
 )
 
 // StatusReport holds runtime diagnostics for the background daemon and hardware RTC alarm.
@@ -215,7 +215,7 @@ func NewManager(
 		opt(m)
 	}
 	if m.binaryPath == "" {
-		m.binaryPath = filepath.Join(m.plat.LocalBinDir(), "aitools")
+		m.binaryPath = filepath.Join(m.plat.LocalBinDir(), "anx")
 	}
 	return m
 }
@@ -264,6 +264,7 @@ func (m *Manager) Install(ctx context.Context) (*InstallResult, error) {
   <key>ProgramArguments</key>
   <array>
     <string>%s</string>
+    <string>ai</string>
     <string>daemon</string>
     <string>run-wake-cycle</string>
   </array>
@@ -303,12 +304,12 @@ func (m *Manager) Install(ctx context.Context) (*InstallResult, error) {
 	}
 
 	monitorUnit := fmt.Sprintf(`[Unit]
-Description=aitools AI Quota & D-Bus Sleep/Resume Monitor
+Description=ANX AI Quota & D-Bus Sleep/Resume Monitor
 After=graphical-session.target network.target
 
 [Service]
 Type=simple
-ExecStart=%s daemon run-monitor
+ExecStart=%s ai daemon run-monitor
 Restart=always
 RestartSec=10
 Environment=PATH=%s:/usr/local/bin:/usr/bin:/bin
@@ -319,18 +320,18 @@ WantedBy=default.target
 `, m.binaryPath, binDir)
 
 	wakeupService := fmt.Sprintf(`[Unit]
-Description=aitools Scheduled Quota Wakeup & Rolling Refresh
+Description=ANX Scheduled AI Quota Wakeup & Rolling Refresh
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=%s daemon run-wake-cycle
+ExecStart=%s ai daemon run-wake-cycle
 Environment=PATH=%s:/usr/local/bin:/usr/bin:/bin
 `, m.binaryPath, binDir)
 
 	wakeupTimer := fmt.Sprintf(`[Unit]
-Description=aitools Daily %s Quota Wakeup Timer
+Description=ANX Daily %s AI Quota Wakeup Timer
 
 [Timer]
 OnCalendar=*-*-* %s:00
@@ -342,7 +343,17 @@ WantedBy=timers.target
 
 	// Clean up legacy unit names if present
 	if _, err := m.lookPath("systemctl"); err == nil {
-		for _, leg := range []string{"aitools-wake.service", "aitools-wake.timer"} {
+		legacyUnits := []string{
+			"aitools-monitor.service",
+			"aitools-wakeup.service",
+			"aitools-wakeup.timer",
+			"aitools-wake.service",
+			"aitools-wake.timer",
+			"quota-monitor.service",
+			"quota-primer.service",
+			"quota-primer.timer",
+		}
+		for _, leg := range legacyUnits {
 			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "stop", leg)
 			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "disable", leg)
 			_ = os.Remove(filepath.Join(dir, leg))
@@ -389,17 +400,31 @@ func (m *Manager) Uninstall(ctx context.Context) error {
 		return nil
 	}
 
+	legacyUnits := []string{
+		UnitMonitorService,
+		UnitWakeupService,
+		UnitWakeupTimer,
+		"aitools-monitor.service",
+		"aitools-wakeup.service",
+		"aitools-wakeup.timer",
+		"aitools-wake.service",
+		"aitools-wake.timer",
+		"quota-monitor.service",
+		"quota-primer.service",
+		"quota-primer.timer",
+	}
+
 	if _, err := m.lookPath("systemctl"); err == nil {
-		_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "stop", UnitMonitorService, UnitWakeupTimer, UnitWakeupService)
-		_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "disable", UnitMonitorService, UnitWakeupTimer, UnitWakeupService)
+		for _, u := range legacyUnits {
+			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "stop", u)
+			_, _ = m.exec.RunWithInput(ctx, security.RunOptions{}, "systemctl", "--user", "disable", u)
+		}
 	}
 
 	dir := m.SystemdUserDir()
-	for _, name := range []string{UnitMonitorService, UnitWakeupService, UnitWakeupTimer, "aitools-wake.service", "aitools-wake.timer"} {
+	for _, name := range legacyUnits {
 		p := filepath.Join(dir, name)
-		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
+		_ = os.Remove(p)
 	}
 
 	if _, err := m.lookPath("systemctl"); err == nil {
@@ -555,7 +580,7 @@ func (m *Manager) Status(ctx context.Context) (*StatusReport, error) {
 // FormatStatus renders a human-readable summary of StatusReport.
 func FormatStatus(rep *StatusReport) string {
 	var sb strings.Builder
-	sb.WriteString("aitools Daemon & Hardware RTC Auto-Wake Status:\n")
+	sb.WriteString("ANX AI Daemon & Hardware RTC Auto-Wake Status:\n")
 	fmt.Fprintf(&sb, "  Auto-Wake Enabled:  %v\n", rep.AutoWakeEnabled)
 	fmt.Fprintf(&sb, "  Target Wake Time:   %s\n", rep.TargetWakeTime)
 	fmt.Fprintf(&sb, "  Auto-Resuspend:     %v (delay: %ds)\n", rep.AutoResuspend, rep.ResuspendDelaySec)
@@ -603,7 +628,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 	res := &WakeCycleResult{}
 	aw := m.cfg.Daemon.AutoWake
 	_ = m.store.AppendLog("INFO", "TIMER_WAKE_START", "Executing scheduled wake cycle", nil)
-	fmt.Fprintln(out, "==> aitools: Executing scheduled wake cycle...")
+	fmt.Fprintln(out, "==> anx ai: Executing scheduled wake cycle...")
 
 	// 1. Verify network reconnect
 	fmt.Fprintf(out, "Awaiting network connectivity (timeout %s)...\n", m.connectivity.Timeout)
@@ -613,7 +638,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		msg := "Internet connectivity unavailable after wakeup. Aborting suspend; system remains awake."
 		fmt.Fprintln(out, msg)
 		_ = m.store.AppendLog("ERROR", "NETWORK_TIMEOUT", msg, nil)
-		m.Notify(ctx, "aitools: Wakeup Failed", msg, "critical")
+		m.Notify(ctx, "ANX AI: Wakeup Failed", msg, "critical")
 		if aw.Enabled {
 			_, _, _ = m.ScheduleNextRTC(ctx, aw.Time)
 		}
@@ -637,7 +662,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		msg := "One or more model wakeup probes failed. Aborting suspend; system remains awake for inspection."
 		fmt.Fprintln(out, msg)
 		_ = m.store.AppendLog("ERROR", "WAKE_FAILED", msg, nil)
-		m.Notify(ctx, "aitools: Wakeup Failed", msg, "critical")
+		m.Notify(ctx, "ANX AI: Wakeup Failed", msg, "critical")
 		if aw.Enabled {
 			_, _, _ = m.ScheduleNextRTC(ctx, aw.Time)
 		}
@@ -661,7 +686,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		msg := fmt.Sprintf("Model quotas primed. Resuspending in %ds...", aw.ResuspendDelaySec)
 		fmt.Fprintln(out, msg)
 		_ = m.store.AppendLog("INFO", "SUSPEND_PENDING", msg, nil)
-		m.Notify(ctx, "aitools: Wake Complete", msg, "normal")
+		m.Notify(ctx, "ANX AI: Wake Complete", msg, "normal")
 
 		if err := m.sleepDelay(ctx, delay); err != nil {
 			return res, err
@@ -676,7 +701,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		res.SuspendMethod = method
 		_ = m.store.AppendLog("INFO", "SUSPEND_SUCCESS", "Suspended via "+method, nil)
 	} else {
-		m.Notify(ctx, "aitools: Wake Complete", "Model rolling quota windows successfully primed.", "normal")
+		m.Notify(ctx, "ANX AI: Wake Complete", "Model rolling quota windows successfully primed.", "normal")
 	}
 
 	return res, nil
@@ -762,7 +787,7 @@ func (m *Manager) Notify(ctx context.Context, title, body, urgency string) {
 					"-u",
 					urgency,
 					"-a",
-					"aitools",
+					"anx-ai",
 					"-i",
 					"utilities-terminal",
 					title,
@@ -826,7 +851,7 @@ func (m *Manager) RunMonitor(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("starting gdbus monitor: %w", err)
 	}
 
-	fmt.Fprintln(out, "==> aitools D-Bus sleep/resume monitor active...")
+	fmt.Fprintln(out, "==> anx ai D-Bus sleep/resume monitor active...")
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		if ctx.Err() != nil {
