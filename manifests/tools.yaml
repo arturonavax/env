@@ -1,0 +1,86 @@
+# Declarative Developer & Personal Tools Registry
+# External tools can be implemented in any language (Go, Rust, Python, Bash, Node.js)
+# and discovered dynamically without recompiling anx. Drop custom tool manifests in ~/.config/anx/tools.d/*.yaml.
+tools:
+  - id: ai
+    name: "AI Productivity Suite (aitools)"
+    category: "ai"
+    description: "Multi-harness AI CLI suite, rolling quota tracker, and gitflow automation"
+    executable: "aitools"
+    fallback_builtin: true
+    language: "go"
+    version_args: ["--version"]
+    repo_url: "https://github.com/arturonavax/env"
+    update_strategy: "anx_self"
+
+  - id: rtk
+    name: "Rust Token Killer"
+    category: "ai"
+    description: "High-speed LLM terminal output compressor proxy (saves 60-90% prompt tokens)"
+    executable: "rtk"
+    fallback_builtin: false
+    language: "rust"
+    version_args: ["--version"]
+    repo_url: "https://github.com/arturonavax/rtk"
+    update_strategy: "self_update"
+    update_cmd: ["rtk", "update"]
+
+  - id: herdr
+    name: "Herdr Multiplexer"
+    category: "terminal"
+    description: "Terminal and agent multiplexer with workspace isolation and socket API"
+    executable: "herdr"
+    fallback_builtin: false
+    language: "rust"
+    version_args: ["--version"]
+    repo_url: "https://herdr.dev"
+    update_strategy: "self_update"
+    update_cmd: ["herdr", "upgrade"]
+
+  - id: usql
+    name: "Universal SQL Client"
+    category: "database"
+    description: "Single universal CLI for PostgreSQL, MySQL, SQLite3, Redis, and ClickHouse"
+    executable: "usql"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "go"
+    version_args: ["--version"]
+    repo_url: "https://github.com/xo/usql"
+    update_strategy: "package"
+
+  - id: difft
+    name: "Difftastic (dft)"
+    category: "git"
+    description: "Tree-sitter structural AST diffing tool"
+    executable: "difft"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    version_args: ["--version"]
+    repo_url: "https://github.com/Wilfred/difftastic"
+    update_strategy: "package"
+
+  - id: delta
+    name: "Git Delta"
+    category: "git"
+    description: "Syntax-highlighting side-by-side terminal diff viewer"
+    executable: "delta"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    version_args: ["--version"]
+    repo_url: "https://github.com/dandavison/delta"
+    update_strategy: "package"
+
+  - id: tealdeer
+    name: "Tealdeer (tldr)"
+    category: "cli-tools"
+    description: "Instant Rust implementation of tldr help pages"
+    executable: "tldr"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    version_args: ["--version"]
+    repo_url: "https://github.com/dbrgn/tealdeer"
+    update_strategy: "package"

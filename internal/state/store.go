@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -44,6 +46,7 @@ type persistedState struct {
 	SchemaVersion int                          `json:"schema_version"`
 	ActiveProfile string                       `json:"active_profile,omitempty"`
 	ActiveTheme   string                       `json:"active_theme,omitempty"`
+	RepoRoot      string                       `json:"repo_root,omitempty"`
 	Resources     map[string]InstalledRecord   `json:"resources"`
 	ConfigBases   map[string]ConfigBaseRecord  `json:"config_bases"`
 	AppliedHacks  map[string]AppliedHackRecord `json:"applied_hacks"`
@@ -151,6 +154,29 @@ func (s *Store) AllResources() map[string]InstalledRecord {
 	return out
 }
 
+// DetectOrphaned compares tracked installed resources against a slice of active/desired resource IDs.
+// It returns all InstalledRecords present in state.json that are no longer part of active/desired manifests.
+func (s *Store) DetectOrphaned(desiredResourceIDs []string) []InstalledRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	desiredMap := make(map[string]bool, len(desiredResourceIDs))
+	for _, id := range desiredResourceIDs {
+		desiredMap[id] = true
+	}
+
+	orphans := make([]InstalledRecord, 0)
+	for id, rec := range s.data.Resources {
+		if !desiredMap[id] {
+			orphans = append(orphans, rec)
+		}
+	}
+	slices.SortFunc(orphans, func(a, b InstalledRecord) int {
+		return strings.Compare(a.ResourceID, b.ResourceID)
+	})
+	return orphans
+}
+
 // RecordConfigBase records the canonical ancestor content for 3-way dotfile merges.
 func (s *Store) RecordConfigBase(configID string, content []byte) error {
 	sum := sha256.Sum256(content)
@@ -246,6 +272,25 @@ func (s *Store) ActiveTheme() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.data.ActiveTheme
+}
+
+// SetRepoRoot updates the persisted repository root directory.
+func (s *Store) SetRepoRoot(path string) error {
+	s.mu.Lock()
+	s.data.RepoRoot = strings.TrimSpace(path)
+	snapshot, err := json.MarshalIndent(s.data, "", "  ")
+	s.mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("marshaling state: %w", err)
+	}
+	return s.atomicWrite(snapshot)
+}
+
+// RepoRoot returns the persisted repository root directory or empty string.
+func (s *Store) RepoRoot() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.data.RepoRoot
 }
 
 func (s *Store) atomicWrite(payload []byte) error {

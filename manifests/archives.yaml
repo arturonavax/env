@@ -1,0 +1,32 @@
+# Declarative Archive of Retired / Deprecated Components
+# Components formally replaced or decommissioned from this developer environment.
+# anx doctor, anx prune, and the TUI dashboard cross-reference this archive to recommend
+# removal or safe uninstallation of stale legacy remnants.
+archives:
+  - id: tmux
+    name: "Tmux Multiplexer"
+    category: "terminal"
+    retired_at: "2026-03-01"
+    reason: "Decommissioned in favor of Herdr (herdr.dev). Herdr provides native AI agent detection, zero nested PTY redraw friction, and socket workspace management."
+    recommend_purge: true
+    replacement: "herdr"
+    cleanup_paths:
+      - "~/.tmux.conf"
+      - "~/.config/tmux"
+      - "~/.tmux"
+
+  - id: wdiff
+    name: "GNU wdiff"
+    category: "cli-tools"
+    retired_at: "2026-04-15"
+    reason: "Replaced by Difftastic (difft) for syntax-aware AST Tree-sitter diffing."
+    recommend_purge: true
+    replacement: "difftastic"
+
+  - id: litecli
+    name: "LiteCLI (Python)"
+    category: "database"
+    retired_at: "2026-05-10"
+    reason: "Replaced by usql (single static Go binary) eliminating Python virtualenv startup overhead."
+    recommend_purge: true
+    replacement: "usql"
