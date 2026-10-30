@@ -115,10 +115,13 @@ func (m Model) renderOverview(w, h int) string {
 			"",
 			m.styles.Highlight.Render("CORE COMMANDS"),
 			"• anx apply       Apply desired workstation state",
+			"• anx update      Check repo, tools & dotfile updates",
+			"• anx upgrade     Pull repo, update tools & sync",
 			"• anx sync        Reconcile managed dotfiles",
+			"• anx capture     Ingest dotfiles back into repo",
 			"• anx doctor      Run full health audit",
 			"• anx audit       Vulnerability scan (OSV)",
-			"• anx ai          AI assistant & automation tools",
+			"• anx tools       Decoupled personal tools engine",
 		}
 
 		rightLines := []string{
@@ -167,6 +170,9 @@ func (m Model) renderPackages(w, h int) string {
 			prefix = "> "
 		}
 		statusTag := m.styles.Success.Render("[Available]")
+		if p.Deprecated {
+			statusTag = m.styles.Warning.Render("[Deprecated]")
+		}
 		row := fmt.Sprintf("%s%-14s %-12s %-32s %s", prefix, p.ID, p.Category, p.Description, statusTag)
 		if i == m.selectedIdx {
 			lines = append(lines, m.styles.SelectedRow.Render(row))
@@ -185,7 +191,11 @@ func (m Model) renderConfigs(w, h int) string {
 		if i == m.selectedIdx {
 			prefix = "> "
 		}
-		row := fmt.Sprintf("%s%-16s %-26s -> %s", prefix, c.ID, c.Source, c.Target)
+		tag := ""
+		if c.Deprecated {
+			tag = " " + m.styles.Warning.Render("[Deprecated]")
+		}
+		row := fmt.Sprintf("%s%-16s %-26s -> %s%s", prefix, c.ID, c.Source, c.Target, tag)
 		if i == m.selectedIdx {
 			lines = append(lines, m.styles.SelectedRow.Render(row))
 		} else {
@@ -196,16 +206,22 @@ func (m Model) renderConfigs(w, h int) string {
 }
 
 func (m Model) renderAI(w, h int) string {
+	toolsBin := "isolated"
+	if m.deps.Platform != nil {
+		toolsBin = m.deps.Platform.ToolsBinDir()
+	}
 	lines := []string{
-		m.styles.Highlight.Render("AI TOOLS & AGENT ORCHESTRATION"),
-		"• CLI Subcommands: anx ai [commit|pr|llm|daemon|setup|status]",
-		"• Supported Harnesses: agy (default), claude, codex, opencode, pi, llm, ollama",
-		"• Quota Management: 5-hour rolling usage tracking with warning thresholds",
-		"• Autonomous Wake: RTC alarm wakeup (04:00 AM) with verified reconnect",
-		"• Safety Guardrails: 500KB context cap, sanitized diffs, timeout safeguards",
+		m.styles.Highlight.Render("PERSONAL TOOLS & AI SUITE (DECOUPLED ARCHITECTURE)"),
+		"• Decoupled Commands: anx tools [list|info|run|update|upgrade]",
+		"• AI Subcommands:     anx tools ai [commit|pr|llm|quota|daemon|status]",
+		"• Direct Shortcuts:    anx tools llm, anx tools commit, anx tools pr, anx tools quota",
+		"• Path Isolation:      " + toolsBin + " (never scans generic ~/.local/bin/)",
+		"• Supported Runtimes:  Independent projects in Go, Rust, Python, Bash, Node.js",
+		"• Quota Tracking:      5-hour rolling usage tracking with warning thresholds",
+		"• Autonomous Wake:     RTC alarm wakeup (04:00 AM) with verified reconnect",
 		"",
 		m.styles.Highlight.Render("MULTICALL STATUS"),
-		"• The 'aitools' binary is symlinked to 'anx' for seamless backwards compatibility.",
+		"• Multicall dispatch: 'aitools' is symlinked to 'anx' with zero recompilation required.",
 	}
 	return BuildPanel(m.styles, lines, w, h, true)
 }

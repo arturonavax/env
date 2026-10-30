@@ -1,69 +1,20 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# rcmd backend: X11 (Universal EWMH)
-# Aislamiento estricto entre ventanas de tipo CLASS y tipo TITLE
+# rcmd backend: X11 (Universal EWMH: wmctrl + xdotool + xprop)
+# Supports:
+# - Configured shortcuts: launch if closed, focus/cycle if open, title/class mode
+# - Unconfigured shortcuts: ONLY focus the last active open app starting with
+#   that letter (lowercase), considering ONLY currently open apps.
+# - Cleans desktop prefixes: gnome-, xfce4-, xfce-, kde- (e.g. gnome-calculator -> calculator)
+# - Filters system panels, docks, desktop elements (e.g. xfce4-panel Clock)
+# - MRU focus + sister windows raising when coming from another app
+# - Optimized for near-instant execution (hash maps & pure bash builtins)
 # ==============================================================================
-
-# Normaliza cualquier representación de ID de ventana a 0x%08x
-normalize_wid() {
-    local raw="$1"
-    [ -z "$raw" ] && { echo ""; return; }
-    printf "0x%08x" "$((raw))" 2>/dev/null || echo "${raw,,}"
-}
-
-# Obtiene todos los patrones configurados con match_mode 'title'
-get_configured_title_patterns() {
-    local conf="${CONFIG_FILE:-}"
-    if [ -z "$conf" ] && declare -f find_config >/dev/null 2>&1; then
-        conf="$(find_config 2>/dev/null || echo "")"
-    fi
-    [ -z "$conf" ] || [ ! -f "$conf" ] && return 0
-
-    while IFS='|' read -r k cmd pat mode rest || [ -n "$k" ]; do
-        k="${k//$'\r'/}"
-        cmd="${cmd//$'\r'/}"
-        pat="${pat//$'\r'/}"
-        mode="${mode//$'\r'/}"
-
-        k="${k#"${k%%[![:space:]]*}"}"
-        k="${k%"${k##*[![:space:]]}"}"
-        case "$k" in '#'*|'') continue ;; esac
-
-        mode="${mode#"${mode%%[![:space:]]*}"}"
-        mode="${mode%"${mode##*[![:space:]]}"}"
-
-        if [ "${mode,,}" = "title" ]; then
-            pat="${pat#"${pat%%[![:space:]]*}"}"
-            pat="${pat%"${pat##*[![:space:]]}"}"
-            cmd="${cmd#"${cmd%%[![:space:]]*}"}"
-            cmd="${cmd%"${cmd##*[![:space:]]}"}"
-            [ -z "$pat" ] && pat="$cmd"
-            [ -n "$pat" ] && echo "$pat"
-        fi
-    done < "$conf"
-}
-
-# Verifica si una cadena contiene alguno de los patrones excluidos
-matches_any_title_pattern() {
-    local str="${1,,}"
-    shift
-    local p
-    for p in "$@"; do
-        [ -z "$p" ] && continue
-        local p_l="${p,,}"
-        if [[ "$str" == *"$p_l"* ]]; then
-            return 0
-        fi
-    done
-    return 1
-}
 
 find_dynamic_app_x11() {
     local key="${1,,}"
-    local title_excludes=()
-    mapfile -t title_excludes < <(get_configured_title_patterns)
 
-    # 1. Obtener orden de apilamiento MRU (cima a fondo)
+    # 1. Obtain stacking order (MRU: top to bottom)
     local stack=()
     mapfile -t stack < <(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null | grep -o "0x[0-9a-fA-F]*" | tac)
     if [ ${#stack[@]} -eq 0 ]; then
@@ -71,21 +22,19 @@ find_dynamic_app_x11() {
     fi
     [ ${#stack[@]} -eq 0 ] && return 1
 
-    # 2. Mapear ventanas abiertas en hash map O(1) con IDs normalizados
+    # 2. Pre-parse open client windows into associative array (O(1) lookups)
     declare -A win_data
-    local w d p c _ t norm_w
-    while read -r w d p c _ t || [ -n "$w" ]; do
+    local w d p c t norm_w
+    while read -r w d p c _ t; do
         [ -z "$w" ] && continue
-        norm_w="$(normalize_wid "$w")"
+        printf -v norm_w "0x%08x" "$((w))" 2>/dev/null || norm_w="${w,,}"
         win_data["$norm_w"]="$d|$p|$c|$t"
     done < <(wmctrl -lxp 2>/dev/null)
 
-    # 3. Buscar la ventana candidata más reciente en el stack
+    # 3. Search in stacking order (MRU)
     for wid_raw in "${stack[@]}"; do
         local wid_hex
-        wid_hex="$(normalize_wid "$wid_raw")"
-        [ -z "$wid_hex" ] && continue
-
+        printf -v wid_hex "0x%08x" "$((wid_raw))" 2>/dev/null || continue
         local info="${win_data[$wid_hex]:-}"
         [ -z "$info" ] && continue
 
@@ -93,24 +42,19 @@ find_dynamic_app_x11() {
         IFS='|' read -r desk pid wmclass title <<< "$info"
         [ "$desk" = "-1" ] && continue
 
-        # Ignorar paneles, escritorios y docks
+        # Skip system desktop elements, panels, docks, trays
         local wmclass_l="${wmclass,,}"
-        case "$wmclass_l" in
-            *panel*|*desktop*|*dock*|*tray*) continue ;;
-        esac
-
-        # Ignorar ventanas que pertenezcan a atajos dedicados de título
-        if [ ${#title_excludes[@]} -gt 0 ] && [ -n "$title" ]; then
-            if matches_any_title_pattern "$title" "${title_excludes[@]}"; then
-                continue
-            fi
+        if [[ "$wmclass_l" =~ (panel|desktop|dock|tray) ]]; then
+            continue
         fi
 
+        # Process name from /proc/$pid/comm (pure bash redirection, 0 forks)
         local comm=""
         if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/comm" ]; then
             read -r comm < "/proc/$pid/comm" 2>/dev/null || comm=""
         fi
 
+        # Convert to lowercase and clean runtime suffixes
         local comm_l="${comm,,}"
         comm_l="${comm_l%-bin}"
         comm_l="${comm_l%.real}"
@@ -118,9 +62,11 @@ find_dynamic_app_x11() {
 
         local inst="${wmclass%%.*}"
         local inst_l="${inst,,}"
+
         local cls="${wmclass##*.}"
         local cls_l="${cls,,}"
 
+        # Clean desktop environment prefixes
         local comm_clean="${comm_l#gnome-}"
         comm_clean="${comm_clean#xfce4-}"
         comm_clean="${comm_clean#xfce-}"
@@ -138,25 +84,27 @@ find_dynamic_app_x11() {
 
         local candidates=("$inst_l" "$inst_clean" "$cls_l" "$cls_clean" "$comm_l" "$comm_clean")
 
-        # Extracción limpia de sufijos de títulos sin regex frágil
+        # Extract app name from title if available
         if [ -n "$title" ]; then
             local title_l="${title,,}"
-            if [[ "$title_l" == *" - "* ]]; then
-                local app_suffix="${title_l##* - }"
+            # If title has separator like ' — ' or ' - ', the app name is at the end (e.g. "... — Mozilla Firefox")
+            if [[ "$title_l" =~ [[:space:]][—\-][[:space:]](.+)$ ]]; then
+                local app_suffix="${BASH_REMATCH[1]}"
                 candidates+=("$app_suffix")
-                for w_item in $app_suffix; do candidates+=("$w_item"); done
-            elif [[ "$title_l" == *"   "* ]]; then
-                local app_suffix="${title_l##*   }"
-                candidates+=("$app_suffix")
-                for w_item in $app_suffix; do candidates+=("$w_item"); done
+                for w in $app_suffix; do
+                    candidates+=("$w")
+                done
             else
+                # Standalone title (e.g. "Calculator", "Ghostty")
                 local clean_title="${title_l#\(*\)[[:space:]]}"
-                clean_title="${clean_title#\([0-9]*\)[[:space:]]}"
                 candidates+=("$clean_title")
-                for w_item in $clean_title; do candidates+=("$w_item"); done
+                for w in $clean_title; do
+                    candidates+=("$w")
+                done
             fi
         fi
 
+        # Check if any candidate starts with the requested key
         for cand in "${candidates[@]}"; do
             [ -z "$cand" ] && continue
             if [[ "$cand" == "$key"* ]]; then
@@ -174,46 +122,37 @@ rcmd_backend_x11() {
     local pattern="$3"
     local match_mode="${4:-class}"
 
+    # Defensive check: ensure required X11 tools exist
     if ! command -v wmctrl >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1; then
-        echo "Error: rcmd requiere 'wmctrl' y 'xdotool' en X11." >&2
-        [ -n "$cmd" ] && rcmd_launch "$cmd"
+        echo "Error: rcmd requires 'wmctrl' and 'xdotool' on X11." >&2
+        if [ -n "$cmd" ]; then
+            nohup bash -c "$cmd" >/dev/null 2>&1 &
+        fi
         exit 1
     fi
 
-    local title_excludes=()
-    if [ "$match_mode" = "class" ]; then
-        mapfile -t title_excludes < <(get_configured_title_patterns)
-    fi
-
     # --------------------------------------------------------------------------
-    # 1. Modo Dinámico (Sin configurar en rcmd.conf)
+    # 1. Dynamic Mode (Unconfigured letter shortcut: only focus currently open apps)
     # --------------------------------------------------------------------------
     if [ -z "$pattern" ] && [ -z "$cmd" ]; then
         local target_info
-        target_info=$(find_dynamic_app_x11 "$key" 2>/dev/null || true)
+        target_info=$(find_dynamic_app_x11 "$key" || true)
+
+        # If no currently open app starts with this letter: DO NOTHING
         [ -z "$target_info" ] && exit 0
 
         local target_win app_wmclass
         IFS='|' read -r target_win app_wmclass <<< "$target_info"
 
+        # Find all open windows belonging to this app
         local WINS=()
-        local app_wmclass_l="${app_wmclass,,}"
-        while read -r w d c _host title || [ -n "$w" ]; do
-            [ -z "$w" ] && continue
-            local c_l="${c,,}"
-            if [[ "$c_l" == *"$app_wmclass_l"* ]]; then
-                if [ ${#title_excludes[@]} -gt 0 ] && matches_any_title_pattern "$title" "${title_excludes[@]}"; then
-                    continue
-                fi
-                WINS+=("$(normalize_wid "$w")")
-            fi
-        done < <(wmctrl -lx 2>/dev/null)
-
+        mapfile -t WINS < <(wmctrl -lx | awk -v pat="$app_wmclass" 'tolower($3) == tolower(pat) {print tolower($1)}')
         [ ${#WINS[@]} -eq 0 ] && WINS=("$target_win")
 
+        # Active window check
         local active_dec active_hex
         active_dec=$(xdotool getactivewindow 2>/dev/null || echo 0)
-        active_hex="$(normalize_wid "$active_dec")"
+        printf -v active_hex "0x%08x" "$active_dec" 2>/dev/null || active_hex="0x00000000"
 
         local is_active_in_app=0
         local current_index=-1
@@ -226,56 +165,49 @@ rcmd_backend_x11() {
         done
 
         if [ "$is_active_in_app" -eq 1 ]; then
+            # Already active in this app: cycle to next window if multiple exist
             local next_index=$(( (current_index + 1) % ${#WINS[@]} ))
             target_win="${WINS[$next_index]}"
+        else
+            # Coming from another app: raise sister windows behind target
+            for w in "${WINS[@]}"; do
+                if [ "$w" != "$target_win" ]; then
+                    xdotool windowraise "$((w))" 2>/dev/null
+                fi
+            done
         fi
 
-        wmctrl -i -a "$target_win" 2>/dev/null || xdotool windowactivate "$((target_win))" 2>/dev/null
+        # Raise and activate target window
+        xdotool windowraise "$((target_win))" 2>/dev/null
+        xdotool windowactivate "$((target_win))" 2>/dev/null
+        wmctrl -i -a "$target_win"
         exit 0
     fi
 
     # --------------------------------------------------------------------------
-    # 2. Modo Configurado (cmd o pattern especificado)
+    # 2. Configured Mode (cmd or pattern specified)
     # --------------------------------------------------------------------------
     [ -z "$pattern" ] && pattern="$cmd"
-    local pat_l="${pattern,,}"
 
     local WINS=()
-    declare -A WINS_MAP
+    if [ "$match_mode" = "title" ]; then
+        mapfile -t WINS < <(wmctrl -l | awk -v pat="$pattern" 'tolower($0) ~ tolower(pat) {print tolower($1)}')
+    else
+        mapfile -t WINS < <(wmctrl -lx | awk -v pat="$pattern" 'tolower($3) ~ tolower(pat) {print tolower($1)}')
+    fi
 
-    while read -r w d c _host title || [ -n "$w" ]; do
-        [ -z "$w" ] && continue
-        local c_l="${c,,}"
-        local t_l="${title,,}"
-        local nw
-        nw="$(normalize_wid "$w")"
-
-        if [ "$match_mode" = "title" ]; then
-            if [[ "$t_l" == *"$pat_l"* ]]; then
-                WINS+=("$nw")
-                WINS_MAP["$nw"]=1
-            fi
-        else
-            if [[ "$c_l" == *"$pat_l"* ]]; then
-                if [ ${#title_excludes[@]} -gt 0 ] && matches_any_title_pattern "$title" "${title_excludes[@]}"; then
-                    continue
-                fi
-                WINS+=("$nw")
-                WINS_MAP["$nw"]=1
-            fi
-        fi
-    done < <(wmctrl -lx 2>/dev/null)
-
+    # Si no hay ventanas abiertas
     if [ ${#WINS[@]} -eq 0 ]; then
         if [ -n "$cmd" ]; then
-            rcmd_launch "$cmd"
+            nohup bash -c "$cmd" >/dev/null 2>&1 &
         fi
         exit 0
     fi
 
+    # Obtener el ID de la ventana activa en formato hex normalizado (0x00000000)
     local active_dec active_hex
     active_dec=$(xdotool getactivewindow 2>/dev/null || echo 0)
-    active_hex="$(normalize_wid "$active_dec")"
+    printf -v active_hex "0x%08x" "$active_dec" 2>/dev/null || active_hex="0x00000000"
 
     local is_active_in_app=0
     local current_index=-1
@@ -287,29 +219,41 @@ rcmd_backend_x11() {
         fi
     done
 
+    # Determinar ventana objetivo (TARGET_WIN)
     local target_win=""
     if [ "$is_active_in_app" -eq 1 ]; then
+        # Ya estás dentro de la app: ciclar a la siguiente ventana
         local next_index=$(( (current_index + 1) % ${#WINS[@]} ))
         target_win="${WINS[$next_index]}"
     else
+        # Vienes de otra app: buscar en el stack X11 la ventana más reciente (MRU)
         local stack=()
         mapfile -t stack < <(xprop -root _NET_CLIENT_LIST_STACKING 2>/dev/null | grep -o '0x[0-9a-fA-F]*' | tac)
         if [ ${#stack[@]} -eq 0 ]; then
             mapfile -t stack < <(xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -o '0x[0-9a-fA-F]*' | tac)
         fi
-
         for s_id in "${stack[@]}"; do
             local s_hex
-            s_hex="$(normalize_wid "$s_id")"
-            [ -z "$s_hex" ] && continue
-            if [ "${WINS_MAP[$s_hex]:-0}" -eq 1 ]; then
-                target_win="$s_hex"
-                break
+            printf -v s_hex "0x%08x" "$((s_id))" 2>/dev/null || continue
+            for w in "${WINS[@]}"; do
+                if [ "$w" = "$s_hex" ]; then
+                    target_win="$w"
+                    break 2
+                fi
+            done
+        done
+        [ -z "$target_win" ] && target_win="${WINS[0]}"
+
+        # Elevar las ventanas hermanas por detrás (estilo macOS)
+        for w in "${WINS[@]}"; do
+            if [ "$w" != "$target_win" ]; then
+                xdotool windowraise "$((w))" 2>/dev/null
             fi
         done
-
-        [ -z "$target_win" ] && target_win="${WINS[0]}"
     fi
 
-    wmctrl -i -a "$target_win" 2>/dev/null || xdotool windowactivate "$((target_win))" 2>/dev/null
+    # Enfocar y elevar a la cima absoluta la ventana objetivo
+    xdotool windowraise "$((target_win))" 2>/dev/null
+    xdotool windowactivate "$((target_win))" 2>/dev/null
+    wmctrl -i -a "$target_win"
 }

@@ -179,9 +179,29 @@ func TestWizardModelWorkflow(t *testing.T) {
 		t.Fatalf("expected initial wizard stage StageSelectProfile, got %v", wiz.stage)
 	}
 
-	// Enter selects profile and advances to StageSelectPackages
+	// Enter selects profile and advances to StageSelectEnvironment
 	nm, _ := wiz.Update(tea.KeyPressMsg{Text: "enter"})
 	w := nm.(WizardModel)
+	if w.stage != StageSelectEnvironment {
+		t.Fatalf("expected StageSelectEnvironment after enter, got %v", w.stage)
+	}
+
+	// Verify environment view rendering
+	envView := w.View()
+	if !strings.Contains(envView.Content, "SHELL SELECTION") || !strings.Contains(envView.Content, "TERMINAL SELECTION") {
+		t.Fatalf("expected shell and terminal selection in envView, got: %s", envView.Content)
+	}
+
+	// Switch focus to terminal and select
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "tab"})
+	w = nm.(WizardModel)
+	if w.envFocus != "terminal" {
+		t.Fatalf("expected envFocus to be terminal after tab, got %s", w.envFocus)
+	}
+
+	// Enter advances to StageSelectPackages
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
 	if w.stage != StageSelectPackages {
 		t.Fatalf("expected StageSelectPackages after enter, got %v", w.stage)
 	}

@@ -10,7 +10,39 @@ configurations:
     targets_by_os:
       darwin: "~/Library/Application Support/com.mitchellh.ghostty"
     os: [linux, darwin]
+    terminals: [ghostty]
     strategy: directory_sync
+    backup: true
+
+  - id: kitty-config
+    name: Kitty Terminal Configuration
+    group: terminal
+    description: GPU-accelerated Kitty terminal configuration with Tokyo Night theme
+    source: files/kitty/kitty.conf
+    target: "~/.config/kitty/kitty.conf"
+    os: [linux, darwin]
+    terminals: [kitty]
+    strategy: three_way
+    backup: true
+
+  - id: wezterm-config
+    name: WezTerm Configuration
+    group: terminal
+    description: Cross-platform Lua WezTerm terminal configuration
+    source: files/wezterm/wezterm.lua
+    target: "~/.config/wezterm/wezterm.lua"
+    terminals: [wezterm]
+    strategy: three_way
+    backup: true
+
+  - id: alacritty-config
+    name: Alacritty Terminal Configuration
+    group: terminal
+    description: Fast OpenGL Alacritty terminal configuration
+    source: files/alacritty/alacritty.toml
+    target: "~/.config/alacritty/alacritty.toml"
+    terminals: [alacritty]
+    strategy: three_way
     backup: true
 
   - id: herdr-config
@@ -58,6 +90,7 @@ configurations:
     source: files/zsh/.base.zsh
     target: "~/.base.zsh"
     os: [linux, darwin]
+    shells: [zsh]
     strategy: three_way
     backup: true
 
@@ -78,6 +111,68 @@ configurations:
     source: files/zsh/.zshrc
     target: "~/.zshrc"
     os: [linux, darwin]
+    shells: [zsh]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: bash-base
+    name: Bash Base Environment (.base.bash)
+    group: terminal
+    description: Adapted core environment, Starship, Atuin, FZF and aliases for Bash
+    source: files/bash/.base.bash
+    target: "~/.base.bash"
+    os: [linux, darwin]
+    shells: [bash]
+    strategy: three_way
+    backup: true
+
+  - id: bash-loader
+    name: Bash User Loader Block (.bashrc)
+    group: terminal
+    description: Non-destructive marker block importing ~/.base.bash in ~/.bashrc
+    source: files/bash/.bashrc
+    target: "~/.bashrc"
+    os: [linux, darwin]
+    shells: [bash]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: fish-config
+    name: Fish Shell Configuration (config.fish)
+    group: terminal
+    description: Adapted Fish shell environment with Starship, Atuin, FZF and core aliases
+    source: files/fish/config.fish
+    target: "~/.config/fish/config.fish"
+    os: [linux, darwin]
+    shells: [fish]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: nushell-config
+    name: Nushell Configuration (config.nu)
+    group: terminal
+    description: Adapted Nushell configuration with Starship and Atuin hooks
+    source: files/nushell/config.nu
+    target: "~/.config/nushell/config.nu"
+    shells: [nu]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: nushell-env
+    name: Nushell Environment (env.nu)
+    group: terminal
+    description: Nushell PATH and environment initialization
+    source: files/nushell/env.nu
+    target: "~/.config/nushell/env.nu"
+    shells: [nu]
     strategy: marker_block
     marker_start: "# >>> arturonavax/env >>>"
     marker_end: "# <<< arturonavax/env <<<"
@@ -187,8 +282,22 @@ configurations:
     source: files/gnome/extensions/rcmd-shell@arturonavax.dev
     target: "~/.local/share/gnome-shell/extensions/rcmd-shell@arturonavax.dev"
     os: [linux]
+    desktops: [gnome]
     strategy: directory_sync
     backup: false
+
+  - id: xfce-rcmd-shortcuts
+    name: XFCE rcmd Shortcuts & Extension
+    group: osconfig
+    description: XFCE4 keyboard shortcuts configuration for rcmd switcher
+    source: files/rcmd/rcmd.conf
+    target: "~/.config/rcmd/rcmd.conf"
+    os: [linux]
+    desktops: [xfce]
+    strategy: three_way
+    post_sync_cmds:
+      - ["rcmd", "--sync-xfce"]
+    backup: true
 
   - id: amethyst-config
     name: Amethyst Tiling Manager Configuration
@@ -210,50 +319,53 @@ configurations:
     strategy: three_way
     backup: true
 
-  - id: vscode-settings
-    name: VS Code User Settings
-    group: vscode
-    description: Visual Studio Code settings (synced only when explicitly requested)
-    source: files/vscode/settings.json
-    target: "~/.config/Code/User/settings.json"
-    targets_by_os:
-      darwin: "~/Library/Application Support/Code/User/settings.json"
-      windows: "~/AppData/Roaming/Code/User/settings.json"
-    strategy: three_way
-    backup: true
-
-  - id: vscode-keybindings
-    name: VS Code Keybindings
-    group: vscode
-    description: Visual Studio Code keybindings (synced only when explicitly requested)
-    source: files/vscode/keybindings.json
-    target: "~/.config/Code/User/keybindings.json"
-    targets_by_os:
-      darwin: "~/Library/Application Support/Code/User/keybindings.json"
-      windows: "~/AppData/Roaming/Code/User/keybindings.json"
-    strategy: three_way
-    backup: true
-
-  - id: cursor-settings
-    name: Cursor IDE User Settings
-    group: cursor
-    description: Cursor IDE settings (synced only when explicitly requested)
-    source: files/cursor/settings.json
-    target: "~/.config/Cursor/User/settings.json"
-    targets_by_os:
-      darwin: "~/Library/Application Support/Cursor/User/settings.json"
-      windows: "~/AppData/Roaming/Cursor/User/settings.json"
-    strategy: three_way
-    backup: true
-
-  - id: cursor-keybindings
-    name: Cursor IDE Keybindings
-    group: cursor
-    description: Cursor IDE keybindings (synced only when explicitly requested)
-    source: files/cursor/keybindings.json
-    target: "~/.config/Cursor/User/keybindings.json"
-    targets_by_os:
-      darwin: "~/Library/Application Support/Cursor/User/keybindings.json"
-      windows: "~/AppData/Roaming/Cursor/User/keybindings.json"
-    strategy: three_way
-    backup: true
+  # ----------------------------------------------------------------------------
+  # Unmaintained IDE Assets (Preserved for existing users without offering purge)
+  # ----------------------------------------------------------------------------
+  # - id: vscode-settings
+  #   name: VS Code User Settings
+  #   group: vscode
+  #   description: Visual Studio Code settings (unmaintained)
+  #   source: files/vscode/settings.json
+  #   target: "~/.config/Code/User/settings.json"
+  #   targets_by_os:
+  #     darwin: "~/Library/Application Support/Code/User/settings.json"
+  #     windows: "~/AppData/Roaming/Code/User/settings.json"
+  #   strategy: three_way
+  #   backup: true
+  #
+  # - id: vscode-keybindings
+  #   name: VS Code Keybindings
+  #   group: vscode
+  #   description: Visual Studio Code keybindings (unmaintained)
+  #   source: files/vscode/keybindings.json
+  #   target: "~/.config/Code/User/keybindings.json"
+  #   targets_by_os:
+  #     darwin: "~/Library/Application Support/Code/User/keybindings.json"
+  #     windows: "~/AppData/Roaming/Code/User/keybindings.json"
+  #   strategy: three_way
+  #   backup: true
+  #
+  # - id: cursor-settings
+  #   name: Cursor IDE User Settings
+  #   group: cursor
+  #   description: Cursor IDE settings (unmaintained)
+  #   source: files/cursor/settings.json
+  #   target: "~/.config/Cursor/User/settings.json"
+  #   targets_by_os:
+  #     darwin: "~/Library/Application Support/Cursor/User/settings.json"
+  #     windows: "~/AppData/Roaming/Cursor/User/settings.json"
+  #   strategy: three_way
+  #   backup: true
+  #
+  # - id: cursor-keybindings
+  #   name: Cursor IDE Keybindings
+  #   group: cursor
+  #   description: Cursor IDE keybindings (unmaintained)
+  #   source: files/cursor/keybindings.json
+  #   target: "~/.config/Cursor/User/keybindings.json"
+  #   targets_by_os:
+  #     darwin: "~/Library/Application Support/Cursor/User/keybindings.json"
+  #     windows: "~/AppData/Roaming/Cursor/User/keybindings.json"
+  #   strategy: three_way
+  #   backup: true
