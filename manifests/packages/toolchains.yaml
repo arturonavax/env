@@ -19,7 +19,7 @@ packages:
         when:
           os: [linux, darwin]
         script:
-          local_script: src/remotes/install_golang.sh
+          local_script: scripts/install_golang.sh
           interpreter: bash
           args: ["-i"]
       - type: native

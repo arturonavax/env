@@ -2,39 +2,57 @@
 # ==============================================================================
 # tests/run_tests.sh
 # Production Master Test Runner & Quality Gate for arturonavax/env.
-# Executes Syntax Validation, Static Analysis (ShellCheck), Unit Tests,
-# Integration Tests, and optional Bats specs with structured colorized summary.
+# Executes Syntax Validation, Static Analysis (ShellCheck), Go Race Tests,
+# and CLI Integration Smoke Tests with structured colorized summary.
 # ==============================================================================
 
 # Anchoring loop to repository root
-while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
-	if [[ "$PWD" == "/" ]]; then
-		echo "Error: Repository root not found" >&2
-		exit 1
+cur="$PWD"
+while [[ "$cur" != "/" ]]; do
+	if [[ -d "${cur}/manifests" && -f "${cur}/scripts/bootstrap_anx.sh" ]]; then
+		REPO_ROOT="$cur"
+		break
 	fi
-	if ! cd ..; then
-		echo "Error: Failed to navigate up" >&2
-		exit 1
-	fi
+	cur="$(dirname "$cur")"
 done
 
-REPO_ROOT="$PWD"
+if [[ -z "${REPO_ROOT:-}" ]]; then
+	echo "Error: Repository root not found" >&2
+	exit 1
+fi
 export REPO_ROOT
+cd "$REPO_ROOT"
 
-# Source internal libraries
-# shellcheck source=/dev/null
-source "${REPO_ROOT}/src/lib/colors.sh" 2>/dev/null || true
-# shellcheck source=/dev/null
-source "${REPO_ROOT}/src/lib/ui_box.sh" 2>/dev/null || true
-# shellcheck source=/dev/null
-source "${REPO_ROOT}/src/lib/logging.sh" 2>/dev/null || true
+# ANSI Colors and symbols
+BOLD_WHITE=$'\033[1;37m'
+BOLD_GREEN=$'\033[1;32m'
+BOLD_RED=$'\033[1;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[0;33m'
+CYAN=$'\033[0;36m'
+RED=$'\033[0;31m'
+GRAY=$'\033[0;90m'
+RESET=$'\033[0m'
+
+SYM_CHECK="✔"
+SYM_CROSS="✖"
+SYM_WARN="⚠"
+SYM_INFO="ℹ"
+
+ui_box_width() { echo "${1:-70}"; }
+ui_box_separator() {
+	local w="$1" char="${2:-═}" col="${3:-$CYAN}"
+	printf "%b" "$col"
+	for ((i = 0; i < w; i++)); do printf "%s" "$char"; done
+	printf "%b\n" "$RESET"
+}
 
 # Execution modes
 RUN_SYNTAX=1
 RUN_LINT=1
 RUN_UNIT=1
 RUN_INTEGRATION=1
-RUN_BATS=1
+RUN_LEGACY=0
 VERBOSE=0
 
 show_help() {
@@ -45,11 +63,11 @@ Usage:
   ./tests/run_tests.sh [options]
 
 Options:
-  --all            Run complete suite (syntax, lint, unit, integration, bats) [default]
-  --unit           Run unit tests only
+  --all            Run complete suite (syntax, lint, go unit tests, integration) [default]
+  --unit           Run Go unit & race tests only
   --integration    Run integration smoke tests only
   --lint           Run syntax check and shellcheck only
-  --bats           Run Bats specifications only
+  --legacy         Also execute archived legacy bash unit tests (archives/tests/)
   -v, --verbose    Show verbose output during execution
   -h, --help       Show this documentation
 
@@ -65,35 +83,27 @@ while [[ $# -gt 0 ]]; do
 		RUN_LINT=1
 		RUN_UNIT=1
 		RUN_INTEGRATION=1
-		RUN_BATS=1
 		;;
 	--unit)
 		RUN_SYNTAX=0
 		RUN_LINT=0
 		RUN_UNIT=1
 		RUN_INTEGRATION=0
-		RUN_BATS=0
 		;;
 	--integration)
 		RUN_SYNTAX=0
 		RUN_LINT=0
 		RUN_UNIT=0
 		RUN_INTEGRATION=1
-		RUN_BATS=0
 		;;
 	--lint)
 		RUN_SYNTAX=1
 		RUN_LINT=1
 		RUN_UNIT=0
 		RUN_INTEGRATION=0
-		RUN_BATS=0
 		;;
-	--bats)
-		RUN_SYNTAX=0
-		RUN_LINT=0
-		RUN_UNIT=0
-		RUN_INTEGRATION=0
-		RUN_BATS=1
+	--legacy)
+		RUN_LEGACY=1
 		;;
 	-v | --verbose)
 		VERBOSE=1
@@ -133,18 +143,16 @@ _indent_output() {
 # ------------------------------------------------------------------------------
 if [[ "$RUN_SYNTAX" -eq 1 ]]; then
 	SUITES_TOTAL=$((SUITES_TOTAL + 1))
-	printf '%s[1/5] Syntax Validation (bash -n)%s\n' "$BOLD_WHITE" "$RESET"
+	printf '%s[1/4] Syntax Validation (bash -n)%s\n' "$BOLD_WHITE" "$RESET"
 	syntax_errors=0
 	checked_count=0
 
 	while IFS= read -r script_file; do
 		[[ -f "$script_file" ]] || continue
-		# Skip non-script assets
 		case "$script_file" in
 		*.md | *.json | *.toml | *.yaml | *.yml | *.txt | *.lock | *.zwc | *.lua | *.js | *.css | *.html | *.svg | *.png | *.desktop) continue ;;
 		esac
 
-		# Validate if file ends with .sh or has a shell shebang
 		if [[ "$script_file" == *.sh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*(bash|sh)'; then
 			checked_count=$((checked_count + 1))
 			if ! bash -n "$script_file" 2>/dev/null; then
@@ -160,10 +168,10 @@ if [[ "$RUN_SYNTAX" -eq 1 ]]; then
 				fi
 			fi
 		fi
-	done < <(find "$REPO_ROOT" -type f ! -path "*/.git/*" ! -path "*/.agents/*" ! -path "*/.gemini/*" ! -path "*/.claude/*" | sort)
+	done < <(find "$REPO_ROOT" -type f ! -path "*/.git/*" ! -path "*/.agents/*" ! -path "*/.gemini/*" ! -path "*/.claude/*" ! -path "*/archives/*" | sort)
 
 	if [[ "$syntax_errors" -eq 0 ]]; then
-		printf '    %s%s%s All %d shell scripts verified with zero syntax errors.\n' "$GREEN" "$SYM_CHECK" "$RESET" "$checked_count"
+		printf '    %s%s%s All %d active shell scripts verified with zero syntax errors.\n' "$GREEN" "$SYM_CHECK" "$RESET" "$checked_count"
 		SUITES_PASSED=$((SUITES_PASSED + 1))
 	else
 		printf '    %s%s%s %d syntax error(s) detected.\n' "$RED" "$SYM_CROSS" "$RESET" "$syntax_errors"
@@ -177,60 +185,41 @@ fi
 # ------------------------------------------------------------------------------
 if [[ "$RUN_LINT" -eq 1 ]]; then
 	SUITES_TOTAL=$((SUITES_TOTAL + 1))
-	printf '%s[2/5] Static Analysis (shellcheck)%s\n' "$BOLD_WHITE" "$RESET"
+	printf '%s[2/4] Static Analysis (shellcheck)%s\n' "$BOLD_WHITE" "$RESET"
 
 	if command -v shellcheck >/dev/null 2>&1; then
 		lint_targets=(
 			"install.sh"
 			"uninstall.sh"
-			"src/wizard.sh"
-			"src/lib/strict.sh"
-			"src/lib/colors.sh"
-			"src/lib/logging.sh"
-			"src/lib/platform.sh"
-			"src/lib/packages.sh"
-			"src/lib/backup.sh"
-			"src/lib/download.sh"
-			"src/lib/concurrency.sh"
-			"src/lib/smart_append.sh"
-			"src/lib/remote_env.sh"
-			"src/lib/plan.sh"
-			"src/lib/toolchain.sh"
-			"src/lib/wizard_engine.sh"
-			"src/lib/ui_box.sh"
-			"utils/backup_config.sh"
-			"utils/restore_backup.sh"
-			"utils/sync_config.sh"
-			"utils/create_wizard.sh"
+			"scripts/bootstrap_anx.sh"
+			"scripts/install_golang.sh"
+			"scripts/test_e2e_docker.sh"
+			"manifests/hacks/dell-precision-m6800/apply_hacks.sh"
+			"manifests/hacks/x11-scroll-lock-led/activate_scroll_lock.sh"
 			"tests/test_helper.sh"
-			"tests/unit/test_platform.sh"
-			"tests/unit/test_packages.sh"
-			"tests/unit/test_smart_append.sh"
-			"tests/unit/test_backup.sh"
-			"tests/unit/test_concurrency.sh"
-			"tests/unit/test_strict.sh"
-			"tests/unit/test_plan.sh"
-			"tests/unit/test_toolchain.sh"
-			"tests/unit/test_wizard_engine.sh"
-			"tests/unit/test_transaction.sh"
-			"tests/unit/test_aitools.sh"
-			"tests/unit/test_shell_configs.sh"
-			"tests/unit/test_runtimes.sh"
-			"tests/unit/test_rebuild_tools.sh"
-			"tests/unit/test_ui_box.sh"
-			"utils/rebuild_tools.sh"
-			"src/remotes/rebuild_tools.sh"
-			"src/remotes/install_python.sh"
-			"src/ai/install_aitools.sh"
-			"files/zsh/.tools.sh"
 			"tests/integration/test_cli_smoke.sh"
+			"tests/e2e/scripts/run_all.sh"
+			"tests/e2e/scripts/test_cli_and_tui.sh"
+			"tests/e2e/scripts/test_concurrency.sh"
+			"tests/e2e/scripts/test_config_and_tools.sh"
+			"tests/e2e/scripts/test_curl_install.sh"
+			"tests/e2e/scripts/test_from_sources.sh"
+			"tests/e2e/scripts/test_github_release.sh"
+			"files/zsh/.tools.sh"
 		)
 
-		lint_output=$(shellcheck -e SC1091 -e SC1090 "${lint_targets[@]}" 2>&1)
+		valid_lint_targets=()
+		for t in "${lint_targets[@]}"; do
+			if [[ -f "$t" ]]; then
+				valid_lint_targets+=("$t")
+			fi
+		done
+
+		lint_output=$(shellcheck -e SC1091 -e SC1090 "${valid_lint_targets[@]}" 2>&1)
 		lint_code=$?
 
 		if [[ "$lint_code" -eq 0 ]]; then
-			printf '    %s%s%s ShellCheck passed with zero warnings across %d core scripts.\n' "$GREEN" "$SYM_CHECK" "$RESET" "${#lint_targets[@]}"
+			printf '    %s%s%s ShellCheck passed with zero warnings across %d active scripts.\n' "$GREEN" "$SYM_CHECK" "$RESET" "${#valid_lint_targets[@]}"
 			SUITES_PASSED=$((SUITES_PASSED + 1))
 		else
 			printf '    %s%s%s ShellCheck detected style/defensive warnings:\n' "$RED" "$SYM_CROSS" "$RESET"
@@ -245,40 +234,36 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Unit Test Suite (tests/unit/test_*.sh)
+# 3. Go Test Suite (Unit & Race Tests)
 # ------------------------------------------------------------------------------
 if [[ "$RUN_UNIT" -eq 1 ]]; then
 	SUITES_TOTAL=$((SUITES_TOTAL + 1))
-	printf '%s[3/5] Unit Test Suite%s\n' "$BOLD_WHITE" "$RESET"
-	unit_fails=0
-	unit_count=0
+	printf '%s[3/4] Go Unit & Race Test Suite (go test -race ./...)%s\n' "$BOLD_WHITE" "$RESET"
 
-	for unit_file in "$REPO_ROOT"/tests/unit/test_*.sh; do
-		[[ -f "$unit_file" ]] || continue
-		unit_count=$((unit_count + 1))
-		unit_name="$(basename "$unit_file")"
-
+	if command -v go >/dev/null 2>&1; then
 		if [[ "$VERBOSE" -eq 1 ]]; then
-			printf '  ▸ Running %s...\n' "$unit_name"
-			if ! bash "$unit_file"; then
-				unit_fails=$((unit_fails + 1))
+			if go test -race ./...; then
+				printf '    %s%s%s Go unit and race tests PASSED.\n' "$GREEN" "$SYM_CHECK" "$RESET"
+				SUITES_PASSED=$((SUITES_PASSED + 1))
+			else
+				printf '    %s%s%s Go unit and race tests FAILED.\n' "$RED" "$SYM_CROSS" "$RESET"
+				SUITES_FAILED=$((SUITES_FAILED + 1))
 			fi
 		else
-			unit_out=$(bash "$unit_file" 2>&1)
-			unit_res=$?
-			if [[ "$unit_res" -eq 0 && "$unit_out" != *"✖"* ]]; then
-				printf '    %s%s%s %-32s (%s)\n' "$GREEN" "$SYM_CHECK" "$RESET" "$unit_name" "PASSED"
+			go_out=$(go test -race ./... 2>&1)
+			go_code=$?
+			if [[ "$go_code" -eq 0 ]]; then
+				test_pkg_count=$(grep -c "ok" <<<"$go_out" || echo "all")
+				printf '    %s%s%s Go test suite passed with zero data races (%s packages OK).\n' "$GREEN" "$SYM_CHECK" "$RESET" "$test_pkg_count"
+				SUITES_PASSED=$((SUITES_PASSED + 1))
 			else
-				printf '    %s%s%s %-32s (%s)\n' "$RED" "$SYM_CROSS" "$RESET" "$unit_name" "FAILED"
-				_indent_output "$unit_out"
-				unit_fails=$((unit_fails + 1))
+				printf '    %s%s%s Go test suite failed:\n' "$RED" "$SYM_CROSS" "$RESET"
+				_indent_output "$go_out"
+				SUITES_FAILED=$((SUITES_FAILED + 1))
 			fi
 		fi
-	done
-
-	if [[ "$unit_fails" -eq 0 ]]; then
-		SUITES_PASSED=$((SUITES_PASSED + 1))
 	else
+		printf '    %s%s%s go compiler not found in PATH; skipping Go unit tests.\n' "$RED" "$SYM_CROSS" "$RESET"
 		SUITES_FAILED=$((SUITES_FAILED + 1))
 	fi
 	echo ""
@@ -289,7 +274,7 @@ fi
 # ------------------------------------------------------------------------------
 if [[ "$RUN_INTEGRATION" -eq 1 ]]; then
 	SUITES_TOTAL=$((SUITES_TOTAL + 1))
-	printf '%s[4/5] Integration Smoke Suite%s\n' "$BOLD_WHITE" "$RESET"
+	printf '%s[4/4] Integration Smoke Suite%s\n' "$BOLD_WHITE" "$RESET"
 	int_fails=0
 
 	for int_file in "$REPO_ROOT"/tests/integration/test_*.sh; do
@@ -323,38 +308,25 @@ if [[ "$RUN_INTEGRATION" -eq 1 ]]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 5. Bats Specifications (tests/bats/*.bats)
+# Optional: Archived Legacy Bash Unit Tests (--legacy)
 # ------------------------------------------------------------------------------
-if [[ "$RUN_BATS" -eq 1 ]]; then
-	SUITES_TOTAL=$((SUITES_TOTAL + 1))
-	printf '%s[5/5] Bats Specifications (tests/bats/)%s\n' "$BOLD_WHITE" "$RESET"
+if [[ "$RUN_LEGACY" -eq 1 ]]; then
+	printf '%s[Bonus] Archived Legacy Bash Unit Tests (archives/tests/unit/)%s\n' "$BOLD_WHITE" "$RESET"
+	legacy_fails=0
+	legacy_count=0
 
-	if command -v bats >/dev/null 2>&1; then
-		bats_fails=0
-		for bats_file in "$REPO_ROOT"/tests/bats/*.bats; do
-			[[ -f "$bats_file" ]] || continue
-			bats_name="$(basename "$bats_file")"
-
-			if bats "$bats_file" >/dev/null 2>&1; then
-				printf '    %s%s%s %-32s (%s)\n' "$GREEN" "$SYM_CHECK" "$RESET" "$bats_name" "PASSED"
-			else
-				printf '    %s%s%s %-32s (%s)\n' "$RED" "$SYM_CROSS" "$RESET" "$bats_name" "FAILED"
-				bats_out=$(bats "$bats_file" 2>&1 || true)
-				_indent_output "$bats_out"
-				bats_fails=$((bats_fails + 1))
-			fi
-		done
-
-		if [[ "$bats_fails" -eq 0 ]]; then
-			SUITES_PASSED=$((SUITES_PASSED + 1))
+	for l_file in "$REPO_ROOT"/archives/tests/unit/test_*.sh; do
+		[[ -f "$l_file" ]] || continue
+		legacy_count=$((legacy_count + 1))
+		l_name="$(basename "$l_file")"
+		l_out=$(bash "$l_file" 2>&1)
+		l_res=$?
+		if [[ "$l_res" -eq 0 && "$l_out" != *"✖"* ]]; then
+			printf '    %s%s%s %-32s (%s)\n' "$GREEN" "$SYM_CHECK" "$RESET" "$l_name" "PASSED"
 		else
-			SUITES_FAILED=$((SUITES_FAILED + 1))
+			printf '    %s%s%s %-32s (%s)\n' "$YELLOW" "$SYM_WARN" "$RESET" "$l_name" "LEGACY_SKIPPED"
 		fi
-	else
-		printf '    %s%s%s bats not installed; optional Bats specifications skipped.\n' "$CYAN" "$SYM_INFO" "$RESET"
-		printf '      %s(Native unit tests cover the entire test matrix without external dependencies)%s\n' "$GRAY" "$RESET"
-		SUITES_PASSED=$((SUITES_PASSED + 1))
-	fi
+	done
 	echo ""
 fi
 

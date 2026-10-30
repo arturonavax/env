@@ -54,13 +54,13 @@ help:
 	@echo ""
 
 optimize:
-	@./utils/optimize_system.sh --dry-run
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx optimize --report
 
 optimize-apply:
-	@./utils/optimize_system.sh --apply
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx optimize --apply
 
 rebuild:
-	@./utils/rebuild_tools.sh
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx rebuild all
 
 rebuild-tools: rebuild
 
@@ -68,7 +68,7 @@ plan:
 	@./install.sh --plan
 
 dry-run:
-	@./install.sh --dry-run
+	@./install.sh --plan
 
 uninstall-plan:
 	@./uninstall.sh --plan
@@ -77,10 +77,10 @@ test:
 	@./tests/run_tests.sh
 
 test-unit:
-	@./tests/run_tests.sh --unit
+	@go test -race ./internal/...
 
 test-integration:
-	@./tests/run_tests.sh --integration
+	@./tests/integration/test_cli_smoke.sh
 
 lint:
 	@./tests/run_tests.sh --lint
@@ -92,16 +92,16 @@ wizard:
 	@./install.sh --wizard
 
 backup:
-	@./utils/backup_config.sh
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx backup create
 
 restore:
-	@./utils/restore_backup.sh
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx backup restore -latest
 
 diff:
-	@./utils/diff_snapshots.sh
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx sync --dry-run
 
 sync:
-	@./utils/sync_config.sh
+	@go run -ldflags "$(LDFLAGS)" ./cmd/anx sync
 
 clean:
 	@rm -rf bin/ /tmp/env_test_sandbox.* /tmp/bats_sandbox.* 2>/dev/null || true

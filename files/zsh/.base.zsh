@@ -331,13 +331,11 @@ function update-python() {
 }
 
 function rebuild-tools() {
-    local script_path="${REPO_ROOT:-$HOME/repos/github.com/arturonavax/env}/utils/rebuild_tools.sh"
-    [[ ! -f "$script_path" ]] && script_path="${HOME}/.local/share/env/utils/rebuild_tools.sh"
-
-    if [[ -f "$script_path" ]]; then
-        bash "$script_path" "$@"
+    if command -v anx >/dev/null 2>&1; then
+        anx rebuild "$@"
     else
-        curl -fsSL https://env.arturonavax.dev/rebuild_tools.sh | bash -s -- "$@"
+        echo "anx command not found" >&2
+        return 1
     fi
 }
 alias rbt=rebuild-tools

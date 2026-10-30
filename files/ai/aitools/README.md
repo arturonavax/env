@@ -85,7 +85,7 @@ aitools commands
 aitools setup
 aitools config --interactive
 # Or launch standalone Pure-Bash wizard:
-./utils/aitools_wizard.sh
+anx tools ai setup
 
 # --- Unified AI CLI Wrapper (aitools llm) ---
 # Direct query using default backend (agy)
@@ -357,7 +357,7 @@ You can register custom harnesses in `~/.config/aitools/config.json`:
 
 ---
 
-## 8. Multi-Platform AI System Hardware & Performance Optimizer (`aitools optimize` / `ai-opt` / `utils/optimize_system.sh`)
+## 8. Multi-Platform AI System Hardware & Performance Optimizer (`anx optimize` / `aitools optimize` / `ai-opt`)
 
 `aitools optimize` audits the host system's hardware, kernel tunables, storage devices, and Lynis security profile, distills high-signal actionable bottlenecks, and delegates to `aitools llm` to generate an ultra-personalized, reversible optimization script backed by strict automated security guardrails.
 

@@ -6,23 +6,77 @@
 # Part of arturonavax/env development environment.
 # ==============================================================================
 
-while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
-	if [[ "$PWD" == "/" ]]; then
-		echo "[Uninstaller Error]: Repository root not found." >&2
-		exit 1
-	fi
-	if ! cd ..; then
-		echo "[Uninstaller Error]: Failed to change directory." >&2
-		exit 1
-	fi
-done
+set -euo pipefail
 
-source ./src/lib/strict.sh
-source ./src/lib/colors.sh
-source ./src/lib/logging.sh
-source ./src/lib/platform.sh
-source ./src/lib/packages.sh
-source ./src/lib/plan.sh
+# ANSI Colors
+BOLD_WHITE="\033[1;37m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+CYAN="\033[0;36m"
+RED="\033[0;31m"
+RESET="\033[0m"
+
+log_info()    { echo -e "  [${CYAN}INFO${RESET}] $*"; }
+log_step()    { echo -e "  [${BOLD_WHITE}STEP${RESET}] $*"; }
+log_success() { echo -e "  [${GREEN}OK${RESET}] $*"; }
+log_warn()    { echo -e "  [${YELLOW}WARN${RESET}] $*"; }
+log_error()   { echo -e "  [${RED}ERROR${RESET}] $*" >&2; }
+
+detect_os() {
+	local u
+	u="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	case "$u" in
+		linux*) echo "linux" ;;
+		darwin*) echo "darwin" ;;
+		*) echo "$u" ;;
+	esac
+}
+
+detect_arch() {
+	uname -m
+}
+
+detect_distro() {
+	if [[ -f /etc/os-release ]]; then
+		# shellcheck source=/dev/null
+		. /etc/os-release
+		echo "${ID:-unknown}"
+	else
+		echo "unknown"
+	fi
+}
+
+pkg_remove() {
+	local pkgs=("$@")
+	if command -v apt-get >/dev/null 2>&1; then
+		sudo apt-get remove -y "${pkgs[@]}" 2>/dev/null || true
+	elif command -v pacman >/dev/null 2>&1; then
+		sudo pacman -R --noconfirm "${pkgs[@]}" 2>/dev/null || true
+	elif command -v dnf >/dev/null 2>&1; then
+		sudo dnf remove -y "${pkgs[@]}" 2>/dev/null || true
+	elif command -v brew >/dev/null 2>&1; then
+		brew uninstall "${pkgs[@]}" 2>/dev/null || true
+	fi
+}
+
+ensure_sudo() {
+	if [[ $EUID -ne 0 ]]; then
+		if command -v sudo >/dev/null 2>&1; then
+			sudo -v || { log_error "Failed to obtain sudo privileges."; exit 1; }
+		else
+			log_error "sudo is required for system uninstallation."
+			exit 1
+		fi
+	fi
+}
+
+show_uninstall_plan() {
+	echo -e "${BOLD_WHITE}Uninstallation Plan & Teardown Preview${RESET}"
+	echo "  • Binaries:       /usr/local/bin/{anx,aitools,herdr,atuin,nvim,ghostty}, ~/.local/bin/{anx,aitools}"
+	echo "  • Configurations: ~/.config/{anx,aitools,ghostty,herdr,atuin,nvim}"
+	echo "  • Data & State:   ~/.local/share/{anx,atuin,nvim}, ~/.local/state/{anx,nvim}"
+	echo "  • Caches:         ~/.cache/{anx,nvim}"
+}
 
 usage() {
 	cat <<EOF
@@ -53,10 +107,10 @@ for arg in "$@"; do
 	esac
 done
 
-log_box "arturonavax/env Uninstaller" \
-	"Platform: $(detect_os) ($(detect_distro) - $(detect_arch))" \
-	"Phase 1: Package removal, systemd units, binaries & desktop entries." \
-	"Phase 2: Purging configuration files, local states, and caches."
+echo -e "${BOLD_WHITE}==============================================================================${RESET}"
+echo -e "${BOLD_WHITE}  arturonavax/env Uninstaller${RESET}"
+echo -e "${BOLD_WHITE}  Platform: $(detect_os) ($(detect_distro) - $(detect_arch))${RESET}"
+echo -e "${BOLD_WHITE}==============================================================================${RESET}"
 
 log_step "Acquiring administrator credentials for uninstallation..."
 ensure_sudo
@@ -145,5 +199,5 @@ if command -v golangci-lint >/dev/null 2>&1; then
 	golangci-lint cache clean 2>/dev/null || true
 fi
 
-log_box "Uninstallation Completed Successfully" \
-	"Binaries, desktop integrations, configs, and caches have been removed."
+log_success "Uninstallation completed successfully."
+log_info "Binaries, desktop integrations, configs, and caches have been removed."

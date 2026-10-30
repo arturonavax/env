@@ -86,5 +86,5 @@ f=org.gnome.Nautilus class launch:nautilus
 Or manually deployed via sync:
 
 ```sh
-./utils/sync_config.sh osconfig
+anx sync osconfig
 ```

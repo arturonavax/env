@@ -173,7 +173,7 @@ install_go_tier1_gvm() {
 
 install_go_tier2_standalone() {
 	log_step "Tier 2: Attempting Go installation via personal standalone installer..."
-	local script_path="${REPO_ROOT}/src/remotes/install_golang.sh"
+	local script_path="${REPO_ROOT}/scripts/install_golang.sh"
 	if [[ -f "${script_path}" ]]; then
 		bash "${script_path}" -i || return 1
 	elif command -v curl >/dev/null 2>&1; then

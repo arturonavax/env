@@ -13,7 +13,7 @@ echo "  Running CLI Smoke & Integration Tests..."
 check_output="$("${REPO_ROOT}/install.sh" --check 2>&1)"
 check_code=$?
 assert_exit_code 0 "$check_code" "./install.sh --check exit status" &&
-	assert_contains "$check_output" "System Hardware & Platform Profile" "Profile header" &&
+	assert_contains "$check_output" "ANX Health Doctor" "Profile header" &&
 	pass "./install.sh --check executed cleanly with platform diagnosis"
 
 # Test 2: ./install.sh --help
@@ -23,42 +23,21 @@ assert_exit_code 0 "$help_code" "./install.sh --help exit status" &&
 	assert_contains "$help_output" "Usage: ./install.sh" "Usage string" &&
 	pass "./install.sh --help displayed usage documentation"
 
-# Test 3: ./utils/restore_backup.sh --help
-restore_help="$("${REPO_ROOT}/utils/restore_backup.sh" --help 2>&1)"
-restore_help_code=$?
-assert_exit_code 0 "$restore_help_code" "./utils/restore_backup.sh --help exit status" &&
-	assert_contains "$restore_help" "Usage: ./utils/restore_backup.sh" "Usage string" &&
-	pass "./utils/restore_backup.sh --help displayed usage documentation"
-
-# Test 4: ./utils/restore_backup.sh -l
-list_output="$("${REPO_ROOT}/utils/restore_backup.sh" -l 2>&1)"
-list_code=$?
-assert_exit_code 0 "$list_code" "./utils/restore_backup.sh -l exit status" &&
-	assert_contains "$list_output" "Available Configuration Snapshots" "Snapshots header" &&
-	pass "./utils/restore_backup.sh -l listed existing backup snapshots"
-
-# Test 5: ./utils/sync_config.sh help
-sync_help="$("${REPO_ROOT}/utils/sync_config.sh" help 2>&1)"
-sync_code=$?
-assert_exit_code 0 "$sync_code" "./utils/sync_config.sh help exit status" &&
-	assert_contains "$sync_help" "[Sync Config]: List of Sync" "Sync config header" &&
-	pass "./utils/sync_config.sh help displayed sync options"
-
-# Test 6: ./install.sh --plan
+# Test 3: ./install.sh --plan
 plan_smoke="$("${REPO_ROOT}/install.sh" --plan 2>&1)"
 plan_smoke_code=$?
 assert_exit_code 0 "$plan_smoke_code" "./install.sh --plan exit status" &&
-	assert_contains "$plan_smoke" "Installation Plan & Manifest Preview" "Plan header" &&
+	assert_contains "$plan_smoke" "Execution Plan:" "Plan header" &&
 	pass "./install.sh --plan previewed installation manifest"
 
-# Test 7: ./install.sh --uninstall-plan
+# Test 4: ./install.sh --uninstall-plan
 uninst_plan_smoke="$("${REPO_ROOT}/install.sh" --uninstall-plan 2>&1)"
 uninst_plan_smoke_code=$?
 assert_exit_code 0 "$uninst_plan_smoke_code" "./install.sh --uninstall-plan exit status" &&
-	assert_contains "$uninst_plan_smoke" "Uninstallation Plan & Teardown Preview" "Uninstall plan header" &&
+	assert_contains "$uninst_plan_smoke" "Uninstallation Plan" "Uninstall plan header" &&
 	pass "./install.sh --uninstall-plan previewed uninstallation manifest"
 
-# Test 8: ./uninstall.sh --plan and --help
+# Test 5: ./uninstall.sh --plan and --help
 uninst_smoke="$("${REPO_ROOT}/uninstall.sh" --plan 2>&1)"
 uninst_smoke_code=$?
 uninst_help="$("${REPO_ROOT}/uninstall.sh" --help 2>&1)"
@@ -69,35 +48,46 @@ assert_exit_code 0 "$uninst_smoke_code" "./uninstall.sh --plan exit status" &&
 	assert_contains "$uninst_help" "Usage: ./uninstall.sh" "Uninstall usage string" &&
 	pass "./uninstall.sh --plan and --help executed cleanly without side effects"
 
-# Test 9: ./src/wizard.sh --help
-wizard_help="$("${REPO_ROOT}/src/wizard.sh" --help 2>&1)"
-wizard_help_code=$?
-assert_exit_code 0 "$wizard_help_code" "./src/wizard.sh --help exit status" &&
-	assert_contains "$wizard_help" "Usage: ./src/wizard.sh" "Wizard usage documentation" &&
-	assert_contains "$wizard_help" "--non-interactive" "Non-interactive flag documentation" &&
-	assert_contains "$wizard_help" "--rollback-on-error" "Rollback on error flag documentation" &&
-	pass "./src/wizard.sh --help displayed comprehensive execution options"
+# Test 6: ANX binary commands smoke test (plan, doctor, status, backup, sync, tools)
+anx_bin="${REPO_ROOT}/bin/anx"
+if [[ ! -x "$anx_bin" ]]; then
+	go build -o "$anx_bin" "${REPO_ROOT}/cmd/anx"
+fi
 
-# Test 10: ./src/wizard.sh --plan
-wizard_plan="$("${REPO_ROOT}/src/wizard.sh" --plan --components=terminal,editor 2>&1)"
-wizard_plan_code=$?
-assert_exit_code 0 "$wizard_plan_code" "./src/wizard.sh --plan exit status" &&
-	assert_contains "$wizard_plan" "Installation Plan & Manifest Preview" "Wizard plan header" &&
-	assert_contains "$wizard_plan" "Ghostty" "Selected terminal component in plan" &&
-	pass "./src/wizard.sh --plan previewed component manifest cleanly"
+anx_plan_out="$("$anx_bin" plan 2>&1)"
+anx_plan_code=$?
+assert_exit_code 0 "$anx_plan_code" "anx plan exit status" &&
+	assert_contains "$anx_plan_out" "Execution Plan:" "ANX plan header" &&
+	pass "anx plan executed cleanly"
 
-# Test 11: ./install.sh --wizard --help forwarding
-install_wizard_help="$("${REPO_ROOT}/install.sh" --wizard --help 2>&1)"
-install_wizard_help_code=$?
-assert_exit_code 0 "$install_wizard_help_code" "./install.sh --wizard --help exit status" &&
-	assert_contains "$install_wizard_help" "Usage: ./src/wizard.sh" "Forwarded wizard usage" &&
-	pass "./install.sh --wizard forwarded CLI arguments directly to wizard runner"
+anx_status_out="$("$anx_bin" status 2>&1)"
+anx_status_code=$?
+assert_exit_code 0 "$anx_status_code" "anx status exit status" &&
+	assert_contains "$anx_status_out" "OS:" "ANX status output" &&
+	pass "anx status executed cleanly"
 
-# Test 12: aitools CLI binary and status
-aitools_smoke="$("${REPO_ROOT}/files/ai/aitools/aitools" --help 2>&1)"
+anx_tools_out="$("$anx_bin" tools list 2>&1)"
+anx_tools_code=$?
+assert_exit_code 0 "$anx_tools_code" "anx tools list exit status" &&
+	assert_contains "$anx_tools_out" "Tool" "ANX tools list table" &&
+	pass "anx tools list displayed personal tools registry"
+
+anx_ai_help="$("$anx_bin" tools ai --help 2>&1)"
+anx_ai_code=$?
+assert_exit_code 0 "$anx_ai_code" "anx tools ai --help exit status" &&
+	assert_contains "$anx_ai_help" "Multi-harness AI CLI suite" "AI suite description" &&
+	pass "anx tools ai displayed AI command suite"
+
+# Test 7: aitools standalone binary
+aitools_bin="${REPO_ROOT}/bin/aitools"
+if [[ ! -x "$aitools_bin" ]]; then
+	go build -o "$aitools_bin" "${REPO_ROOT}/cmd/aitools"
+fi
+
+aitools_smoke="$("$aitools_bin" --help 2>&1)"
 aitools_smoke_code=$?
 assert_exit_code 0 "$aitools_smoke_code" "aitools --help exit status" &&
-	assert_contains "$aitools_smoke" "aitools: AI Productivity" "aitools description" &&
-	assert_contains "$aitools_smoke" "quota" "aitools quota command" &&
+	assert_contains "$aitools_smoke" "Multi-harness AI CLI suite" "aitools description" &&
 	assert_contains "$aitools_smoke" "commit" "aitools commit command" &&
+	assert_contains "$aitools_smoke" "quota" "aitools quota command" &&
 	pass "aitools CLI verified with full subcommands suite"

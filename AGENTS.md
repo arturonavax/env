@@ -54,47 +54,19 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── zsh/                # Zsh config, plugins, tools, and color definitions
 │   ├── starship/           # Cross-shell Starship prompt configuration
 │   └── [cursor,vscode,...] # IDE configs, settings, and formatters
-├── src/                    # Subsystem installation scripts & modular runtime
-│   ├── wizard.sh           # Master installation wizard (dual interactive interview & autonomous non-interactive modes)
-│   ├── lib/                # Core modular libraries (strict, colors, logging, platform, packages, backup, download, concurrency, smart_append, transaction)
-│   │   ├── strict.sh       # set -euo pipefail, root anchoring, callstack traceback traps, sudo keep-alive
-│   │   ├── colors.sh       # Cross-terminal ANSI color palette and legacy compatibility variables
-│   │   ├── logging.sh      # Structured logging (log_info, log_step, log_success, log_warn, log_error, log_fatal)
-│   │   ├── platform.sh     # Multi-platform OS, distribution, architecture, and hardware discovery (Linux, macOS, Windows, Android Termux)
-│   │   ├── packages.sh     # Universal package translation matrix (apt, dnf, pacman, brew, pkg, zypper) & pkg_* commands
-│   │   ├── backup.sh       # Portable configuration snapshot, rotation (50MB quota), and rollback engine
-│   │   ├── transaction.sh  # Transactional execution, audit journal, graceful shutdown traps (SIGINT/SIGTERM), and LIFO rollback
-│   │   ├── download.sh     # Resilient retry-capable downloader with checksums, extraction, and parallel execution
-│   │   ├── concurrency.sh  # Parallel background task pool with real-time status monitor and error capture
-│   │   ├── smart_append.sh # Non-destructive smart file preservation (smart-append-first) with marker blocks
-│   │   ├── toolchain.sh    # Multi-tier resilient toolchain & declarative dependency fallback engine
-│   │   ├── wizard_engine.sh# Pure-Bash zero-dependency interactive wizard & TUI framework
-│   │   ├── plan.sh         # Dry-run execution plan and filesystem interaction manifest inspector
-│   │   └── remote_env.sh   # Dual local/remote resolver for env.arturonavax.dev subdomains
-│   ├── osconfig/           # Centralized OS & desktop environment setups
-│   │   ├── linux_osconfig.sh # Core Linux settings, limits, sysctl, and fonts cache
-│   │   ├── xfce/           # XFCE Pro power-user desktop workflow & keyboard shortcuts
-│   │   └── macos/          # macOS Safari tweaks, spaces animation, and TouchID sudo
-│   ├── hacks/              # Workstation & hardware-specific hacks (scroll lock, hardware LEDs)
-│   ├── install_terminal.sh # Ghostty, Herdr, zsh, fonts setup
-│   ├── install_editor.sh   # Neovim, Mason dependencies, LazyVim sync
-│   ├── install_ai.sh       # CLI AI assistants, RTK optimizer, MCP harnesses, aitools suite
-│   ├── _install_requirements.sh # Core system packages & package managers (GVM primary)
-│   ├── requirements/       # Pre-flight requirement checks (editor, terminal, ai)
-│   ├── remotes/            # Self-contained remote scripts & compatibility shims executable via curl
-│   └── dom-scraping/       # Browser/node utility scraping scripts
-├── utils/                  # Safe system lifecycle & synchronization utilities
-│   ├── sync_config.sh      # Propagate repo dotfiles into the active filesystem
-│   ├── backup_config.sh    # Snapshot active user configurations to ~/.arturonavax-env-backups/
-│   ├── restore_backup.sh   # Interactive or scripted configuration rollback from snapshots
-│   ├── rebuild_tools.sh    # Post-upgrade rebuilder & recompiler across Python, Node, Go, Rust, Neovim
-│   ├── create_wizard.sh    # Pure-bash wizard generator scaffolding new interactive setups
-│   ├── copy_config.sh      # Ingest active user dotfiles back into the repo
-│   └── diff_snapshots.sh   # Review differences between local machine and repo
-├── tests/                  # Multi-tier testing suite
+├── archives/               # Decommissioned legacy Bash scripts, utilities, and tests
+│   ├── src/                # Legacy Bash subsystem installers and modular runtime
+│   │   ├── install_terminal.sh # Legacy terminal and shell provisioning script
+│   │   ├── install_editor.sh   # Legacy Neovim and LazyVim setup script
+│   │   ├── install_ai.sh       # Legacy AI tools installer
+│   │   ├── wizard.sh           # Legacy Bash-driven interactive setup wizard
+│   │   └── lib/                # Legacy Bash modular libraries (strict, backup, packages, etc.)
+│   ├── utils/              # Legacy Bash operational utilities (sync, backup, rebuild, optimize)
+│   └── tests/              # Legacy Bash unit and bats test specifications
+├── tests/                  # Multi-platform testing suite
 │   ├── e2e/                # Docker-isolated multi-stage E2E harnesses (Debian, Alpine)
-│   ├── unit/               # Modular unit tests
-│   └── integration/        # CLI smoke & integration test suite
+│   ├── integration/        # CLI smoke & integration test suite
+│   └── run_tests.sh        # Master quality gate & test runner (syntax, shellcheck, go race, smoke)
 ├── odd/                    # Organic Driven Development (ODD) specifications & task tracking
 │   ├── tasks/              # Active task boards (anx-platform-overhaul.md, master-spec.md)
 │   └── specs/              # Production system specifications (odd/specs/anx/*)
@@ -140,11 +112,10 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - Two-phase teardown:
     1. Uninstalls packages (apt, dnf, pacman, brew), systemd user units, desktop entries, and `/opt` / `/usr/local/bin` binaries (including `anx` and `aitools`).
     2. Purges configuration directories (`~/.config/anx`, `~/.config/nvim`, `~/.config/ghostty`, `~/.config/herdr`), caches, and local states.
-- **`./utils/sync_config.sh [target]`**:
-  - Selectively applies configuration updates without a complete installation cycle. Targets: `terminal`, `editor`, `plugins`, `plugins-update`, `osconfig`, `vscode`, `cursor`, `devtools`, `all`.
-- **`./utils/backup_config.sh` / `./utils/restore_backup.sh`**:
-  - `backup_config.sh`: Creates timestamped snapshots in `~/.arturonavax-env-backups/YYYY-MM-DD_HH-MM-SS` before destructive operations (capped at 50MB rotation using POSIX-portable commands).
-  - `restore_backup.sh`: Reverses modifications by restoring any snapshot interactively or via timestamp flag (`-latest`, `<timestamp>`).
+- **`anx sync [--dry-run|--push]` (Legacy: `./archives/utils/sync_config.sh`)**:
+  - Reconcile dotfiles with Myers diff, 3-way merge, and smart-append markers.
+- **`anx backup [create|list|restore]` (Legacy: `./archives/utils/backup_config.sh`)**:
+  - Manage hierarchical snapshots (50MB quota) before destructive operations or restore interactively.
 
 ---
 

@@ -15,5 +15,5 @@ This directory stores transferable configurations, harnesses, optimization proxi
 * When `./install.sh ai` or `./install.sh all` is executed, these configurations, tools, and environments are automatically initialized and synchronized.
 * To synchronize AI tooling independently:
   ```sh
-  ./utils/sync_config.sh devtools
+  anx sync devtools
   ```

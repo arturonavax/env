@@ -6,7 +6,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MOCK_SERVER_URL="${MOCK_SERVER_URL:-http://mock-server:8080}"
 DEST_BIN="${HOME}/.local/bin"
 
