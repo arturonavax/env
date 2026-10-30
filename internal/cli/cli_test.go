@@ -270,6 +270,21 @@ func TestCLIUpdate(t *testing.T) {
 	if !strings.Contains(out, "ANX Update Check") {
 		t.Fatalf("expected update check header, got: %s", out)
 	}
+
+	// JSON format output test
+	var jsonOut, jsonErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"update", "--fetch=false", "--format", "json"}, &jsonOut, &jsonErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for json update, got %d (err: %s)", code, jsonErr.String())
+	}
+	var summary cli.UpdateCheckSummary
+	if err := json.Unmarshal(jsonOut.Bytes(), &summary); err != nil {
+		t.Fatalf("expected valid JSON UpdateCheckSummary, got error %v (output: %s)", err, jsonOut.String())
+	}
+	// Verify that ConfigDrifts matches the number of DriftedFiles
+	if summary.ConfigDrifts != len(summary.DriftedFiles) {
+		t.Errorf("expected ConfigDrifts (%d) to match DriftedFiles count (%d)", summary.ConfigDrifts, len(summary.DriftedFiles))
+	}
 }
 
 func TestCLIUpgradeDryRun(t *testing.T) {
@@ -349,5 +364,35 @@ func TestCLIIdempotence(t *testing.T) {
 
 	if outBuf3.String() != outBuf4.String() {
 		t.Fatalf("cleanup output changed between consecutive dry runs")
+	}
+}
+
+func TestCLIExplain(t *testing.T) {
+	// Text format
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"explain", "ripgrep"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for explain, got %d (err: %s)", code, errBuf.String())
+	}
+	out := outBuf.String()
+	if !strings.Contains(out, "Resource Provenance: ripgrep") {
+		t.Fatalf("expected provenance header, got: %s", out)
+	}
+	if !strings.Contains(out, "Kind:           package") {
+		t.Fatalf("expected kind package, got: %s", out)
+	}
+
+	// JSON format
+	var jsonOut, jsonErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"explain", "ripgrep", "--format", "json"}, &jsonOut, &jsonErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for json explain, got %d (err: %s)", code, jsonErr.String())
+	}
+	var prov map[string]interface{}
+	if err := json.Unmarshal(jsonOut.Bytes(), &prov); err != nil {
+		t.Fatalf("expected valid JSON provenance, got error %v (output: %s)", err, jsonOut.String())
+	}
+	if prov["resource_id"] != "ripgrep" || prov["kind"] != "package" {
+		t.Fatalf("unexpected json fields: %v", prov)
 	}
 }

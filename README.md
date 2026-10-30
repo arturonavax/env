@@ -10,8 +10,7 @@ Orchestrated by the unified Go CLI/TUI platform **ANX** (`anx`) and powered by a
 
 ```text
 ├── cmd/
-│   ├── anx/                # Master multicall CLI & TUI entrypoint
-│   └── aitools/            # Standalone multicall symlink entrypoint
+│   └── anx/                # Master multicall CLI & TUI entrypoint (anx, aitools, safe-suspend)
 ├── manifests/              # Declarative zero-Go-edit YAML manifests
 │   ├── packages/           # 80 packages with multi-distro translations & fallbacks
 │   ├── configs.yaml        # 23 managed dotfile configuration assets

@@ -55,8 +55,9 @@ type AppContext struct {
 	AuditSvc   *app.AuditService
 	HacksSvc   *app.HacksService
 	OpsSvc     *app.OpsService
-	ToolsSvc   *app.ToolsService
-	RepoRoot   string
+	ToolsSvc     *app.ToolsService
+	ControlPlane *app.ControlPlaneService
+	RepoRoot     string
 	Viper      *viper.Viper
 	Flags      GlobalFlagState
 	Version    string

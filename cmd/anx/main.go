@@ -26,6 +26,11 @@ func main() {
 		os.Exit(exitCode)
 	}
 
+	if base == "aitools" {
+		exitCode := cli.ExecuteCLI(append([]string{"ai"}, os.Args[1:]...), os.Stdout, os.Stderr, Version, Commit, Date)
+		os.Exit(exitCode)
+	}
+
 	exitCode := cli.ExecuteCLI(os.Args[1:], os.Stdout, os.Stderr, Version, Commit, Date)
 	os.Exit(exitCode)
 }

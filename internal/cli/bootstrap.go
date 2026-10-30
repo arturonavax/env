@@ -3,150 +3,55 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	aicli "github.com/arturonavax/env/internal/ai/cli"
-	"github.com/arturonavax/env/internal/app"
-	"github.com/arturonavax/env/internal/catalog"
-	"github.com/arturonavax/env/internal/hacks"
-	"github.com/arturonavax/env/internal/journal"
-	"github.com/arturonavax/env/internal/platform"
-	"github.com/arturonavax/env/internal/providers"
-	"github.com/arturonavax/env/internal/security"
-	"github.com/arturonavax/env/internal/snapshot"
-	"github.com/arturonavax/env/internal/state"
+	"github.com/arturonavax/env/internal/bootstrap"
 	"github.com/arturonavax/env/internal/theme"
-	"github.com/arturonavax/env/internal/tools"
 )
 
-// BuildAppContext constructs the runtime AppContext (services, declarative catalog, state).
+// BuildAppContext constructs the runtime AppContext by delegating to the reusable bootstrap container.
 func BuildAppContext(version, commit, date string) (*AppContext, error) {
-	plat := platform.Detect()
-
-	v := viper.New()
-	v.SetEnvPrefix("ANX")
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	v.AutomaticEnv()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(plat.ConfigDir())
-	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
-			return nil, fmt.Errorf("reading %s/config.yaml: %w", plat.ConfigDir(), err)
-		}
-	}
-
-	store, err := state.OpenStore(plat.StateDir())
+	container, err := bootstrap.NewContainer(bootstrap.WithVersion(version, commit, date))
 	if err != nil {
 		return nil, err
 	}
-
-	repoRoot := resolveRepoRoot(v.GetString("repo"), plat.HomeDir(), store.RepoRoot())
-	if isDir(filepath.Join(repoRoot, "files")) && isDir(filepath.Join(repoRoot, "manifests")) {
-		_ = store.SetRepoRoot(repoRoot)
-	}
-
-	cat, err := catalog.NewRegistryWithOverlays(
-		filepath.Join(repoRoot, "manifests"),
-		filepath.Join(plat.ConfigDir(), "manifests.d"),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	j, err := journal.NewFileJournal(plat.StateDir())
-	if err != nil {
-		return nil, err
-	}
-	snap, err := snapshot.NewManager(plat.StateDir())
-	if err != nil {
-		return nil, err
-	}
-
-	runner := security.NewRunner(60 * time.Second)
-	installRunner := security.NewRunner(30 * time.Minute)
-	prov := providers.NewDispatcher(plat, cat.Catalog(), installRunner, repoRoot)
-
-	syncSvc := app.NewSyncService(plat, cat, snap, store, repoRoot)
-	installSvc := app.NewInstallService(app.InstallDeps{
-		Platform: plat, Catalog: cat, Journal: j, Snapshots: snap, Provider: prov, Store: store, Sync: syncSvc,
-	})
-
-	osvClient := security.NewOSVClient(
-		10*time.Second,
-		security.WithOSVCacheDir(filepath.Join(plat.CacheDir(), "osv"), 6*time.Hour),
-	)
-
-	repoHacksDir := filepath.Join(repoRoot, "manifests", "hacks")
-	if _, err := os.Stat(repoHacksDir); err != nil {
-		repoHacksDir = filepath.Join(repoRoot, "hacks")
-	}
-
-	hackReg, err := hacks.LoadRegistry(
-		hacks.WithRepoHacksDir(repoHacksDir),
-		hacks.WithUserHacksDir(filepath.Join(plat.ConfigDir(), "hacks.d")),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	toolReg, err := tools.LoadRegistry(
-		tools.WithRepoToolsDir(filepath.Join(repoRoot, "manifests")),
-		tools.WithUserToolsDir(filepath.Join(plat.ConfigDir(), "tools.d")),
-		tools.WithPlatform(plat),
-	)
-	if err != nil {
-		return nil, err
-	}
-	toolRunner := tools.NewRunner(toolReg)
-	toolUpdater := tools.NewUpdater(toolReg, func(ctx context.Context, packageID string) error {
-		plan, err := installSvc.Plan(ctx, "all", []string{packageID})
-		if err != nil {
-			return err
-		}
-		return installSvc.Apply(ctx, plan)
-	})
-	toolsSvc := app.NewToolsService(toolReg, toolRunner, toolUpdater)
 
 	appCtx := &AppContext{
-		Platform:   plat,
-		Catalog:    cat,
-		Journal:    j,
-		Snapshots:  snap,
-		Store:      store,
-		Runner:     runner,
-		Provider:   prov,
-		InstallSvc: installSvc,
-		SyncSvc:    syncSvc,
-		DoctorSvc:  app.NewDoctorService(plat, cat, app.WithDoctorStore(store)),
-		AuditSvc:   app.NewAuditService(cat, prov, osvClient),
-		HacksSvc:   app.NewHacksService(plat, hackReg, installRunner, snap, store, repoRoot),
-		OpsSvc:     app.NewOpsService(plat, installRunner),
-		ToolsSvc:   toolsSvc,
-		RepoRoot:   repoRoot,
-		Viper:      v,
+		Platform:   container.Platform,
+		Catalog:    container.Catalog,
+		Journal:    container.Journal,
+		Snapshots:  container.Snapshots,
+		Store:      container.Store,
+		Runner:     container.Runner,
+		Provider:   container.Provider,
+		InstallSvc: container.InstallSvc,
+		SyncSvc:    container.SyncSvc,
+		DoctorSvc:  container.DoctorSvc,
+		AuditSvc:   container.AuditSvc,
+		HacksSvc:   container.HacksSvc,
+		OpsSvc:     container.OpsSvc,
+		ToolsSvc:     container.ToolsSvc,
+		ControlPlane: container.ControlPlane,
+		RepoRoot:     container.RepoRoot,
+		Viper:      container.Viper,
 		Version:    version,
 		Commit:     commit,
 		Date:       date,
 	}
 
-	toolRunner.RegisterBuiltin("ai", func(ctx context.Context, _ string, args []string, in io.Reader, out, errOut io.Writer) error {
+	container.ToolRunner.RegisterBuiltin("ai", func(ctx context.Context, _ string, args []string, in io.Reader, out, errOut io.Writer) error {
 		cmd := aicli.NewCommand(
 			aicli.WithUse("ai"),
 			aicli.WithOptimizeFunc(aiOptimizeFunc(appCtx)),
-			aicli.WithPlatform(plat),
+			aicli.WithPlatform(container.Platform),
 		)
 		cmd.SetArgs(args)
 		cmd.SetIn(in)
@@ -158,40 +63,9 @@ func BuildAppContext(version, commit, date string) (*AppContext, error) {
 	return appCtx, nil
 }
 
-// resolveRepoRoot finds the env repository: configured path, walking up from cwd, persisted store root, or well-known user paths.
+// resolveRepoRoot finds the env repository by delegating to bootstrap.ResolveRepoRoot.
 func resolveRepoRoot(configured, home, stored string) string {
-	if configured != "" && isDir(filepath.Join(configured, "manifests")) {
-		return configured
-	}
-	cwd, err := os.Getwd()
-	if err == nil {
-		for dir := cwd; ; dir = filepath.Dir(dir) {
-			if isDir(filepath.Join(dir, "files")) && isDir(filepath.Join(dir, "manifests")) {
-				return dir
-			}
-			if dir == filepath.Dir(dir) {
-				break
-			}
-		}
-	}
-	if stored != "" && isDir(filepath.Join(stored, "files")) && isDir(filepath.Join(stored, "manifests")) {
-		return stored
-	}
-	candidates := []string{
-		filepath.Join(home, "repos", "github.com", "arturonavax", "env"),
-		filepath.Join(home, ".local", "share", "anx", "repo"),
-		filepath.Join(home, "env"),
-		filepath.Join(home, ".dotfiles"),
-	}
-	for _, cand := range candidates {
-		if isDir(filepath.Join(cand, "files")) && isDir(filepath.Join(cand, "manifests")) {
-			return cand
-		}
-	}
-	if cwd != "" {
-		return cwd
-	}
-	return "."
+	return bootstrap.ResolveRepoRoot(configured, home, stored)
 }
 
 func isDir(p string) bool {

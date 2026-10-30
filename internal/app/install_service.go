@@ -152,10 +152,12 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 	defer func() { _ = lock.Release() }()
 
 	txID := fmt.Sprintf("tx-%d", time.Now().UnixNano())
-	s.journalAppend(domain.JournalEntry{
+	if err := s.journalAppend(domain.JournalEntry{
 		TxID: txID, Timestamp: time.Now(), Type: "begin",
 		Details: fmt.Sprintf("plan %s (%d steps)", plan.ID, len(plan.Steps)),
-	})
+	}); err != nil {
+		return domain.NewExitError(domain.ExitRollbackOrPartial, fmt.Errorf("journal begin failed: %w", err))
+	}
 
 	tasks := make([]execution.Task, len(plan.Steps))
 	for i := range plan.Steps {
@@ -185,7 +187,7 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 	})
 
 	if execErr != nil {
-		s.journalAppend(domain.JournalEntry{
+		_ = s.journalAppend(domain.JournalEntry{
 			TxID: txID, Timestamp: time.Now(), Type: "rollback", Details: execErr.Error(),
 		})
 		if errors.Is(execErr, execution.ErrExecutionInterrupted) {
@@ -194,9 +196,11 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		return domain.NewExitError(domain.ExitRollbackOrPartial, execErr)
 	}
 
-	s.journalAppend(domain.JournalEntry{
+	if err := s.journalAppend(domain.JournalEntry{
 		TxID: txID, Timestamp: time.Now(), Type: "commit", Details: "all steps succeeded",
-	})
+	}); err != nil {
+		return domain.NewExitError(domain.ExitRollbackOrPartial, fmt.Errorf("journal commit failed: %w", err))
+	}
 	return nil
 }
 
@@ -211,14 +215,21 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 		}
 		task.Timeout = 30 * time.Minute
 		task.Execute = func(ctx context.Context) error {
-			s.journalStep(txID, "step_start", step, "")
+			if err := s.journalStep(txID, "step_start", step, ""); err != nil {
+				return fmt.Errorf("journal step_start: %w", err)
+			}
 			if err := s.provider.Install(ctx, pkg); err != nil {
-				s.journalStep(txID, "step_failed", step, err.Error())
+				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				return err
 			}
 			_, ver, _ := s.provider.IsInstalled(ctx, pkg)
-			s.recordInstalled(pkg, ver)
-			s.journalStep(txID, "step_done", step, "")
+			if err := s.recordInstalled(pkg, ver); err != nil {
+				_ = s.journalStep(txID, "step_failed", step, err.Error())
+				return fmt.Errorf("recording installed %s: %w", pkg.ID, err)
+			}
+			if err := s.journalStep(txID, "step_done", step, ""); err != nil {
+				return fmt.Errorf("journal step_done: %w", err)
+			}
 			return nil
 		}
 		task.Compensate = func(ctx context.Context) error {
@@ -234,17 +245,21 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 	case domain.ActionSync:
 		var snapID string
 		task.Execute = func(ctx context.Context) error {
-			s.journalStep(txID, "step_start", step, "")
+			if err := s.journalStep(txID, "step_start", step, ""); err != nil {
+				return fmt.Errorf("journal step_start: %w", err)
+			}
 			if s.sync == nil {
 				return errors.New("sync service not configured")
 			}
 			res, err := s.sync.SyncOne(ctx, step.ResourceID, SyncOptions{})
 			if err != nil {
-				s.journalStep(txID, "step_failed", step, err.Error())
+				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				return err
 			}
 			snapID = res.SnapshotID
-			s.journalStep(txID, "step_done", step, "")
+			if err := s.journalStep(txID, "step_done", step, ""); err != nil {
+				return fmt.Errorf("journal step_done: %w", err)
+			}
 			return nil
 		}
 		task.Compensate = func(_ context.Context) error {
@@ -274,7 +289,9 @@ func (s *InstallService) Uninstall(ctx context.Context, ids []string) error {
 			return fmt.Errorf("uninstalling %s: %w", id, err)
 		}
 		if s.store != nil {
-			_ = s.store.RemoveResource(id)
+			if err := s.store.RemoveResource(id); err != nil {
+				return fmt.Errorf("removing %s from state store: %w", id, err)
+			}
 		}
 	}
 	return nil
@@ -306,11 +323,11 @@ func (s *InstallService) Resume(ctx context.Context) (*domain.ExecutionPlan, err
 	return plan, s.Apply(ctx, plan)
 }
 
-func (s *InstallService) recordInstalled(pkg domain.ManagedResource, version string) {
+func (s *InstallService) recordInstalled(pkg domain.ManagedResource, version string) error {
 	if s.store == nil {
-		return
+		return nil
 	}
-	_ = s.store.RecordResource(state.InstalledRecord{
+	return s.store.RecordResource(state.InstalledRecord{
 		ResourceID:   pkg.ID,
 		Version:      strings.TrimSpace(version),
 		Strategy:     string(pkg.Strategy),
@@ -319,14 +336,15 @@ func (s *InstallService) recordInstalled(pkg domain.ManagedResource, version str
 	})
 }
 
-func (s *InstallService) journalAppend(e domain.JournalEntry) {
+func (s *InstallService) journalAppend(e domain.JournalEntry) error {
 	if s.journal != nil {
-		_ = s.journal.Append(e)
+		return s.journal.Append(e)
 	}
+	return nil
 }
 
-func (s *InstallService) journalStep(txID, typ string, step domain.PlanStep, errMsg string) {
-	s.journalAppend(domain.JournalEntry{
+func (s *InstallService) journalStep(txID, typ string, step domain.PlanStep, errMsg string) error {
+	return s.journalAppend(domain.JournalEntry{
 		TxID: txID, Timestamp: time.Now(), Type: typ, StepID: step.ID,
 		Action: step.Action, Target: step.TargetPath, Error: errMsg,
 	})

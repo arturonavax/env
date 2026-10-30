@@ -151,3 +151,49 @@ func TestDoctorService(t *testing.T) {
 		t.Fatal("expected diagnostic checks")
 	}
 }
+
+func TestControlPlaneServiceExplainAndInventory(t *testing.T) {
+	fx := newFixture(t)
+	sync := app.NewSyncService(fx.plat, fx.cat, fx.snap, fx.store, fx.repo)
+	cp := app.NewControlPlaneService(fx.plat, fx.cat, nil, sync, nil, nil, fx.store)
+	ctx := context.Background()
+
+	// 1. Inventory query
+	inv, err := cp.Inventory(ctx, app.InventoryFilter{})
+	if err != nil {
+		t.Fatalf("inventory query failed: %v", err)
+	}
+	if len(inv.Packages) == 0 {
+		t.Errorf("expected packages in inventory, got 0")
+	}
+	if len(inv.Configurations) == 0 {
+		t.Errorf("expected configurations in inventory, got 0")
+	}
+
+	// 2. Explain Package
+	provPkg, err := cp.Explain(ctx, domain.ResourceID("ripgrep"))
+	if err != nil {
+		t.Fatalf("explain ripgrep failed: %v", err)
+	}
+	if provPkg.Kind != domain.KindPackage {
+		t.Errorf("expected kind %s, got %s", domain.KindPackage, provPkg.Kind)
+	}
+	if provPkg.Origin == "" {
+		t.Errorf("expected non-empty origin for ripgrep")
+	}
+
+	// 3. Explain Config
+	provCfg, err := cp.Explain(ctx, domain.ResourceID("starship-config"))
+	if err != nil {
+		t.Fatalf("explain starship-config failed: %v", err)
+	}
+	if provCfg.Kind != domain.KindConfig {
+		t.Errorf("expected kind %s, got %s", domain.KindConfig, provCfg.Kind)
+	}
+
+	// 4. Explain Unknown
+	_, err = cp.Explain(ctx, domain.ResourceID("non-existent-artifact"))
+	if err == nil {
+		t.Errorf("expected error explaining non-existent artifact")
+	}
+}

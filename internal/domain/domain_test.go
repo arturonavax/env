@@ -81,3 +81,50 @@ func TestDomainHermetic(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 }
+
+func TestPlanSpecDeterministicDigest(t *testing.T) {
+	// Plan A created at time T1 with ID A
+	planA := domain.ExecutionPlan{
+		ID:        "plan-12345",
+		CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		Platform:  "linux",
+		Profile:   "developer",
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "ripgrep", Action: domain.ActionInstall, Description: "Install ripgrep"},
+			{ID: 2, ResourceID: "ghostty", Action: domain.ActionInstall, Description: "Install ghostty"},
+		},
+	}
+
+	// Plan B created at time T2 with ID B, but identical canonical content
+	planB := domain.ExecutionPlan{
+		ID:        "plan-99999",
+		CreatedAt: time.Date(2026, 10, 30, 18, 0, 0, 0, time.UTC),
+		Platform:  "linux",
+		Profile:   "developer",
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "ripgrep", Action: domain.ActionInstall, Description: "Install ripgrep"},
+			{ID: 2, ResourceID: "ghostty", Action: domain.ActionInstall, Description: "Install ghostty"},
+		},
+	}
+
+	digestA := planA.Digest()
+	digestB := planB.Digest()
+
+	if digestA == "" {
+		t.Fatalf("expected non-empty digest for planA")
+	}
+	if digestA != digestB {
+		t.Fatalf("AC-03 violation: expected identical digest for identical plans regardless of ID/time, got %q vs %q", digestA, digestB)
+	}
+
+	// Plan C with modified action must produce different digest
+	planC := planB
+	planC.Steps = []domain.PlanStep{
+		{ID: 1, ResourceID: "ripgrep", Action: domain.ActionInstall, Description: "Install ripgrep"},
+		{ID: 2, ResourceID: "bat", Action: domain.ActionInstall, Description: "Install bat"},
+	}
+	digestC := planC.Digest()
+	if digestA == digestC {
+		t.Fatalf("expected different digest when actions differ, got identical %q", digestA)
+	}
+}

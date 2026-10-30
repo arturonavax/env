@@ -154,8 +154,20 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 			continue
 		}
 
-		incoming, _ := os.ReadFile(source)
-		local, _ := os.ReadFile(target)
+		incoming, err := os.ReadFile(source)
+		if err != nil {
+			d.State = "missing"
+			d.Summary = fmt.Sprintf("source unreadable: %v", err)
+			diffs = append(diffs, d)
+			continue
+		}
+		local, err := os.ReadFile(target)
+		if err != nil {
+			d.State = "missing"
+			d.Summary = fmt.Sprintf("target unreadable: %v", err)
+			diffs = append(diffs, d)
+			continue
+		}
 		if cfg.Strategy == domain.StrategyMarkerBlock || cfg.Strategy == domain.StrategySmartAppend {
 			block, ok := configsync.ExtractMarkerBlock(string(local), markerStart(cfg), markerEnd(cfg))
 			if ok && bytes.Equal(bytes.TrimSpace([]byte(block)), bytes.TrimSpace(incoming)) {
@@ -326,15 +338,23 @@ func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOpti
 	}
 
 	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated") {
-		s.runPostSync(cfg)
+		if err := s.runPostSync(cfg); err != nil {
+			if r.Detail != "" {
+				r.Detail += "; "
+			}
+			r.Detail += fmt.Sprintf("post-sync error: %v", err)
+		}
 	}
 	return r, syncErr
 }
 
-func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) {
+func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) error {
+	var errs []error
 	for _, cmdArgs := range cfg.PostSyncCmds {
 		if len(cmdArgs) > 0 {
-			_ = exec.Command(cmdArgs[0], cmdArgs[1:]...).Run()
+			if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Run(); err != nil {
+				errs = append(errs, fmt.Errorf("post-sync cmd %v: %w", cmdArgs, err))
+			}
 		}
 	}
 	if s.platform != nil && len(cfg.PostSyncByDesktop) > 0 {
@@ -342,11 +362,14 @@ func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) {
 		if deCmds, ok := cfg.PostSyncByDesktop[de]; ok {
 			for _, cmdArgs := range deCmds {
 				if len(cmdArgs) > 0 {
-					_ = exec.Command(cmdArgs[0], cmdArgs[1:]...).Run()
+					if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Run(); err != nil {
+						errs = append(errs, fmt.Errorf("post-sync desktop cmd %v: %w", cmdArgs, err))
+					}
 				}
 			}
 		}
 	}
+	return errors.Join(errs...)
 }
 
 func (s *SyncService) syncDirectory(

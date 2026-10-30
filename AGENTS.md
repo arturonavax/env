@@ -11,9 +11,8 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ### Repository Structure
 
 ```text
-├── cmd/                    # Go application entrypoints
-│   ├── anx/                # Master CLI/TUI entrypoint (multicall binary dispatch)
-│   └── aitools/            # Standalone entrypoint for AI productivity suite
+├── cmd/                    # Go application entrypoint
+│   └── anx/                # Master CLI/TUI & multicall binary dispatch (anx, aitools, safe-suspend)
 ├── manifests/              # Declarative zero-Go-edit YAML configuration manifests
 │   ├── packages/           # 80 packages with multi-distro translations & fallbacks
 │   ├── configs.yaml        # 23 dotfile configuration assets

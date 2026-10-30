@@ -19,7 +19,7 @@
 
 ## 3. Technology Stack
 
-- **Language**: Go 1.27+
+- **Language**: Go 1.26+ (built with modern toolchains, compatible with bootstrap runtime Go >= 1.24)
 - **CLI Framework**: `github.com/spf13/cobra` (v1.10.2)
 - **TUI Framework**: `charm.land/bubbletea/v2` (v2.1.1)
 - **Styling**: `charm.land/lipgloss/v2` (v2.0.6)

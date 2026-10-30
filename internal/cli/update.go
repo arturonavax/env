@@ -77,7 +77,9 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 				diffs, err := appCtx.SyncSvc.Diff(ctx, "all")
 				if err == nil {
 					for _, d := range diffs {
-						if d.State != "synced" {
+						// d.State is "clean" when live and repository are synchronized.
+						// Only count as drift if it differs, conflicts, or is missing.
+						if d.State != "clean" && d.State != "synced" {
 							summary.ConfigDrifts++
 							sum := d.Summary
 							if sum == "" {

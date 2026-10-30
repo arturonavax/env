@@ -99,3 +99,41 @@ func (p *ExecutionPlan) HasDestructiveSteps() bool {
 	}
 	return false
 }
+
+// ToSpec extracts an immutable PlanSpec from the execution plan.
+func (p *ExecutionPlan) ToSpec() *PlanSpec {
+	if p == nil {
+		return nil
+	}
+	actions := make([]PlanAction, len(p.Steps))
+	for i, s := range p.Steps {
+		actions[i] = PlanAction{
+			ID:            s.ID,
+			ResourceID:    ResourceID(s.ResourceID),
+			Action:        s.Action,
+			Description:   s.Description,
+			Provider:      s.Provider,
+			Strategy:      s.Strategy,
+			TargetPath:    s.TargetPath,
+			SourcePath:    s.SourcePath,
+			IsPrivileged:  s.IsPrivileged,
+			IsDestructive: s.IsDestructive,
+			IsExclusive:   s.IsExclusive,
+		}
+	}
+	return &PlanSpec{
+		SchemaVersion: "anx.dev/v1",
+		Platform:      p.Platform,
+		Profile:       p.Profile,
+		Actions:       actions,
+	}
+}
+
+// Digest computes a deterministic SHA-256 fingerprint over the plan's actions and target parameters,
+// independent of execution ID or creation timestamp.
+func (p *ExecutionPlan) Digest() string {
+	if p == nil {
+		return ""
+	}
+	return p.ToSpec().Digest()
+}

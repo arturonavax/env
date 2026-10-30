@@ -27,6 +27,7 @@ import (
 func metaCommands(appCtx *AppContext) []*cobra.Command {
 	cmds := []*cobra.Command{
 		newStatusCmd(appCtx),
+		newExplainCmd(appCtx),
 		newDoctorCmd(appCtx),
 		newAuditCmd(appCtx),
 		newThemeCmd(appCtx),
@@ -146,6 +147,55 @@ func runStatus(cmd *cobra.Command, appCtx *AppContext) error {
 		fmt.Fprintf(w, "\n  Packages: %d installed / %d missing\n", len(payload.Installed), len(payload.Missing))
 		printRows(w, appCtx, rows)
 	})
+}
+
+func newExplainCmd(appCtx *AppContext) *cobra.Command {
+	return &cobra.Command{
+		Use:   "explain <resource-id>",
+		Short: "Explain origin, winning policy, conditions, and provenance of a resource",
+		Long: `Inspect and explain why a package, dotfile configuration, personal tool, or hardware hack
+was selected, including its origin manifest, active profile, dependencies, and winning policy.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			st := styles(appCtx)
+			rawID := args[0]
+
+			if appCtx.ControlPlane == nil {
+				return errors.New("control plane service not available")
+			}
+
+			prov, err := appCtx.ControlPlane.Explain(ctx, domain.ResourceID(rawID))
+			if err != nil {
+				return domain.NewExitError(domain.ExitUsageError, err)
+			}
+
+			return emit(cmd, appCtx, prov, func(w io.Writer) {
+				fmt.Fprintln(w, st.Header.Render(fmt.Sprintf("Resource Provenance: %s", prov.ResourceID)))
+				fmt.Fprintf(w, "  • Kind:           %s\n", prov.Kind)
+				fmt.Fprintf(w, "  • Origin:         %s\n", prov.Origin)
+				if prov.ActiveProfile != "" {
+					fmt.Fprintf(w, "  • Active Profile: %s\n", prov.ActiveProfile)
+				}
+				if len(prov.Conditions) > 0 {
+					fmt.Fprintf(w, "  • Conditions:     %s\n", strings.Join(prov.Conditions, ", "))
+				}
+				if prov.WinningPolicy != "" {
+					fmt.Fprintf(w, "  • Winning Policy: %s\n", st.Highlight.Render(prov.WinningPolicy))
+				}
+				if len(prov.Dependencies) > 0 {
+					deps := make([]string, len(prov.Dependencies))
+					for i, d := range prov.Dependencies {
+						deps[i] = string(d)
+					}
+					fmt.Fprintf(w, "  • Dependencies:   %s\n", strings.Join(deps, ", "))
+				}
+				if prov.Reason != "" {
+					fmt.Fprintf(w, "  • Explanation:    %s\n", prov.Reason)
+				}
+			})
+		},
+	}
 }
 
 func newDoctorCmd(appCtx *AppContext) *cobra.Command {
