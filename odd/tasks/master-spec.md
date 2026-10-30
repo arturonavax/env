@@ -60,19 +60,19 @@ Before modifying the operational code:
 
 Create and maintain a specification structure equivalent to:
 
-- `specs/anx/overview.md`
-- `specs/anx/requirements.md`
-- `specs/anx/architecture.md`
-- `specs/anx/cli-contract.md`
-- `specs/anx/tui-design.md`
-- `specs/anx/manifest-schema.md`
-- `specs/anx/state-and-transactions.md`
-- `specs/anx/synchronization.md`
-- `specs/anx/security.md`
-- `specs/anx/platform-compatibility.md`
-- `specs/anx/testing-and-acceptance.md`
-- `specs/anx/migration-plan.md`
-- `specs/anx/traceability.md`
+- `odd/specs/anx/overview.md`
+- `odd/specs/anx/requirements.md`
+- `odd/specs/anx/architecture.md`
+- `odd/specs/anx/cli-contract.md`
+- `odd/specs/anx/tui-design.md`
+- `odd/specs/anx/manifest-schema.md`
+- `odd/specs/anx/state-and-transactions.md`
+- `odd/specs/anx/synchronization.md`
+- `odd/specs/anx/security.md`
+- `odd/specs/anx/platform-compatibility.md`
+- `odd/specs/anx/testing-and-acceptance.md`
+- `odd/specs/anx/migration-plan.md`
+- `odd/specs/anx/traceability.md`
 
 The exact file organization may be improved if justified.
 

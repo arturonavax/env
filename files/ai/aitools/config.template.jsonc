@@ -1,279 +1,36 @@
-// ==============================================================================
-// ~/.config/aitools/config.json (JSON with Comments supported)
-// aitools — AI Productivity, Quota Management & Automated Workflows Suite.
-// All sections and commands are 100% declarative and extensible.
-// Changes here take effect immediately without recompilation or code modification.
-// ==============================================================================
 {
-  // Schema version for future automated migrations
   "version": "1.0.0",
-
-  // Default AI backend CLI used when not explicitly specified
-  // Options: "agy" (Google Antigravity), "claude" (Claude Code), "codex" (OpenAI),
-  //          "llm" (Datasette LLM), "opencode" (OpenCode), "pi" (Inflection Pi),
-  //          "ollama" (Local Ollama), or any custom harness defined in "backends" below.
   "default_commit_backend": "agy",
-
-  // ----------------------------------------------------------------------------
-  // AI Harness Adapters & CLI Backends (`backends`)
-  // ----------------------------------------------------------------------------
-  // Adapter Pattern: Normalizes divergent I/O protocols across AI tools:
-  // - input_mode  : "arg" (via CLI argument/flag) | "stdin" (UNIX pipe) | "temp_file" ({prompt_file})
-  // - output_mode : "stdout" (standard output) | "temp_file" ({output_file}) | "json" (parsed via json_key)
-  // - clean_ansi  : Automatically strips ANSI color codes, cursor escapes, and spinner artifacts
-  // ----------------------------------------------------------------------------
-  "backends": {
-    // Google Antigravity CLI (Default)
-    "agy": {
-      "command": ["agy", "-p", "{prompt}", "--disable-slash-commands"],
-      "input_mode": "arg",
-      "output_mode": "stdout",
-      "model_flag": "--model",
-      "effort_flag": "--effort",
-      "clean_ansi": true,
-      "clean_markdown": true
-    },
-
-    // Datasette LLM CLI (Simon Willison) — Native UNIX stdin pipeline
-    "llm": {
-      "command": ["llm", "{prompt}"],
-      "input_mode": "stdin",
-      "output_mode": "stdout",
-      "model_flag": "-m",
-      "clean_ansi": true,
-      "clean_markdown": true
-    },
-
-    // Anthropic Claude Code CLI
-    "claude": {
-      "command": ["claude", "-p", "{prompt}"],
-      "input_mode": "arg",
-      "output_mode": "stdout",
-      "model_flag": "--model",
-      "clean_ansi": true,
-      "clean_markdown": true
-    },
-
-    // OpenAI Codex CLI
-    "codex": {
-      "command": ["codex", "exec", "{prompt}"],
-      "input_mode": "arg",
-      "output_mode": "stdout",
-      "model_flag": "-m",
-      "clean_ansi": true,
-      "clean_markdown": true
-    },
-
-    // Ollama Local LLM Runner
-    "ollama": {
-      "command": ["ollama", "run", "{model}"],
-      "default_model": "codellama",
-      "input_mode": "stdin",
-      "output_mode": "stdout",
-      "clean_ansi": true,
-      "clean_markdown": true
-    }
-
-    // Example 1: Custom harness that writes to an output file instead of stdout:
-    // "file-harness": {
-    //   "command": ["my-agent", "--in", "{prompt_file}", "--out", "{output_file}"],
-    //   "input_mode": "temp_file",
-    //   "output_mode": "temp_file"
-    // },
-
-    // Example 2: Custom harness that outputs structured JSON:
-    // "json-harness": {
-    //   "command": ["my-tool", "-p", "{prompt}", "--format", "json"],
-    //   "input_mode": "arg",
-    //   "output_mode": "json",
-    //   "json_key": "choices.0.message.content"
-    // }
-  },
-
-  // ----------------------------------------------------------------------------
-  // Unified Non-Interactive LLM CLI Wrapper (`aitools llm`)
-  // ----------------------------------------------------------------------------
-  "llm": {
-    // Default AI CLI backend harness (agy, claude, codex, llm, opencode, pi, ollama, or custom)
-    "default_backend": "agy",
-
-    // Optional model override
-    "default_model": null,
-
-    // Default reasoning effort (low | medium | high | xhigh | max)
-    "default_effort": "low",
-
-    // Default execution mode:
-    // - "chat" / "ask"          : Single-turn direct response (no agentic loops or file modifications)
-    // - "action" / "simple-agent": Single order-to-action execution
-    // - "agent"                 : Default full agentic capabilities of the harness
-    "default_mode": "agent",
-
-    // Default output format: "text" | "json" | "raw"
-    "default_output_format": "text",
-
-    // Default timeout in seconds for LLM query execution
-    "timeout_sec": 60
-  },
-
-  // ----------------------------------------------------------------------------
-  // Git Conventional Commit Generator Configuration (`aitools commit` / `ai-commit` / `ai-cm`)
-  // ----------------------------------------------------------------------------
   "commit": {
-    // Backend CLI used for commit message generation
     "default_backend": "agy",
-
-    // Optional model override (e.g. "gemini-3.8-flash-low", "claude-sonnet-5-5-low")
     "model": null,
-
-    // Reasoning effort passed to LLMs that support it (e.g. agy: "low", "high")
     "effort": "low",
-
-    // Whether to automatically stage all modified tracked files by default
     "default_stage_all": false,
-
-    // Maximum diff characters sent to LLM prompt (prevents OS arg overflow)
     "max_diff_length": 15000,
-
-    // Default commit template to use. Built-in options:
-    // - "conventional" : Standard Conventional Commits (<type>(<scope>): <summary>)
-    // - "task"         : Task-prefixed commit ([<TASK-ID>] <type>(<scope>): <summary>)
-    // - "task-scope"   : Task issue as commit scope (<type>(<TASK-ID>): <summary>)
-    // - "detailed"     : Multi-line commit with WHAT/WHY paragraph and bullet points
-    // - "repo"         : Discovered repository commit template (.gitmessage / commit.template)
-    // Or specify any custom key defined under "templates" below, or a file path.
     "default_template": "conventional",
-
-    // Automatically detect and honor repository commit templates when inside a git repo.
-    // Discovers: git config commit.template, .gitmessage, .github/commit_template.md, etc.
     "auto_detect_repo_template": true,
-
-    // Optional manual Task / Issue ticket ID (e.g. "PROJ-1234", "#42").
-    // If null, aitools automatically extracts ticket patterns from the current Git branch name.
-    "task_id": null,
-
-    // Optional custom commit message templates.
-    // Available placeholders for dynamic string interpolation:
-    //   {diff}     : Git staged diff
-    //   {branch}   : Current Git branch name
-    //   {task_id}  : Task/Issue ticket ID (auto-extracted from branch or CLI/config override)
-    //   {issue_id} : Alias for {task_id}
-    //   {ticket}   : Alias for {task_id}
-    //   {files}    : Comma-separated list of modified/staged files
-    //   {scope}    : Scope override passed via CLI --scope
-    //   {model}    : Active model name
-    "templates": {
-      // Example 1: Organization format with ticket prefix:
-      // "org-custom": "Write a commit for branch {branch} (Task: {task_id}).\nFormat: [{task_id}] <type>: <summary>\nDiff:\n{diff}",
-      // Example 2: Linear / GitHub style:
-      // "linear-style": "Generate a concise conventional commit with issue ref: <type>(<scope>): <summary>\nFixes {task_id}\n\nDiff:\n{diff}"
-    },
-
-    // Legacy default prompt template (used if no named template is chosen)
-    "prompt_template": "You are an expert developer creating a clean conventional git commit message.\nAnalyze the following git diff and output a single, high-quality conventional commit message.\n\nRequirements:\n1. Format: <type>(<scope>): <summary in imperative mood, lower case>\n   Types: feat, fix, refactor, docs, chore, test, perf, build, ci\n2. Keep the first line under 72 characters.\n3. If necessary, add a blank line followed by bullet points describing key architectural details.\n4. Output in English.\n5. Do NOT include markdown code blocks (no ``` backticks), quotes, or explanation.\n6. Do NOT add 'Co-Authored-By', AI attribution, or metadata.\n7. Output ONLY the raw commit message.\n\nGit Diff:\n{diff}"
+    "task_id": null
   },
-
-  // ----------------------------------------------------------------------------
-  // Pull Request (PR) Description Generator Configuration (`aitools pr` / `ai-pr`)
-  // ----------------------------------------------------------------------------
-  "pr": {
-    // Backend CLI used for PR description generation (falls back to default_backend)
-    "default_backend": "agy",
-
-    // Optional model override (e.g. "gemini-2.5-flash", "claude-3-7-sonnet")
-    "model": null,
-
-    // Reasoning effort passed to LLMs that support it (e.g. agy: "low", "high")
-    "effort": "low",
-
-    // Target base branch (null = auto-detects main, master, develop, or upstream remote)
-    "default_base": null,
-
-    // Maximum diff characters sent to LLM prompt (prevents OS arg overflow)
-    "max_diff_length": 25000,
-
-    // Default PR template to use. Built-in options:
-    // - "standard" : Comprehensive PR with Overview, Motivation, Changes, Testing & Checklist
-    // - "task"     : Task/Issue-centered PR linked to ticket ([TASK-ID] Title, Problem, Solution, Verification)
-    // - "minimal"  : Terse summary, bulleted changes and verification note
-    // - "detailed" : Full architectural breakdown with design decisions, migrations & test evidence
-    // - "repo"     : Discovered repository PR template (.github/pull_request_template.md, etc.)
-    "default_template": "standard",
-
-    // Automatically detect and prioritize repository PR templates when inside a git repo.
-    // Discovers templates in .github/, .gitlab/, docs/, and repository root.
-    "auto_detect_repo_template": true,
-
-    // Optional manual Task / Issue ticket ID override (e.g. "PROJ-1234", "#42").
-    // If null, aitools automatically extracts ticket patterns from the current Git branch name.
-    "task_id": null,
-
-    // Custom Pull Request templates.
-    // Available placeholders for dynamic string interpolation:
-    //   {branch}   : Current Git branch name
-    //   {base}     : Target base branch name
-    //   {head}     : Head branch / commit ref
-    //   {task_id}  : Task/Issue ticket ID (auto-extracted from branch or CLI/config override)
-    //   {issue_id} : Alias for {task_id}
-    //   {ticket}   : Alias for {task_id}
-    //   {task_ref} : Formatted reference line "- **Related Issue / Ticket**: {task_id}"
-    //   {commits}  : Bulleted list of commit summaries on this branch
-    //   {files}    : Comma-separated list of modified files
-    //   {stat}     : Git diff --stat summary
-    //   {diff}     : Git branch diff (base...head)
-    //   {model}    : Active model name
-    "templates": {
-      // Example custom template:
-      // "release-pr": "# Release {branch}\n\n## Changes\n{commits}\n\n## Diff Stat\n{stat}\n\nDiff:\n{diff}"
-    }
-  },
-
-  // ----------------------------------------------------------------------------
-  // Background Wakeup & Hardware RTC Auto-Wake Daemon (`aitools daemon`)
-  // ----------------------------------------------------------------------------
   "daemon": {
-    // Hardware Real-Time Clock (RTC) auto-wake from S3 sleep
     "auto_wake": {
-      // Toggle motherboard hardware RTC alarm
       "enabled": true,
-
-      // Target wake time in 24-hour format (HH:MM)
       "time": "04:00",
-
-      // Automatically return system to sleep (suspend) after wake cycle completes
       "auto_resuspend": true,
-
-      // Delay in seconds before putting system back to sleep to allow notifications
       "resuspend_delay_seconds": 12,
-
-      // Maximum wake window timeout in minutes
       "max_wake_window_minutes": 15
     },
-
-    // Daily active window during which models can be monitored and alerted
     "active_hours": {
       "start": "03:55",
       "end": "22:00"
     },
-
-    // Advance warning in minutes before a model quota refreshes
     "reset_alert_lead_minutes": 5,
-
-    // Desktop notification banners (via notify-send on Linux or osascript on macOS)
     "desktop_notifications": true,
-
-    // Optional Telegram Bot notifications for quota alerts and wake completions
     "telegram": {
       "enabled": false,
       "bot_token": "",
       "chat_id": ""
     }
   },
-
-  // ----------------------------------------------------------------------------
-  // Model Targets & Quota Buckets (`aitools quota`, `watch`, `wake`)
-  // Add as many models, agents, tools, or accounts as desired!
-  // ----------------------------------------------------------------------------
   "targets": [
     {
       "id": "gemini",
@@ -281,10 +38,6 @@
       "tool": "agy",
       "account": "default",
       "enabled": true,
-      // Telemetry type:
-      //   "agy_usage": Scrapes live JSON telemetry via `agy -p /usage --output-format json`
-      //   "claude_status": Parses `claude status --json`
-      //   "timed_fallback": Fallback countdown timer based on last successful wake epoch
       "telemetry_type": "agy_usage",
       "bucket_id": "gemini-5h",
       "wake_command": [
@@ -307,45 +60,14 @@
       "timeout_sec": 20
     }
   ],
-
-  // ----------------------------------------------------------------------------
-  // Custom Declarative AI Pipelines & Commands
-  // Users can define any custom workflow here and run it via `aitools <command>`
-  // or `aitools run <command>` without touching Python code!
-  // ----------------------------------------------------------------------------
   "commands": {
     "review": {
       "description": "Perform an AI code review on current staged git diff",
       "backend": "agy",
       "model": null,
       "effort": "low",
-      // input_type options: "git_staged_diff", "git_diff", "stdin", "args", "stdin_or_args", "file", "none"
       "input_type": "git_staged_diff",
       "prompt_template": "You are a Principal Software Architect. Review the following git diff for logical bugs, security vulnerabilities, edge cases, and performance regressions. Be concise, actionable, and prioritize findings by severity:\n\n{input}"
-    },
-    "explain": {
-      "description": "Explain a code snippet, error message, or technical concept",
-      "backend": "agy",
-      "model": null,
-      "effort": "low",
-      "input_type": "stdin_or_args",
-      "prompt_template": "You are an expert technical instructor. Explain the following code, error trace, or concept clearly with a focus on fundamentals and concise practical examples:\n\n{input}"
-    },
-    "ask": {
-      "description": "Quick one-line question to the default AI assistant",
-      "backend": "agy",
-      "model": null,
-      "effort": "low",
-      "input_type": "args",
-      "prompt_template": "Answer the following question concisely and technically without introductory conversational fluff:\n\n{input}"
-    },
-    "optimize": {
-      "description": "Suggest performance optimizations for code provided via stdin or argument",
-      "backend": "agy",
-      "model": null,
-      "effort": "low",
-      "input_type": "stdin_or_args",
-      "prompt_template": "Analyze the following code for memory allocations, CPU complexity, and latency bottlenecks. Suggest optimal refactoring with concrete code diffs:\n\n{input}"
     }
   }
 }

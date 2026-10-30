@@ -4,7 +4,7 @@
 # ==============================================================================
 
 .DEFAULT_GOAL := help
-.PHONY: help build install test test-go test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean rebuild rebuild-tools optimize optimize-apply anx-plan anx-status anx-doctor
+.PHONY: help build install test test-go test-e2e test-unit test-integration lint check wizard plan dry-run uninstall-plan backup restore diff sync clean rebuild rebuild-tools optimize optimize-apply anx-plan anx-status anx-doctor
 
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "1.0.0")
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
@@ -22,6 +22,9 @@ install:
 
 test-go:
 	@go test -v -race ./...
+
+test-e2e:
+	@./scripts/test_e2e_docker.sh all
 
 anx-plan:
 	@go run -ldflags "$(LDFLAGS)" ./cmd/anx plan

@@ -6,32 +6,39 @@
 # Run: ./install.sh --help
 # ==============================================================================
 
-# Anchoring
-while [[ ! -d ./.git/ && ! -d ./files/ && ! -d ./src/ ]]; do
-	if [[ "$PWD" == "/" ]]; then
-		echo "[Installer Error]: Repository root not found." >&2
-		exit 1
+# Anchoring: locate repository root or clone on remote curl execution
+REPO_ROOT=""
+cur="$PWD"
+while [[ "$cur" != "/" ]]; do
+	if [[ -d "${cur}/manifests" && -f "${cur}/scripts/bootstrap_anx.sh" ]]; then
+		REPO_ROOT="$cur"
+		break
 	fi
-	if ! cd ..; then
-		echo "[Installer Error]: Failed to change directory." >&2
-		exit 1
-	fi
+	cur="$(dirname "$cur")"
 done
 
-# Check if legacy bash mode was explicitly requested
-LEGACY_BASH=0
-filtered_args=()
-for arg in "$@"; do
-	if [[ "$arg" == "--legacy-bash" ]]; then
-		LEGACY_BASH=1
+if [[ -z "${REPO_ROOT}" ]]; then
+	TARGET_REPO="${ANX_REPO_DIR:-${HOME}/.local/share/anx/repo}"
+	echo "  [INFO] Remote curl execution detected: bootstrapping repository into ${TARGET_REPO}..."
+	mkdir -p "$(dirname "${TARGET_REPO}")"
+	if [[ -d "${TARGET_REPO}/.git" ]]; then
+		git -C "${TARGET_REPO}" pull --rebase origin main 2>/dev/null || true
 	else
-		filtered_args+=("$arg")
+		GIT_REMOTE_URL="${ANX_GIT_URL:-https://github.com/arturonavax/env.git}"
+		if [[ -d "${GIT_REMOTE_URL}" ]]; then
+			mkdir -p "${TARGET_REPO}"
+			cp -r "${GIT_REMOTE_URL}/." "${TARGET_REPO}/"
+		elif command -v git >/dev/null 2>&1; then
+			git clone --depth 1 "${GIT_REMOTE_URL}" "${TARGET_REPO}"
+		else
+			echo "[Installer Error]: 'git' is required to clone repository for installation." >&2
+			exit 1
+		fi
 	fi
-done
-
-if [[ "${LEGACY_BASH}" -ne 1 ]]; then
-	exec ./scripts/bootstrap_anx.sh "${filtered_args[@]}"
+	REPO_ROOT="${TARGET_REPO}"
 fi
+
+cd "${REPO_ROOT}"
 
 source ./src/lib/strict.sh
 source ./src/lib/colors.sh
@@ -85,11 +92,10 @@ Examples:
 EOF
 }
 
-# Early check for plan, wizard, check, help, and unattended flags
+# Early check for plan, wizard, check, and help flags
 for arg in "$@"; do
 	case "$arg" in
 	-p | --plan | plan | --dry-run | dry-run | --preview | preview)
-		# Filter out plan flags and pass target components to show_install_plan
 		plan_components=()
 		for item in "$@"; do
 			case "$item" in
@@ -114,9 +120,6 @@ for arg in "$@"; do
 		done
 		exec ./src/wizard.sh "${shift_args[@]}"
 		;;
-	-y | --yes | -n | --non-interactive | --unattended | --batch)
-		exec ./src/wizard.sh "$@"
-		;;
 	--check | check)
 		print_platform_summary
 		exit 0
@@ -127,6 +130,21 @@ for arg in "$@"; do
 		;;
 	esac
 done
+
+# Check if legacy bash mode was explicitly requested
+LEGACY_BASH=0
+filtered_args=()
+for arg in "$@"; do
+	if [[ "$arg" == "--legacy-bash" ]]; then
+		LEGACY_BASH=1
+	else
+		filtered_args+=("$arg")
+	fi
+done
+
+if [[ "${LEGACY_BASH}" -ne 1 ]]; then
+	exec ./scripts/bootstrap_anx.sh "${filtered_args[@]}"
+fi
 
 # If invoked interactively with no arguments, launch wizard by default!
 if [[ "$#" -eq 0 ]] && [[ -t 0 ]]; then

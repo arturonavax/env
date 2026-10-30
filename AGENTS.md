@@ -17,10 +17,13 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 ├── manifests/              # Declarative zero-Go-edit YAML configuration manifests
 │   ├── packages/           # 80 packages with multi-distro translations & fallbacks
 │   ├── configs.yaml        # 23 dotfile configuration assets
-│   └── profiles.yaml       # 8 preset workstation profiles
-├── hacks/                  # Declarative machine- and hardware-specific system hacks
-│   ├── dell-precision-m6800/ # Dell M6800 fan, GPU and power optimizations
-│   └── x11-scroll-lock-led/  # Hardware Scroll Lock LED control
+│   ├── profiles.yaml       # 8 preset workstation profiles
+│   ├── hacks.yaml          # Declarative hardware optimization definitions
+│   ├── hacks/              # Machine- and hardware-specific system optimizations
+│   │   ├── dell-precision-m6800/ # Dell M6800 fan, GPU and power optimizations
+│   │   └── x11-scroll-lock-led/  # Hardware Scroll Lock LED control
+│   ├── tools.yaml          # Decoupled personal tools engine registry
+│   └── archives.yaml       # Decommissioned legacy tools (tmux, wdiff, litecli)
 ├── scripts/                # Multi-platform pre-flight & Go bootstrap scripts
 │   ├── bootstrap_anx.sh    # Unix bootstrap (GVM priority -> standalone -> native PM)
 │   └── bootstrap_anx.ps1   # Windows bootstrap (official go.dev archive with SHA-256)
@@ -88,6 +91,15 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── create_wizard.sh    # Pure-bash wizard generator scaffolding new interactive setups
 │   ├── copy_config.sh      # Ingest active user dotfiles back into the repo
 │   └── diff_snapshots.sh   # Review differences between local machine and repo
+├── tests/                  # Multi-tier testing suite
+│   ├── e2e/                # Docker-isolated multi-stage E2E harnesses (Debian, Alpine)
+│   ├── unit/               # Modular unit tests
+│   └── integration/        # CLI smoke & integration test suite
+├── odd/                    # Organic Driven Development (ODD) specifications & task tracking
+│   ├── tasks/              # Active task boards (anx-platform-overhaul.md, master-spec.md)
+│   └── specs/              # Production system specifications (odd/specs/anx/*)
+├── man/                    # Generated troff Section 1 man pages (anx.1, aitools.1)
+├── docs/                   # Markdown CLI reference manuals
 ├── .atl/                   # Agent runtime state (skill registry index & cache)
 ├── codegraph.json          # CodeGraph AST indexing configuration and exclusion globs
 └── .engram/config.json     # Engram memory project binding ("env")
@@ -104,17 +116,25 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 - **`./install.bat` / `scripts\bootstrap_anx.ps1` (Windows)**:
   - Automated Windows pre-flight check and Go bootstrap via official `go.dev` SHA-256 verified archive, compiling `anx.exe` and `aitools.exe` into `%LOCALAPPDATA%\Programs\anx\bin`.
 - **`anx [command]` (Master Environment CLI & TUI)**:
-  - `anx apply [--profile <name>]`: Apply desired state with DAG dependency resolution.
+  - `anx apply [--profile <name>] [--include-hacks]`: Apply desired state with DAG dependency resolution.
   - `anx plan [--profile <name>]`: Dry-run preview of planned actions without modifying filesystem.
+  - `anx update [--fetch]`: Inspect repo commits, personal tools, and dotfile drifts for available updates (CWD-independent).
+  - `anx upgrade [--dry-run] [--include-hacks]`: End-to-end upgrade: pull repo, update tools, apply package plans, and sync dotfiles.
   - `anx sync [--dry-run|--push]`: Reconcile dotfiles with Myers diff, 3-way merge, and smart-append markers.
+  - `anx capture [group|config-id] [--commit] [--push] [--wizard]`: Ingest live dotfiles into repo with branch creation and ownership-guarded push.
   - `anx backup [create|list|restore]`: Manage hierarchical snapshots (50MB quota).
-  - `anx hacks [list|detect|info|apply]`: Detect and apply workstation/hardware optimizations.
+  - `anx hacks [list|detect|info|apply]`: Detect and apply workstation/hardware optimizations declared in `manifests/hacks.yaml`.
   - `anx rebuild [all|go|rust|node|python|nvim]`: Recompile language toolchains.
   - `anx optimize [--report|--apply]`: Lynis security audit & hardware optimization with 12 security guardrails.
-  - `anx doctor`: Run comprehensive diagnostic health checks.
+  - `anx cleanup` / `anx prune [--dry-run|-y]`: Safely detect and prune orphaned, deprecated, and archived components.
+  - `anx alias <name>`: Create custom command alias/symlink in `~/.local/bin/<name>` (supported via `--bin-name` in bootstrap).
+  - `anx doctor`: Run comprehensive diagnostic health checks (including orphan, deprecation, and archive remnant checks).
   - `anx audit`: Scan installed tools for vulnerabilities against OSV.dev.
-  - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI.
-  - `anx ai [commit|pr|llm|daemon|watch|setup]`: AI productivity suite (also available directly as `aitools`).
+  - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges and hardware hack indicators.
+  - `anx tools [list|info|run|update|upgrade]`: Decoupled personal tools engine with isolated path (`~/.local/share/anx/bin`).
+  - `anx tools ai [commit|pr|llm|quota|daemon]`: AI productivity suite (also available via shortcuts `anx tools llm`, `anx tools commit`, `anx tools pr`, `anx tools quota`, and root aliases `anx ai`, `anx llm`).
+  - `anx doc man [--install]` / `anx doc markdown`: Generate standard troff man pages (section 1) and Markdown documentation.
+  - `anx completion <bash|zsh|fish|powershell> [--install]`: Generate or directly install shell completion scripts.
 - **`./uninstall.sh [--plan]`**:
   - Planning / Dry-run: `./uninstall.sh --plan` previews purged packages, binaries, desktop entries, and configuration directories without touching anything.
   - Two-phase teardown:
@@ -137,6 +157,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 - **Hotkeys**: Dispatches via Right-Alt key combinations (e.g. `Right-Alt + C` focuses Google Chrome).
 - **Agnostic Multi-Backend Router (`files/rcmd/rcmd`)**:
   - **GNOME Shell (Wayland/X11)**: Communicates directly via D-Bus (`busctl`/`gdbus`) with the bundled extension `rcmd-shell@arturonavax.dev` (`files/gnome/extensions/rcmd-shell@arturonavax.dev/extension.js`) exporting interface `dev.arturonavax.rcmd`. Falls back to `org.gnome.Shell.Extensions.RunOrRaise`.
+  - **XFCE (X11)**: Dispatches via `files/rcmd/backends/xfce.sh` with EWMH window cycling and registers global Alt hotkeys via `rcmd --sync-xfce` using `xfconf-query`.
   - **Hyprland**: Dispatches via `hyprctl dispatch focuswindow` and `hyprctl clients -j`.
   - **Sway**: Dispatches via `swaymsg [app_id=...] focus` and IPC trees.
   - **KDE KWin**: Dispatches via KWin scripting over D-Bus (`org.kde.KWin`).
@@ -202,6 +223,25 @@ To maximize terminal responsiveness and eliminate subshell latency, shell initia
   - Compact 2-line layout with minimal execution overhead (`cmd_duration` threshold 2000ms).
   - Cloud modules (`aws`, `gcloud`, `package`) are disabled to prevent synchronous blocking on network or slow runtimes.
   - Includes `custom.agent_workspace` (`🤖 AGENTS`) to highlight directories governed by `AGENTS.md` and AI engineering rules.
+
+### Multi-Shell & Multi-Terminal Architecture
+
+`arturonavax/env` enforces a strict source-of-truth hierarchy across shells and terminals:
+
+1. **Multi-Shell Compatibility**:
+   - **`zsh` (Primary Source of Truth)**: The canonical dotfile development environment with cached completion compilation (`.zwc`), interactive `fzf-tab`, Atuin SQLite history, and complete aliases.
+   - **`bash` (Native Adapter)**: Adapted `files/bash/.base.bash` and non-destructive marker block in `files/bash/.bashrc` preserving user variables while loading Starship prompt, Atuin history, and FZF.
+   - **`fish` (Native Adapter)**: Managed `files/fish/config.fish` with Starship initialization, Atuin keybindings, and canonical CLI aliases.
+   - **`nushell` (Native Adapter)**: Managed `files/nushell/config.nu` and `files/nushell/env.nu` providing structured pipeline integration for Starship prompts and Atuin hooks.
+
+2. **Multi-Terminal Compatibility & Architectural Boundaries**:
+   - **`ghostty` (Primary & Recommended)**: Official GPU-accelerated terminal configured with 24-bit TrueColor, split panes, and automatic invocation of `herdr` multiplexer.
+   - **`kitty` / `wezterm` / `alacritty` (Fully Supported)**: Supported GPU terminals deployed with Tokyo Night theme palettes and automatic `herdr` agent multiplexer startup.
+   - **`windows-terminal` (Partial Compatibility)**: Microsoft Windows Terminal configured with tabs and split panes; note that native POSIX signals and Unix socket IPC for multiplexing require WSL.
+   - **`warp` (Architectural Boundary Notice)**: Due to Warp's proprietary command-block execution model and closed terminal architecture, custom prompts (`starship`), interactive subshell search widgets (`fzf`), and terminal multiplexers (`herdr`) are disabled by Warp's design. The setup wizard displays a clear compatibility notice when Warp is selected.
+
+3. **Preserved Unmaintained IDE Assets**:
+   - Configuration assets for **VS Code** and **Cursor IDE** are no longer actively maintained by the author. They are preserved in `files/vscode/` and `files/cursor/` and commented out in `manifests/configs.yaml`. They are **NOT** marked as archived in `manifests/archives.yaml` to ensure existing users are never prompted to purge or uninstall their editor settings.
 
 ### Diagnostic & Performance Architecture (Ubuntu / Ghostty / Wayland)
 

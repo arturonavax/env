@@ -23,6 +23,7 @@ bin/
 
 # Herdr runtime logs & session state
 files/herdr/*.log
+files/herdr/*.sock*
 files/herdr/session.json
 files/herdr/session-snapshots/
 files/herdr/.plugins.lock
