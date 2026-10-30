@@ -20,7 +20,14 @@
 
 set -euo pipefail
 
-# ANSI Colors
+# Prefer unified ANX platform Go engine when available
+if command -v anx >/dev/null 2>&1; then
+	exec anx sleep "$@"
+elif [[ -x "${HOME}/.local/bin/anx" ]]; then
+	exec "${HOME}/.local/bin/anx" sleep "$@"
+fi
+
+# Fallback standalone routines when ANX has not yet been bootstrapped
 BOLD="\033[1m"
 GREEN="\033[0;32m"
 YELLOW="\033[0;33m"

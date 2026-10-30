@@ -42,6 +42,11 @@ func main() {
 		return
 	}
 
+	if base == "safe-suspend" || base == "suspend" {
+		exitCode := cli.ExecuteCLI(append([]string{"sleep"}, os.Args[1:]...), os.Stdout, os.Stderr, Version, Commit, Date)
+		os.Exit(exitCode)
+	}
+
 	exitCode := cli.ExecuteCLI(os.Args[1:], os.Stdout, os.Stderr, Version, Commit, Date)
 	os.Exit(exitCode)
 }

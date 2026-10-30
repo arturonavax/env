@@ -3,9 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -43,19 +40,7 @@ func newSleepCmd(appCtx *AppContext) *cobra.Command {
 			if len(args) > 0 {
 				mode = args[0]
 			}
-			scriptPath := filepath.Join(appCtx.RepoRoot, "scripts", "safe_suspend.sh")
-			if !isFile(scriptPath) {
-				binPath, err := exec.LookPath("safe-suspend")
-				if err != nil {
-					return fmt.Errorf("safe-suspend script not found in repo or PATH: %w", err)
-				}
-				scriptPath = binPath
-			}
-			c := exec.CommandContext(cmd.Context(), "bash", scriptPath, mode)
-			c.Stdout = cmd.OutOrStdout()
-			c.Stderr = cmd.ErrOrStderr()
-			c.Stdin = os.Stdin
-			return c.Run()
+			return appCtx.OpsSvc.SafeSuspend(cmd.Context(), mode, appCtx.Flags.DryRun, cmd.OutOrStdout())
 		},
 	}
 }

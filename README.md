@@ -50,14 +50,17 @@ Designed for software engineers, architects, and AI developers who demand near-i
 Bootstrap directly from the `env.arturonavax.dev` subdomain:
 
 ```sh
-# Linux & macOS (reconnects TTY automatically when piped)
-curl -fsSL https://env.arturonavax.dev/install.sh | bash
+# Linux, macOS, BSD, Raspberry Pi & Android Termux (pure POSIX sh)
+curl -fsSL https://env.arturonavax.dev/install.sh | sh
+
+# Shorthand via Cloudflare Edge Worker
+curl -fsSL https://env.arturonavax.dev | sh
 
 # Autonomous unattended provisioning
-curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- -y --profile developer
+curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
 
 # Safe dry-run preview
-curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- --plan
+curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
 ```powershell
@@ -65,7 +68,7 @@ curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- --plan
 irm https://env.arturonavax.dev/install.ps1 | iex
 ```
 
-See [docs/remote_install.md](docs/remote_install.md) for full subdomain configuration and Cloudflare Worker setup.
+See [docs/remote_install.md](docs/remote_install.md) and [docs/cloudflare_worker.md](docs/cloudflare_worker.md) for full subdomain configuration and Cloudflare Edge Worker deployment.
 
 ### Local Unix Bootstrap
 

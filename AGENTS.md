@@ -105,6 +105,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges and hardware hack indicators.
   - `anx tools [list|info|run|update|upgrade]`: Decoupled personal tools engine with isolated path (`~/.local/share/anx/bin`).
   - `anx tools ai [commit|pr|llm|quota|daemon]`: AI productivity suite (also available via shortcuts `anx tools llm`, `anx tools commit`, `anx tools pr`, `anx tools quota`, and root aliases `anx ai`, `anx llm`).
+  - `anx sleep [lock|s2idle|deep|hibernate|status]`: Hardware-safe power transitions, screen standby via DPMS, and hibernation diagnostics (multicall: `safe-suspend`).
   - `anx doc man [--install]` / `anx doc markdown`: Generate standard troff man pages (section 1) and Markdown documentation.
   - `anx completion <bash|zsh|fish|powershell> [--install]`: Generate or directly install shell completion scripts.
 - **`./uninstall.sh [--plan]`**:

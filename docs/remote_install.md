@@ -8,17 +8,20 @@ Comprehensive guide for deploying and configuring the zero-dependency remote boo
 
 `arturonavax/env` provides native, zero-dependency remote bootstrap pipelines tailored to each operating system's canonical shell.
 
-### Linux & macOS (Bash / Zsh)
+### Linux, macOS, BSD & Raspberry Pi (POSIX sh / bash / zsh / ash / dash)
 
 ```bash
-# Interactive guided setup (reconnects /dev/tty automatically when piped)
-curl -fsSL https://env.arturonavax.dev/install.sh | bash
+# Interactive guided setup (reconnects /dev/tty automatically when piped; works with pure POSIX sh)
+curl -fsSL https://env.arturonavax.dev/install.sh | sh
+
+# Shorthand via Cloudflare Edge Worker
+curl -fsSL https://env.arturonavax.dev | sh
 
 # Unattended non-interactive automated provisioning
-curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- -y --profile developer
+curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
 
 # Safe dry-run preview (shows planned packages and touched files)
-curl -fsSL https://env.arturonavax.dev/install.sh | bash -s -- --plan
+curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
 ### Windows (PowerShell)
@@ -86,33 +89,11 @@ This enables:
 
 ### Method B: Universal Cloudflare Worker (Ultimate UX with OS Detection)
 
-If you want users to be able to run `curl -fsSL https://env.arturonavax.dev | bash` without even typing `/install.sh`:
+If you want users to be able to run `curl -fsSL https://env.arturonavax.dev | sh` without even typing `/install.sh`:
 
-Deploy this lightweight Cloudflare Worker on `env.arturonavax.dev/*`:
-
-```javascript
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    const userAgent = request.headers.get("user-agent") || "";
-    const repoBase = "https://raw.githubusercontent.com/arturonavax/env/main";
-
-    // 1. Explicit file requests (/install.sh, /install.ps1, /install.bat, etc.)
-    if (url.pathname !== "/" && url.pathname !== "") {
-      return fetch(`${repoBase}${url.pathname}`);
-    }
-
-    // 2. Root domain request: detect OS / Client
-    if (userAgent.includes("PowerShell") || userAgent.includes("WindowsPowerShell")) {
-      return fetch(`${repoBase}/install.ps1`);
-    }
-
-    // Default to Bash for curl, wget, Linux, macOS
-    return fetch(`${repoBase}/install.sh`);
-  }
-};
-```
+Deploy the production Cloudflare Edge Worker on `env.arturonavax.dev/*` documented in detail in [docs/cloudflare_worker.md](file:///home/arthurnavah/repos/github.com/arturonavax/env/docs/cloudflare_worker.md).
 
 With this Worker active:
-- **Linux/macOS**: `curl -fsSL https://env.arturonavax.dev | bash`
-- **Windows**: `irm https://env.arturonavax.dev | iex`
+- **Linux/macOS/BSD/Raspberry Pi/Android Termux**: `curl -fsSL https://env.arturonavax.dev | sh`
+- **Windows (PowerShell)**: `irm https://env.arturonavax.dev | iex`
+- **Desktop/Mobile Browsers**: Opens responsive HTML dashboard with one-click copy buttons.
