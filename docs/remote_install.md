@@ -89,7 +89,7 @@ flowchart TD
     C --> H{"Pre-compiled release available?"}
     H -- Yes --> I["Download anx binary from GitHub Releases"]
     H -- No --> J["Bootstrap Go runtime & compile anx from source"]
-    I --> K["Deploy to ~/.local/bin/anx & symlink aitools"]
+    I --> K["Deploy to ~/.local/bin/anx"]
     J --> K
     K --> L["Launch ANX Wizard / Apply Desired State"]
 ```

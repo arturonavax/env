@@ -13,6 +13,12 @@
       "skillPath": ".claude/skills/bubbletea/SKILL.md",
       "computedHash": "a06df850cbd8282da9c362bd5585150119c87032bb07417a141b71b6f0b966ba"
     },
+    "cloudflare": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloudflare/SKILL.md",
+      "computedHash": "2c2f869eb520868563bba5903856a3c71972dcccba1e78459ef5006ad3b4c089"
+    },
     "debian-linux-triage": {
       "source": "github/awesome-copilot",
       "sourceType": "github",

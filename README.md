@@ -135,7 +135,7 @@ Autonomous non-interactive installation:
 
 ### Windows Bootstrap
 
-Run the native PowerShell preflight and bootstrap script via `install.bat` or `scripts/bootstrap_anx.ps1`. Automatically downloads the official SHA-256 verified Go archive from `go.dev` if missing, compiles `anx.exe` and `aitools.exe` into `%LOCALAPPDATA%\Programs\anx\bin`, and registers user PATH:
+Run the native PowerShell preflight and bootstrap script via `install.bat` or `scripts/bootstrap_anx.ps1`. Automatically downloads the official SHA-256 verified Go archive from `go.dev` if missing, compiles `anx.exe` into `%LOCALAPPDATA%\Programs\anx\bin`, and registers user PATH:
 
 ```bat
 install.bat
