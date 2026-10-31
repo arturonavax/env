@@ -44,6 +44,16 @@ test('Browser User-Agent on env.arturonavax.dev redirects to docs site', async (
   assert.strictEqual(res.headers.get('Location'), 'https://arturonavax.dev/env');
 });
 
+test('Browser User-Agent on sh.arturonavax.dev redirects to arturonavax.dev/sh', async () => {
+  const req = new Request('https://sh.arturonavax.dev/', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36' },
+  });
+
+  const res = await router.fetch(req, {});
+  assert.strictEqual(res.status, 302);
+  assert.strictEqual(res.headers.get('Location'), 'https://arturonavax.dev/sh');
+});
+
 test('Explicit subpath /install.bat is forwarded', async () => {
   let fetchedUrl = '';
   globalThis.fetch = async (url) => {

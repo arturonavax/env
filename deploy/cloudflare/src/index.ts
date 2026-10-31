@@ -52,9 +52,9 @@ export default {
       lowerUA.includes("httpie") ||
       lowerUA.includes("fetch") ||
       lowerUA.includes("aria2") ||
+      lowerUA.includes("libcurl") ||
       lowerUA.startsWith("sh/") ||
-      lowerUA === "posix" ||
-      url.hostname.startsWith("sh.")
+      lowerUA === "posix"
     ) {
       const targetUrl = `${upstreamRawBase}/install.sh`;
       return fetchUpstreamRaw(request, ctx, targetUrl);
@@ -70,11 +70,13 @@ export default {
       lowerUA.includes("linkedinbot") ||
       lowerUA.includes("facebookexternalhit")
     ) {
-      return serveSocialMetadata(websiteUrl);
+      const targetLanding = url.hostname.startsWith("sh.") ? "https://arturonavax.dev/sh" : websiteUrl;
+      return serveSocialMetadata(targetLanding);
     }
 
     // 5. Desktop / mobile browsers -> redirect to docs site
-    return Response.redirect(websiteUrl, 302);
+    const targetRedirect = url.hostname.startsWith("sh.") ? "https://arturonavax.dev/sh" : websiteUrl;
+    return Response.redirect(targetRedirect, 302);
   },
 };
 
