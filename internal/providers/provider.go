@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 	"time"
@@ -77,11 +79,19 @@ func probeBinaryVersion(
 	}
 
 	for _, args := range attempts {
+		command, commandArgs := binPath, args
+		if runtime.GOOS == "windows" {
+			ext := strings.ToLower(filepath.Ext(binPath))
+			if ext == ".cmd" || ext == ".bat" {
+				command = "cmd.exe"
+				commandArgs = append([]string{"/d", "/c", binPath}, args...)
+			}
+		}
 		out, err := runner.RunWithInput(
 			ctx,
 			security.RunOptions{Timeout: 4 * time.Second},
-			binPath,
-			args...,
+			command,
+			commandArgs...,
 		)
 		trimmed := strings.TrimSpace(out)
 		if trimmed == "" && err != nil {

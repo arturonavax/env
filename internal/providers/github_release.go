@@ -112,8 +112,11 @@ func (d *Dispatcher) installGitHubRelease(
 	} else {
 		installTo = expandTemplateString(installTo, d.platform, d.repoDir)
 	}
-	if d.platform.OS() == "windows" && !strings.HasSuffix(strings.ToLower(installTo), ".exe") {
-		installTo += ".exe"
+	if d.platform.OS() == "windows" {
+		lower := strings.ToLower(installTo)
+		if !strings.HasSuffix(lower, ".exe") && !strings.HasSuffix(lower, ".cmd") && !strings.HasSuffix(lower, ".bat") {
+			installTo += ".exe"
+		}
 	}
 
 	return copyFileAtomic(foundBin, installTo, 0o755)
