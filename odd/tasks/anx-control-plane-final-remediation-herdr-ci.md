@@ -9,10 +9,11 @@
 
 ## 1. Local Diagnostics & Herdr Runtime Isolation (R02, HS09, HS10, HS12)
 
-- [x] **Local Inspection:** Verified `~/.config/herdr` is a directory symlink -> `files/herdr`.
-  - Evidence: `readlink -f ~/.config/herdr` returns `<repo>/files/herdr`.
-  - Impact: Herdr writes runtime artifacts (`herdr.sock`, `session.json`, `session-snapshots/`, logs) directly into repo working tree.
-  - Action: Enforced strict default-deny in `.gitignore`, restricted sync to single vetted `config.toml`, and eliminated whole-tree staging.
+- [x] **Local Inspection:** Verified `~/.config/herdr` was previously a directory symlink -> `files/herdr`.
+  - Evidence: `readlink -f ~/.config/herdr` returned `<repo>/files/herdr`.
+  - Impact: Herdr wrote runtime artifacts (`herdr.sock`, `session.json`, `session-snapshots/`, logs) directly into repo working tree.
+  - Action: Decoupled directory symlink. Converted `~/.config/herdr` into an independent real directory, preserved session snapshots in user home, and purged all residual runtime files from `files/herdr/`.
+  - Policy Enforced: Strict default-deny in `.gitignore`, restricted sync to single vetted `config.toml`, and eliminated whole-tree staging. `files/herdr/` now exclusively tracks `config.toml`.
 
 ---
 

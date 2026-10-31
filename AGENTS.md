@@ -168,6 +168,11 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - Local Unix socket API (`herdr workspace`, `herdr pane`, `herdr wait`) for programmatic agent orchestration.
   - Zero nested-PTY scroll friction and robust terminal protocol parsing.
 - **Tmux Elimination**: Tmux compatibility has been completely purged across all dotfiles, VSCode/Cursor configs, and install scripts in favor of Herdr.
+- **Dotfile Isolation & Privacy Boundary**:
+  - `files/herdr/` in this repository **strictly and exclusively contains `config.toml`**.
+  - `~/.config/herdr` on host machines **MUST ALWAYS be an independent real directory**, never a directory symlink to `files/herdr/`.
+  - Herdr writes runtime session snapshots (`session-snapshots/`), session states (`session.json`), and UNIX domain sockets (`herdr.sock`) directly into `~/.config/herdr/`. Preserving `~/.config/herdr` as a real directory guarantees runtime state and local path history are never written into the repository tree.
+  - Manifest management in `manifests/configs.yaml` (`herdr-config`) explicitly targets `~/.config/herdr/config.toml` via granular 3-way synchronization, and `anx capture` enforces a fail-closed allowlist that rejects runtime session files.
 
 ### Lean Zsh, FZF & Starship Architecture
 
@@ -249,6 +254,11 @@ Documented root causes and mitigations for hardware/display edge cases:
    - Every generated script begins with defensive shell patterns (`set -euo pipefail`), target environment detection, and an explicit **AUDIT & ARCHITECTURAL BOUNDARY NOTICE**:
      - Documents that internal Go engine operations (goroutine pools, content-addressable storage, SQLite WAL transactions, Myers AST diff computations, zero-alloc secret scanners) are excluded by design as they exceed shell script boundaries.
      - Captures and serializes all host state mutations (package manager invocations, dotfile links, chmod, sysctl tunings, service restarts) for strict inspection prior to execution.
+
+3. **Repository Security & Privacy Audit Verification**:
+   - **Zero Secret Leakage**: Rigorously audited commit history (`git log -S / -G`), manifests, and dotfiles. No API keys, Cloudflare/GitHub tokens, or private SSH keys are tracked or exposed.
+   - **Offline Privacy Guarantee**: Tools handling persistent user state (e.g., Atuin SQLite shell history in `files/atuin/config.toml`) are configured strictly offline (`auto_sync = false`, `update_check = false`) with zero telemetry.
+   - **Dotfile Isolation Boundaries**: Tools generating runtime state (e.g., Herdr session snapshots, sockets) must never have their target configuration directories symlinked wholesale to repository source folders (`files/*`). Host configuration directories remain independent, while ANX manages only declared single-file assets (`config.toml`) via granular 3-way synchronization and fail-closed capture allowlists.
 
 ### Modern CLI Tooling Stack & Non-Destructive Alias Architecture
 
