@@ -1,7 +1,6 @@
 name: CI
 
-# Stable runner images: avoid '-latest' OS migration and macOS ARM64 queue notices.
-# macOS runs on Intel x64 here; native Apple Silicon coverage is a separate gate.
+# Explicit runners avoid -latest migration. macos-26 runs on Apple Silicon arm64.
 permissions:
   contents: read
 
@@ -18,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26-intel, windows-latest]
+        os: [ubuntu-24.04, macos-26, windows-latest]
         go: ['1.27.3']
 
     steps:
@@ -30,6 +29,12 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache: true
+
+      - name: Verify runner architecture
+        if: runner.os == 'macOS'
+        run: |
+          test "$(uname -m)" = arm64
+          test "$(go env GOARCH)" = arm64
 
       - name: Verify dependencies
         run: go mod verify
