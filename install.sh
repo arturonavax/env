@@ -12,13 +12,18 @@
 
 set -eu
 
-# If running through a pipe (e.g. curl ... | sh) and a controlling TTY exists and can be opened,
-# reconnect standard input so interactive wizards (Bubble Tea) can operate.
-if [ ! -t 0 ] && [ -c /dev/tty ]; then
-	if (exec </dev/tty) 2>/dev/null; then
-		exec </dev/tty
+# Safe dispatch wrapper: re-connects standard input to controlling terminal
+# only when handing off to child processes at the end of installation,
+# preserving the incoming curl pipe during script execution.
+dispatch_exec() {
+	if [ -n "${TTY_DEV:-}" ] && [ -c "${TTY_DEV:-}" ]; then
+		exec "$@" <"$TTY_DEV"
+	elif [ -c /dev/tty ] && [ ! -t 0 ]; then
+		exec "$@" </dev/tty
+	else
+		exec "$@"
 	fi
-fi
+}
 
 DEST_BIN="${HOME}/.local/bin"
 
@@ -78,76 +83,173 @@ detect_os_arch() {
 	echo "${os}_${arch}"
 }
 
-# Interactive TTY prompt (supports /dev/tty even when piped via curl | sh)
-INTERACTIVE_TTY=0
+# Terminal styling & Tokyo Night palette with graceful degradation
+has_utf8=0
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+	*[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) has_utf8=1 ;;
+esac
+
+TN_PURPLE=""
+TN_BLUE=""
+TN_CYAN=""
+TN_GREEN=""
+TN_ORANGE=""
+TN_DIM=""
+TN_BOLD=""
+TN_RESET=""
+
+# Detect controlling terminal for interactive execution
 TTY_DEV=""
+if [ -c /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+	TTY_DEV="/dev/tty"
+fi
+
+if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+	if [ "${COLORTERM:-}" = "truecolor" ] || [ "${COLORTERM:-}" = "24bit" ]; then
+		# Tokyo Night 24-bit TrueColor
+		TN_PURPLE="\033[38;2;187;154;247m"
+		TN_BLUE="\033[38;2;122;162;247m"
+		TN_CYAN="\033[38;2;125;207;255m"
+		TN_GREEN="\033[38;2;115;218;202m"
+		TN_ORANGE="\033[38;2;255;158;100m"
+		TN_DIM="\033[38;2;86;95;137m"
+		TN_BOLD="\033[1m"
+		TN_RESET="\033[0m"
+	elif command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ] || case "${TERM:-}" in *256color*) true ;; *) false ;; esac; then
+		# Tokyo Night 256-color palette
+		TN_PURPLE="\033[38;5;141m"
+		TN_BLUE="\033[38;5;111m"
+		TN_CYAN="\033[38;5;117m"
+		TN_GREEN="\033[38;5;79m"
+		TN_ORANGE="\033[38;5;215m"
+		TN_DIM="\033[38;5;60m"
+		TN_BOLD="\033[1m"
+		TN_RESET="\033[0m"
+	elif command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ] || [ -t 1 ] || [ -n "$TTY_DEV" ]; then
+		# Standard 8/16-color ANSI fallback
+		TN_PURPLE="\033[1;35m"
+		TN_BLUE="\033[1;34m"
+		TN_CYAN="\033[1;36m"
+		TN_GREEN="\033[1;32m"
+		TN_ORANGE="\033[1;33m"
+		TN_DIM="\033[2m"
+		TN_BOLD="\033[1m"
+		TN_RESET="\033[0m"
+	fi
+fi
+
+if [ "$has_utf8" -eq 1 ]; then
+	SYM_DOT="·"
+	SYM_DIAMOND="◆"
+else
+	SYM_DOT="-"
+	SYM_DIAMOND="*"
+fi
+
+prompt_out() {
+	if [ -n "$TTY_DEV" ]; then
+		printf "%b" "$*" >"$TTY_DEV"
+	else
+		printf "%b" "$*"
+	fi
+}
+
+check_precompiled_release() {
+	if [ "$FORCE_SOURCE" -eq 1 ] || [ "$FORCE_GO_INSTALL" -eq 1 ]; then
+		return 1
+	fi
+	_arch="$(detect_os_arch 2>/dev/null)" || return 1
+	_archive="anx_${_arch}.tar.gz"
+	_url="${ANX_RELEASE_URL:-https://github.com/arturonavax/env/releases/latest/download/${_archive}}"
+	if command -v curl >/dev/null 2>&1; then
+		_status="$(curl -sIL -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 3 "$_url" 2>/dev/null || echo "000")"
+		[ "$_status" = "200" ] || [ "$_status" = "302" ]
+	elif command -v wget >/dev/null 2>&1; then
+		wget --spider -q -T 3 "$_url" 2>/dev/null
+	else
+		return 1
+	fi
+}
+
+INTERACTIVE_TTY=0
 if [ "$#" -eq 0 ] && [ -z "${ANX_INSTALL_MODE:-}" ]; then
 	if [ -t 0 ] && [ -t 1 ]; then
 		INTERACTIVE_TTY=1
-	elif [ -c /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+	elif [ -n "$TTY_DEV" ]; then
 		INTERACTIVE_TTY=1
-		TTY_DEV="/dev/tty"
 	fi
 fi
 
 if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 	os_arch="$(detect_os_arch)" || exit 1
-	if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
-		if command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
-			BOLD="$(tput bold 2>/dev/null || printf '\033[1m')"
-			DIM="$(tput dim 2>/dev/null || printf '\033[2m')"
-			RESET="$(tput sgr0 2>/dev/null || printf '\033[0m')"
-			CYAN="$(tput setaf 6 2>/dev/null || printf '\033[36m')"
-		else
-			BOLD="$(printf '\033[1m')"
-			DIM="$(printf '\033[2m')"
-			RESET="$(printf '\033[0m')"
-			CYAN="$(printf '\033[36m')"
-		fi
-	else
-		BOLD=""
-		DIM=""
-		RESET=""
-		CYAN=""
+
+	has_release=0
+	if check_precompiled_release; then
+		has_release=1
 	fi
 
-	prompt_out() {
+	prompt_out "\n  ${TN_PURPLE}${SYM_DIAMOND}${TN_RESET}  ${TN_BOLD}ANX Setup${TN_RESET}  ${TN_DIM}${SYM_DOT}${TN_RESET}  ${TN_CYAN}${os_arch}${TN_RESET}\n"
+	prompt_out "  ${TN_DIM}Choose installation method:${TN_RESET}\n"
+
+	if [ "$has_release" -eq 1 ]; then
+		prompt_out "    ${TN_BLUE}${TN_BOLD}1)${TN_RESET} Verified release   ${TN_GREEN}(Fast · pre-compiled binary)${TN_RESET}\n"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}2)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}3)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}4)${TN_RESET} Exit\n\n"
+		prompt_out "  Select [1-4] (default: 1): "
 		if [ -n "$TTY_DEV" ]; then
-			printf "%b" "$*" >"$TTY_DEV"
+			read -r choice <"$TTY_DEV" || choice="1"
 		else
-			printf "%b" "$*"
+			read -r choice || choice="1"
 		fi
-	}
-	prompt_out "\n  ${BOLD}ANX Setup${RESET}  ·  ${CYAN}${os_arch}${RESET}\n"
-	prompt_out "  ${DIM}Choose installation method:${RESET}\n"
-	prompt_out "    ${BOLD}1)${RESET} Verified release  ${DIM}(Fast · no compiler needed)${RESET}\n"
-	prompt_out "    ${BOLD}2)${RESET} Build from source ${DIM}(Compiles latest binary)${RESET}\n"
-	prompt_out "    ${BOLD}3)${RESET} Preview           ${DIM}(Dry-run · no changes)${RESET}\n"
-	prompt_out "    ${BOLD}4)${RESET} Exit\n\n"
-	prompt_out "  Select [1-4] (default: 1): "
-	if [ -n "$TTY_DEV" ]; then
-		read -r choice <"$TTY_DEV" || choice="1"
+		prompt_out "\n"
+		case "$choice" in
+		2) FORCE_SOURCE=1 ;;
+		3)
+			echo "  [INFO] Preview mode selected."
+			echo "  - OS/Arch     : ${os_arch}"
+			echo "  - Destination : ${DEST_BIN}/anx"
+			echo "  - Action      : Dry-run preview, zero modifications made."
+			exit 0
+			;;
+		4)
+			echo "  Installation aborted."
+			exit 0
+			;;
+		*)
+			# Default 1: verified release
+			FORCE_SOURCE=0
+			;;
+		esac
 	else
-		read -r choice || choice="1"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}1)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}2)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
+		prompt_out "    ${TN_BLUE}${TN_BOLD}3)${TN_RESET} Exit\n\n"
+		prompt_out "  Select [1-3] (default: 1): "
+		if [ -n "$TTY_DEV" ]; then
+			read -r choice <"$TTY_DEV" || choice="1"
+		else
+			read -r choice || choice="1"
+		fi
+		prompt_out "\n"
+		case "$choice" in
+		2)
+			echo "  [INFO] Preview mode selected."
+			echo "  - OS/Arch     : ${os_arch}"
+			echo "  - Destination : ${DEST_BIN}/anx"
+			echo "  - Action      : Dry-run preview, zero modifications made."
+			exit 0
+			;;
+		3)
+			echo "  Installation aborted."
+			exit 0
+			;;
+		*)
+			# Default 1: build from source
+			FORCE_SOURCE=1
+			;;
+		esac
 	fi
-	prompt_out "\n"
-	case "$choice" in
-	2) FORCE_SOURCE=1 ;;
-	3)
-		echo "  [INFO] Preview mode selected."
-		echo "  - OS/Arch     : ${os_arch}"
-		echo "  - Destination : ${DEST_BIN}/anx"
-		echo "  - Action      : Dry-run preview, zero modifications made."
-		exit 0
-		;;
-	4)
-		echo "  Installation aborted."
-		exit 0
-		;;
-	*)
-		# Default 1: verified release
-		;;
-	esac
 fi
 
 try_download_release_direct() {
@@ -270,16 +372,16 @@ try_go_install_direct() {
 if [ -z "${REPO_ROOT}" ]; then
 	if [ "$FORCE_GO_INSTALL" -eq 1 ]; then
 		if try_go_install_direct; then
-			exec "${DEST_BIN}/anx" "$@"
+			dispatch_exec "${DEST_BIN}/anx" "$@"
 		fi
 	fi
 
 	if [ "$FORCE_SOURCE" -eq 0 ]; then
 		if try_download_release_direct; then
-			exec "${DEST_BIN}/anx" "$@"
+			dispatch_exec "${DEST_BIN}/anx" "$@"
 		fi
 		if try_go_install_direct; then
-			exec "${DEST_BIN}/anx" "$@"
+			dispatch_exec "${DEST_BIN}/anx" "$@"
 		fi
 	fi
 
@@ -392,7 +494,7 @@ while [ "$count" -gt 0 ]; do
 done
 
 if command -v bash >/dev/null 2>&1; then
-	exec bash "./scripts/bootstrap_anx.sh" "$@"
+	dispatch_exec bash "./scripts/bootstrap_anx.sh" "$@"
 else
-	exec ./scripts/bootstrap_anx.sh "$@"
+	dispatch_exec ./scripts/bootstrap_anx.sh "$@"
 fi
