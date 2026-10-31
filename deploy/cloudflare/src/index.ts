@@ -79,7 +79,7 @@ export default {
 };
 
 async function fetchUpstreamRaw(
-  _request: Request,
+  request: Request,
   ctx: ExecutionContext | undefined,
   targetUrl: string
 ): Promise<Response> {
@@ -93,7 +93,10 @@ async function fetchUpstreamRaw(
     cache = undefined;
   }
 
-  if (cache) {
+  const clientCacheControl = request.headers.get("cache-control") || "";
+  const bypassCache = clientCacheControl.includes("no-cache") || new URL(request.url).searchParams.has("nocache");
+
+  if (cache && !bypassCache) {
     const cachedResponse = await cache.match(cacheKey);
     if (cachedResponse) {
       const headers = new Headers(cachedResponse.headers);

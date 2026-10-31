@@ -59,3 +59,19 @@ test('Explicit subpath /install.bat is forwarded', async () => {
   assert.strictEqual(res.status, 200);
   assert.ok(fetchedUrl.endsWith('/install.bat'), `expected install.bat, got ${fetchedUrl}`);
 });
+
+test('Bypass cache with ?nocache query parameter', async () => {
+  let fetchCount = 0;
+  globalThis.fetch = async () => {
+    fetchCount++;
+    return new Response('#!/bin/sh\n', { status: 200 });
+  };
+
+  const req = new Request('https://sh.arturonavax.dev/?nocache', {
+    headers: { 'User-Agent': 'curl/8.5.0' },
+  });
+
+  const res = await router.fetch(req, {});
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(fetchCount, 1);
+});
