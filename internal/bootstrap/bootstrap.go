@@ -25,17 +25,17 @@ import (
 
 // Container holds the assembled composition root services and infrastructure singletons.
 type Container struct {
-	Platform   *platform.Info
-	Catalog    *catalog.Registry
-	Journal    *journal.FileJournal
-	Snapshots  *snapshot.Manager
-	Store      *state.Store
-	Runner     *security.Runner
-	Provider   providers.Provider
-	InstallSvc *app.InstallService
-	SyncSvc    *app.SyncService
-	DoctorSvc  *app.DoctorService
-	AuditSvc   *app.AuditService
+	Platform     *platform.Info
+	Catalog      *catalog.Registry
+	Journal      *journal.FileJournal
+	Snapshots    *snapshot.Manager
+	Store        *state.Store
+	Runner       *security.Runner
+	Provider     providers.Provider
+	InstallSvc   *app.InstallService
+	SyncSvc      *app.SyncService
+	DoctorSvc    *app.DoctorService
+	AuditSvc     *app.AuditService
 	HacksSvc     *app.HacksService
 	OpsSvc       *app.OpsService
 	ToolsSvc     *app.ToolsService
@@ -44,10 +44,10 @@ type Container struct {
 	DestroyerSvc *app.DestroyerService
 	SecuritySeal *security.OriginSeal
 	RepoRoot     string
-	Viper      *viper.Viper
-	Version    string
-	Commit     string
-	Date       string
+	Viper        *viper.Viper
+	Version      string
+	Commit       string
+	Date         string
 }
 
 // Config specifies runtime options for constructing a Container.

@@ -52,7 +52,6 @@ var TokyoNightStormPalette = Palette{
 	Border:     lipgloss.Color("#414868"),
 }
 
-
 // CatppuccinMochaPalette is the Catppuccin Mocha dark palette.
 var CatppuccinMochaPalette = Palette{
 	Name: "catppuccin", Background: lipgloss.Color("#1e1e2e"), Foreground: lipgloss.Color("#cdd6f4"),

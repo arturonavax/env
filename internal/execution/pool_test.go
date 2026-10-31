@@ -119,7 +119,7 @@ func TestEngineInverseTopologicalRollbackOrder(t *testing.T) {
 	// Task 4 (fails)
 	tasks := []Task{
 		{
-			Step: domain.PlanStep{ID: 1, ResourceID: "lib-base"},
+			Step:    domain.PlanStep{ID: 1, ResourceID: "lib-base"},
 			Execute: func(ctx context.Context) error { return nil },
 			Compensate: func(ctx context.Context) error {
 				mu.Lock()
@@ -129,7 +129,7 @@ func TestEngineInverseTopologicalRollbackOrder(t *testing.T) {
 			},
 		},
 		{
-			Step: domain.PlanStep{ID: 2, ResourceID: "app-dependent", DependsOn: []int{1}},
+			Step:    domain.PlanStep{ID: 2, ResourceID: "app-dependent", DependsOn: []int{1}},
 			Execute: func(ctx context.Context) error { return nil },
 			Compensate: func(ctx context.Context) error {
 				mu.Lock()
@@ -139,7 +139,7 @@ func TestEngineInverseTopologicalRollbackOrder(t *testing.T) {
 			},
 		},
 		{
-			Step: domain.PlanStep{ID: 3, ResourceID: "unrelated-tool"},
+			Step:    domain.PlanStep{ID: 3, ResourceID: "unrelated-tool"},
 			Execute: func(ctx context.Context) error { return nil },
 			Compensate: func(ctx context.Context) error {
 				mu.Lock()
@@ -187,7 +187,7 @@ func TestEngineFineGrainedLockSerialization(t *testing.T) {
 
 	tasks := []Task{
 		{
-			Step:  domain.PlanStep{ID: 1, ResourceID: "step-apt-1", Locks: []string{"pkg:apt"}},
+			Step: domain.PlanStep{ID: 1, ResourceID: "step-apt-1", Locks: []string{"pkg:apt"}},
 			Execute: func(ctx context.Context) error {
 				val := activeLock.Add(1)
 				if val > 1 {
@@ -199,7 +199,7 @@ func TestEngineFineGrainedLockSerialization(t *testing.T) {
 			},
 		},
 		{
-			Step:  domain.PlanStep{ID: 2, ResourceID: "step-apt-2", Locks: []string{"pkg:apt"}},
+			Step: domain.PlanStep{ID: 2, ResourceID: "step-apt-2", Locks: []string{"pkg:apt"}},
 			Execute: func(ctx context.Context) error {
 				val := activeLock.Add(1)
 				if val > 1 {

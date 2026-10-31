@@ -285,7 +285,6 @@ func newDoctorCmd(appCtx *AppContext) *cobra.Command {
 	return cmd
 }
 
-
 func newThemeCmd(appCtx *AppContext) *cobra.Command {
 	cmd := &cobra.Command{Use: "theme", Short: "List and persist UI themes"}
 	cmd.AddCommand(&cobra.Command{
@@ -453,8 +452,8 @@ func newCompletionCmd(root *cobra.Command, appCtx *AppContext) *cobra.Command {
 	var install bool
 
 	cmd := &cobra.Command{
-		Use:       "completion <bash|zsh|fish|powershell>",
-		Short:     "Generate or install shell completion script",
+		Use:   "completion <bash|zsh|fish|powershell>",
+		Short: "Generate or install shell completion script",
 		Long: `Generate or install automatic completion scripts for bash, zsh, fish, or powershell.
 
 Pass --install to write the completion file directly to your shell's user completion path.`,

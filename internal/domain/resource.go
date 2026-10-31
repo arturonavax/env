@@ -118,29 +118,29 @@ type ManagedResource struct {
 
 // ConfigurationResource represents a managed dotfile, directory tree, or shell marker block.
 type ConfigurationResource struct {
-	ID                 string              `json:"id" yaml:"id"`
-	Name               string              `json:"name" yaml:"name"`
-	Group              string              `json:"group,omitempty" yaml:"group,omitempty"`
-	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
-	Source             string              `json:"source" yaml:"source"`
-	Target             string              `json:"target" yaml:"target"`
-	TargetsByOS        map[string]string   `json:"targets_by_os,omitempty" yaml:"targets_by_os,omitempty"`
-	Strategy           StrategyType        `json:"strategy" yaml:"strategy"`
-	MarkerStart        string              `json:"marker_start,omitempty" yaml:"marker_start,omitempty"`
-	MarkerEnd          string              `json:"marker_end,omitempty" yaml:"marker_end,omitempty"`
-	Excludes           []string            `json:"excludes,omitempty" yaml:"excludes,omitempty"`
-	SupportedOS        []string            `json:"supported_os,omitempty" yaml:"os,omitempty"`
-	SupportedDesktops  []string            `json:"supported_desktops,omitempty" yaml:"desktops,omitempty"`
-	SupportedShells    []string            `json:"supported_shells,omitempty" yaml:"shells,omitempty"`
-	SupportedTerminals []string            `json:"supported_terminals,omitempty" yaml:"terminals,omitempty"`
-	PostSyncCmds       [][]string          `json:"post_sync_cmds,omitempty" yaml:"post_sync_cmds,omitempty"`
+	ID                 string                `json:"id" yaml:"id"`
+	Name               string                `json:"name" yaml:"name"`
+	Group              string                `json:"group,omitempty" yaml:"group,omitempty"`
+	Description        string                `json:"description,omitempty" yaml:"description,omitempty"`
+	Source             string                `json:"source" yaml:"source"`
+	Target             string                `json:"target" yaml:"target"`
+	TargetsByOS        map[string]string     `json:"targets_by_os,omitempty" yaml:"targets_by_os,omitempty"`
+	Strategy           StrategyType          `json:"strategy" yaml:"strategy"`
+	MarkerStart        string                `json:"marker_start,omitempty" yaml:"marker_start,omitempty"`
+	MarkerEnd          string                `json:"marker_end,omitempty" yaml:"marker_end,omitempty"`
+	Excludes           []string              `json:"excludes,omitempty" yaml:"excludes,omitempty"`
+	SupportedOS        []string              `json:"supported_os,omitempty" yaml:"os,omitempty"`
+	SupportedDesktops  []string              `json:"supported_desktops,omitempty" yaml:"desktops,omitempty"`
+	SupportedShells    []string              `json:"supported_shells,omitempty" yaml:"shells,omitempty"`
+	SupportedTerminals []string              `json:"supported_terminals,omitempty" yaml:"terminals,omitempty"`
+	PostSyncCmds       [][]string            `json:"post_sync_cmds,omitempty" yaml:"post_sync_cmds,omitempty"`
 	PostSyncByDesktop  map[string][][]string `json:"post_sync_by_desktop,omitempty" yaml:"post_sync_by_desktop,omitempty"`
-	Backup             bool                `json:"backup" yaml:"backup"`
-	Deprecated         bool                `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
-	DeprecatedReason   string              `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
-	RecommendPurge     bool                `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
-	Replacement        string              `json:"replacement,omitempty" yaml:"replacement,omitempty"`
-	Archived           bool                `json:"archived,omitempty" yaml:"archived,omitempty"`
+	Backup             bool                  `json:"backup" yaml:"backup"`
+	Deprecated         bool                  `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason   string                `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge     bool                  `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement        string                `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived           bool                  `json:"archived,omitempty" yaml:"archived,omitempty"`
 }
 
 // TargetForOS resolves the OS-specific target path, falling back to Target.
