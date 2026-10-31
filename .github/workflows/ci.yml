@@ -1,5 +1,10 @@
 name: CI
 
+# Stable runner images: avoid '-latest' OS migration and macOS ARM64 queue notices.
+# macOS runs on Intel x64 here; native Apple Silicon coverage is a separate gate.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -13,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-26-intel, windows-latest]
         go: ['1.27.3']
 
     steps:
@@ -50,7 +55,7 @@ jobs:
 
   lint:
     name: Shell & Code Linting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -69,7 +74,7 @@ jobs:
 
   e2e:
     name: E2E Integration (Docker)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint]
     steps:
       - name: Check out repository
@@ -96,7 +101,7 @@ jobs:
 
   e2e-build:
     name: Build static Linux E2E binary
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint]
     permissions:
       contents: read
@@ -110,7 +115,7 @@ jobs:
         run: |
           mkdir -p tests/e2e/.artifacts
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o tests/e2e/.artifacts/anx ./cmd/anx
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: anx-e2e-linux-amd64
           path: tests/e2e/.artifacts/anx
@@ -120,7 +125,7 @@ jobs:
   e2e-smoke:
     name: E2E smoke (${{ matrix.distro }})
     needs: [e2e-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     strategy:
@@ -139,7 +144,7 @@ jobs:
             image: archlinux:base
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: anx-e2e-linux-amd64
           path: tests/e2e/.artifacts
@@ -155,7 +160,7 @@ jobs:
   e2e-arm64-linux:
     name: ARM64 Linux smoke (not Android/Termux)
     needs: [lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -164,7 +169,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
       - name: Cross-build and execute under QEMU
