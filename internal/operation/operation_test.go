@@ -206,3 +206,52 @@ func TestCompileIR(t *testing.T) {
 		t.Fatalf("CanonicalDigest failed: %v, digest: %s", err, digest)
 	}
 }
+
+func TestCompileIR_MultiLevelDependsOn(t *testing.T) {
+	execPlan := &domain.ExecutionPlan{
+		ID:       "dag-plan",
+		Platform: "linux",
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "base", Action: domain.ActionInstall, Provider: "apt"},
+			{ID: 2, ResourceID: "mid", Action: domain.ActionInstall, Provider: "apt", DependsOn: []int{1}},
+			{ID: 3, ResourceID: "top", Action: domain.ActionInstall, Provider: "apt", DependsOn: []int{2}},
+		},
+	}
+
+	ir, err := CompileIR(execPlan, "linux", "amd64")
+	if err != nil {
+		t.Fatalf("CompileIR failed: %v", err)
+	}
+
+	if len(ir.Operations[1].DependsOn) != 1 || ir.Operations[1].DependsOn[0] != "step-1-base" {
+		t.Fatalf("expected op 2 to depend on 'step-1-base', got %v", ir.Operations[1].DependsOn)
+	}
+	if len(ir.Operations[2].DependsOn) != 1 || ir.Operations[2].DependsOn[0] != "step-2-mid" {
+		t.Fatalf("expected op 3 to depend on 'step-2-mid', got %v", ir.Operations[2].DependsOn)
+	}
+}
+
+func TestGoExecutor_DAGCycleAndMissingDeps(t *testing.T) {
+	exec := NewGoExecutor(nil, nil)
+
+	// Missing dependency
+	missingPlan := PlanIR{
+		Operations: []Operation{
+			{OpID: "op-1", Kind: OpEnsureDirectory, TargetPath: "/tmp", DependsOn: []string{"op-nonexistent"}},
+		},
+	}
+	if err := exec.ExecutePlan(context.Background(), missingPlan); err == nil {
+		t.Fatal("expected error for non-existent dependency")
+	}
+
+	// Cycle
+	cyclePlan := PlanIR{
+		Operations: []Operation{
+			{OpID: "op-1", Kind: OpEnsureDirectory, TargetPath: "/tmp", DependsOn: []string{"op-2"}},
+			{OpID: "op-2", Kind: OpEnsureDirectory, TargetPath: "/tmp", DependsOn: []string{"op-1"}},
+		},
+	}
+	if err := exec.ExecutePlan(context.Background(), cyclePlan); err == nil {
+		t.Fatal("expected error for dependency cycle")
+	}
+}

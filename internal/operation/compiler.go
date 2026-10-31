@@ -19,9 +19,18 @@ func CompileIR(plan *domain.ExecutionPlan, goos, arch string) (*PlanIR, error) {
 		Operations:    make([]Operation, 0, len(plan.Steps)),
 	}
 
+	stepIDToOpID := make(map[int]string, len(plan.Steps))
+	for _, step := range plan.Steps {
+		opID := fmt.Sprintf("step-%d-%s", step.ID, step.ResourceID)
+		if step.ResourceID == "" {
+			opID = fmt.Sprintf("step-%d", step.ID)
+		}
+		stepIDToOpID[step.ID] = opID
+	}
+
 	for _, step := range plan.Steps {
 		op := Operation{
-			OpID:        fmt.Sprintf("step-%d-%s", step.ID, step.ResourceID),
+			OpID:        stepIDToOpID[step.ID],
 			Description: step.Description,
 			Resources:   []string{step.ResourceID},
 			TargetOS:    goos,
@@ -40,7 +49,11 @@ func CompileIR(plan *domain.ExecutionPlan, goos, arch string) (*PlanIR, error) {
 		}
 
 		for _, dep := range step.DependsOn {
-			op.DependsOn = append(op.DependsOn, fmt.Sprintf("step-%d", dep))
+			if targetOpID, ok := stepIDToOpID[dep]; ok {
+				op.DependsOn = append(op.DependsOn, targetOpID)
+			} else {
+				return nil, fmt.Errorf("step %d depends on unknown step ID %d", step.ID, dep)
+			}
 		}
 
 		switch step.Action {

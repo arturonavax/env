@@ -28,14 +28,71 @@ func NewGoExecutor(stdout, stderr io.Writer) *GoExecutor {
 	return &GoExecutor{Stdout: stdout, Stderr: stderr}
 }
 
-// ExecutePlan executes all operations in plan in DAG/sequence order.
+// ExecutePlan executes all operations in plan in validated DAG topological order.
 func (e *GoExecutor) ExecutePlan(ctx context.Context, plan PlanIR) error {
-	for _, op := range plan.Operations {
+	orderedOps, err := sortOperationsByDAG(plan.Operations)
+	if err != nil {
+		return fmt.Errorf("validating operation DAG: %w", err)
+	}
+
+	for _, op := range orderedOps {
 		if err := e.ExecuteOp(ctx, op); err != nil {
 			return fmt.Errorf("executing operation %s (%s): %w", op.OpID, op.Kind, err)
 		}
 	}
 	return nil
+}
+
+// sortOperationsByDAG validates dependencies and orders operations topologically.
+func sortOperationsByDAG(ops []Operation) ([]Operation, error) {
+	byID := make(map[string]Operation, len(ops))
+	indegree := make(map[string]int, len(ops))
+	dependents := make(map[string][]string, len(ops))
+
+	for _, op := range ops {
+		if _, exists := byID[op.OpID]; exists {
+			return nil, fmt.Errorf("duplicate operation ID %q", op.OpID)
+		}
+		byID[op.OpID] = op
+		indegree[op.OpID] = 0
+	}
+
+	for _, op := range ops {
+		for _, dep := range op.DependsOn {
+			if _, exists := byID[dep]; !exists {
+				return nil, fmt.Errorf("operation %q depends on non-existent operation %q", op.OpID, dep)
+			}
+			indegree[op.OpID]++
+			dependents[dep] = append(dependents[dep], op.OpID)
+		}
+	}
+
+	var queue []string
+	for _, op := range ops {
+		if indegree[op.OpID] == 0 {
+			queue = append(queue, op.OpID)
+		}
+	}
+
+	ordered := make([]Operation, 0, len(ops))
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+		ordered = append(ordered, byID[curr])
+
+		for _, next := range dependents[curr] {
+			indegree[next]--
+			if indegree[next] == 0 {
+				queue = append(queue, next)
+			}
+		}
+	}
+
+	if len(ordered) != len(ops) {
+		return nil, fmt.Errorf("dependency cycle detected among plan operations")
+	}
+
+	return ordered, nil
 }
 
 // ExecuteOp validates preconditions, executes the typed operation, and validates postconditions.
@@ -73,17 +130,31 @@ func (e *GoExecutor) ExecuteOp(ctx context.Context, op Operation) error {
 		}
 
 	case OpDeleteOwned:
-		if err := os.Remove(op.TargetPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("removing %s: %w", op.TargetPath, err)
+		cleanPath := filepath.Clean(op.TargetPath)
+		if cleanPath == "/" || cleanPath == "." || filepath.VolumeName(cleanPath) == cleanPath {
+			return fmt.Errorf("refusing to delete root path %q", cleanPath)
+		}
+		if err := os.Remove(cleanPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing %s: %w", cleanPath, err)
 		}
 
 	case OpCreateSymlinkOwned:
-		_ = os.Remove(op.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(op.TargetPath), 0755); err != nil {
+		cleanTarget := filepath.Clean(op.TargetPath)
+		if cleanTarget == "/" || cleanTarget == "." || filepath.VolumeName(cleanTarget) == cleanTarget {
+			return fmt.Errorf("invalid symlink target path %q", cleanTarget)
+		}
+		if fi, err := os.Lstat(cleanTarget); err == nil {
+			if fi.Mode()&os.ModeSymlink != 0 {
+				_ = os.Remove(cleanTarget)
+			} else {
+				_ = os.Remove(cleanTarget)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(cleanTarget), 0755); err != nil {
 			return err
 		}
-		if err := os.Symlink(op.SourcePath, op.TargetPath); err != nil {
-			return fmt.Errorf("symlink %s -> %s: %w", op.TargetPath, op.SourcePath, err)
+		if err := os.Symlink(op.SourcePath, cleanTarget); err != nil {
+			return fmt.Errorf("symlink %s -> %s: %w", cleanTarget, op.SourcePath, err)
 		}
 
 	case OpExecArgv, OpPackageInstall, OpPackageRemove, OpPackageUpgrade:
@@ -168,8 +239,15 @@ func writeAtomic(target string, data []byte, mode uint32) error {
 		_ = os.Remove(tmpName)
 		return err
 	}
-	_ = tmp.Sync()
-	_ = tmp.Close()
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("syncing %s: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("closing %s: %w", tmpName, err)
+	}
 
 	_ = os.Chmod(tmpName, fileMode)
 
