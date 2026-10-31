@@ -70,7 +70,7 @@ jobs:
   e2e:
     name: E2E Integration (Docker)
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [lint]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -93,3 +93,83 @@ jobs:
           docker compose -f tests/e2e/docker-compose.yml run -T --rm test-debian
           docker compose -f tests/e2e/docker-compose.yml run -T --rm test-alpine
           docker compose -f tests/e2e/docker-compose.yml down -v
+
+  e2e-build:
+    name: Build static Linux E2E binary
+    runs-on: ubuntu-latest
+    needs: [lint]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile once for all five distros
+        run: |
+          mkdir -p tests/e2e/.artifacts
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o tests/e2e/.artifacts/anx ./cmd/anx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anx-e2e-linux-amd64
+          path: tests/e2e/.artifacts/anx
+          retention-days: 1
+          if-no-files-found: error
+
+  e2e-smoke:
+    name: E2E smoke (${{ matrix.distro }})
+    needs: [e2e-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:bookworm-slim
+          - distro: ubuntu
+            image: ubuntu:24.04
+          - distro: fedora
+            image: fedora:42
+          - distro: alpine
+            image: alpine:3.21
+          - distro: arch
+            image: archlinux:base
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: anx-e2e-linux-amd64
+          path: tests/e2e/.artifacts
+      - name: Run native distro runtime with no network or privileges
+        env:
+          BASE_IMAGE: ${{ matrix.image }}
+          DISTRO: ${{ matrix.distro }}
+        run: |
+          chmod +x tests/e2e/.artifacts/anx
+          docker build -f tests/e2e/Dockerfile.matrix --build-arg BASE_IMAGE="$BASE_IMAGE" -t "anx-e2e-$DISTRO:$GITHUB_SHA" .
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 96 --memory 384m --cpus 1 --tmpfs /tmp:rw,size=64m,mode=1777 -e EXPECTED_DISTRO="$DISTRO" "anx-e2e-$DISTRO:$GITHUB_SHA"
+
+  e2e-arm64-linux:
+    name: ARM64 Linux smoke (not Android/Termux)
+    needs: [lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Cross-build and execute under QEMU
+        run: |
+          mkdir -p tests/e2e/.artifacts
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -o tests/e2e/.artifacts/anx ./cmd/anx
+          docker build --platform linux/arm64 -f tests/e2e/Dockerfile.matrix --build-arg BASE_IMAGE=ubuntu:24.04 -t anx-e2e-arm64 .
+          docker run --rm --platform linux/arm64 --network none --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,size=64m,mode=1777 -e EXPECTED_DISTRO=ubuntu anx-e2e-arm64
