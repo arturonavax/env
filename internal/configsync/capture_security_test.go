@@ -2,6 +2,7 @@ package configsync_test
 
 import (
 	"os"
+	"runtime"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -198,7 +199,14 @@ func TestHS11_PreservesPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat repo file: %v", err)
 	}
-	if info.Mode()&0o111 == 0 {
+	copied, err := os.ReadFile(filepath.Join(repoDir, "run.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(copied) != "#!/bin/sh\necho hello\n" {
+		t.Fatalf("captured script contents differ: %q", copied)
+	}
+	if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
 		t.Errorf("expected executable bit preserved on run.sh, got mode: %v", info.Mode())
 	}
 }
