@@ -151,6 +151,49 @@ Legacy `state.json` persistence suffered from multi-process file contention (`os
     ✔ test_cli_smoke.sh                (PASSED)
 
 ══════════════════════════════════════════════════════════════════════
-  ✔ ALL TEST SUITES PASSED (4/4 passed in 36s)
+  ✔ ALL TEST SUITES PASSED (4/4 passed in 38s)
 ══════════════════════════════════════════════════════════════════════
 ```
+
+---
+
+## 7. Phase F00–F13 — Final Closure & Certification (odd/new_task_completion2.md)
+
+### 7.1 W0-A — Windows DB Lifetime & Resource Cleanup (P0)
+- **Problem**: In Windows CI run `41240251525`, `TempDir RemoveAll cleanup: unlinkat ...\anx.db` failed with `Access is denied` because open SQLite handles were held across `app_test.go`, `destroyer_test.go`, `hacks_test.go`, `state_test.go`, and CLI command executions.
+- **Fix**:
+  1. Made `sqlite.DB.Close()` and `state.Store.Close()` safe and idempotent (`db.writer = nil`, `db.reader = nil`, `s.db = nil`).
+  2. Implemented `(c *Container) Close() error` in `internal/bootstrap/bootstrap.go`, ensuring partial initialization failures close open stores cleanly.
+  3. Implemented `(a *AppContext) Close() error` and deferred `appCtx.Close()` in `internal/cli/root.go:ExecuteCLI`.
+  4. Added `t.Cleanup(func() { _ = store.Close() })` to all fixtures in `app_test.go`, `destroyer_test.go`, `hacks_test.go`, `state_test.go`, and `bootstrap_test.go`.
+
+### 7.2 W0-B — Windows NTFS ACL & Trust Verifier (P0)
+- **Problem**: Volume root `D:\` with owner `NETWORK SERVICE` (`S-1-5-20`) was classified as `classOtherPrincipal`, marking ancestors as `TrustUntrusted` and triggering exit 6 in CLI dry-run tests.
+- **Fix**:
+  1. Classified `WinNetworkServiceSid` (`S-1-5-20`) and `WinLocalServiceSid` (`S-1-5-19`) as `classPrivileged` in `internal/security/trust_windows.go`.
+  2. Refined `maskRenameChildren` to `maskDeleteChild | maskWriteDAC | maskWriteOwner | maskGenericAll`, eliminating false positives caused by `maskGenericWrite` on ancestor roots.
+  3. Added `WithTrustVerifier` option to `bootstrap.Config` for explicit dependency injection in test fixtures.
+
+### 7.3 CP-ATOMIC — Control Plane Durable Jobs & Atomic Guarantees (P0)
+- **Problem**: `control_plane.go` discarded database errors with `_ = db.*`, leading to potential discrepancies between persistent state and executed host actions.
+- **Fix**:
+  1. Propagated errors in `BuildPlan` and `Apply` for `SavePlan`, `CreateJob`, `AppendEvent`, and `UpdateJobState`.
+  2. Enforced pre-mutation atomic transactions: if any DB write fails before external effects, the operation aborts immediately with zero side effects.
+  3. Added `needs_reconcile` error state transition if database persistence fails after external execution steps succeed.
+
+### 7.4 IR-UNIFIED — Canonical Operation IR & Topological Execution (P0)
+- **Problem**: `OpID` used `step-%d-%s` while `DependsOn` used `step-%d`, resulting in broken DAG edge references. `GoExecutor.ExecutePlan` iterated operations linearly without verifying DAG order.
+- **Fix**:
+  1. Built two-pass `stepID -> opID` mapping in `internal/operation/compiler.go`, resolving multi-level dependencies to canonical operation IDs.
+  2. Implemented `sortOperationsByDAG` using Kahn's algorithm in `internal/operation/executor.go`, guaranteeing topological execution order and detecting cycles or missing dependencies.
+  3. Hardened `OpDeleteOwned` and `OpCreateSymlinkOwned` against root path deletion and added error checks for `Sync()` and `Close()` in `writeAtomic`.
+
+### 7.5 INSTALL-P0 & CI Hardening
+- **Installer (`install.sh`)**:
+  1. Enabled interactive prompt via `/dev/tty` when piped (`curl -fsSL ... | sh`).
+  2. Enforced fail-closed 64-char hex checksum validation, aborting if verification tools or hashes are missing.
+  3. Enforced safe tar extraction blocking path traversal (`../`) and leading `/`.
+  4. Provided structured output in preview mode (`--mode=plan`).
+- **CI & E2E**:
+  1. Added Cloudflare Worker unit tests (`node --test deploy/cloudflare/src/index.test.js`) to GitHub Actions `lint` job.
+  2. Enhanced `tests/e2e/scripts/test_concurrency.sh` with concurrent background multi-process plans and state status checks.
