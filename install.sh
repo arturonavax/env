@@ -70,26 +70,54 @@ detect_os_arch() {
 	case "$arch" in
 	x86_64 | amd64) arch="amd64" ;;
 	aarch64 | arm64) arch="arm64" ;;
-	*) arch="amd64" ;;
+	*)
+		echo "  [ERROR] Unsupported architecture: ${arch}" >&2
+		return 1
+		;;
 	esac
 	echo "${os}_${arch}"
 }
 
-# Interactive TTY prompt only when executed with zero arguments in a real interactive terminal
-if [ "$#" -eq 0 ] && [ -t 0 ] && [ -t 1 ] && [ -z "${ANX_INSTALL_MODE:-}" ]; then
-	os_arch="$(detect_os_arch)"
-	printf "\n  \033[1mANX Setup\033[0m  ·  %s\n" "${os_arch}"
-	printf "  Choose installation method:\n"
-	printf "    1) Verified release  (Fast · no compiler needed)\n"
-	printf "    2) Build from source (Compiles latest binary)\n"
-	printf "    3) Preview           (Dry-run · no changes)\n"
-	printf "    4) Exit\n"
-	printf "  Select [1-4] (default: 1): "
-	read -r choice || choice="1"
+# Interactive TTY prompt (supports /dev/tty even when piped via curl | sh)
+INTERACTIVE_TTY=0
+TTY_DEV=""
+if [ "$#" -eq 0 ] && [ -z "${ANX_INSTALL_MODE:-}" ]; then
+	if [ -t 0 ] && [ -t 1 ]; then
+		INTERACTIVE_TTY=1
+	elif [ -c /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+		INTERACTIVE_TTY=1
+		TTY_DEV="/dev/tty"
+	fi
+fi
+
+if [ "$INTERACTIVE_TTY" -eq 1 ]; then
+	os_arch="$(detect_os_arch)" || exit 1
+	prompt_out() {
+		if [ -n "$TTY_DEV" ]; then
+			printf "%s" "$*" >"$TTY_DEV"
+		else
+			printf "%s" "$*"
+		fi
+	}
+	prompt_out "\n  \033[1mANX Setup\033[0m  ·  ${os_arch}\n"
+	prompt_out "  Choose installation method:\n"
+	prompt_out "    1) Verified release  (Fast · no compiler needed)\n"
+	prompt_out "    2) Build from source (Compiles latest binary)\n"
+	prompt_out "    3) Preview           (Dry-run · no changes)\n"
+	prompt_out "    4) Exit\n"
+	prompt_out "  Select [1-4] (default: 1): "
+	if [ -n "$TTY_DEV" ]; then
+		read -r choice <"$TTY_DEV" || choice="1"
+	else
+		read -r choice || choice="1"
+	fi
 	case "$choice" in
 	2) FORCE_SOURCE=1 ;;
 	3)
-		echo "  [INFO] Preview mode selected. No system changes made."
+		echo "  [INFO] Preview mode selected."
+		echo "  - OS/Arch     : ${os_arch}"
+		echo "  - Destination : ${DEST_BIN}/anx"
+		echo "  - Action      : Dry-run preview, zero modifications made."
 		exit 0
 		;;
 	4)
@@ -135,21 +163,41 @@ try_download_release_direct() {
 	fi
 
 	if [ "$dl_ok" -eq 1 ] && [ -s "$tarball" ] && [ -s "$sums_file" ]; then
-		# Checksum verification
+		# Checksum verification (fail-closed)
 		want_sum="$(grep "${archive_name}" "$sums_file" 2>/dev/null | awk '{print $1}' || true)"
-		if [ -n "$want_sum" ]; then
-			computed_sum=""
-			if command -v sha256sum >/dev/null 2>&1; then
-				computed_sum="$(sha256sum "$tarball" | awk '{print $1}')"
-			elif command -v shasum >/dev/null 2>&1; then
-				computed_sum="$(shasum -a 256 "$tarball" | awk '{print $1}')"
-			fi
+		if [ -z "$want_sum" ]; then
+			echo "  [WARN] Release asset checksum not found in SHA256SUMS." >&2
+			rm -rf "$tmp_dir"
+			return 1
+		fi
+		if ! echo "$want_sum" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+			echo "  [WARN] Invalid checksum format for release asset." >&2
+			rm -rf "$tmp_dir"
+			return 1
+		fi
 
-			if [ -n "$computed_sum" ] && [ "$computed_sum" != "$want_sum" ]; then
-				echo "  [WARN] Release asset checksum mismatch. Falling back to source build." >&2
-				rm -rf "$tmp_dir"
-				return 1
-			fi
+		computed_sum=""
+		if command -v sha256sum >/dev/null 2>&1; then
+			computed_sum="$(sha256sum "$tarball" | awk '{print $1}')"
+		elif command -v shasum >/dev/null 2>&1; then
+			computed_sum="$(shasum -a 256 "$tarball" | awk '{print $1}')"
+		else
+			echo "  [WARN] Neither sha256sum nor shasum available to verify checksum." >&2
+			rm -rf "$tmp_dir"
+			return 1
+		fi
+
+		if [ "$computed_sum" != "$want_sum" ]; then
+			echo "  [WARN] Release asset checksum mismatch. Computed: $computed_sum, expected: $want_sum." >&2
+			rm -rf "$tmp_dir"
+			return 1
+		fi
+
+		# Verify tarball paths are safe (no leading / or ../)
+		if tar -tf "$tarball" 2>/dev/null | grep -E '(^/|\.\./)' >/dev/null; then
+			echo "  [WARN] Hostile path detected in release archive. Aborting release extraction." >&2
+			rm -rf "$tmp_dir"
+			return 1
 		fi
 
 		mkdir -p "${tmp_dir}/extract"

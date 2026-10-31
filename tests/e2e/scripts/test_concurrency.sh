@@ -22,9 +22,17 @@ echo "-> 2. Testing non-concurrent sequential execution..."
 # Apply minimal profile sequentially
 "${ANX_BIN}" apply --yes --profile minimal
 
-echo "-> 3. Testing concurrent package resolution across multiple profiles..."
-"${ANX_BIN}" plan --profile minimal
-"${ANX_BIN}" plan --profile developer
+echo "-> 3. Testing concurrent multi-process state reads and plan DAG solvers..."
+"${ANX_BIN}" plan --profile minimal >/dev/null &
+pid1=$!
+"${ANX_BIN}" plan --profile developer >/dev/null &
+pid2=$!
+"${ANX_BIN}" state status >/dev/null &
+pid3=$!
+wait "$pid1"
+wait "$pid2"
+wait "$pid3"
+echo "  [OK] Concurrent multi-process executions completed with zero lock failures."
 
 echo "-> 4. Testing concurrent tools inspection..."
 "${ANX_BIN}" tools list

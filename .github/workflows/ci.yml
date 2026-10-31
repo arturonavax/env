@@ -81,6 +81,10 @@ jobs:
             shellcheck scripts/bootstrap_anx.sh install.sh uninstall.sh files/security/anx-security
           fi
 
+      - name: Run Cloudflare Worker unit tests
+        run: |
+          node --test deploy/cloudflare/src/index.test.js
+
   e2e:
     name: E2E Integration (Docker)
     runs-on: ubuntu-24.04
