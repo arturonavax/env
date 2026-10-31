@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/arturonavax/env/internal/domain"
@@ -79,10 +80,21 @@ func TestToolRunnerBuiltin(t *testing.T) {
 }
 
 func TestToolRunnerExternal(t *testing.T) {
+	mockDir := t.TempDir()
+	binName := "custom-tool"
+	var binPath string
+	if runtime.GOOS == "windows" {
+		binPath = filepath.Join(mockDir, binName+".cmd")
+		_ = os.WriteFile(binPath, []byte("@echo off\r\necho %*\r\n"), 0o755)
+	} else {
+		binPath = filepath.Join(mockDir, binName)
+		_ = os.WriteFile(binPath, []byte("#!/bin/sh\necho \"$*\"\n"), 0o755)
+	}
+
 	r, err := tools.LoadRegistry(
 		tools.WithLookPath(func(name string) (string, error) {
 			if name == "echo" || name == "custom-tool" {
-				return "/bin/echo", nil
+				return binPath, nil
 			}
 			return "", fmt.Errorf("not found")
 		}),
@@ -187,10 +199,15 @@ func TestToolIsolationNoGenericLocalBin(t *testing.T) {
 		AllowGlobalPATH: false,
 	})
 
+	binSuffix := ""
+	if plat.OS() == "windows" {
+		binSuffix = ".exe"
+	}
+
 	// 1. Placing binary in generic ~/.local/bin/ must NOT be picked up
 	legacyLocalBin := filepath.Join(tempHome, ".local", "bin")
 	_ = os.MkdirAll(legacyLocalBin, 0o755)
-	legacyBinary := filepath.Join(legacyLocalBin, "isolated-tool")
+	legacyBinary := filepath.Join(legacyLocalBin, "isolated-tool"+binSuffix)
 	_ = os.WriteFile(legacyBinary, []byte("#!/bin/sh\necho legacy\n"), 0o755)
 
 	st, err := r.CheckStatus(context.Background(), "isolated-tool")
@@ -222,7 +239,7 @@ func TestToolIsolationNoGenericLocalBin(t *testing.T) {
 	})
 
 	_ = os.MkdirAll(isolatedBin, 0o755)
-	isolatedFile := filepath.Join(isolatedBin, "isolated-tool")
+	isolatedFile := filepath.Join(isolatedBin, "isolated-tool"+binSuffix)
 	_ = os.WriteFile(isolatedFile, []byte("#!/bin/sh\necho isolated\n"), 0o755)
 
 	st2, err := r2.CheckStatus(context.Background(), "isolated-tool")

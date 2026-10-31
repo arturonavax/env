@@ -167,6 +167,19 @@ func newRebuildCmd(appCtx *AppContext) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if appCtx.Flags.ScriptMode {
+				fmt.Fprintln(cmd.OutOrStdout(), "#!/usr/bin/env bash")
+				fmt.Fprintln(cmd.OutOrStdout(), "# ANX Rebuild Toolchains Script")
+				fmt.Fprintln(cmd.OutOrStdout(), "set -euo pipefail")
+				for _, r := range results {
+					fmt.Fprintf(cmd.OutOrStdout(), "# Scope: %s\n", r.Scope)
+					for _, c := range r.Commands {
+						fmt.Fprintf(cmd.OutOrStdout(), "%s\n", c)
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
+				return nil
+			}
 			return emit(cmd, appCtx, results, func(w io.Writer) {
 				for _, r := range results {
 					state := fmt.Sprintf("%d rebuilt", r.Rebuilt)
@@ -206,6 +219,12 @@ func newOptimizeCmd(appCtx *AppContext) *cobra.Command {
 			res, err := appCtx.OpsSvc.Optimize(cmd.Context(), req)
 			if err != nil {
 				return domain.NewExitError(domain.ExitConflictOrAudit, err)
+			}
+			if appCtx.Flags.ScriptMode {
+				if res.Script != "" {
+					fmt.Fprintln(cmd.OutOrStdout(), res.Script)
+				}
+				return nil
 			}
 			return emit(cmd, appCtx, res, func(w io.Writer) {
 				fmt.Fprintln(w, res.Report.MarkdownSummary())

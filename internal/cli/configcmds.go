@@ -99,6 +99,9 @@ func newSyncCmd(appCtx *AppContext) *cobra.Command {
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: groupCompletion(appCtx),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if appCtx.Flags.ScriptMode {
+				return renderSyncScript(cmd.OutOrStdout(), appCtx, args, push)
+			}
 			opts := appSyncOptions(appCtx, args, push, force)
 			results, err := appCtx.SyncSvc.Sync(cmd.Context(), opts)
 			if err != nil {
@@ -265,4 +268,35 @@ func newHistoryCmd(appCtx *AppContext) *cobra.Command {
 			})
 		},
 	}
+}
+
+func renderSyncScript(w io.Writer, appCtx *AppContext, args []string, push bool) error {
+	group := "all"
+	if len(args) == 1 {
+		group = args[0]
+	}
+	cfgs := appCtx.Catalog.ListConfigurationsByGroup(group)
+
+	fmt.Fprintln(w, "#!/usr/bin/env bash")
+	if push {
+		fmt.Fprintf(w, "# ANX Dotfile Capture Script (Group: %s)\n", group)
+	} else {
+		fmt.Fprintf(w, "# ANX Dotfile Deployment Script (Group: %s)\n", group)
+	}
+	fmt.Fprintln(w, "set -euo pipefail")
+
+	for _, c := range cfgs {
+		target := c.TargetForOS(appCtx.Platform.OS())
+		source := c.Source
+		if push {
+			fmt.Fprintf(w, "# Capture %s\n", c.ID)
+			fmt.Fprintf(w, "mkdir -p $(dirname %s)\n", source)
+			fmt.Fprintf(w, "cp -a %s %s\n\n", target, source)
+		} else {
+			fmt.Fprintf(w, "# Deploy %s\n", c.ID)
+			fmt.Fprintf(w, "mkdir -p $(dirname %s)\n", target)
+			fmt.Fprintf(w, "cp -a %s %s\n\n", source, target)
+		}
+	}
+	return nil
 }

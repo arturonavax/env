@@ -494,12 +494,29 @@ func (m *Manager) ScheduleNextRTC(ctx context.Context, wakeTimeHHMM string) (tim
 		"rtcwake",
 		"-m",
 		"no",
+		"-u",
 		"-t",
 		strconv.FormatInt(target.Unix(), 10),
 	)
 	if runErr != nil {
+		// Attempt direct sysfs write or sudo tee
+		alarmPath := "/sys/class/rtc/rtc0/wakealarm"
+		if _, statErr := os.Stat(alarmPath); statErr == nil {
+			_ = os.WriteFile(alarmPath, []byte("0\n"), 0o644)
+			if writeErr := os.WriteFile(alarmPath, []byte(strconv.FormatInt(target.Unix(), 10)+"\n"), 0o644); writeErr == nil {
+				_ = m.store.AppendLog("INFO", "RTC_SYSFS_ARMED", fmt.Sprintf("Armed RTC via sysfs to %d", target.Unix()), nil)
+				return target, true, nil
+			}
+			cmd := fmt.Sprintf("echo 0 > %s && echo %d > %s", alarmPath, target.Unix(), alarmPath)
+			if _, sysErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 5 * time.Second}, "sudo", "-n", "sh", "-c", cmd); sysErr == nil {
+				_ = m.store.AppendLog("INFO", "RTC_SYSFS_ARMED", fmt.Sprintf("Armed RTC via sudo sysfs to %d", target.Unix()), nil)
+				return target, true, nil
+			}
+		}
+		_ = m.store.AppendLog("WARN", "RTC_SCHEDULE_FAILED", fmt.Sprintf("Failed to arm rtcwake: %v", runErr), nil)
 		return target, false, runErr
 	}
+	_ = m.store.AppendLog("INFO", "RTC_ARMED", fmt.Sprintf("Armed rtcwake to %s (epoch %d)", target.Format(time.RFC3339), target.Unix()), nil)
 	return target, true, nil
 }
 
@@ -650,7 +667,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 
 	// 2. Execute wakeup probes and validate probe success
 	wakeRep, wakeErr := m.quotaSvc.WakeWithOptions(ctx, quota.WakeOptions{
-		Force:  false,
+		Force:  true,
 		Reason: "scheduled_wake_cycle",
 		Out:    out,
 	})
@@ -891,16 +908,20 @@ func (m *Manager) HandleDBusLine(ctx context.Context, out io.Writer, line string
 		if maxWindowSec <= 0 {
 			maxWindowSec = 15 * 60
 		}
-		diff := now - st.ScheduledWakeEpoch
-		if diff < 0 {
-			diff = -diff
-		}
-		if st.ExpectingAutoWake && st.ScheduledWakeEpoch > 0 && diff <= maxWindowSec {
+
+		if st.ExpectingAutoWake && st.ScheduledWakeEpoch > 0 && now >= st.ScheduledWakeEpoch {
+			if now-st.ScheduledWakeEpoch > maxWindowSec {
+				_ = m.store.AppendLog("WARN", "MISSED_WAKE_CATCHUP", fmt.Sprintf("Scheduled wake passed %ds ago during sleep; running catchup wake cycle now", now-st.ScheduledWakeEpoch), nil)
+				fmt.Fprintf(out, "[D-Bus] Missed scheduled wake during sleep (%ds late); executing catchup wake cycle...\n", now-st.ScheduledWakeEpoch)
+			} else {
+				fmt.Fprintln(out, "[D-Bus] On-schedule resume detected; executing wake cycle...")
+			}
 			_, err := m.RunWakeCycle(ctx, out)
 			return err
 		}
+
 		_ = m.store.AppendLog("INFO", "USER_RESUME", "Manual user resume detected", nil)
-		if m.cfg.Daemon.AutoWake.Enabled {
+		if m.cfg.Daemon.AutoWake.Enabled && (!st.ExpectingAutoWake || now >= st.ScheduledWakeEpoch) {
 			_, _, _ = m.ScheduleNextRTC(ctx, m.cfg.Daemon.AutoWake.Time)
 		}
 	}

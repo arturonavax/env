@@ -97,8 +97,8 @@ func TestProbeHardwareAndMatchHacks(t *testing.T) {
 
 	mustWrite(sysRoot, "class/dmi/id/sys_vendor", "Dell Inc.\n")
 	mustWrite(sysRoot, "class/dmi/id/product_name", "Precision M6800\n")
-	mustWrite(sysRoot, "bus/pci/devices/0000:01:00.0/class", "0x030000\n")
-	mustWrite(sysRoot, "bus/pci/devices/0000:01:00.0/uevent", "DRIVER=nouveau\nPCI_CLASS=30000\nPCI_ID=10DE:11FC\n")
+	mustWrite(sysRoot, "bus/pci/devices/0000_01_00.0/class", "0x030000\n")
+	mustWrite(sysRoot, "bus/pci/devices/0000_01_00.0/uevent", "DRIVER=nouveau\nPCI_CLASS=30000\nPCI_ID=10DE:11FC\n")
 
 	mustWrite(procRoot, "cpuinfo", "processor\t: 0\nmodel name\t: Intel(R) Core(TM) i7-4910MQ CPU @ 2.90GHz\n")
 	mustWrite(procRoot, "meminfo", "MemTotal:       32768000 kB\n")

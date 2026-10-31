@@ -267,3 +267,88 @@ func TestSystemdUnitAndLaunchdGenerationInTempDir(t *testing.T) {
 		t.Fatalf("expected launchd plist file, got %v", macInst.Files)
 	}
 }
+
+func TestHandleDBusLineResumeAndCatchup(t *testing.T) {
+	t.Parallel()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, aErr := ln.Accept()
+			if aErr != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+
+	home := t.TempDir()
+	cfg, err := config.DefaultConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Daemon.AutoWake.Enabled = true
+	cfg.Daemon.AutoWake.AutoResuspend = false
+	cfg.Daemon.AutoWake.Time = "04:00"
+
+	store := config.NewStateStore(filepath.Join(home, "state"))
+	mockExec := &mockCmdExec{}
+	quotaSvc := quota.NewService(
+		cfg,
+		store,
+		quota.WithExecutor(mockExec),
+	)
+
+	wakeEpoch := time.Date(2026, 10, 31, 4, 0, 0, 0, time.UTC).Unix()
+	currentTime := time.Date(2026, 10, 31, 7, 30, 0, 0, time.UTC) // 3.5 hours late (missed wake during suspend)
+
+	mgr := daemon.NewManager(
+		cfg,
+		store,
+		quotaSvc,
+		daemon.WithPlatform(platform.NewTestInfo(platform.TestInfoParams{OS: "linux", HomeDir: home})),
+		daemon.WithConnectivity(daemon.ConnectivityOptions{
+			Endpoints: []string{ln.Addr().String()},
+			DNSHost:   "localhost",
+			Timeout:   time.Second,
+			LookupHost: func(context.Context, string) ([]string, error) {
+				return []string{"127.0.0.1"}, nil
+			},
+		}),
+		daemon.WithClock(func() time.Time { return currentTime }),
+		daemon.WithLookPath(func(name string) (string, error) {
+			if name == "gdbus" || name == "rtcwake" {
+				return "/bin/" + name, nil
+			}
+			return "", errors.New("not found")
+		}),
+		daemon.WithCommandExecutor(mockExec),
+	)
+
+	// Seed state with expecting autowake at 04:00 AM
+	st, _ := store.Load()
+	st.ScheduledWakeEpoch = wakeEpoch
+	st.ExpectingAutoWake = true
+	_ = store.Save(st)
+
+	var out bytes.Buffer
+	line := "PrepareForSleep: <false>"
+	if err := mgr.HandleDBusLine(context.Background(), &out, line); err != nil {
+		t.Fatalf("HandleDBusLine returned error: %v", err)
+	}
+
+	stAfter, _ := store.Load()
+	if stAfter.ScheduledWakeEpoch <= currentTime.Unix() {
+		t.Errorf("expected ScheduledWakeEpoch to be re-armed in the future, got %d <= %d", stAfter.ScheduledWakeEpoch, currentTime.Unix())
+	}
+	if stAfter.LastAutoWakeEpoch != currentTime.Unix() {
+		t.Errorf("expected LastAutoWakeEpoch %d, got %d", currentTime.Unix(), stAfter.LastAutoWakeEpoch)
+	}
+	if !strings.Contains(out.String(), "catchup wake cycle") {
+		t.Errorf("expected catchup wake log in output, got:\n%s", out.String())
+	}
+}

@@ -104,8 +104,9 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - `anx explain <resource-id>`: Multi-layered provenance inspection with winning policies and origins.
   - `anx self update [--check|--dry-run]`: Check for and securely update the ANX binary to the latest release with SHA-256 verification.
   - `anx doctor`: Run comprehensive diagnostic health checks (including orphan, deprecation, and archive remnant checks).
-  - `anx audit`: Scan installed tools for vulnerabilities against OSV.dev.
-  - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges and hardware hack indicators.
+  - `anx audit [--profile <workstation|server|minimal>] [--report] [--script] [--ai] [--apply] [--packages]`: Run multi-level security compliance audits (`Critical`, `High`, `Medium`, `Low`, `Info`) and OSV tool vulnerability scans, generate standalone idempotent remediation scripts, or synthesize remediations via configured LLM harnesses.
+  - Universal `--script` mode: Inspect executable Bash scripts across `apply`, `sync`, `optimize`, `audit`, `rebuild`, `capture`, and `cleanup`/`prune` prior to execution.
+  - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges, hardware hack indicators, and interactive Security Audit tab with profile switching ('p') and remediation script generation ('s').
   - `anx tools [list|info|run|update|upgrade]`: Decoupled personal tools engine with isolated path (`~/.local/share/anx/bin`).
   - `anx tools ai [commit|pr|llm|quota|daemon]`: AI productivity suite (also available via shortcuts `anx tools llm`, `anx tools commit`, `anx tools pr`, `anx tools quota`, and root aliases `anx ai`, `anx llm`).
   - `anx sleep [lock|s2idle|deep|hibernate|status]`: Hardware-safe power transitions, screen standby via DPMS, and hibernation diagnostics (multicall: `safe-suspend`).

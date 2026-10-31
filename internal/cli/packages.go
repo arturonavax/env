@@ -77,6 +77,9 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 	if err != nil {
 		return err
 	}
+	if appCtx.Flags.ScriptMode {
+		return renderPlanScript(cmd.OutOrStdout(), appCtx, plan)
+	}
 	plan.DryRun = appCtx.Flags.DryRun
 	if appCtx.Flags.DryRun {
 		return emit(cmd, appCtx, plan, func(w io.Writer) { renderPlan(w, appCtx, plan) })
@@ -434,4 +437,57 @@ func newProfileCmd(appCtx *AppContext) *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func renderPlanScript(w io.Writer, _ *AppContext, plan *domain.ExecutionPlan) error {
+	fmt.Fprintln(w, "#!/usr/bin/env bash")
+	fmt.Fprintf(w, "# ANX Apply Plan: %s (Profile: %s, Total Steps: %d)\n", plan.ID, plan.Profile, len(plan.Steps))
+	fmt.Fprintln(w, "set -euo pipefail")
+
+	if len(plan.Steps) == 0 {
+		fmt.Fprintln(w, "echo '==> System is already in desired state. No actions needed.'")
+		return nil
+	}
+
+	for i, st := range plan.Steps {
+		fmt.Fprintf(w, "# Step %d: %s %s [%s]\n", i+1, st.Action, st.ResourceID, st.Provider)
+		if st.Strategy == "github_release" || st.Strategy == "script" {
+			fmt.Fprintf(w, "echo '--> Installing %s via %s...'\n", st.ResourceID, st.Strategy)
+			fmt.Fprintf(w, "anx install %s\n\n", st.ResourceID)
+			continue
+		}
+		switch {
+		case strings.HasPrefix(st.Provider, "native:apt"):
+			pkg := strings.TrimPrefix(st.Provider, "native:apt (")
+			pkg = strings.TrimSuffix(pkg, ")")
+			if pkg == "" {
+				pkg = st.ResourceID
+			}
+			fmt.Fprintf(w, "sudo apt-get update -y && sudo apt-get install -y %s\n\n", pkg)
+		case strings.HasPrefix(st.Provider, "native:pacman"):
+			pkg := strings.TrimPrefix(st.Provider, "native:pacman (")
+			pkg = strings.TrimSuffix(pkg, ")")
+			if pkg == "" {
+				pkg = st.ResourceID
+			}
+			fmt.Fprintf(w, "sudo pacman -S --noconfirm --needed %s\n\n", pkg)
+		case strings.HasPrefix(st.Provider, "native:dnf"):
+			pkg := strings.TrimPrefix(st.Provider, "native:dnf (")
+			pkg = strings.TrimSuffix(pkg, ")")
+			if pkg == "" {
+				pkg = st.ResourceID
+			}
+			fmt.Fprintf(w, "sudo dnf install -y %s\n\n", pkg)
+		case strings.HasPrefix(st.Provider, "native:brew"):
+			pkg := strings.TrimPrefix(st.Provider, "native:brew (")
+			pkg = strings.TrimSuffix(pkg, ")")
+			if pkg == "" {
+				pkg = st.ResourceID
+			}
+			fmt.Fprintf(w, "brew install %s\n\n", pkg)
+		default:
+			fmt.Fprintf(w, "anx install %s\n\n", st.ResourceID)
+		}
+	}
+	return nil
 }

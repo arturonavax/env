@@ -21,9 +21,6 @@ __pycache__/
 bin/
 *.exe
 
-# Herdr runtime logs & session state
-files/herdr/*.log
-files/herdr/*.sock*
-files/herdr/session.json
-files/herdr/session-snapshots/
-files/herdr/.plugins.lock
+# Herdr: deny all runtime by default, allow only vetted template
+/files/herdr/**
+!/files/herdr/config.toml

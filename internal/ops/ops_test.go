@@ -3,8 +3,11 @@ package ops_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -14,17 +17,47 @@ import (
 	"github.com/arturonavax/env/internal/security"
 )
 
-func writeMockExecutable(t *testing.T, dir, name, body string) string {
+var mockToolBin string
+
+func TestMain(m *testing.M) {
+	tempDir, err := os.MkdirTemp("", "mock-tool-build-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tempDir)
+
+	exeName := "mock_tool"
+	if runtime.GOOS == "windows" {
+		exeName += ".exe"
+	}
+	mockToolBin = filepath.Join(tempDir, exeName)
+
+	cmd := exec.Command("go", "build", "-o", mockToolBin, "./testdata/mock_tool")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to build mock tool: %v, output: %s\n", err, out)
+		os.Exit(1)
+	}
+
+	os.Exit(m.Run())
+}
+
+func installMockTool(t *testing.T, dir, name string) {
 	t.Helper()
+	data, err := os.ReadFile(mockToolBin)
+	if err != nil {
+		t.Fatalf("reading mock tool binary: %v", err)
+	}
 	p := filepath.Join(dir, name)
-	content := "#!/usr/bin/env bash\nset -euo pipefail\n" + body + "\n"
-	if err := os.WriteFile(p, []byte(content), 0o755); err != nil {
+	if err := os.WriteFile(p, data, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(p, 0o755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		pExe := filepath.Join(dir, name+".exe")
+		if err := os.WriteFile(pExe, data, 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
-	return p
 }
 
 func TestRebuilderDryRunAndMockExecution(t *testing.T) {
@@ -52,46 +85,13 @@ func TestRebuilderDryRunAndMockExecution(t *testing.T) {
 		}
 	}
 
-	// Mock go binary supporting `version -m <bin>` and `install ...`
-	writeMockExecutable(t, mockBinDir, "go", `
-if [[ "${1:-}" == "version" && "${2:-}" == "-m" ]]; then
-    target="$(basename "${3:-}")"
-    case "$target" in
-        gopls)
-            printf "%s: go1.27.3\n\tpath\tgolang.org/x/tools/gopls\n\tmod\tgolang.org/x/tools/gopls\tv0.18.0\n" "${3}"
-            ;;
-        gofumpt)
-            printf "%s: go1.27.3\n\tpath\tmvdan.cc/gofumpt\n\tmod\tmvdan.cc/gofumpt\tv0.7.0\n" "${3}"
-            ;;
-        localdev)
-            printf "%s: go1.27.3\n\tpath\tcommand-line-arguments\n" "${3}"
-            ;;
-    esac
-    exit 0
-fi
-echo "go $*" >> "`+logFile+`"
-`)
-
-	// Mock cargo binary supporting `install --list` and `install <crate>`
-	writeMockExecutable(t, mockBinDir, "cargo", `
-if [[ "${1:-}" == "install" && "${2:-}" == "--list" ]]; then
-    cat <<'EOF'
-difftastic v0.61.0:
-    difft
-git-delta v0.18.2:
-    delta
-local-tool v0.1.0 (/tmp/local-tool):
-    local-tool
-EOF
-    exit 0
-fi
-echo "cargo $*" >> "`+logFile+`"
-`)
-
-	writeMockExecutable(t, mockBinDir, "pnpm", `echo "pnpm $*" >> "`+logFile+`"`)
-	writeMockExecutable(t, mockBinDir, "pipx", `echo "pipx $*" >> "`+logFile+`"`)
-	writeMockExecutable(t, mockBinDir, "nvim", `echo "nvim $*" >> "`+logFile+`"`)
-	writeMockExecutable(t, mockBinDir, "zsh", `echo "zsh $*" >> "`+logFile+`"`)
+	installMockTool(t, mockBinDir, "go")
+	installMockTool(t, mockBinDir, "cargo")
+	installMockTool(t, mockBinDir, "rustup")
+	installMockTool(t, mockBinDir, "pnpm")
+	installMockTool(t, mockBinDir, "pipx")
+	installMockTool(t, mockBinDir, "nvim")
+	installMockTool(t, mockBinDir, "zsh")
 
 	plat := platform.NewTestInfo(platform.TestInfoParams{
 		OS:          "linux",
@@ -100,11 +100,11 @@ echo "cargo $*" >> "`+logFile+`"
 		LocalBinDir: filepath.Join(homeDir, ".local", "bin"),
 	})
 	runner := security.NewRunner(10 * time.Second)
-	sysPath := "/usr/bin:/bin"
 	env := []string{
-		"PATH=" + mockBinDir + string(os.PathListSeparator) + sysPath,
+		"PATH=" + mockBinDir + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"HOME=" + homeDir,
 		"GOBIN=" + goBinDir,
+		"ANX_MOCK_LOG_FILE=" + logFile,
 	}
 
 	t.Run("dry-run previews commands without mutating or invoking installers", func(t *testing.T) {
@@ -201,29 +201,8 @@ func TestOptimizerAuditSynthesizeAndGuardrails(t *testing.T) {
 	mustWrite(sysRoot, "block/nvme0n1/queue/rotational", "0\n")
 	mustWrite(sysRoot, "devices/system/cpu/cpu0/cpufreq/scaling_governor", "powersave\n")
 
-	// Mock lynis binary writing warning and suggestion lines.
-	writeMockExecutable(t, mockBinDir, "lynis", `
-report_file=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --report-file)
-            report_file="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-if [[ -n "$report_file" ]]; then
-    cat <<'EOF' > "$report_file"
-hardening_index=74
-warning[]=FIRE-4512|Firewall module inactive|
-suggestion[]=KRNL-6000|Restrict kernel pointer exposure via sysctl|
-EOF
-fi
-echo "[WARNING] Check firewall rules"
-`)
+	installMockTool(t, mockBinDir, "lynis")
+	installMockTool(t, mockBinDir, "bash")
 
 	plat := platform.NewTestInfo(platform.TestInfoParams{
 		OS:           "linux",
@@ -233,7 +212,7 @@ echo "[WARNING] Check firewall rules"
 	})
 	runner := security.NewRunner(10 * time.Second)
 	env := []string{
-		"PATH=" + mockBinDir + string(os.PathListSeparator) + "/usr/bin:/bin",
+		"PATH=" + mockBinDir + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"HOME=" + homeDir,
 		"XDG_SESSION_TYPE=x11",
 		"XDG_CURRENT_DESKTOP=XFCE",

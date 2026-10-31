@@ -2,9 +2,13 @@ package tui
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/arturonavax/env/internal/security"
 )
 
 // handleKeyPress processes keyboard interactions and navigation.
@@ -87,12 +91,57 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Accordion mode disabled (equal 50/50 split)"
 		}
 
+	case "p":
+		if m.activeTab == TabSecurity {
+			switch m.securityProfile {
+			case security.ProfileWorkstation:
+				m.securityProfile = security.ProfileServer
+			case security.ProfileServer:
+				m.securityProfile = security.ProfileMinimal
+			default:
+				m.securityProfile = security.ProfileWorkstation
+			}
+			m.selectedIdx = 0
+			m.statusMsg = fmt.Sprintf("Switched to [%s] profile. Re-auditing...", m.securityProfile)
+			ctx := context.Background()
+			return m, loadSystemAuditCmd(ctx, m.deps.Audit, m.securityProfile)
+		}
+
+	case "s":
+		if m.activeTab == TabSecurity {
+			if m.securityReport == nil {
+				m.statusMsg = "No audit report available to generate script."
+				return m, nil
+			}
+			auditor := security.NewSecurityAuditor(security.WithAuditorProfile(m.securityProfile))
+			script, err := auditor.SynthesizeScript(context.Background(), m.securityReport)
+			if err != nil {
+				m.statusMsg = "Script generation failed: " + err.Error()
+				return m, nil
+			}
+			targetDir := ""
+			if m.deps.Platform != nil {
+				targetDir = m.deps.Platform.ConfigDir()
+			}
+			if targetDir != "" {
+				_ = os.MkdirAll(targetDir, 0755)
+				outPath := filepath.Join(targetDir, "security-remediation.sh")
+				if err := os.WriteFile(outPath, []byte(script), 0700); err == nil {
+					m.statusMsg = "Remediation script saved to " + outPath
+					return m, nil
+				}
+			}
+			m.statusMsg = fmt.Sprintf("Remediation script generated (%d bytes).", len(script))
+			return m, nil
+		}
+
 	case "r":
 		m.statusMsg = "Refreshing diagnostics at " + time.Now().Format("15:04:05")
 		ctx := context.Background()
 		return m, tea.Batch(
 			tea.Cmd(loadDoctorCmd(ctx, m.deps.Doctor)),
 			tea.Cmd(loadAuditCmd(ctx, m.deps.Audit)),
+			tea.Cmd(loadSystemAuditCmd(ctx, m.deps.Audit, m.securityProfile)),
 			tea.Cmd(loadHacksCmd(ctx, m.deps.Hacks)),
 		)
 	}
@@ -115,6 +164,9 @@ func (m Model) maxSelectedIndex() int {
 			return len(m.doctorChecks) - 1
 		}
 	case TabSecurity:
+		if m.securityReport != nil && len(m.securityReport.Findings) > 0 {
+			return len(m.securityReport.Findings) - 1
+		}
 		if len(m.auditFindings) > 0 {
 			return len(m.auditFindings) - 1
 		}

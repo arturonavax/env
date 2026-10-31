@@ -37,7 +37,14 @@ func (d *Dispatcher) installScript(ctx context.Context, spec manifest.ScriptSpec
 			return fmt.Errorf("creating temp script dir: %w", err)
 		}
 		cleanup = func() { _ = os.RemoveAll(tmpDir) }
-		scriptPath = filepath.Join(tmpDir, "install.sh")
+		scriptName := "install.sh"
+		interp := strings.ToLower(strings.TrimSpace(spec.Interpreter))
+		if interp == "cmd" || interp == "cmd.exe" {
+			scriptName = "install.cmd"
+		} else if interp == "powershell" || interp == "pwsh" {
+			scriptName = "install.ps1"
+		}
+		scriptPath = filepath.Join(tmpDir, scriptName)
 		if err := d.downloader.DownloadToFile(ctx, strings.TrimSpace(spec.URL), scriptPath, spec.SHA256); err != nil {
 			cleanup()
 			return err
@@ -69,7 +76,13 @@ func (d *Dispatcher) installScript(ctx context.Context, spec manifest.ScriptSpec
 		interpreter = "sh"
 	}
 
-	execArgs := make([]string, 0, len(spec.Args)+1)
+	execArgs := make([]string, 0, len(spec.Args)+3)
+	lowerInterp := strings.ToLower(interpreter)
+	if lowerInterp == "cmd" || lowerInterp == "cmd.exe" {
+		execArgs = append(execArgs, "/c")
+	} else if lowerInterp == "powershell" || lowerInterp == "pwsh" {
+		execArgs = append(execArgs, "-ExecutionPolicy", "Bypass", "-File")
+	}
 	execArgs = append(execArgs, scriptPath)
 	for _, rawArg := range spec.Args {
 		execArgs = append(execArgs, expandTemplateString(rawArg, d.platform, d.repoDir))

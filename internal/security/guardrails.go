@@ -24,7 +24,7 @@ var scriptGuardrailRules = []guardrailRule{
 	{
 		id:          "GR-001",
 		description: "recursive deletion targeting root or top-level system directories",
-		pattern:     regexp.MustCompile(`(?i)\brm\s+([^\n;|&]*-(?:[a-zA-Z]*[rf][a-zA-Z]*|-recursive|-force)\s+)+[^\n;|&]*(?:^|\s)(/|/\*|/boot|/etc|/usr|/var|/home|--no-preserve-root)(?:\s|$)`),
+		pattern:     regexp.MustCompile(`(?i)\brm\s+(?:[^\n;|&]*\s+)?-(?:[a-zA-Z]*[rf][a-zA-Z]*|-recursive|-force)(?:\s+[^\n;|&]*)?\s+(/|/\*|/boot|/etc|/usr|/var|/home|--no-preserve-root)(?:\s|$)`),
 	},
 	{
 		id:          "GR-002",

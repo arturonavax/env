@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,10 +73,6 @@ func TestClipboardOSC52FallbackAndBinary(t *testing.T) {
 	binDir := t.TempDir()
 	outCapture := filepath.Join(binDir, "clip.txt")
 	wlCopy := filepath.Join(binDir, "wl-copy")
-	script := "#!/bin/sh\ncat > " + outCapture + "\n"
-	if err := os.WriteFile(wlCopy, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	method, err = gitflow.CopyToClipboardWithOptions(ctx, runner, "wayland-payload", gitflow.ClipboardOptions{
 		LookPath: func(name string) (string, error) {
@@ -89,6 +86,10 @@ func TestClipboardOSC52FallbackAndBinary(t *testing.T) {
 				return "wayland-0"
 			}
 			return ""
+		},
+		CommandRunner: func(ctx context.Context, bin string, args []string, stdin io.Reader) error {
+			data, _ := io.ReadAll(stdin)
+			return os.WriteFile(outCapture, data, 0o644)
 		},
 	})
 	if err != nil {

@@ -3,8 +3,9 @@ package harness_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,14 +13,44 @@ import (
 	"github.com/arturonavax/env/internal/ai/harness"
 )
 
-func writeFakeScript(t *testing.T, dir, name, body string) string {
-	t.Helper()
-	p := filepath.Join(dir, name)
-	content := "#!/bin/sh\nset -e\n" + body + "\n"
-	if err := os.WriteFile(p, []byte(content), 0o755); err != nil {
-		t.Fatalf("writing fake script %s: %v", p, err)
+type mockTestRunner struct{}
+
+func (m *mockTestRunner) ExecuteProcess(ctx context.Context, spec harness.ProcessSpec) (harness.ProcessResult, error) {
+	switch spec.Binary {
+	case "fake-arg":
+		return harness.ProcessResult{
+			Stdout: fmt.Sprintf("\x1b[36m```text\nARG_OK:%s\n```\x1b[0m\n", strings.Join(spec.Args, " ")),
+		}, nil
+	case "fake-stdin":
+		var inStr string
+		if spec.Stdin != nil {
+			b, _ := io.ReadAll(spec.Stdin)
+			inStr = string(b)
+		}
+		return harness.ProcessResult{
+			Stdout: fmt.Sprintf("STDIN_OK:%s\n", inStr),
+		}, nil
+	case "fake-file":
+		if len(spec.Args) >= 2 {
+			data, err := os.ReadFile(spec.Args[0])
+			if err != nil {
+				return harness.ProcessResult{}, err
+			}
+			if err := os.WriteFile(spec.Args[1], []byte(fmt.Sprintf("FILE_OK:%s", string(data))), 0o644); err != nil {
+				return harness.ProcessResult{}, err
+			}
+		}
+		return harness.ProcessResult{}, nil
+	case "fake-json":
+		return harness.ProcessResult{
+			Stdout: "{\"choices\":[{\"message\":{\"content\":\"JSON_EXTRACTED_OK\"}}]}\n",
+		}, nil
+	case "claude":
+		return harness.ProcessResult{
+			Stdout: "CLAUDE_FALLBACK_OK",
+		}, nil
 	}
-	return p
+	return harness.ProcessResult{}, fmt.Errorf("unknown binary: %s", spec.Binary)
 }
 
 func TestCleanersAndJSONPath(t *testing.T) {
@@ -44,36 +75,12 @@ func TestCleanersAndJSONPath(t *testing.T) {
 func TestHarnessProtocolsWithFakeScripts(t *testing.T) {
 	t.Parallel()
 
-	binDir := t.TempDir()
-
-	// 1. arg + stdout + ANSI/markdown cleaning + model/effort flags
-	argBin := writeFakeScript(t, binDir, "fake-arg", "printf '\\033[36m```text\\nARG_OK:%s\\n```\\033[0m\\n' \"$*\"")
-
-	// 2. stdin + stdout
-	stdinBin := writeFakeScript(t, binDir, "fake-stdin", `
-input="$(cat)"
-printf 'STDIN_OK:%s\n' "$input"
-`)
-
-	// 3. temp_file input + temp_file output
-	fileBin := writeFakeScript(t, binDir, "fake-file", `
-in_file="$1"
-out_file="$2"
-data="$(cat "$in_file")"
-printf 'FILE_OK:%s' "$data" > "$out_file"
-`)
-
-	// 4. json output mode with nested array/object dot-path
-	jsonBin := writeFakeScript(t, binDir, "fake-json", `
-printf '{"choices":[{"message":{"content":"JSON_EXTRACTED_OK"}}]}\n'
-`)
-
 	cfg, err := config.DefaultConfig()
 	if err != nil {
 		t.Fatalf("DefaultConfig() error: %v", err)
 	}
 	cfg.Backends["test-arg"] = config.BackendConfig{
-		Command:       []string{argBin, "-p", "{prompt}"},
+		Command:       []string{"fake-arg", "-p", "{prompt}"},
 		InputMode:     "arg",
 		OutputMode:    "stdout",
 		ModelFlag:     "--model",
@@ -82,21 +89,21 @@ printf '{"choices":[{"message":{"content":"JSON_EXTRACTED_OK"}}]}\n'
 		CleanMarkdown: true,
 	}
 	cfg.Backends["test-stdin"] = config.BackendConfig{
-		Command:       []string{stdinBin, "{prompt}"},
+		Command:       []string{"fake-stdin", "{prompt}"},
 		InputMode:     "stdin",
 		OutputMode:    "stdout",
 		CleanANSI:     true,
 		CleanMarkdown: true,
 	}
 	cfg.Backends["test-file"] = config.BackendConfig{
-		Command:       []string{fileBin, "{prompt_file}", "{output_file}"},
+		Command:       []string{"fake-file", "{prompt_file}", "{output_file}"},
 		InputMode:     "temp_file",
 		OutputMode:    "temp_file",
 		CleanANSI:     true,
 		CleanMarkdown: true,
 	}
 	cfg.Backends["test-json"] = config.BackendConfig{
-		Command:       []string{jsonBin, "{prompt}"},
+		Command:       []string{"fake-json", "{prompt}"},
 		InputMode:     "arg",
 		OutputMode:    "json",
 		JSONKey:       "choices.0.message.content",
@@ -104,7 +111,11 @@ printf '{"choices":[{"message":{"content":"JSON_EXTRACTED_OK"}}]}\n'
 		CleanMarkdown: true,
 	}
 
-	reg := harness.NewRegistry(cfg)
+	reg := harness.NewRegistry(
+		cfg,
+		harness.WithLookPath(func(bin string) (string, error) { return bin, nil }),
+		harness.WithProcessRunner(&mockTestRunner{}),
+	)
 	ctx := context.Background()
 
 	t.Run("arg input with model and effort flags", func(t *testing.T) {
@@ -183,9 +194,6 @@ printf '{"choices":[{"message":{"content":"JSON_EXTRACTED_OK"}}]}\n'
 func TestFallbackDiscovery(t *testing.T) {
 	t.Parallel()
 
-	binDir := t.TempDir()
-	claudeBin := writeFakeScript(t, binDir, "claude", `printf 'CLAUDE_FALLBACK_OK'`)
-
 	cfg, err := config.DefaultConfig()
 	if err != nil {
 		t.Fatalf("DefaultConfig(): %v", err)
@@ -193,17 +201,17 @@ func TestFallbackDiscovery(t *testing.T) {
 
 	lookPath := func(bin string) (string, error) {
 		if bin == "claude" {
-			return claudeBin, nil
+			return "claude", nil
 		}
 		return "", errors.New("not found")
 	}
 
-	// Point claude command in cfg to claudeBin while agy is missing.
+	// Point claude command in cfg to "claude" while agy is missing.
 	claudeSpec := cfg.Backends["claude"]
-	claudeSpec.Command = []string{claudeBin, "-p", "{prompt}"}
+	claudeSpec.Command = []string{"claude", "-p", "{prompt}"}
 	cfg.Backends["claude"] = claudeSpec
 
-	reg := harness.NewRegistry(cfg, harness.WithLookPath(lookPath))
+	reg := harness.NewRegistry(cfg, harness.WithLookPath(lookPath), harness.WithProcessRunner(&mockTestRunner{}))
 
 	adapter, usedFallback, err := reg.ResolveWithFallback("agy")
 	if err != nil {

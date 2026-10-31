@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/security"
 )
 
 // AuthCheckResult details the authorization outcome for git push operations.
@@ -107,9 +110,11 @@ func runCaptureNonInteractive(
 	}
 
 	capturedCount := 0
+	var allCapturedPaths []string
 	for _, r := range results {
-		if r.Action == "captured" {
-			capturedCount++
+		if r.Action == "captured" || r.Action == "drift" {
+			capturedCount += len(r.CapturedPaths)
+			allCapturedPaths = append(allCapturedPaths, r.CapturedPaths...)
 		}
 	}
 
@@ -120,8 +125,27 @@ func runCaptureNonInteractive(
 		return nil
 	}
 
+	if appCtx.Flags.ScriptMode {
+		fmt.Fprintln(out, "#!/usr/bin/env bash\n# ANX Capture Script\nset -euo pipefail")
+		bName := branchName
+		if bName == "" {
+			bName = "sync/dotfiles-update"
+		}
+		cMsg := commitMsg
+		if cMsg == "" {
+			cMsg = "feat(config): capture live dotfiles into repository"
+		}
+		fmt.Fprintf(out, "git checkout -b %s\n", bName)
+		fmt.Fprintf(out, "git add -- %s\n", strings.Join(allCapturedPaths, " "))
+		fmt.Fprintf(out, "git commit -m %q\n", cMsg)
+		if doPush {
+			fmt.Fprintf(out, "git push -u origin %s\n", bName)
+		}
+		return nil
+	}
+
 	if doCommit || doPush {
-		return executeGitCommitAndPush(cmd, appCtx, branchName, commitMsg, doPush)
+		return executeGitCommitAndPush(cmd, appCtx, branchName, commitMsg, allCapturedPaths, doPush)
 	}
 
 	return nil
@@ -183,6 +207,7 @@ func runCaptureWizard(cmd *cobra.Command, appCtx *AppContext, group string) erro
 	}
 
 	fmt.Fprintf(out, "\nCapturing %d configuration(s) into %s/files/...\n", len(toCapture), appCtx.RepoRoot)
+	var wizardCapturedPaths []string
 	for _, id := range toCapture {
 		opts := app.SyncOptions{Group: id, Push: true}
 		res, err := appCtx.SyncSvc.Sync(ctx, opts)
@@ -190,6 +215,7 @@ func runCaptureWizard(cmd *cobra.Command, appCtx *AppContext, group string) erro
 			fmt.Fprintf(out, "  %s Failed capturing %s: %v\n", st.Error.Render("✗"), id, err)
 		} else {
 			for _, r := range res {
+				wizardCapturedPaths = append(wizardCapturedPaths, r.CapturedPaths...)
 				fmt.Fprintf(out, "  %s %s: captured %d file(s)\n", st.Success.Render("✓"), r.ConfigID, r.Files)
 			}
 		}
@@ -233,13 +259,14 @@ func runCaptureWizard(cmd *cobra.Command, appCtx *AppContext, group string) erro
 		fmt.Fprintln(out, st.Muted.Render("Remote push is disabled because you are not listed as the repository owner/member."))
 	}
 
-	return executeGitCommitAndPush(cmd, appCtx, branch, "", doPush)
+	return executeGitCommitAndPush(cmd, appCtx, branch, "", wizardCapturedPaths, doPush)
 }
 
 func executeGitCommitAndPush(
 	cmd *cobra.Command,
 	appCtx *AppContext,
 	branchName, commitMsg string,
+	capturedPaths []string,
 	doPush bool,
 ) error {
 	ctx := cmd.Context()
@@ -254,14 +281,43 @@ func executeGitCommitAndPush(
 		commitMsg = "feat(config): capture live dotfiles into repository"
 	}
 
+	if appCtx.Flags.DryRun {
+		fmt.Fprintf(out, "[dry-run] Would create branch %s and stage %d captured files:\n", branchName, len(capturedPaths))
+		for _, p := range capturedPaths {
+			fmt.Fprintf(out, "  [dry-run] git add -- %s\n", p)
+		}
+		if doPush {
+			fmt.Fprintf(out, "  [dry-run] Would push branch %s to origin\n", branchName)
+		}
+		return nil
+	}
+
+	if len(capturedPaths) == 0 {
+		return nil
+	}
+
+	// Secret scan every captured file before staging
+	for _, relPath := range capturedPaths {
+		fullPath := filepath.Join(repo, relPath)
+		data, err := os.ReadFile(fullPath)
+		if err == nil {
+			findings := security.ScanForSecrets(string(data))
+			if len(findings) > 0 {
+				return fmt.Errorf("security guardrail: secret detected in %s (%s, line %d); commit and push aborted to prevent credentials leakage",
+					relPath, findings[0].RuleID, findings[0].Line)
+			}
+		}
+	}
+
 	// 1. Create and switch to feature branch
 	if bErr := exec.CommandContext(ctx, "git", "-C", repo, "checkout", "-b", branchName).Run(); bErr != nil {
 		// If branch exists, just checkout
 		_ = exec.CommandContext(ctx, "git", "-C", repo, "checkout", branchName).Run()
 	}
 
-	// 2. Stage files
-	if aErr := exec.CommandContext(ctx, "git", "-C", repo, "add", "files/").Run(); aErr != nil {
+	// 2. Stage ONLY the exact allowlisted captured files
+	addArgs := append([]string{"-C", repo, "add", "--"}, capturedPaths...)
+	if aErr := exec.CommandContext(ctx, "git", addArgs...).Run(); aErr != nil {
 		return fmt.Errorf("staging captured files: %w", aErr)
 	}
 

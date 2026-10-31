@@ -8,6 +8,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -51,11 +52,12 @@ type Deps struct {
 
 // Async message types for loading data without freezing the UI.
 type (
-	doctorLoadedMsg []app.DoctorCheck
-	auditLoadedMsg  []domain.AuditFinding
-	hacksLoadedMsg  []domain.HackProfile
-	statusUpdateMsg string
-	errMsg          struct{ err error }
+	doctorLoadedMsg      []app.DoctorCheck
+	auditLoadedMsg       []domain.AuditFinding
+	systemAuditLoadedMsg *security.SecurityAuditReport
+	hacksLoadedMsg       []domain.HackProfile
+	statusUpdateMsg      string
+	errMsg               struct{ err error }
 )
 
 // loadDoctorCmd returns a tea.Cmd fetching doctor health checks asynchronously.
@@ -83,6 +85,23 @@ func loadAuditCmd(ctx context.Context, svc *app.AuditService) tea.Cmd {
 			return errMsg{err: err}
 		}
 		return auditLoadedMsg(findings)
+	}
+}
+
+// loadSystemAuditCmd returns a tea.Cmd executing full system security auditing asynchronously.
+func loadSystemAuditCmd(ctx context.Context, svc *app.AuditService, profile string) tea.Cmd {
+	return func() tea.Msg {
+		if svc == nil {
+			return systemAuditLoadedMsg(nil)
+		}
+		res, err := svc.SystemAudit(ctx, app.SecurityAuditRequest{Profile: profile}, true)
+		if err != nil {
+			return errMsg{err: err}
+		}
+		if res != nil {
+			return systemAuditLoadedMsg(res.Report)
+		}
+		return systemAuditLoadedMsg(nil)
 	}
 }
 

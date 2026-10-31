@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -221,5 +222,66 @@ func TestWizardModelWorkflow(t *testing.T) {
 	view := w.View()
 	if !strings.Contains(view.Content, "ANX SETUP WIZARD") {
 		t.Fatalf("expected wizard header in view, got: %s", view.Content)
+	}
+}
+
+func TestSecurityAuditTabAndShortcuts(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Switch to TabSecurity
+	nm, _ := m.Update(tea.KeyPressMsg{Text: "8"})
+	curr := nm.(Model)
+	if curr.ActiveTab() != TabSecurity {
+		t.Fatalf("expected activeTab to be TabSecurity, got %v", curr.ActiveTab())
+	}
+
+	// Deliver simulated systemAuditLoadedMsg
+	fakeReport := &security.SecurityAuditReport{
+		Profile:        security.ProfileWorkstation,
+		HardeningScore: 88,
+		Findings: []security.SecurityFinding{
+			{
+				ID:                 "SEC-TEST-001",
+				Category:           security.CategoryNetwork,
+				Severity:           security.SeverityCritical,
+				Title:              "Unprotected Test Port",
+				Description:        "Port 9999 is open",
+				Remediation:        "Close test port",
+				RemediationCommand: "iptables -D INPUT -p tcp --dport 9999 -j ACCEPT",
+			},
+		},
+	}
+
+	nm, _ = curr.Update(systemAuditLoadedMsg(fakeReport))
+	curr = nm.(Model)
+	if curr.securityReport == nil || len(curr.securityReport.Findings) != 1 {
+		t.Fatalf("expected 1 finding in securityReport")
+	}
+
+	view := curr.View().Content
+	if !strings.Contains(view, "SYSTEM SECURITY AUDIT") {
+		t.Fatalf("expected security audit header in view, got: %s", view)
+	}
+	if !strings.Contains(view, "Unprotected Test Port") {
+		t.Fatalf("expected test finding title in view, got: %s", view)
+	}
+	if !strings.Contains(view, "88/100") {
+		t.Fatalf("expected score 88/100 in view, got: %s", view)
+	}
+
+	// Test profile cycling with 'p'
+	nm, _ = curr.Update(tea.KeyPressMsg{Text: "p"})
+	curr = nm.(Model)
+	if curr.securityProfile != security.ProfileServer {
+		t.Fatalf("expected profile to switch to server, got %s", curr.securityProfile)
+	}
+
+	// Test script generation with 's'
+	nm, _ = curr.Update(tea.KeyPressMsg{Text: "s"})
+	curr = nm.(Model)
+	if !strings.Contains(curr.statusMsg, "script") {
+		t.Fatalf("expected status message mentioning script, got: %s", curr.statusMsg)
 	}
 }

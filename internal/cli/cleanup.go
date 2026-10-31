@@ -74,6 +74,22 @@ func runCleanup(cmd *cobra.Command, appCtx *AppContext, orphansOnly, deprecatedO
 	out := cmd.OutOrStdout()
 	items := collectCleanupCandidates(ctx, appCtx, orphansOnly, deprecatedOnly, archivesOnly)
 
+	if appCtx.Flags.ScriptMode {
+		fmt.Fprintln(out, "#!/usr/bin/env bash\n# ANX Cleanup / Prune Script\nset -euo pipefail")
+		if len(items) == 0 {
+			fmt.Fprintln(out, "echo '==> No cleanup candidates. Environment is clean.'")
+			return nil
+		}
+		for _, it := range items {
+			fmt.Fprintf(out, "# [%s] %s: %s\n", it.Kind, it.ID, it.Reason)
+			for _, p := range it.Paths {
+				fmt.Fprintf(out, "if [ -e %q ]; then rm -rf %q; fi\n", p, p)
+			}
+			fmt.Fprintln(out)
+		}
+		return nil
+	}
+
 	report := cleanupReport{
 		TotalFound: len(items),
 		DryRun:     appCtx.Flags.DryRun,

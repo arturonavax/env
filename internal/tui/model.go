@@ -6,28 +6,31 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/theme"
 )
 
 // Model represents the top-level Bubble Tea v2 state model.
 type Model struct {
-	width         int
-	height        int
-	activeTab     TabID
-	selectedIdx   int
-	scrollOffset  int
-	focusedPanel  string // "left" or "right" in dual-pane layouts
-	accordionMode bool
-	deps          Deps
-	styles        *theme.Styles
-	packages      []domain.ManagedResource
-	configs       []domain.ConfigurationResource
-	doctorChecks  []app.DoctorCheck
-	auditFindings []domain.AuditFinding
-	detectedHacks []domain.HackProfile
-	showHelp      bool
-	statusMsg     string
-	quitting      bool
+	width           int
+	height          int
+	activeTab       TabID
+	selectedIdx     int
+	scrollOffset    int
+	focusedPanel    string // "left" or "right" in dual-pane layouts
+	accordionMode   bool
+	deps            Deps
+	styles          *theme.Styles
+	packages        []domain.ManagedResource
+	configs         []domain.ConfigurationResource
+	doctorChecks    []app.DoctorCheck
+	auditFindings   []domain.AuditFinding
+	securityReport  *security.SecurityAuditReport
+	securityProfile string
+	detectedHacks   []domain.HackProfile
+	showHelp        bool
+	statusMsg       string
+	quitting        bool
 }
 
 // NewModel instantiates the dashboard model from configured dependencies.
@@ -57,15 +60,16 @@ func NewModel(deps Deps) Model {
 	}
 
 	return Model{
-		activeTab:     TabOverview,
-		selectedIdx:   0,
-		focusedPanel:  "left",
-		accordionMode: true,
-		deps:          deps,
-		styles:        st,
-		packages:      pkgs,
-		configs:       cfgs,
-		statusMsg:     "Ready. Press [?] for help, [Tab] to switch view, [q] to quit.",
+		activeTab:       TabOverview,
+		selectedIdx:     0,
+		focusedPanel:    "left",
+		accordionMode:   true,
+		deps:            deps,
+		styles:          st,
+		packages:        pkgs,
+		configs:         cfgs,
+		securityProfile: security.ProfileWorkstation,
+		statusMsg:       "Ready. Press [?] for help, [Tab] to switch view, [q] to quit.",
 	}
 }
 
@@ -75,6 +79,7 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		loadDoctorCmd(ctx, m.deps.Doctor),
 		loadAuditCmd(ctx, m.deps.Audit),
+		loadSystemAuditCmd(ctx, m.deps.Audit, m.securityProfile),
 		loadHacksCmd(ctx, m.deps.Hacks),
 	)
 }

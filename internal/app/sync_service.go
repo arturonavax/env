@@ -32,12 +32,13 @@ type SyncOptions struct {
 
 // SyncResult reports what happened for one configuration.
 type SyncResult struct {
-	ConfigID   string `json:"config_id"`
-	Target     string `json:"target"`
-	Action     string `json:"action"` // created|updated|merged|unchanged|conflict|captured|skipped
-	Files      int    `json:"files,omitempty"`
-	SnapshotID string `json:"snapshot_id,omitempty"`
-	Detail     string `json:"detail,omitempty"`
+	ConfigID      string   `json:"config_id"`
+	Target        string   `json:"target"`
+	Action        string   `json:"action"` // created|updated|merged|unchanged|conflict|captured|skipped|drift
+	Files         int      `json:"files,omitempty"`
+	SnapshotID    string   `json:"snapshot_id,omitempty"`
+	Detail        string   `json:"detail,omitempty"`
+	CapturedPaths []string `json:"captured_paths,omitempty"`
 }
 
 // ConfigDiff is a read-only comparison between repository and live dotfiles.
@@ -231,19 +232,26 @@ func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult,
 
 	if opts.Push {
 		for _, cfg := range cfgs {
-			if opts.DryRun {
-				results = append(results, SyncResult{ConfigID: cfg.ID, Action: "captured", Files: 1})
-				continue
-			}
-			n, err := configsync.CaptureToRepo(s.platform.HomeDir(), s.repoRoot, cfg, s.platform.OS())
+			capturedPaths, err := configsync.CaptureToRepoDetailed(s.platform.HomeDir(), s.repoRoot, cfg, s.platform.OS(), opts.DryRun)
 			if err != nil {
 				return results, fmt.Errorf("capturing %s: %w", cfg.ID, err)
 			}
 			act := "captured"
-			if n == 0 {
+			if opts.DryRun {
+				if len(capturedPaths) > 0 {
+					act = "drift"
+				} else {
+					act = "unchanged"
+				}
+			} else if len(capturedPaths) == 0 {
 				act = "skipped"
 			}
-			results = append(results, SyncResult{ConfigID: cfg.ID, Action: act, Files: n})
+			results = append(results, SyncResult{
+				ConfigID:      cfg.ID,
+				Action:        act,
+				Files:         len(capturedPaths),
+				CapturedPaths: capturedPaths,
+			})
 		}
 		return results, nil
 	}

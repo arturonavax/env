@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -24,8 +25,18 @@ import (
 func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
 	home := t.TempDir()
 	binDir := filepath.Join(home, ".local", "bin")
+
+	osName := "linux"
+	binExt := ""
+	scriptInterp := "sh"
+	if runtime.GOOS == "windows" {
+		osName = "windows"
+		binExt = ".cmd"
+		scriptInterp = "cmd"
+	}
+
 	plat := platform.NewTestInfo(platform.TestInfoParams{
-		OS:              "linux",
+		OS:              osName,
 		Arch:            "amd64",
 		Distribution:    "ubuntu",
 		PackageManagers: []string{},
@@ -39,8 +50,11 @@ func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
 	gzw := gzip.NewWriter(&tarBuf)
 	tw := tar.NewWriter(gzw)
 	binContent := []byte("#!/bin/sh\necho 'demo-tool 2.4.0'\n")
+	if runtime.GOOS == "windows" {
+		binContent = []byte("@echo off\r\necho demo-tool 2.4.0\r\n")
+	}
 	if err := tw.WriteHeader(&tar.Header{
-		Name: "demo-2.4.0/demo-tool",
+		Name: "demo-2.4.0/demo-tool" + binExt,
 		Mode: 0o755,
 		Size: int64(len(binContent)),
 	}); err != nil {
@@ -55,12 +69,19 @@ func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
 	sum := sha256.Sum256(tarBuf.Bytes())
 	tarSHA := hex.EncodeToString(sum[:])
 
+	scriptBody := "#!/bin/sh\nmkdir -p \"" + binDir + "\"\nprintf '#!/bin/sh\\necho script-tool 1.0.0\\n' > \"" + filepath.Join(binDir, "script-tool") + "\"\nchmod +x \"" + filepath.Join(binDir, "script-tool") + "\"\n"
+	if runtime.GOOS == "windows" {
+		escapedBinDir := filepath.Clean(binDir)
+		targetFile := filepath.Join(escapedBinDir, "script-tool.cmd")
+		scriptBody = "@echo off\r\nif not exist \"" + escapedBinDir + "\" mkdir \"" + escapedBinDir + "\"\r\necho @echo off> \"" + targetFile + "\"\r\necho echo script-tool 1.0.0>> \"" + targetFile + "\"\r\n"
+	}
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/demo-linux-amd64.tar.gz":
+		case "/demo-tarball.tar.gz":
 			_, _ = w.Write(tarBuf.Bytes())
-		case "/install-script.sh":
-			_, _ = w.Write([]byte("#!/bin/sh\nmkdir -p \"" + binDir + "\"\nprintf '#!/bin/sh\\necho script-tool 1.0.0\\n' > \"" + filepath.Join(binDir, "script-tool") + "\"\nchmod +x \"" + filepath.Join(binDir, "script-tool") + "\"\n"))
+		case "/install-script":
+			_, _ = w.Write([]byte(scriptBody))
 		default:
 			http.NotFound(w, r)
 		}
@@ -72,31 +93,33 @@ func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
   - id: demo-tool
     name: Demo Tool
     category: test
-    binary_name: demo-tool
+    binary_name: demo-tool` + binExt + `
     strategies:
       - type: github_release
         github_release:
           direct_urls:
-            linux/amd64: "` + srv.URL + `/demo-linux-amd64.tar.gz"
+            linux/amd64: "` + srv.URL + `/demo-tarball.tar.gz"
+            windows/amd64: "` + srv.URL + `/demo-tarball.tar.gz"
           sha256: "` + tarSHA + `"
-          binary_in_archive: "demo-tool"
-          install_to: "~/.local/bin/demo-tool"
+          binary_in_archive: "demo-tool` + binExt + `"
+          install_to: "~/.local/bin/demo-tool` + binExt + `"
   - id: fallback-tool
     name: Fallback Tool
     category: test
-    binary_name: script-tool
+    binary_name: script-tool` + binExt + `
     strategies:
       - type: github_release
         github_release:
           direct_urls:
             linux/amd64: "` + srv.URL + `/missing-404.tar.gz"
-          binary_in_archive: "script-tool"
-          install_to: "~/.local/bin/script-tool"
+            windows/amd64: "` + srv.URL + `/missing-404.tar.gz"
+          binary_in_archive: "script-tool` + binExt + `"
+          install_to: "~/.local/bin/script-tool` + binExt + `"
       - type: script
         script:
-          url: "` + srv.URL + `/install-script.sh"
-          interpreter: sh
-          creates: "~/.local/bin/script-tool"
+          url: "` + srv.URL + `/install-script"
+          interpreter: ` + scriptInterp + `
+          creates: "~/.local/bin/script-tool` + binExt + `"
 `
 	if err := os.WriteFile(filepath.Join(dropIn, "test.yaml"), []byte(yamlSpec), 0o600); err != nil {
 		t.Fatal(err)
@@ -111,7 +134,7 @@ func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
 	disp := providers.NewDispatcher(plat, cat, runner, "")
 
 	// 1. Install demo-tool via verified tar.gz extraction
-	demoRes := domain.ManagedResource{ID: "demo-tool", Name: "Demo Tool", BinaryName: "demo-tool"}
+	demoRes := domain.ManagedResource{ID: "demo-tool", Name: "Demo Tool", BinaryName: "demo-tool" + binExt}
 	if err := disp.Install(context.Background(), demoRes); err != nil {
 		t.Fatalf("expected demo-tool install to succeed, got %v", err)
 	}
@@ -121,7 +144,7 @@ func TestMultiStrategyDispatcherGitHubTarballFallbackToScript(t *testing.T) {
 	}
 
 	// 2. Install fallback-tool: tier 1 (404 tarball) fails -> falls back automatically to tier 2 (verified curl script)!
-	fbRes := domain.ManagedResource{ID: "fallback-tool", Name: "Fallback Tool", BinaryName: "script-tool"}
+	fbRes := domain.ManagedResource{ID: "fallback-tool", Name: "Fallback Tool", BinaryName: "script-tool" + binExt}
 	if err := disp.Install(context.Background(), fbRes); err != nil {
 		t.Fatalf("expected fallback-tool multi-tier install to succeed, got %v", err)
 	}

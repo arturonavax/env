@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/security"
 )
 
 // View renders the TUI screen returning tea.View (Bubble Tea v2).
@@ -282,18 +283,148 @@ func (m Model) renderHistory(w, h int) string {
 }
 
 func (m Model) renderSecurity(w, h int) string {
-	lines := []string{
-		m.styles.Highlight.Render("SECURITY VULNERABILITY AUDITING (OSV)"),
-		"• Database: Open Source Vulnerabilities (OSV.dev)",
-		"• Ecosystems: Linux, macOS, Go, Rust, Node.js",
-		"",
+	if m.isWideLayout() {
+		leftW, rightW := m.calculateDualPaneWidths()
+
+		profName := m.securityProfile
+		if profName == "" {
+			profName = security.ProfileWorkstation
+		}
+
+		scoreStr := "Pending..."
+		critCount, highCount, medCount, lowCount := 0, 0, 0, 0
+		if m.securityReport != nil {
+			score := m.securityReport.HardeningScore
+			scoreBadge := m.styles.Success.Render(fmt.Sprintf("%d/100", score))
+			if score < 60 {
+				scoreBadge = m.styles.Error.Render(fmt.Sprintf("%d/100", score))
+			} else if score < 80 {
+				scoreBadge = m.styles.Warning.Render(fmt.Sprintf("%d/100", score))
+			}
+			scoreStr = scoreBadge
+
+			for _, f := range m.securityReport.Findings {
+				switch f.Severity {
+				case security.SeverityCritical:
+					critCount++
+				case security.SeverityHigh:
+					highCount++
+				case security.SeverityMedium:
+					medCount++
+				case security.SeverityLow:
+					lowCount++
+				}
+			}
+		}
+
+		leftLines := []string{
+			m.styles.Highlight.Render("SYSTEM SECURITY AUDIT & COMPLIANCE"),
+			fmt.Sprintf("• Profile:         [%s] (press 'p' to switch)", strings.ToUpper(profName)),
+			fmt.Sprintf("• Hardening Score: %s", scoreStr),
+			fmt.Sprintf("• Summary:         Crit: %d | High: %d | Med: %d | Low: %d", critCount, highCount, medCount, lowCount),
+			"",
+			m.styles.Highlight.Render("AUDIT FINDINGS:"),
+		}
+
+		if m.securityReport == nil || len(m.securityReport.Findings) == 0 {
+			if m.securityReport != nil {
+				leftLines = append(leftLines, m.styles.Success.Render("✓ No security risks detected for this profile."))
+			} else {
+				leftLines = append(leftLines, m.styles.Muted.Render("• Running security audit..."))
+			}
+		} else {
+			for i, f := range m.securityReport.Findings {
+				prefix := "  "
+				if i == m.selectedIdx {
+					prefix = "> "
+				}
+				badge := m.styles.Muted.Render(fmt.Sprintf("[%s]", f.Severity))
+				switch f.Severity {
+				case security.SeverityCritical:
+					badge = m.styles.Error.Render("[CRIT]")
+				case security.SeverityHigh:
+					badge = m.styles.Warning.Render("[HIGH]")
+				case security.SeverityMedium:
+					badge = m.styles.Warning.Render("[MED ]")
+				case security.SeverityLow:
+					badge = m.styles.Muted.Render("[LOW ]")
+				}
+				row := fmt.Sprintf("%s%s %s", prefix, badge, f.Title)
+				if i == m.selectedIdx {
+					leftLines = append(leftLines, m.styles.SelectedRow.Render(row))
+				} else {
+					leftLines = append(leftLines, row)
+				}
+			}
+		}
+
+		rightLines := []string{
+			m.styles.Highlight.Render("FINDING DETAILS & REMEDIATION"),
+		}
+		if m.securityReport != nil && len(m.securityReport.Findings) > 0 {
+			sel := m.selectedIdx
+			if sel >= len(m.securityReport.Findings) {
+				sel = 0
+			}
+			f := m.securityReport.Findings[sel]
+			rightLines = append(rightLines,
+				fmt.Sprintf("• ID:          %s", f.ID),
+				fmt.Sprintf("• Severity:    %s", f.Severity),
+				fmt.Sprintf("• Category:    %s", f.Category),
+				fmt.Sprintf("• Title:       %s", f.Title),
+				"",
+				m.styles.Highlight.Render("DESCRIPTION:"),
+				f.Description,
+				"",
+				m.styles.Highlight.Render("IMPACT:"),
+				f.Impact,
+				"",
+				m.styles.Highlight.Render("REMEDIATION:"),
+				f.Remediation,
+			)
+			if f.RemediationCommand != "" {
+				rightLines = append(rightLines,
+					"",
+					m.styles.Highlight.Render("COMMAND:"),
+					f.RemediationCommand,
+				)
+			}
+		} else {
+			rightLines = append(rightLines,
+				m.styles.Muted.Render("Select a finding to inspect remediation details."),
+			)
+		}
+
+		rightLines = append(rightLines,
+			"",
+			m.styles.Highlight.Render("ACTIONS:"),
+			"• [p] Switch Profile (Workstation / Server / Minimal)",
+			"• [s] Generate Remediation Script to ~/.config/anx/",
+			"• [r] Re-run Audit",
+		)
+
+		if len(m.auditFindings) > 0 {
+			rightLines = append(rightLines,
+				"",
+				m.styles.Highlight.Render("PACKAGE VULNERABILITIES (OSV):"),
+			)
+			for _, pf := range m.auditFindings {
+				rightLines = append(rightLines, fmt.Sprintf("• %s %s: %s", pf.ToolName, pf.DetectedVersion, pf.Summary))
+			}
+		}
+
+		leftPanel := BuildPanel(m.styles, leftLines, leftW, h, m.focusedPanel == "left")
+		rightPanel := BuildPanel(m.styles, rightLines, rightW, h, m.focusedPanel == "right")
+		return JoinHorizontal(leftPanel, rightPanel, 2)
 	}
-	if len(m.auditFindings) == 0 {
-		lines = append(lines, m.styles.Success.Render("✓ Zero known vulnerabilities detected on installed tools."))
-	} else {
-		for _, f := range m.auditFindings {
-			badge := m.styles.Warning.Render(fmt.Sprintf("[%s]", f.Severity))
-			lines = append(lines, fmt.Sprintf("%s %s %s: %s", badge, f.ToolName, f.DetectedVersion, f.Summary))
+
+	lines := []string{
+		m.styles.Highlight.Render("SYSTEM SECURITY AUDIT & COMPLIANCE"),
+	}
+	if m.securityReport != nil {
+		lines = append(lines, fmt.Sprintf("Profile: %s | Score: %d/100", m.securityProfile, m.securityReport.HardeningScore))
+		for _, f := range m.securityReport.Findings {
+			lines = append(lines, fmt.Sprintf("[%s] %s", f.Severity, f.Title))
 		}
 	}
 	return BuildPanel(m.styles, lines, w, h, true)

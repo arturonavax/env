@@ -38,6 +38,7 @@ type GlobalFlagState struct {
 	Offline      bool
 	Profile      string
 	IncludeHacks bool
+	ScriptMode   bool
 }
 
 // AppContext holds shared domain services injected into CLI commands.
@@ -101,6 +102,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	pf.BoolVar(&appCtx.Flags.Offline, "offline", false, "Disable network queries")
 	pf.StringVar(&appCtx.Flags.Profile, "profile", "developer", "Target profile name")
 	pf.BoolVar(&appCtx.Flags.IncludeHacks, "include-hacks", false, "Include matched hardware workstation hacks during apply")
+	pf.BoolVar(&appCtx.Flags.ScriptMode, "script", false, "Output shell script preview of planned actions")
 	_ = rootCmd.RegisterFlagCompletionFunc("format", staticCompletion("text", "json", "yaml"))
 	_ = rootCmd.RegisterFlagCompletionFunc("profile", profileCompletion(appCtx))
 	_ = rootCmd.RegisterFlagCompletionFunc("theme", staticCompletion(themeNames()...))
@@ -131,6 +133,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 // applyConfigLayering resolves flag > env (ANX_*) > config.yaml > default for unchanged persistent flags.
 func applyConfigLayering(cmd *cobra.Command, appCtx *AppContext) error {
 	v := appCtx.Viper
+	if v == nil {
+		return nil
+	}
 	root := cmd.Root()
 	root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		if f.Changed {

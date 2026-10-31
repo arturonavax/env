@@ -20,6 +20,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.auditFindings = msg
 		return m, nil
 
+	case systemAuditLoadedMsg:
+		m.securityReport = msg
+		return m, nil
+
 	case hacksLoadedMsg:
 		m.detectedHacks = msg
 		return m, nil

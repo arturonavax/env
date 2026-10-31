@@ -405,8 +405,11 @@ func (d *Dispatcher) locateBinary(name string) string {
 		return ""
 	}
 	names := []string{name}
-	if d.platform.OS() == "windows" && !strings.HasSuffix(strings.ToLower(name), ".exe") {
-		names = append([]string{name + ".exe"}, names...)
+	if d.platform.OS() == "windows" {
+		lower := strings.ToLower(name)
+		if !strings.HasSuffix(lower, ".exe") && !strings.HasSuffix(lower, ".cmd") && !strings.HasSuffix(lower, ".bat") {
+			names = []string{name + ".exe", name + ".cmd", name + ".bat", name}
+		}
 	}
 
 	home := d.platform.HomeDir()

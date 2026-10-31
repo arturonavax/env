@@ -236,36 +236,6 @@ func newDoctorCmd(appCtx *AppContext) *cobra.Command {
 	}
 }
 
-func newAuditCmd(appCtx *AppContext) *cobra.Command {
-	return &cobra.Command{
-		Use:   "audit",
-		Short: "Scan installed tools for known vulnerabilities (OSV)",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if appCtx.Flags.Offline {
-				return domain.NewExitError(domain.ExitPreflightFailed, errors.New("audit requires network access; remove --offline"))
-			}
-			findings, err := appCtx.AuditSvc.Audit(cmd.Context())
-			if err != nil {
-				return err
-			}
-			if err := emit(cmd, appCtx, findings, func(w io.Writer) {
-				if len(findings) == 0 {
-					fmt.Fprintln(w, "No known vulnerabilities detected on installed tools.")
-				}
-				for _, f := range findings {
-					fmt.Fprintf(w, "  [%s] %s %s: %s\n         %s\n", f.Severity, f.ToolName, f.DetectedVersion, f.Summary, f.AdvisoryURL)
-				}
-			}); err != nil {
-				return err
-			}
-			if len(findings) > 0 {
-				return domain.NewExitError(domain.ExitConflictOrAudit, fmt.Errorf("%d vulnerabilities found", len(findings)))
-			}
-			return nil
-		},
-	}
-}
 
 func newThemeCmd(appCtx *AppContext) *cobra.Command {
 	cmd := &cobra.Command{Use: "theme", Short: "List and persist UI themes"}

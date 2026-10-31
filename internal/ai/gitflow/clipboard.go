@@ -19,6 +19,7 @@ type ClipboardOptions struct {
 	FallbackWriter io.Writer
 	LookPath       func(string) (string, error)
 	Getenv         func(string) string
+	CommandRunner  func(ctx context.Context, bin string, args []string, stdin io.Reader) error
 }
 
 // CopyToClipboard copies text to the system clipboard using the active platform utility
@@ -81,15 +82,20 @@ func CopyToClipboardWithOptions(
 		if err != nil {
 			continue
 		}
-		_, runErr := runner.RunWithInput(
-			ctx,
-			security.RunOptions{
-				Stdin:   strings.NewReader(text),
-				Timeout: 5 * time.Second,
-			},
-			binPath,
-			c.args...,
-		)
+		var runErr error
+		if opts.CommandRunner != nil {
+			runErr = opts.CommandRunner(ctx, binPath, c.args, strings.NewReader(text))
+		} else {
+			_, runErr = runner.RunWithInput(
+				ctx,
+				security.RunOptions{
+					Stdin:   strings.NewReader(text),
+					Timeout: 5 * time.Second,
+				},
+				binPath,
+				c.args...,
+			)
+		}
 		if runErr == nil {
 			return c.name, nil
 		}
