@@ -66,7 +66,7 @@ func TestCreateOriginSeal_WithRepoAndTamper(t *testing.T) {
 		t.Fatalf("write customrc: %v", err)
 	}
 
-	seal, err := CreateOriginSeal(WithSealRepoRoot(tmpDir))
+	seal, err := CreateOriginSeal(WithSealRepoRoot(tmpDir), WithSealTrustVerifier(fixedTrust(TrustTrusted)))
 	if err != nil {
 		t.Fatalf("CreateOriginSeal with repo failed: %v", err)
 	}
@@ -133,39 +133,91 @@ func TestCreateOriginSeal_WithRepoAndTamper(t *testing.T) {
 	}
 }
 
-func TestOriginSeal_UntrustedOrigin(t *testing.T) {
+// fixedTrust returns a verifier with a constant verdict so seal tests do not depend on the
+// permissions or ACLs of the machine running them. Real OS verdicts are covered by the
+// platform-specific tests (trust_unix_test.go, trust_windows_test.go).
+func fixedTrust(level TrustLevel, reasons ...string) DirectoryTrustVerifier {
+	return DirectoryTrustVerifierFunc(func(path string) TrustReport {
+		return newTrustReport(path, level, reasons...)
+	})
+}
+
+func TestOriginSeal_TrustLevelsDriveVerification(t *testing.T) {
 	tmpDir := t.TempDir()
-	manDir := filepath.Join(tmpDir, "manifests")
-	if err := os.MkdirAll(manDir, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmpDir, "manifests"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	// Make directory world-writable (mode 0777)
-	if err := os.Chmod(tmpDir, 0777); err != nil {
-		t.Fatalf("chmod: %v", err)
+	tests := []struct {
+		name         string
+		level        TrustLevel
+		wantBlocked  bool
+		wantInsecure bool
+		wantWarning  bool
+	}{
+		{name: "trusted", level: TrustTrusted},
+		{name: "degraded warns but allows", level: TrustDegraded, wantWarning: true},
+		{name: "untrusted blocks", level: TrustUntrusted, wantBlocked: true, wantInsecure: true},
+		{name: "unknown fails closed", level: TrustUnknown, wantBlocked: true, wantInsecure: true},
 	}
 
-	seal, err := CreateOriginSeal(WithSealRepoRoot(tmpDir))
-	if err != nil {
-		t.Fatalf("CreateOriginSeal failed: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seal, err := CreateOriginSeal(
+				WithSealRepoRoot(tmpDir),
+				WithSealSkipDotfiles(true),
+				WithSealTrustVerifier(fixedTrust(tt.level, "synthetic finding")),
+			)
+			if err != nil {
+				t.Fatalf("CreateOriginSeal: %v", err)
+			}
+			if seal.InsecureOrigin != tt.wantInsecure {
+				t.Errorf("InsecureOrigin = %v, want %v", seal.InsecureOrigin, tt.wantInsecure)
+			}
+			if (seal.OriginTrustWarning != "") != tt.wantWarning {
+				t.Errorf("OriginTrustWarning = %q, want warning=%v", seal.OriginTrustWarning, tt.wantWarning)
+			}
+			if seal.OriginTrust != tt.level.String() {
+				t.Errorf("OriginTrust = %q, want %q", seal.OriginTrust, tt.level)
+			}
 
-	if !seal.InsecureOrigin {
-		t.Errorf("expected InsecureOrigin to be true for world-writable dir")
+			vErr := seal.Verify(context.Background())
+			if !tt.wantBlocked {
+				if vErr != nil {
+					t.Fatalf("Verify: unexpected error %v", vErr)
+				}
+				return
+			}
+			var exitErr *domain.ExitError
+			if !errors.As(vErr, &exitErr) || exitErr.Code != domain.ExitSecurityViolation {
+				t.Fatalf("expected ExitSecurityViolation, got %v", vErr)
+			}
+			if !errors.Is(vErr, ErrUntrustedOrigin) {
+				t.Fatalf("expected ErrUntrustedOrigin, got %v", vErr)
+			}
+		})
 	}
+}
 
-	ctx := context.Background()
-	vErr := seal.Verify(ctx)
-	if vErr == nil {
-		t.Fatal("expected untrusted origin error during verify, got nil")
+func TestTrustLevel_ZeroValueIsUnknownAndBlocks(t *testing.T) {
+	var zero TrustLevel
+	if zero != TrustUnknown || !zero.Blocks() {
+		t.Fatalf("zero TrustLevel must be unknown and blocking, got %v blocks=%v", zero, zero.Blocks())
 	}
-	var exitErr *domain.ExitError
-	if !errors.As(vErr, &exitErr) || exitErr.Code != domain.ExitSecurityViolation {
-		t.Errorf("expected ExitSecurityViolation for untrusted origin, got: %v", vErr)
-	}
+}
 
-	// Fix permissions
-	_ = os.Chmod(tmpDir, 0755)
+func TestWorseOrdering(t *testing.T) {
+	tests := []struct{ a, b, want TrustLevel }{
+		{TrustTrusted, TrustDegraded, TrustDegraded},
+		{TrustDegraded, TrustUnknown, TrustUnknown},
+		{TrustUnknown, TrustUntrusted, TrustUntrusted},
+		{TrustTrusted, TrustTrusted, TrustTrusted},
+	}
+	for _, tt := range tests {
+		if got := worse(tt.a, tt.b); got != tt.want {
+			t.Errorf("worse(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+		}
+	}
 }
 
 func TestOriginSeal_ConcurrentVerify(t *testing.T) {

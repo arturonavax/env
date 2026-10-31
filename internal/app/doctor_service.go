@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,12 +52,21 @@ func WithDoctorRepoRoot(repoRoot string) DoctorOption {
 	}
 }
 
+// WithDoctorTrustVerifier overrides the OS-specific directory trust verifier used for origin and state checks.
+func WithDoctorTrustVerifier(v security.DirectoryTrustVerifier) DoctorOption {
+	return func(d *DoctorService) {
+		d.trust = v
+	}
+}
+
 // DoctorService evaluates system health, missing tools, and configuration drift.
+// Diagnose is strictly read-only: it never creates directories or changes permissions.
 type DoctorService struct {
 	platform *platform.Info
 	catalog  *catalog.Registry
 	store    *state.Store
 	repoRoot string
+	trust    security.DirectoryTrustVerifier
 }
 
 // NewDoctorService creates a DoctorService.
@@ -65,6 +76,9 @@ func NewDoctorService(plat *platform.Info, cat *catalog.Registry, opts ...Doctor
 		if opt != nil {
 			opt(d)
 		}
+	}
+	if d.trust == nil {
+		d.trust = security.DefaultTrustVerifier()
 	}
 	return d
 }
@@ -102,6 +116,7 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 		security.WithSealRepoRoot(d.repoRoot),
 		security.WithSealUserDropIn(filepath.Join(d.platform.ConfigDir(), "manifests.d")),
 		security.WithSealTargetHome(d.platform.HomeDir()),
+		security.WithSealTrustVerifier(d.trust),
 	)
 	if sErr != nil {
 		checks = append(checks, DoctorCheck{
@@ -114,8 +129,15 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 		checks = append(checks, DoctorCheck{
 			Name:        "Origin Security Seal",
 			Verdict:     VerdictFail,
-			Message:     fmt.Sprintf("Insecure origin permissions detected: %s", seal.InsecureReason),
-			Remediation: fmt.Sprintf("Run 'chmod 755 %s' to remove world-writable permissions", seal.RepoRoot),
+			Message:     fmt.Sprintf("Origin is %s: %s", seal.OriginTrust, seal.InsecureReason),
+			Remediation: trustRemediation(d.platform.OS(), seal.RepoRoot),
+		})
+	} else if seal.OriginTrustWarning != "" {
+		checks = append(checks, DoctorCheck{
+			Name:        "Origin Security Seal",
+			Verdict:     VerdictWarn,
+			Message:     fmt.Sprintf("Sealed (%s) but origin is shared-writable: %s", seal.ShortDigest(), seal.OriginTrustWarning),
+			Remediation: trustRemediation(d.platform.OS(), seal.RepoRoot),
 		})
 	} else {
 		checks = append(checks, DoctorCheck{
@@ -142,22 +164,8 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 		})
 	}
 
-	// 4. State Directory Permissions
-	stateDir := d.platform.StateDir()
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
-		checks = append(checks, DoctorCheck{
-			Name:        "State Directory",
-			Verdict:     VerdictFail,
-			Message:     fmt.Sprintf("Failed to access state directory %s: %v", stateDir, err),
-			Remediation: "Ensure permissions for your user account on " + stateDir,
-		})
-	} else {
-		checks = append(checks, DoctorCheck{
-			Name:    "State Directory",
-			Verdict: VerdictPass,
-			Message: fmt.Sprintf("Accessible and writable (%s)", stateDir),
-		})
-	}
+	// 4. State Directory (read-only inspection: Diagnose never creates or chmods anything)
+	checks = append(checks, d.checkStateDirectory())
 
 	// 5. Essential Tools & Toolchains Inspection
 	type toolDef struct {
@@ -305,4 +313,67 @@ func (d *DoctorService) HealthStatus(checks []DoctorCheck) domain.HealthStatus {
 func isDir(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && info.IsDir()
+}
+
+// checkStateDirectory inspects the state directory without mutating the filesystem.
+func (d *DoctorService) checkStateDirectory() DoctorCheck {
+	stateDir := d.platform.StateDir()
+	info, err := os.Stat(stateDir)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return DoctorCheck{
+			Name:    "State Directory",
+			Verdict: VerdictWarn,
+			Message: fmt.Sprintf("Not created yet (%s); it is created on the first mutating command", stateDir),
+		}
+	case err != nil:
+		return DoctorCheck{
+			Name:        "State Directory",
+			Verdict:     VerdictFail,
+			Message:     fmt.Sprintf("Cannot inspect state directory %s: %v", stateDir, err),
+			Remediation: "Ensure permissions for your user account on " + stateDir,
+		}
+	case !info.IsDir():
+		return DoctorCheck{
+			Name:        "State Directory",
+			Verdict:     VerdictFail,
+			Message:     fmt.Sprintf("%s exists but is not a directory", stateDir),
+			Remediation: "Move the conflicting file away from " + stateDir,
+		}
+	}
+
+	report := d.trust.VerifyDirectory(stateDir)
+	switch report.Level {
+	case security.TrustTrusted:
+		return DoctorCheck{
+			Name:    "State Directory",
+			Verdict: VerdictPass,
+			Message: fmt.Sprintf("Present and private to the current user (%s)", stateDir),
+		}
+	case security.TrustDegraded:
+		return DoctorCheck{
+			Name:        "State Directory",
+			Verdict:     VerdictWarn,
+			Message:     fmt.Sprintf("Present but shared-writable (%s): %s", stateDir, report.Reason()),
+			Remediation: trustRemediation(d.platform.OS(), stateDir),
+		}
+	default:
+		return DoctorCheck{
+			Name:        "State Directory",
+			Verdict:     VerdictFail,
+			Message:     fmt.Sprintf("State directory is %s (%s): %s", report.Level, stateDir, report.Reason()),
+			Remediation: trustRemediation(d.platform.OS(), stateDir),
+		}
+	}
+}
+
+// trustRemediation returns an OS-appropriate hint; it never suggests POSIX chmod on Windows.
+func trustRemediation(goos, path string) string {
+	if goos == "windows" {
+		return fmt.Sprintf(
+			`Remove write access for Everyone/Users with: icacls "%s" /inheritance:r /grant:r "%%USERNAME%%:(OI)(CI)F"`,
+			path,
+		)
+	}
+	return fmt.Sprintf("Run 'chmod go-w %s' and make sure it is owned by your user", path)
 }

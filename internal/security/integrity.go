@@ -54,9 +54,12 @@ type OriginSeal struct {
 	SealedAt            time.Time             `json:"sealed_at"`
 	InsecureOrigin      bool                  `json:"insecure_origin"`
 	InsecureReason      string                `json:"insecure_reason,omitempty"`
+	OriginTrust         string                `json:"origin_trust,omitempty"`
+	OriginTrustWarning  string                `json:"origin_trust_warning,omitempty"`
 	ManifestDigests     map[string]FileDigest `json:"manifest_digests,omitempty"`
 	DotfileDigests      map[string]FileDigest `json:"dotfile_digests,omitempty"`
 	mu                  sync.RWMutex
+	trust               DirectoryTrustVerifier
 }
 
 // SealOptions configures OriginSeal generation.
@@ -65,6 +68,7 @@ type SealOptions struct {
 	UserDropInDir string
 	TargetHome    string
 	SkipDotfiles  bool
+	Trust         DirectoryTrustVerifier
 }
 
 // SealOption configures a SealOptions value.
@@ -91,6 +95,13 @@ func WithSealTargetHome(dir string) SealOption {
 	}
 }
 
+// WithSealTrustVerifier overrides the OS-specific directory trust verifier (used by tests and policy hooks).
+func WithSealTrustVerifier(v DirectoryTrustVerifier) SealOption {
+	return func(o *SealOptions) {
+		o.Trust = v
+	}
+}
+
 // WithSealSkipDotfiles skips scanning dotfile source templates in files/.
 func WithSealSkipDotfiles(skip bool) SealOption {
 	return func(o *SealOptions) {
@@ -114,7 +125,12 @@ func CreateOriginSeal(opts ...SealOption) (*OriginSeal, error) {
 		}
 	}
 
+	if cfg.Trust == nil {
+		cfg.Trust = DefaultTrustVerifier()
+	}
+
 	seal := &OriginSeal{
+		trust:           cfg.Trust,
 		RepoRoot:        cfg.RepoRoot,
 		UserDropInDir:   cfg.UserDropInDir,
 		TargetHome:      cfg.TargetHome,
@@ -125,9 +141,14 @@ func CreateOriginSeal(opts ...SealOption) (*OriginSeal, error) {
 
 	// 1. Check repository trust & ownership
 	if cfg.RepoRoot != "" {
-		if err := verifyDirectoryTrust(cfg.RepoRoot); err != nil {
-			seal.InsecureOrigin = true
-			seal.InsecureReason = err.Error()
+		report := cfg.Trust.VerifyDirectory(cfg.RepoRoot)
+		seal.OriginTrust = report.Level.String()
+		seal.InsecureOrigin = report.Level.Blocks()
+		switch {
+		case seal.InsecureOrigin:
+			seal.InsecureReason = report.Reason()
+		case report.Level == TrustDegraded:
+			seal.OriginTrustWarning = report.Reason()
 		}
 	}
 
@@ -179,6 +200,14 @@ func CreateOriginSeal(opts ...SealOption) (*OriginSeal, error) {
 	return seal, nil
 }
 
+// verifier returns the configured trust verifier, defaulting to the OS implementation.
+func (s *OriginSeal) verifier() DirectoryTrustVerifier {
+	if s.trust == nil {
+		return DefaultTrustVerifier()
+	}
+	return s.trust
+}
+
 // ShortDigest returns an abbreviated 12-hex-character digest for clean UI badges.
 func (s *OriginSeal) ShortDigest() string {
 	s.mu.RLock()
@@ -217,10 +246,10 @@ func (s *OriginSeal) Verify(_ context.Context) error {
 
 	// Recheck repo trust if repo is active
 	if s.RepoRoot != "" {
-		if err := verifyDirectoryTrust(s.RepoRoot); err != nil {
+		if report := s.verifier().VerifyDirectory(s.RepoRoot); report.Level.Blocks() {
 			return domain.NewExitError(
 				domain.ExitSecurityViolation,
-				fmt.Errorf("%w: %v", ErrUntrustedOrigin, err),
+				fmt.Errorf("%w: %s (%s)", ErrUntrustedOrigin, report.Reason(), report.Level),
 			)
 		}
 	}
@@ -466,18 +495,4 @@ func findFirstDiscrepancy(orig, fresh map[string]FileDigest) string {
 		}
 	}
 	return "unknown asset"
-}
-
-func verifyDirectoryTrust(dir string) error {
-	info, err := os.Stat(dir)
-	if err != nil {
-		return err
-	}
-
-	// World-writable directories are an immediate security violation
-	if info.Mode().Perm()&0o002 != 0 {
-		return fmt.Errorf("directory %q is world-writable (mode %04o)", dir, info.Mode().Perm())
-	}
-
-	return nil
 }
