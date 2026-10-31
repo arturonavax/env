@@ -116,46 +116,52 @@ func TestStoreConcurrentInProcessWrites(t *testing.T) {
 
 // STATE-01: Multi-process simulation (multiple Store instances targeting the same directory).
 func TestStoreMultiProcessSimulation(t *testing.T) {
-	dir := t.TempDir()
-	const instances = 4
-	const writesPerInstance = 10
+	for _, instances := range []int{2, 4, 8} {
+		t.Run(fmt.Sprintf("%d_instances", instances), func(t *testing.T) {
+			dir := t.TempDir()
+			const writesPerInstance = 10
 
-	var wg sync.WaitGroup
-	for inst := range instances {
-		wg.Add(1)
-		go func(instanceID int) {
-			defer wg.Done()
-			// Each instance opens its own Store object simulating a separate process
-			s, err := OpenStore(dir)
+			var wg sync.WaitGroup
+			for inst := range instances {
+				wg.Add(1)
+				go func(instanceID int) {
+					defer wg.Done()
+					// Each instance opens its own Store object simulating a separate process
+					s, err := OpenStore(dir)
+					if err != nil {
+						t.Errorf("instance %d OpenStore: %v", instanceID, err)
+						return
+					}
+					defer func() { _ = s.Close() }()
+
+					for i := range writesPerInstance {
+						resID := fmt.Sprintf("multi-inst-%d-%d", instanceID, i)
+						rec := InstalledRecord{
+							ResourceID:   resID,
+							Version:      "1.0",
+							ManagedByAnx: true,
+						}
+						if err := s.RecordResource(rec); err != nil {
+							t.Errorf("instance %d record %s: %v", instanceID, resID, err)
+							return
+						}
+					}
+				}(inst)
+			}
+			wg.Wait()
+
+			finalStore, err := OpenStore(dir)
 			if err != nil {
-				t.Errorf("instance %d OpenStore: %v", instanceID, err)
-				return
+				t.Fatal(err)
 			}
+			defer func() { _ = finalStore.Close() }()
 
-			for i := range writesPerInstance {
-				resID := fmt.Sprintf("multi-inst-%d-%d", instanceID, i)
-				rec := InstalledRecord{
-					ResourceID:   resID,
-					Version:      "1.0",
-					ManagedByAnx: true,
-				}
-				if err := s.RecordResource(rec); err != nil {
-					t.Errorf("instance %d record %s: %v", instanceID, resID, err)
-					return
-				}
+			all := finalStore.AllResources()
+			expected := instances * writesPerInstance
+			if len(all) != expected {
+				t.Fatalf("multi-instance concurrent writes: expected %d records, got %d", expected, len(all))
 			}
-		}(inst)
-	}
-	wg.Wait()
-
-	finalStore, err := OpenStore(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	all := finalStore.AllResources()
-	expected := instances * writesPerInstance
-	if len(all) != expected {
-		t.Fatalf("multi-instance concurrent writes: expected %d records, got %d", expected, len(all))
+		})
 	}
 }
 
