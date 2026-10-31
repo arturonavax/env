@@ -10,6 +10,7 @@ import (
 
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/scriptgen"
 )
 
 func configCommands(appCtx *AppContext) []*cobra.Command {
@@ -277,26 +278,22 @@ func renderSyncScript(w io.Writer, appCtx *AppContext, args []string, push bool)
 	}
 	cfgs := appCtx.Catalog.ListConfigurationsByGroup(group)
 
-	fmt.Fprintln(w, "#!/usr/bin/env bash")
+	b := scriptgen.NewBuilder("sync", appCtx.Platform)
+	actionTitle := fmt.Sprintf("Deploy Dotfile Group [%s]", group)
 	if push {
-		fmt.Fprintf(w, "# ANX Dotfile Capture Script (Group: %s)\n", group)
-	} else {
-		fmt.Fprintf(w, "# ANX Dotfile Deployment Script (Group: %s)\n", group)
+		actionTitle = fmt.Sprintf("Capture Dotfile Group [%s]", group)
 	}
-	fmt.Fprintln(w, "set -euo pipefail")
+	b.AddSection(actionTitle, "Synchronize managed configuration assets")
 
 	for _, c := range cfgs {
 		target := c.TargetForOS(appCtx.Platform.OS())
 		source := c.Source
 		if push {
-			fmt.Fprintf(w, "# Capture %s\n", c.ID)
-			fmt.Fprintf(w, "mkdir -p $(dirname %s)\n", source)
-			fmt.Fprintf(w, "cp -a %s %s\n\n", target, source)
+			b.AddCommand(fmt.Sprintf("mkdir -p $(dirname %q) && cp -a %q %q", source, target, source), fmt.Sprintf("Capture %s", c.ID))
 		} else {
-			fmt.Fprintf(w, "# Deploy %s\n", c.ID)
-			fmt.Fprintf(w, "mkdir -p $(dirname %s)\n", target)
-			fmt.Fprintf(w, "cp -a %s %s\n\n", source, target)
+			b.AddCommand(fmt.Sprintf("mkdir -p $(dirname %q) && cp -a %q %q", target, source, target), fmt.Sprintf("Deploy %s", c.ID))
 		}
 	}
+	fmt.Fprint(w, b.Render())
 	return nil
 }

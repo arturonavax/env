@@ -10,6 +10,7 @@ import (
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/hacks"
+	"github.com/arturonavax/env/internal/scriptgen"
 )
 
 func systemCommands(appCtx *AppContext) []*cobra.Command {
@@ -168,16 +169,8 @@ func newRebuildCmd(appCtx *AppContext) *cobra.Command {
 				return err
 			}
 			if appCtx.Flags.ScriptMode {
-				fmt.Fprintln(cmd.OutOrStdout(), "#!/usr/bin/env bash")
-				fmt.Fprintln(cmd.OutOrStdout(), "# ANX Rebuild Toolchains Script")
-				fmt.Fprintln(cmd.OutOrStdout(), "set -euo pipefail")
-				for _, r := range results {
-					fmt.Fprintf(cmd.OutOrStdout(), "# Scope: %s\n", r.Scope)
-					for _, c := range r.Commands {
-						fmt.Fprintf(cmd.OutOrStdout(), "%s\n", c)
-					}
-					fmt.Fprintln(cmd.OutOrStdout())
-				}
+				script := scriptgen.TranslateRebuild(results, appCtx.Platform)
+				fmt.Fprint(cmd.OutOrStdout(), script)
 				return nil
 			}
 			return emit(cmd, appCtx, results, func(w io.Writer) {
@@ -221,9 +214,12 @@ func newOptimizeCmd(appCtx *AppContext) *cobra.Command {
 				return domain.NewExitError(domain.ExitConflictOrAudit, err)
 			}
 			if appCtx.Flags.ScriptMode {
+				b := scriptgen.NewBuilder("optimize", appCtx.Platform)
+				b.AddSection("Workstation Lynis & Hardware Optimization", "Guardrail-validated hardware and kernel optimizations")
 				if res.Script != "" {
-					fmt.Fprintln(cmd.OutOrStdout(), res.Script)
+					b.AddCommand(res.Script, "Generated optimization script")
 				}
+				fmt.Fprint(cmd.OutOrStdout(), b.Render())
 				return nil
 			}
 			return emit(cmd, appCtx, res, func(w io.Writer) {

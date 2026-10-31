@@ -50,6 +50,7 @@ anx tools [flags]
 * [anx tools quota](anx_tools_quota.md)	 - Inspect rolling AI quota and usage (shortcut for 'anx tools ai quota')
 * [anx tools rtk](anx_tools_rtk.md)	 - High-speed LLM terminal output compressor proxy (saves 60-90% prompt tokens)
 * [anx tools run](anx_tools_run.md)	 - Run any decoupled tool forwarding arguments, environment, and I/O streams
+* [anx tools security-audit](anx_tools_security-audit.md)	 - Decoupled multi-tool security compliance auditor and vulnerability scanner
 * [anx tools tealdeer](anx_tools_tealdeer.md)	 - Instant Rust implementation of tldr help pages
 * [anx tools update](anx_tools_update.md)	 - Check and apply updates for tools via their native update strategy
 * [anx tools upgrade](anx_tools_upgrade.md)	 - Alias for 'anx tools update'

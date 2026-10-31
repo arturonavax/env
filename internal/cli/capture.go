@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/scriptgen"
 	"github.com/arturonavax/env/internal/security"
 )
 
@@ -126,7 +127,6 @@ func runCaptureNonInteractive(
 	}
 
 	if appCtx.Flags.ScriptMode {
-		fmt.Fprintln(out, "#!/usr/bin/env bash\n# ANX Capture Script\nset -euo pipefail")
 		bName := branchName
 		if bName == "" {
 			bName = "sync/dotfiles-update"
@@ -135,12 +135,20 @@ func runCaptureNonInteractive(
 		if cMsg == "" {
 			cMsg = "feat(config): capture live dotfiles into repository"
 		}
-		fmt.Fprintf(out, "git checkout -b %s\n", bName)
-		fmt.Fprintf(out, "git add -- %s\n", strings.Join(allCapturedPaths, " "))
-		fmt.Fprintf(out, "git commit -m %q\n", cMsg)
-		if doPush {
-			fmt.Fprintf(out, "git push -u origin %s\n", bName)
+		b := scriptgen.NewBuilder("capture", appCtx.Platform)
+		b.AddSection("Capture Dotfiles to Working Tree", fmt.Sprintf("Staging %d assets", len(allCapturedPaths)))
+		for _, p := range allCapturedPaths {
+			b.AddCommand(fmt.Sprintf("git add -- %q", p), "Stage captured asset exclusively")
 		}
+		b.AddSection("Branch Creation", fmt.Sprintf("Create capture branch %s", bName))
+		b.AddCommand(fmt.Sprintf("git checkout -b %q", bName), "Isolate changes in dedicated branch")
+		b.AddSection("Commit Captured Changes", "Create atomic conventional commit")
+		b.AddCommand(fmt.Sprintf("git commit -m %q", cMsg), "Ownership-guarded commit")
+		if doPush {
+			b.AddSection("Remote Push", fmt.Sprintf("Push %s to origin", bName))
+			b.AddCommand(fmt.Sprintf("git push -u origin %q", bName), "Publish branch")
+		}
+		fmt.Fprint(out, b.Render())
 		return nil
 	}
 

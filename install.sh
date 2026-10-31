@@ -12,10 +12,12 @@
 
 set -eu
 
-# If running through a pipe (e.g. curl ... | sh) and a controlling TTY exists,
+# If running through a pipe (e.g. curl ... | sh) and a controlling TTY exists and can be opened,
 # reconnect standard input so interactive wizards (Bubble Tea) can operate.
-if [ ! -t 0 ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
-	exec </dev/tty
+if [ ! -t 0 ] && [ -c /dev/tty ]; then
+	if (exec </dev/tty) 2>/dev/null; then
+		exec </dev/tty
+	fi
 fi
 
 # Locate repository root or clone on remote curl execution

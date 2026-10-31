@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/scriptgen"
 )
 
 func packageCommands(appCtx *AppContext) []*cobra.Command {
@@ -439,21 +441,23 @@ func newProfileCmd(appCtx *AppContext) *cobra.Command {
 	return cmd
 }
 
-func renderPlanScript(w io.Writer, _ *AppContext, plan *domain.ExecutionPlan) error {
-	fmt.Fprintln(w, "#!/usr/bin/env bash")
-	fmt.Fprintf(w, "# ANX Apply Plan: %s (Profile: %s, Total Steps: %d)\n", plan.ID, plan.Profile, len(plan.Steps))
-	fmt.Fprintln(w, "set -euo pipefail")
-
-	if len(plan.Steps) == 0 {
-		fmt.Fprintln(w, "echo '==> System is already in desired state. No actions needed.'")
+func renderPlanScript(w io.Writer, appCtx *AppContext, plan *domain.ExecutionPlan) error {
+	var plat *platform.Info
+	if appCtx != nil {
+		plat = appCtx.Platform
+	}
+	b := scriptgen.NewBuilder("apply", plat)
+	if plan == nil || len(plan.Steps) == 0 {
+		fmt.Fprint(w, b.Render())
 		return nil
 	}
 
 	for i, st := range plan.Steps {
-		fmt.Fprintf(w, "# Step %d: %s %s [%s]\n", i+1, st.Action, st.ResourceID, st.Provider)
+		sectionTitle := fmt.Sprintf("Step %d: %s %s [%s]", i+1, st.Action, st.ResourceID, st.Provider)
+		b.AddSection(sectionTitle, st.Description)
+
 		if st.Strategy == "github_release" || st.Strategy == "script" {
-			fmt.Fprintf(w, "echo '--> Installing %s via %s...'\n", st.ResourceID, st.Strategy)
-			fmt.Fprintf(w, "anx install %s\n\n", st.ResourceID)
+			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Install %s via %s", st.ResourceID, st.Strategy))
 			continue
 		}
 		switch {
@@ -463,31 +467,33 @@ func renderPlanScript(w io.Writer, _ *AppContext, plan *domain.ExecutionPlan) er
 			if pkg == "" {
 				pkg = st.ResourceID
 			}
-			fmt.Fprintf(w, "sudo apt-get update -y && sudo apt-get install -y %s\n\n", pkg)
+			b.AddCommand(fmt.Sprintf("sudo apt-get update -y && sudo apt-get install -y %s", pkg), "Native APT package manager")
 		case strings.HasPrefix(st.Provider, "native:pacman"):
 			pkg := strings.TrimPrefix(st.Provider, "native:pacman (")
 			pkg = strings.TrimSuffix(pkg, ")")
 			if pkg == "" {
 				pkg = st.ResourceID
 			}
-			fmt.Fprintf(w, "sudo pacman -S --noconfirm --needed %s\n\n", pkg)
+			b.AddCommand(fmt.Sprintf("sudo pacman -S --noconfirm --needed %s", pkg), "Native Pacman package manager")
 		case strings.HasPrefix(st.Provider, "native:dnf"):
 			pkg := strings.TrimPrefix(st.Provider, "native:dnf (")
 			pkg = strings.TrimSuffix(pkg, ")")
 			if pkg == "" {
 				pkg = st.ResourceID
 			}
-			fmt.Fprintf(w, "sudo dnf install -y %s\n\n", pkg)
+			b.AddCommand(fmt.Sprintf("sudo dnf install -y %s", pkg), "Native DNF package manager")
 		case strings.HasPrefix(st.Provider, "native:brew"):
 			pkg := strings.TrimPrefix(st.Provider, "native:brew (")
 			pkg = strings.TrimSuffix(pkg, ")")
 			if pkg == "" {
 				pkg = st.ResourceID
 			}
-			fmt.Fprintf(w, "brew install %s\n\n", pkg)
+			b.AddCommand(fmt.Sprintf("brew install %s", pkg), "Homebrew package manager")
 		default:
-			fmt.Fprintf(w, "anx install %s\n\n", st.ResourceID)
+			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Fallback install via %s", st.Provider))
 		}
 	}
+
+	fmt.Fprint(w, b.Render())
 	return nil
 }

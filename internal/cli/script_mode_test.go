@@ -19,8 +19,11 @@ func TestUniversalScriptModeAcrossCommands(t *testing.T) {
 		if !strings.Contains(out, "#!/usr/bin/env bash") {
 			t.Errorf("expected bash shebang, got:\n%s", out)
 		}
-		if !strings.Contains(out, "ANX Security Audit Remediation Script") {
-			t.Errorf("expected security remediation plan banner, got:\n%s", out)
+		if !strings.Contains(out, "ANX AUDITABLE EXECUTION SCRIPT") {
+			t.Errorf("expected auditable script banner, got:\n%s", out)
+		}
+		if !strings.Contains(out, "IN-PROCESS GO RUNTIME OPERATIONS EXCLUDED") {
+			t.Errorf("expected Go runtime boundary notice, got:\n%s", out)
 		}
 	})
 

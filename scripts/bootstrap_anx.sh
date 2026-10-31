@@ -102,7 +102,7 @@ try_download_release_binary() {
 		log_info "Extracting release binary to ${DEST_BIN}..."
 		if tar -xzf "${tarball}" -C "${DEST_BIN}" 2>/dev/null; then
 			chmod +x "${DEST_BIN}/anx"
-			rm -f "${DEST_BIN}/aitools"
+			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
 			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
 			if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
 				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
@@ -269,9 +269,9 @@ build_anx() {
 	)
 
 	# Multicall compatibility symlinks
-	rm -f "${DEST_BIN}/aitools"
+	ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
 	ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
-	log_success "ANX binary built and deployed to ${DEST_BIN}/anx (multicall symlink: safe-suspend)"
+	log_success "ANX binary built and deployed to ${DEST_BIN}/anx (multicall symlinks: aitools, safe-suspend)"
 
 	if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
 		ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"

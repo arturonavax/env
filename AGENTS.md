@@ -235,6 +235,21 @@ Documented root causes and mitigations for hardware/display edge cases:
 2. **Ghostty Sudden Crashes in Xfce / Legacy Nested Multiplexers via SSH**:
    - **Root Cause**: Nested terminal multiplexer sessions over SSH with `allow-passthrough on` and `set-clipboard on` (OSC 52) combined with Ghostty's `copy-on-select = clipboard`. Rapid mouse wheel scrolling or selection drags over SSH emit split escape sequences across network packets, triggering X11 selection ownership race conditions (`BadWindow` / `XIOError` in libX11) or unhandled terminal escape parser panics in older builds. Migrating exclusively to Herdr eliminates this nested multiplexer friction.
 
+### Decoupled Security Audit Tool & Universal Auditable Script Generator
+
+1. **Decoupled Security Tool (`files/security/anx-security`)**:
+   - Standalone executable tool registered under `manifests/tools.yaml` (`security-audit`), decoupled from `anx` to allow independent execution, migration, or external repository maintenance.
+   - Primarily orchestrates established cybersecurity tools and system scanners (`lynis`, `osv-scanner`, `ufw`, `iptables`, `ss`, `sysctl`, `aa-status`, `sestatus`, UID 0 security checks).
+   - Configurable compliance profiles (`workstation`, `server`, `minimal`) adapting check severities and expectations.
+   - Outputs in `text`, `json`, and `markdown`, and supports `--generate-script` to emit standalone, idempotent remediation scripts.
+   - Fully integrated into `anx audit` and the Bubble Tea v2 TUI Security Audit tab ('p' profile switch, 's' script generation, and optional LLM synthesis via configured AI harnesses).
+
+2. **Universal Auditable Shell Script Architecture (`internal/scriptgen`)**:
+   - Employs an `AuditableScriptBuilder` translator design pattern across all mutating CLI commands (`apply`, `plan`, `sync`, `optimize`, `audit`, `rebuild`, `capture`, `cleanup`/`prune`).
+   - Every generated script begins with defensive shell patterns (`set -euo pipefail`), target environment detection, and an explicit **AUDIT & ARCHITECTURAL BOUNDARY NOTICE**:
+     - Documents that internal Go engine operations (goroutine pools, content-addressable storage, SQLite WAL transactions, Myers AST diff computations, zero-alloc secret scanners) are excluded by design as they exceed shell script boundaries.
+     - Captures and serializes all host state mutations (package manager invocations, dotfile links, chmod, sysctl tunings, service restarts) for strict inspection prior to execution.
+
 ### Modern CLI Tooling Stack & Non-Destructive Alias Architecture
 
 This environment deploys high-performance, single-binary modern CLI tools and strictly adheres to a **non-destructive alias policy**:

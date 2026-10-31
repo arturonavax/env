@@ -496,6 +496,12 @@ func (sa *SecurityAuditor) Audit(ctx context.Context) (*SecurityAuditReport, err
 		})
 	}
 
+	// 12. External Cybersecurity Tools: Lynis & ss socket inspection
+	recordCheck()
+	sa.auditLynis(ctx, report)
+	recordCheck()
+	sa.auditListeningSockets(ctx, report)
+
 	// Calculate Hardening Index
 	score := 100
 	for _, f := range report.Findings {
@@ -550,6 +556,111 @@ func (sa *SecurityAuditor) auditSudoersFile(path string, report *SecurityAuditRe
 				ItemPath:    path,
 			})
 		}
+	}
+}
+
+// auditLynis runs lynis system audit if available and extracts high-priority findings.
+func (sa *SecurityAuditor) auditLynis(ctx context.Context, report *SecurityAuditReport) {
+	if sa.lookupBin == nil {
+		return
+	}
+	lynisBin, err := sa.lookupBin("lynis")
+	if err != nil || lynisBin == "" {
+		return
+	}
+
+	datPath := filepath.Join(sa.etcRoot, "..", "var", "log", "lynis-report.dat")
+	if data, err := os.ReadFile(datPath); err == nil {
+		sa.parseLynisReportDat(data, report)
+		return
+	}
+
+	if sa.runner != nil {
+		out, err := sa.runner.Run(ctx, lynisBin, "audit", "system", "--quick", "--auditor", "anx", "--cronjob")
+		if err == nil || len(out) > 0 {
+			sa.parseLynisOutput(out, report)
+		}
+	}
+}
+
+func (sa *SecurityAuditor) parseLynisReportDat(data []byte, report *SecurityAuditReport) {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "warning[]=") {
+			warn := strings.TrimPrefix(line, "warning[]=")
+			parts := strings.SplitN(warn, "|", 3)
+			title := warn
+			if len(parts) > 1 {
+				title = parts[1]
+			}
+			report.Findings = append(report.Findings, SecurityFinding{
+				ID:          "LYNIS-WARN",
+				Category:    "Lynis",
+				Severity:    SeverityHigh,
+				Title:       "Lynis warning: " + title,
+				Description: "Lynis automated compliance scan warning from /var/log/lynis-report.dat",
+				Remediation: "Inspect Lynis log at /var/log/lynis.log",
+				Impact:      "Host configuration violates standard CIS/Lynis hardening checks.",
+			})
+		}
+	}
+}
+
+func (sa *SecurityAuditor) parseLynisOutput(output string, report *SecurityAuditReport) {
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "Warning:") || strings.HasPrefix(line, "! ") {
+			report.Findings = append(report.Findings, SecurityFinding{
+				ID:          "LYNIS-WARN",
+				Category:    "Lynis",
+				Severity:    SeverityHigh,
+				Title:       line,
+				Description: "Lynis automated compliance scan warning",
+				Remediation: "Review Lynis audit log in /var/log/lynis.log",
+				Impact:      "Potential host security weakness identified by Lynis.",
+			})
+		}
+	}
+}
+
+// auditListeningSockets inspects network sockets via ss or netstat.
+func (sa *SecurityAuditor) auditListeningSockets(ctx context.Context, report *SecurityAuditReport) {
+	if sa.lookupBin == nil || sa.runner == nil {
+		return
+	}
+	ssBin, err := sa.lookupBin("ss")
+	if err != nil || ssBin == "" {
+		return
+	}
+
+	out, err := sa.runner.Run(ctx, ssBin, "-tulpn")
+	if err != nil || len(out) == 0 {
+		return
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(out))
+	unconfinedListeners := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.Contains(line, "0.0.0.0:") || strings.Contains(line, "*:") || strings.Contains(line, ":::*") {
+			if !strings.Contains(line, "127.0.0.1") && !strings.Contains(line, "[::1]") {
+				unconfinedListeners++
+			}
+		}
+	}
+
+	if unconfinedListeners > 0 && sa.profile == ProfileServer {
+		report.Findings = append(report.Findings, SecurityFinding{
+			ID:          "SEC-NET-UNCONFINED",
+			Category:    CategoryNetwork,
+			Severity:    SeverityHigh,
+			Title:       fmt.Sprintf("%d unconfined public network socket listeners detected", unconfinedListeners),
+			Description: "Active network daemons listening globally on 0.0.0.0 or ::: without host-only binding.",
+			Remediation: "Bind daemons to 127.0.0.1 or enforce strict ingress firewall policies.",
+			Impact:      "Services exposed to unsolicited external network probes and potential exploitation.",
+		})
 	}
 }
 

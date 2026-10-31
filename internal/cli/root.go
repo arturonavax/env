@@ -79,6 +79,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 			return applyConfigLayering(cmd, appCtx)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if appCtx.Flags.Yes {
+				return runApply(cmd, appCtx, appCtx.Flags.Profile, nil)
+			}
 			// TTY guard: never launch a full-screen program into a pipe or when machine output was requested.
 			if appCtx.Flags.Format != "text" || !isTerminal(cmd) {
 				return runStatus(cmd, appCtx)

@@ -84,3 +84,15 @@ tools:
     version_args: ["--version"]
     repo_url: "https://github.com/dbrgn/tealdeer"
     update_strategy: "package"
+
+  - id: security-audit
+    name: "Security Audit Engine (anx-security)"
+    category: "security"
+    description: "Decoupled multi-tool security compliance auditor and vulnerability scanner"
+    executable: "anx-security"
+    fallback_builtin: true
+    allow_global_path: true
+    language: "bash"
+    version_args: ["--version"]
+    repo_url: "https://github.com/arturonavax/env"
+    update_strategy: "package"

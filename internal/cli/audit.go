@@ -8,6 +8,7 @@ import (
 
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/scriptgen"
 	"github.com/arturonavax/env/internal/security"
 )
 
@@ -99,10 +100,18 @@ security guardrails, and optional AI synthesis via the configured aitools harnes
 			// Script mode: output shell script directly
 			if showScript || appCtx.Flags.ScriptMode {
 				if res.Script == "" {
-					fmt.Fprintln(out, "#!/usr/bin/env bash\n# No remediations required. System is fully hardened.\nexit 0")
+					b := scriptgen.NewBuilder("audit", appCtx.Platform)
+					b.AddSection("Security Remediation", "System is already fully hardened. No remediations required.")
+					b.AddCommand("echo '==> No security remediations required.'", "Clean audit")
+					fmt.Fprint(out, b.Render())
 					return nil
 				}
-				fmt.Fprintln(out, res.Script)
+				if useAI {
+					fmt.Fprintln(out, res.Script)
+					return nil
+				}
+				script := scriptgen.TranslateSecurityAudit(res.Report, appCtx.Platform)
+				fmt.Fprint(out, script)
 				return nil
 			}
 

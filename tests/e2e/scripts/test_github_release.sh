@@ -19,7 +19,7 @@ echo "-> 1. Running bootstrap in zero-Go environment with ANX_RELEASE_URL..."
 export ANX_RELEASE_URL="${MOCK_SERVER_URL}/releases/latest/download/anx_linux_amd64.tar.gz"
 
 # Deliberately remove /usr/local/go/bin from PATH to guarantee zero-Go environment
-export PATH="${DEST_BIN}:/usr/local/bin:/usr/bin:/bin"
+export PATH="${DEST_BIN}:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin"
 if command -v go >/dev/null 2>&1; then
 	echo "[WARN] go command is still available via system path, testing release priority"
 fi
