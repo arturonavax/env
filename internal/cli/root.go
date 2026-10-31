@@ -45,29 +45,29 @@ type GlobalFlagState struct {
 
 // AppContext holds shared domain services injected into CLI commands.
 type AppContext struct {
-	Platform   *platform.Info
-	Catalog    *catalog.Registry
-	Journal    *journal.FileJournal
-	Snapshots  *snapshot.Manager
-	Store      *state.Store
-	Runner     *security.Runner
-	Provider   providers.Provider
-	InstallSvc *app.InstallService
-	SyncSvc    *app.SyncService
-	DoctorSvc  *app.DoctorService
-	AuditSvc   *app.AuditService
-	HacksSvc   *app.HacksService
-	OpsSvc     *app.OpsService
+	Platform     *platform.Info
+	Catalog      *catalog.Registry
+	Journal      *journal.FileJournal
+	Snapshots    *snapshot.Manager
+	Store        *state.Store
+	Runner       *security.Runner
+	Provider     providers.Provider
+	InstallSvc   *app.InstallService
+	SyncSvc      *app.SyncService
+	DoctorSvc    *app.DoctorService
+	AuditSvc     *app.AuditService
+	HacksSvc     *app.HacksService
+	OpsSvc       *app.OpsService
 	ToolsSvc     *app.ToolsService
 	ControlPlane *app.ControlPlaneService
 	DestroyerSvc *app.DestroyerService
 	SecuritySeal *security.OriginSeal
 	RepoRoot     string
-	Viper      *viper.Viper
-	Flags      GlobalFlagState
-	Version    string
-	Commit     string
-	Date       string
+	Viper        *viper.Viper
+	Flags        GlobalFlagState
+	Version      string
+	Commit       string
+	Date         string
 }
 
 // NewRootCommand creates the top-level anx Cobra command tree.
@@ -137,6 +137,8 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newResetCmd(appCtx))
+	rootCmd.AddCommand(newStateCmd(appCtx))
+	rootCmd.AddCommand(newJobsCmd(appCtx))
 
 	return rootCmd
 }
