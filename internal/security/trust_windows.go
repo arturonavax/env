@@ -24,7 +24,7 @@ const (
 	maskGenericAll     = 0x10000000
 	maskGenericWrite   = 0x40000000
 	maskLeafWriteBits  = maskAddFile | maskAddSubdir | maskDeleteChild | maskDelete | maskWriteDAC | maskWriteOwner | maskGenericAll | maskGenericWrite
-	maskRenameChildren = maskDeleteChild | maskWriteDAC | maskWriteOwner | maskGenericAll | maskGenericWrite
+	maskRenameChildren = maskDeleteChild | maskWriteDAC | maskWriteOwner | maskGenericAll
 )
 
 // platformTrustVerifier implements DirectoryTrustVerifier with real NTFS owner and DACL analysis.
@@ -192,6 +192,8 @@ func classifySID(sid, user *windows.SID) sidClass {
 		windows.WinBuiltinAdministratorsSid,
 		windows.WinLocalSystemSid,
 		windows.WinCreatorOwnerSid,
+		windows.WinNetworkServiceSid,
+		windows.WinLocalServiceSid,
 	} {
 		if sid.IsWellKnown(wk) {
 			return classPrivileged
