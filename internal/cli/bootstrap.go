@@ -33,6 +33,7 @@ func BuildLazyAppContext(version, commit, date string) (*AppContext, error) {
 		Version:      version,
 		Commit:       commit,
 		Date:         date,
+		container:    container,
 	}, nil
 }
 
@@ -66,6 +67,7 @@ func BuildAppContext(version, commit, date string) (*AppContext, error) {
 		Version:      version,
 		Commit:       commit,
 		Date:         date,
+		container:    container,
 	}
 
 	container.ToolRunner.RegisterBuiltin("ai", func(ctx context.Context, _ string, args []string, in io.Reader, out, errOut io.Writer) error {

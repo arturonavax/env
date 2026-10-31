@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/bootstrap"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/journal"
@@ -68,6 +69,21 @@ type AppContext struct {
 	Version      string
 	Commit       string
 	Date         string
+	container    *bootstrap.Container
+}
+
+// Close safely and idempotently closes all runtime resources held by the application context.
+func (a *AppContext) Close() error {
+	if a == nil {
+		return nil
+	}
+	if a.container != nil {
+		return a.container.Close()
+	}
+	if a.Store != nil {
+		return a.Store.Close()
+	}
+	return nil
 }
 
 // NewRootCommand creates the top-level anx Cobra command tree.
@@ -205,6 +221,9 @@ func ExecuteCLI(args []string, out, errOut io.Writer, version, commit, date stri
 		fmt.Fprintf(errOut, "Initialization error: %v\n", err)
 		return domain.ExitPreflightFailed
 	}
+	defer func() {
+		_ = appCtx.Close()
+	}()
 
 	rootCmd := NewRootCommand(appCtx)
 	rootCmd.SetArgs(args)

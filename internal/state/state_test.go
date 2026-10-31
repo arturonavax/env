@@ -35,11 +35,14 @@ func TestStorePersistenceAndConfigBases(t *testing.T) {
 		t.Fatalf("RecordHack failed: %v", err)
 	}
 
+	_ = store.Close()
+
 	// Reopen from disk to prove durability
 	reopened, err := OpenStore(dir)
 	if err != nil {
 		t.Fatalf("reopening store failed: %v", err)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 
 	got, ok := reopened.GetResource("ripgrep")
 	if !ok || got.Version != "14.1.1" || !got.ManagedByAnx {
@@ -102,12 +105,14 @@ func TestStoreConcurrentInProcessWrites(t *testing.T) {
 	if len(all) != expectedCount {
 		t.Fatalf("expected %d records in store, got %d", expectedCount, len(all))
 	}
+	_ = store.Close()
 
 	// Verify durability after reopening
 	reopened, err := OpenStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 	reopenedAll := reopened.AllResources()
 	if len(reopenedAll) != expectedCount {
 		t.Fatalf("reopened store has %d records, want %d", len(reopenedAll), expectedCount)

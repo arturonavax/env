@@ -249,6 +249,7 @@ func TestPlanHackAndApplyHackIsolatedExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	runner := security.NewRunner(10 * time.Second)
 
 	res, err := hacks.ApplyHack(context.Background(), profile, hacks.ApplyOptions{

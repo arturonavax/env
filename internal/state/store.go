@@ -81,12 +81,14 @@ func (s *Store) DB() *sqlite.DB {
 	return s.db
 }
 
-// Close closes the underlying SQLite database cleanly.
+// Close closes the underlying SQLite database cleanly and is safe and idempotent.
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.db != nil {
-		return s.db.Close()
+		err := s.db.Close()
+		s.db = nil
+		return err
 	}
 	return nil
 }

@@ -21,6 +21,7 @@ func TestDestroyerService_PlanPurge_All(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open store: %v", err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 
 	destroyer := app.NewDestroyerService(plat, cat, nil, nil, store)
 
@@ -47,6 +48,7 @@ func TestDestroyerService_PlanPurge_ProfileScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open store: %v", err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 
 	destroyer := app.NewDestroyerService(plat, cat, nil, nil, store)
 
@@ -81,6 +83,7 @@ func TestDestroyerService_ExecutePurge_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open store: %v", err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 
 	destroyer := app.NewDestroyerService(plat, cat, nil, nil, store)
 

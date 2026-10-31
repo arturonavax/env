@@ -39,6 +39,9 @@ func newFixture(t *testing.T) fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
 	return fixture{plat: plat, cat: catalog.NewDefaultRegistry(), snap: snap, store: store, repo: repo, home: home}
 }
 

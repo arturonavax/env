@@ -130,18 +130,23 @@ func (db *DB) Reader() *sql.DB {
 	return db.reader
 }
 
-// Close closes all writer and reader database handles.
+// Close closes all writer and reader database handles. It is safe and idempotent.
 func (db *DB) Close() error {
+	if db == nil {
+		return nil
+	}
 	var firstErr error
 	if db.reader != nil {
 		if err := db.reader.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
+		db.reader = nil
 	}
 	if db.writer != nil {
 		if err := db.writer.Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
+		db.writer = nil
 	}
 	return firstErr
 }

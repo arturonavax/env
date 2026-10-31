@@ -52,15 +52,37 @@ type Container struct {
 
 // Config specifies runtime options for constructing a Container.
 type Config struct {
-	RepoRoot string
-	Version  string
-	Commit   string
-	Date     string
-	Offline  bool
+	RepoRoot      string
+	Version       string
+	Commit        string
+	Date          string
+	Offline       bool
+	TrustVerifier security.DirectoryTrustVerifier
 }
 
 // Option modifies Config.
 type Option func(*Config)
+
+// WithTrustVerifier allows injecting a custom directory trust verifier.
+func WithTrustVerifier(v security.DirectoryTrustVerifier) Option {
+	return func(c *Config) {
+		c.TrustVerifier = v
+	}
+}
+
+// Close closes runtime resources held by the container, including state storage and journals.
+func (c *Container) Close() error {
+	if c == nil {
+		return nil
+	}
+	var errs []error
+	if c.Store != nil {
+		if err := c.Store.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
 
 // WithRepoRoot sets an explicit repository root override.
 func WithRepoRoot(repoRoot string) Option {
@@ -101,10 +123,14 @@ func NewLazyContainer(opts ...Option) (*Container, error) {
 	v.AutomaticEnv()
 
 	cat := catalog.NewDefaultRegistry()
-	seal, _ := security.CreateOriginSeal(
+	sealOpts := []security.SealOption{
 		security.WithSealRepoRoot(cfg.RepoRoot),
 		security.WithSealSkipDotfiles(true),
-	)
+	}
+	if cfg.TrustVerifier != nil {
+		sealOpts = append(sealOpts, security.WithSealTrustVerifier(cfg.TrustVerifier))
+	}
+	seal, _ := security.CreateOriginSeal(sealOpts...)
 
 	return &Container{
 		Platform:     plat,
@@ -144,6 +170,12 @@ func NewContainer(opts ...Option) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	var initSuccess bool
+	defer func() {
+		if !initSuccess && store != nil {
+			_ = store.Close()
+		}
+	}()
 
 	repoRoot := cfg.RepoRoot
 	if repoRoot == "" {
@@ -221,11 +253,17 @@ func NewContainer(opts ...Option) (*Container, error) {
 	opsSvc := app.NewOpsService(plat, installRunner)
 	controlPlane := app.NewControlPlaneService(plat, cat, installSvc, syncSvc, hacksSvc, toolsSvc, store)
 	destroyerSvc := app.NewDestroyerService(plat, cat, installSvc, syncSvc, store, app.WithDestroyerToolsRegistry(toolReg))
-	seal, _ := security.CreateOriginSeal(
+	sealOpts := []security.SealOption{
 		security.WithSealRepoRoot(repoRoot),
 		security.WithSealUserDropIn(filepath.Join(plat.ConfigDir(), "manifests.d")),
 		security.WithSealTargetHome(plat.HomeDir()),
-	)
+	}
+	if cfg.TrustVerifier != nil {
+		sealOpts = append(sealOpts, security.WithSealTrustVerifier(cfg.TrustVerifier))
+	}
+	seal, _ := security.CreateOriginSeal(sealOpts...)
+
+	initSuccess = true
 
 	return &Container{
 		Platform:     plat,
