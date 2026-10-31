@@ -194,14 +194,14 @@ type Job struct {
 
 // Event represents a sequenced lifecycle notification emitted during execution.
 type Event struct {
-	Cursor     int64        `json:"cursor"`
-	JobID      string       `json:"job_id"`
-	Timestamp  time.Time    `json:"timestamp"`
-	Type       string       `json:"type"` // "job_start", "action_start", "action_done", "job_done", "error"
-	ActionID   int          `json:"action_id,omitempty"`
-	ResourceID ResourceID   `json:"resource_id,omitempty"`
-	Status     StepStatus   `json:"status"`
-	Message    string       `json:"message,omitempty"`
+	Cursor     int64      `json:"cursor"`
+	JobID      string     `json:"job_id"`
+	Timestamp  time.Time  `json:"timestamp"`
+	Type       string     `json:"type"` // "job_start", "action_start", "action_done", "job_done", "error"
+	ActionID   int        `json:"action_id,omitempty"`
+	ResourceID ResourceID `json:"resource_id,omitempty"`
+	Status     StepStatus `json:"status"`
+	Message    string     `json:"message,omitempty"`
 }
 
 // Provenance explains why a setting, package, or configuration was chosen and where it came from.

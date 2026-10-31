@@ -70,6 +70,16 @@ func NewSyncService(
 	return &SyncService{platform: plat, catalog: cat, snapshots: snap, store: store, repoRoot: repoRoot}
 }
 
+// SetRepoRoot updates the repository root used for resolving configuration files.
+func (s *SyncService) SetRepoRoot(repoRoot string) {
+	s.repoRoot = repoRoot
+}
+
+// RepoRoot returns the currently configured repository root.
+func (s *SyncService) RepoRoot() string {
+	return s.repoRoot
+}
+
 func (s *SyncService) selectConfigs(group string, overrideShell, overrideTerminal string) []domain.ConfigurationResource {
 	all := s.catalog.ListConfigurationsByGroup(group)
 	out := make([]domain.ConfigurationResource, 0, len(all))

@@ -52,6 +52,7 @@ func newPlanCmd(appCtx *AppContext) *cobra.Command {
 
 func renderPlan(w io.Writer, appCtx *AppContext, plan *domain.ExecutionPlan) {
 	st := styles(appCtx)
+	renderSecuritySealBanner(w, appCtx)
 	fmt.Fprintln(w, st.Header.Render(fmt.Sprintf("Execution Plan: %s (Profile: %s)", plan.ID, plan.Profile)))
 	if len(plan.Steps) == 0 {
 		fmt.Fprintln(w, "  Nothing to do: the machine already matches the desired state.")
@@ -75,6 +76,9 @@ func newApplyCmd(appCtx *AppContext) *cobra.Command {
 }
 
 func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []string) error {
+	if appCtx.Flags.Destroyer && appCtx.DestroyerSvc != nil {
+		return runDestroyerReinstall(cmd, appCtx, profile)
+	}
 	plan, err := appCtx.InstallSvc.Plan(cmd.Context(), profile, pkgs)
 	if err != nil {
 		return err
@@ -85,6 +89,12 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 	plan.DryRun = appCtx.Flags.DryRun
 	if appCtx.Flags.DryRun {
 		return emit(cmd, appCtx, plan, func(w io.Writer) { renderPlan(w, appCtx, plan) })
+	}
+	if !appCtx.Flags.ScriptMode && !appCtx.Flags.Quiet {
+		renderSecuritySealBanner(cmd.OutOrStdout(), appCtx)
+	}
+	if err := verifySecuritySeal(cmd, appCtx); err != nil {
+		return err
 	}
 	if !appCtx.Flags.Quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "Applying plan %s (%d steps)...\n", plan.ID, len(plan.Steps))
@@ -126,20 +136,23 @@ func newUninstallCmd(appCtx *AppContext) *cobra.Command {
 		purgeConfigs    bool
 	)
 	cmd := &cobra.Command{
-		Use:               "uninstall [package...]",
-		Aliases:           []string{"remove"},
-		Short:             "Remove managed packages (or --system to teardown the anx platform)",
+		Use:     "uninstall [package...]",
+		Aliases: []string{"remove"},
+		Short:   "Remove managed packages (or --system to teardown the anx platform)",
 		Args: func(cmd *cobra.Command, args []string) error {
-			if systemUninstall {
+			if systemUninstall || appCtx.Flags.Destroyer {
 				return nil
 			}
 			if len(args) == 0 {
-				return errors.New("requires at least 1 arg(s), or --system for full teardown")
+				return errors.New("requires at least 1 arg(s), or --system/--destroyer for full teardown")
 			}
 			return nil
 		},
 		ValidArgsFunction: packageCompletion(appCtx),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if appCtx.Flags.Destroyer {
+				return runDestroyerUninstall(cmd, appCtx, appCtx.Flags.Profile)
+			}
 			if systemUninstall {
 				return runSystemUninstall(cmd, appCtx, purgeConfigs)
 			}
@@ -446,54 +459,7 @@ func renderPlanScript(w io.Writer, appCtx *AppContext, plan *domain.ExecutionPla
 	if appCtx != nil {
 		plat = appCtx.Platform
 	}
-	b := scriptgen.NewBuilder("apply", plat)
-	if plan == nil || len(plan.Steps) == 0 {
-		fmt.Fprint(w, b.Render())
-		return nil
-	}
-
-	for i, st := range plan.Steps {
-		sectionTitle := fmt.Sprintf("Step %d: %s %s [%s]", i+1, st.Action, st.ResourceID, st.Provider)
-		b.AddSection(sectionTitle, st.Description)
-
-		if st.Strategy == "github_release" || st.Strategy == "script" {
-			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Install %s via %s", st.ResourceID, st.Strategy))
-			continue
-		}
-		switch {
-		case strings.HasPrefix(st.Provider, "native:apt"):
-			pkg := strings.TrimPrefix(st.Provider, "native:apt (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo apt-get update -y && sudo apt-get install -y %s", pkg), "Native APT package manager")
-		case strings.HasPrefix(st.Provider, "native:pacman"):
-			pkg := strings.TrimPrefix(st.Provider, "native:pacman (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo pacman -S --noconfirm --needed %s", pkg), "Native Pacman package manager")
-		case strings.HasPrefix(st.Provider, "native:dnf"):
-			pkg := strings.TrimPrefix(st.Provider, "native:dnf (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo dnf install -y %s", pkg), "Native DNF package manager")
-		case strings.HasPrefix(st.Provider, "native:brew"):
-			pkg := strings.TrimPrefix(st.Provider, "native:brew (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("brew install %s", pkg), "Homebrew package manager")
-		default:
-			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Fallback install via %s", st.Provider))
-		}
-	}
-
-	fmt.Fprint(w, b.Render())
-	return nil
+	script := scriptgen.TranslatePlan(plan, plat)
+	_, err := fmt.Fprint(w, script)
+	return err
 }

@@ -21,6 +21,7 @@ func configCommands(appCtx *AppContext) []*cobra.Command {
 		newBackupCmd(appCtx),
 		newRollbackCmd(appCtx),
 		newHistoryCmd(appCtx),
+		newRepoCmd(appCtx),
 	}
 	for _, c := range cmds {
 		c.GroupID = "config"
@@ -52,6 +53,11 @@ func newDiffCmd(appCtx *AppContext) *cobra.Command {
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: groupCompletion(appCtx),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !appCtx.Flags.ScriptMode {
+				if err := ensureDotfilesRepo(cmd, appCtx); err != nil {
+					return err
+				}
+			}
 			group := ""
 			if len(args) == 1 {
 				group = args[0]
@@ -62,6 +68,7 @@ func newDiffCmd(appCtx *AppContext) *cobra.Command {
 			}
 			return emit(cmd, appCtx, diffs, func(w io.Writer) {
 				st := styles(appCtx)
+				renderSecuritySealBanner(w, appCtx)
 				fmt.Fprintln(w, st.Header.Render("Dotfile Differences"))
 				for _, d := range diffs {
 					tag := st.Success.Render("[" + d.State + "]")
@@ -102,6 +109,38 @@ func newSyncCmd(appCtx *AppContext) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if appCtx.Flags.ScriptMode {
 				return renderSyncScript(cmd.OutOrStdout(), appCtx, args, push)
+			}
+			if appCtx.Flags.Destroyer && appCtx.DestroyerSvc != nil {
+				desc := "PURGE all managed live dotfile configurations before re-synchronizing"
+				confirmed, err := confirmDestroyerAction(cmd, appCtx, desc)
+				if err != nil {
+					return err
+				}
+				if !confirmed {
+					return nil
+				}
+				opts := app.PurgeOptions{
+					Profile:       appCtx.Flags.Profile,
+					PurgeBinaries: false,
+					PurgeState:    false,
+				}
+				purgePlan, err := appCtx.DestroyerSvc.PlanPurge(cmd.Context(), opts)
+				if err != nil {
+					return err
+				}
+				for _, target := range purgePlan.ConfigTargets {
+					markers := purgePlan.ConfigMarkers[target]
+					_ = app.PurgeConfigTargetWithMarker(target, markers[0], markers[1])
+				}
+			}
+			if err := ensureDotfilesRepo(cmd, appCtx); err != nil {
+				return err
+			}
+			if !appCtx.Flags.ScriptMode && !appCtx.Flags.Quiet {
+				renderSecuritySealBanner(cmd.OutOrStdout(), appCtx)
+			}
+			if err := verifySecuritySeal(cmd, appCtx); err != nil {
+				return err
 			}
 			opts := appSyncOptions(appCtx, args, push, force)
 			results, err := appCtx.SyncSvc.Sync(cmd.Context(), opts)

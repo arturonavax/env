@@ -21,10 +21,34 @@ Check for and securely update the ANX binary to the latest verified release
 \fB-h\fP, \fB--help\fP[=false]
 	help for update
 
+.PP
+\fB--include-prerelease\fP[=false]
+	Include pre-releases when checking latest release
+
+.PP
+\fB--method\fP="auto"
+	Update method (auto|release|go-install)
+
+.PP
+\fB--tag\fP=""
+	Explicit release tag to update or downgrade to (e.g. v1.2.0)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--destroyer\fP[=false]
+	Destroyer mode: aggressively purge packages, tools, configurations, and state
+
+.PP
+\fB--destroyer-reinstall\fP[=false]
+	Alias for --destroyer
+
+.PP
 \fB--dry-run\fP[=false]
 	Preview actions without mutating the system
+
+.PP
+\fB--force\fP[=false]
+	Force operation and bypass confirmation prompts
 
 .PP
 \fB--format\fP="text"
@@ -79,8 +103,14 @@ Check for and securely update the ANX binary to the latest verified release
   # Preview update in dry-run mode
   anx self update --dry-run
 
-  # Apply verified update
+  # Apply verified update to latest stable release
   anx self update
+
+  # Update to a specific release tag (can upgrade or downgrade)
+  anx self update --tag v1.2.0
+
+  # Update via go install (using the Go toolchain)
+  anx self update --method go-install
 .EE
 
 

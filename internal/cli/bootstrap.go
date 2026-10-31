@@ -26,12 +26,14 @@ func BuildLazyAppContext(version, commit, date string) (*AppContext, error) {
 	}
 
 	return &AppContext{
-		Platform: container.Platform,
-		Catalog:  container.Catalog,
-		Viper:    container.Viper,
-		Version:  version,
-		Commit:   commit,
-		Date:     date,
+		Platform:     container.Platform,
+		Catalog:      container.Catalog,
+		SecuritySeal: container.SecuritySeal,
+		Viper:        container.Viper,
+		Version:      version,
+		Commit:       commit,
+		Date:         date,
+		container:    container,
 	}, nil
 }
 
@@ -43,26 +45,29 @@ func BuildAppContext(version, commit, date string) (*AppContext, error) {
 	}
 
 	appCtx := &AppContext{
-		Platform:   container.Platform,
-		Catalog:    container.Catalog,
-		Journal:    container.Journal,
-		Snapshots:  container.Snapshots,
-		Store:      container.Store,
-		Runner:     container.Runner,
-		Provider:   container.Provider,
-		InstallSvc: container.InstallSvc,
-		SyncSvc:    container.SyncSvc,
-		DoctorSvc:  container.DoctorSvc,
-		AuditSvc:   container.AuditSvc,
-		HacksSvc:   container.HacksSvc,
-		OpsSvc:     container.OpsSvc,
+		Platform:     container.Platform,
+		Catalog:      container.Catalog,
+		Journal:      container.Journal,
+		Snapshots:    container.Snapshots,
+		Store:        container.Store,
+		Runner:       container.Runner,
+		Provider:     container.Provider,
+		InstallSvc:   container.InstallSvc,
+		SyncSvc:      container.SyncSvc,
+		DoctorSvc:    container.DoctorSvc,
+		AuditSvc:     container.AuditSvc,
+		HacksSvc:     container.HacksSvc,
+		OpsSvc:       container.OpsSvc,
 		ToolsSvc:     container.ToolsSvc,
 		ControlPlane: container.ControlPlane,
+		DestroyerSvc: container.DestroyerSvc,
+		SecuritySeal: container.SecuritySeal,
 		RepoRoot:     container.RepoRoot,
-		Viper:      container.Viper,
-		Version:    version,
-		Commit:     commit,
-		Date:       date,
+		Viper:        container.Viper,
+		Version:      version,
+		Commit:       commit,
+		Date:         date,
+		container:    container,
 	}
 
 	container.ToolRunner.RegisterBuiltin("ai", func(ctx context.Context, _ string, args []string, in io.Reader, out, errOut io.Writer) error {

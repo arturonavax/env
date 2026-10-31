@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"slices"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/arturonavax/env/internal/domain"
 )
@@ -15,10 +13,14 @@ import (
 // ErrExecutionInterrupted indicates execution stopped due to context cancellation or signal.
 var ErrExecutionInterrupted = errors.New("execution was cancelled or interrupted")
 
+// compensationTimeout bounds each compensation call; it runs on a fresh context so that
+// rollback still happens after the caller's context was cancelled.
+const compensationTimeout = 45 * time.Second
+
 // Task represents a discrete executable unit within an ExecutionPlan.
 type Task struct {
 	Step       domain.PlanStep
-	Exclusive  bool     // If true, drains prior parallel tasks and runs strictly alone
+	Exclusive  bool     // If true, drains prior tasks and runs strictly alone (barrier)
 	Locks      []string // Fine-grained lock domains (e.g. "pkg:apt", "file:~/.config/nvim", "service:daemon")
 	Timeout    time.Duration
 	Execute    func(ctx context.Context) error
@@ -35,7 +37,7 @@ type Result struct {
 // EngineOption configures an Engine instance.
 type EngineOption func(*Engine)
 
-// WithRollbackOnError toggles automatic LIFO compensation across all previously succeeded tasks when a step fails.
+// WithRollbackOnError toggles automatic compensation across all previously succeeded tasks when a step fails.
 func WithRollbackOnError(enabled bool) EngineOption {
 	return func(e *Engine) {
 		e.rollbackOnError = enabled
@@ -51,7 +53,8 @@ func WithDefaultTaskTimeout(d time.Duration) EngineOption {
 	}
 }
 
-// Engine coordinates structured concurrent and exclusive execution of tasks with LIFO rollback.
+// Engine is a DAG scheduler: tasks run as soon as every dependency has succeeded, bounded by a worker
+// limit and by resource locks, with compensation in reverse dependency order on failure.
 type Engine struct {
 	maxWorkers      int
 	rollbackOnError bool
@@ -74,8 +77,29 @@ func NewEngine(maxWorkers int, opts ...EngineOption) *Engine {
 	return e
 }
 
-// ExecuteTasks partitions tasks into parallel batches separated by exclusive barriers,
-// guarantees all goroutines finish before returning, and executes LIFO compensation on error.
+type completion struct {
+	idx int
+	res Result
+}
+
+// run owns all mutable scheduling state. It is only touched by the coordinator goroutine
+// (the caller of ExecuteTasks), so no mutex is needed; workers communicate solely via the done channel.
+type run struct {
+	tasks   []Task
+	g       *graph
+	indeg   []int
+	ready   []int // task indices ready to start, ascending (deterministic order)
+	held    map[string]struct{}
+	results []Result
+	done    chan completion
+	running int
+}
+
+// ExecuteTasks schedules tasks over their dependency graph and guarantees every goroutine it
+// started has finished before returning. On the first failure it stops dispatching, cancels the
+// in-flight tasks, waits for them, and compensates completed tasks in reverse dependency order.
+//
+// Progress callbacks are invoked from the calling goroutine only, never concurrently.
 func (e *Engine) ExecuteTasks(
 	ctx context.Context,
 	tasks []Task,
@@ -85,16 +109,10 @@ func (e *Engine) ExecuteTasks(
 		return []Result{}, nil
 	}
 
-	results := make([]Result, len(tasks))
-	for i := range tasks {
-		results[i] = Result{
-			StepID: tasks[i].Step.ID,
-			Status: domain.StepPending,
-		}
+	g, err := buildGraph(tasks)
+	if err != nil {
+		return nil, err
 	}
-
-	var completedMu sync.Mutex
-	completedIndices := make([]int, 0, len(tasks))
 
 	notify := func(r Result) {
 		if onProgress != nil {
@@ -102,106 +120,169 @@ func (e *Engine) ExecuteTasks(
 		}
 	}
 
+	r := newRun(tasks, g)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var execErr error
-	i := 0
-	for i < len(tasks) {
-		if err := ctx.Err(); err != nil {
-			execErr = fmt.Errorf("%w: %w", ErrExecutionInterrupted, err)
+	completed := make([]int, 0, len(tasks))
+
+	for {
+		if execErr == nil {
+			if cerr := ctx.Err(); cerr != nil {
+				execErr = fmt.Errorf("%w: %w", ErrExecutionInterrupted, cerr)
+				cancel()
+			}
+		}
+		if execErr == nil {
+			r.dispatch(runCtx, e)
+		}
+		if r.running == 0 {
 			break
 		}
 
-		if tasks[i].Exclusive || tasks[i].Step.IsExclusive {
-			res := e.runSingleTask(ctx, &tasks[i])
-			results[i] = res
-			notify(res)
-			if res.Error != nil {
-				execErr = fmt.Errorf("step %d (%s) failed: %w", tasks[i].Step.ID, tasks[i].Step.ResourceID, res.Error)
-				break
+		// Workers observe runCtx (derived from ctx), so cancellation always reaches them and they
+		// always report back; waiting on done alone cannot leak or hang beyond task cooperation.
+		c := <-r.done
+		r.running--
+		r.release(c.idx)
+		r.results[c.idx] = c.res
+		notify(c.res)
+
+		if c.res.Error != nil {
+			if execErr == nil {
+				step := &tasks[c.idx].Step
+				execErr = fmt.Errorf("step %d (%s) failed: %w", step.ID, step.ResourceID, c.res.Error)
+				cancel()
 			}
-			completedMu.Lock()
-			completedIndices = append(completedIndices, i)
-			completedMu.Unlock()
-			i++
 			continue
 		}
 
-		// Collect contiguous non-exclusive batch up to the next exclusive barrier
-		batchStart := i
-		for i < len(tasks) && !tasks[i].Exclusive && !tasks[i].Step.IsExclusive {
-			i++
-		}
-		batchEnd := i
-
-		g, gCtx := errgroup.WithContext(ctx)
-		g.SetLimit(e.maxWorkers)
-		lm := newLockManager()
-
-		var progressMu sync.Mutex
-		for idx := batchStart; idx < batchEnd; idx++ {
-			taskIdx := idx
-			g.Go(func() error {
-				if err := gCtx.Err(); err != nil {
-					return err
-				}
-				locks := tasks[taskIdx].Locks
-				if len(locks) == 0 {
-					locks = tasks[taskIdx].Step.Locks
-				}
-				if err := lm.Acquire(gCtx, locks); err != nil {
-					return err
-				}
-				defer lm.Release(locks)
-
-				res := e.runSingleTask(gCtx, &tasks[taskIdx])
-				results[taskIdx] = res
-
-				progressMu.Lock()
-				notify(res)
-				progressMu.Unlock()
-
-				if res.Error != nil {
-					return fmt.Errorf("step %d (%s) failed: %w", tasks[taskIdx].Step.ID, tasks[taskIdx].Step.ResourceID, res.Error)
-				}
-
-				completedMu.Lock()
-				completedIndices = append(completedIndices, taskIdx)
-				completedMu.Unlock()
-				return nil
-			})
-		}
-
-		if batchErr := g.Wait(); batchErr != nil {
-			execErr = batchErr
-			break
+		completed = append(completed, c.idx)
+		if execErr == nil {
+			r.unblock(c.idx)
 		}
 	}
 
-	if execErr != nil && e.rollbackOnError && len(completedIndices) > 0 {
-		// Rollback in inverse topological order (dependencies are undone after dependents)
-		rollbackOrder := computeInverseTopologicalOrder(tasks, completedIndices)
-		for _, idx := range rollbackOrder {
-			compFn := tasks[idx].Compensate
-			if compFn == nil {
-				continue
-			}
-			compCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			compErr := compFn(compCtx)
-			cancel()
-			if compErr == nil {
-				results[idx].Status = domain.StepCompensated
-				notify(results[idx])
-			}
-		}
+	if execErr != nil && e.rollbackOnError && len(completed) > 0 {
+		execErr = errors.Join(execErr, e.compensate(g, tasks, completed, r.results, notify))
 	}
 
-	return results, execErr
+	return r.results, execErr
 }
 
-func (e *Engine) runSingleTask(ctx context.Context, task *Task) Result {
-	res := Result{
-		StepID: task.Step.ID,
-		Status: domain.StepRunning,
+func newRun(tasks []Task, g *graph) *run {
+	r := &run{
+		tasks:   tasks,
+		g:       g,
+		indeg:   slices.Clone(g.indeg),
+		ready:   make([]int, 0, len(tasks)),
+		held:    make(map[string]struct{}),
+		results: make([]Result, len(tasks)),
+		done:    make(chan completion, len(tasks)), // buffered: a worker never blocks on reporting
 	}
+	for i := range tasks {
+		r.results[i] = Result{StepID: tasks[i].Step.ID, Status: domain.StepPending}
+		if r.indeg[i] == 0 {
+			r.ready = append(r.ready, i)
+		}
+	}
+	return r
+}
+
+// dispatch starts ready tasks while worker slots and their locks are available. Tasks whose locks
+// are busy are skipped (not blocked on), so one contended resource never starves unrelated work.
+func (r *run) dispatch(ctx context.Context, e *Engine) {
+	for r.running < e.maxWorkers {
+		pos := r.firstRunnable()
+		if pos < 0 {
+			return
+		}
+		idx := r.ready[pos]
+		r.ready = slices.Delete(r.ready, pos, pos+1)
+
+		for _, l := range r.g.locks[idx] {
+			r.held[l] = struct{}{}
+		}
+		r.running++
+
+		go func() {
+			r.done <- completion{idx: idx, res: e.runSingleTask(ctx, &r.tasks[idx])}
+		}()
+	}
+}
+
+// firstRunnable returns the position in ready of the lowest-index task whose locks are all free.
+func (r *run) firstRunnable() int {
+	for pos, idx := range r.ready {
+		if r.locksFree(r.g.locks[idx]) {
+			return pos
+		}
+	}
+	return -1
+}
+
+func (r *run) locksFree(locks []string) bool {
+	for _, l := range locks {
+		if _, busy := r.held[l]; busy {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *run) release(idx int) {
+	for _, l := range r.g.locks[idx] {
+		delete(r.held, l)
+	}
+}
+
+// unblock decrements successor in-degrees and queues the ones that became ready.
+func (r *run) unblock(idx int) {
+	for _, s := range r.g.succ[idx] {
+		r.indeg[s]--
+		if r.indeg[s] == 0 {
+			at, _ := slices.BinarySearch(r.ready, s)
+			r.ready = slices.Insert(r.ready, at, s)
+		}
+	}
+}
+
+// compensate undoes completed tasks (dependents before their dependencies) and reports failures,
+// so a broken rollback is never silent.
+func (e *Engine) compensate(
+	g *graph,
+	tasks []Task,
+	completed []int,
+	results []Result,
+	notify func(Result),
+) error {
+	var errs []error
+	for _, idx := range g.compensationOrder(completed) {
+		fn := tasks[idx].Compensate
+		if fn == nil {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), compensationTimeout)
+		err := fn(ctx)
+		cancel()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("compensating step %d (%s): %w",
+				tasks[idx].Step.ID, tasks[idx].Step.ResourceID, err))
+			continue
+		}
+
+		results[idx].Status = domain.StepCompensated
+		notify(results[idx])
+	}
+	return errors.Join(errs...)
+}
+
+// runSingleTask executes one task under its timeout and converts a panic into a failed Result:
+// an unrecovered panic in a worker goroutine would kill the process and skip rollback entirely.
+func (e *Engine) runSingleTask(ctx context.Context, task *Task) (res Result) {
+	res = Result{StepID: task.Step.ID, Status: domain.StepRunning}
 
 	if task.Execute == nil {
 		res.Status = domain.StepSuccess
@@ -216,6 +297,13 @@ func (e *Engine) runSingleTask(ctx context.Context, task *Task) Result {
 	taskCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	defer func() {
+		if p := recover(); p != nil {
+			res.Status = domain.StepFailed
+			res.Error = fmt.Errorf("task panicked: %v", p)
+		}
+	}()
+
 	if err := task.Execute(taskCtx); err != nil {
 		res.Status = domain.StepFailed
 		res.Error = err
@@ -224,131 +312,4 @@ func (e *Engine) runSingleTask(ctx context.Context, task *Task) Result {
 
 	res.Status = domain.StepSuccess
 	return res
-}
-
-// computeInverseTopologicalOrder orders completed tasks such that if task B depends on task A,
-// task B is compensated before task A.
-func computeInverseTopologicalOrder(tasks []Task, completedIndices []int) []int {
-	if len(completedIndices) <= 1 {
-		return completedIndices
-	}
-
-	stepIDToIdx := make(map[int]int, len(tasks))
-	for _, idx := range completedIndices {
-		stepIDToIdx[tasks[idx].Step.ID] = idx
-	}
-
-	inDegree := make(map[int]int, len(completedIndices))
-	dependents := make(map[int][]int, len(completedIndices))
-	for _, bIdx := range completedIndices {
-		inDegree[bIdx] = 0
-	}
-
-	for _, bIdx := range completedIndices {
-		for _, depStepID := range tasks[bIdx].Step.DependsOn {
-			if aIdx, ok := stepIDToIdx[depStepID]; ok && aIdx != bIdx {
-				dependents[bIdx] = append(dependents[bIdx], aIdx)
-				inDegree[aIdx]++
-			}
-		}
-	}
-
-	ready := make([]int, 0, len(completedIndices))
-	for pos := len(completedIndices) - 1; pos >= 0; pos-- {
-		idx := completedIndices[pos]
-		if inDegree[idx] == 0 {
-			ready = append(ready, idx)
-		}
-	}
-
-	result := make([]int, 0, len(completedIndices))
-	for len(ready) > 0 {
-		curr := ready[0]
-		ready = ready[1:]
-		result = append(result, curr)
-
-		for _, aIdx := range dependents[curr] {
-			inDegree[aIdx]--
-			if inDegree[aIdx] == 0 {
-				ready = append(ready, aIdx)
-			}
-		}
-	}
-
-	if len(result) < len(completedIndices) {
-		seen := make(map[int]bool, len(result))
-		for _, idx := range result {
-			seen[idx] = true
-		}
-		for pos := len(completedIndices) - 1; pos >= 0; pos-- {
-			idx := completedIndices[pos]
-			if !seen[idx] {
-				result = append(result, idx)
-			}
-		}
-	}
-
-	return result
-}
-
-type lockManager struct {
-	mu     sync.Mutex
-	active map[string]bool
-	cond   *sync.Cond
-}
-
-func newLockManager() *lockManager {
-	lm := &lockManager{
-		active: make(map[string]bool),
-	}
-	lm.cond = sync.NewCond(&lm.mu)
-	return lm
-}
-
-func (lm *lockManager) Acquire(ctx context.Context, locks []string) error {
-	if len(locks) == 0 {
-		return nil
-	}
-
-	stop := context.AfterFunc(ctx, func() {
-		lm.mu.Lock()
-		lm.cond.Broadcast()
-		lm.mu.Unlock()
-	})
-	defer stop()
-
-	lm.mu.Lock()
-	defer lm.mu.Unlock()
-
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		conflict := false
-		for _, l := range locks {
-			if lm.active[l] {
-				conflict = true
-				break
-			}
-		}
-		if !conflict {
-			for _, l := range locks {
-				lm.active[l] = true
-			}
-			return nil
-		}
-		lm.cond.Wait()
-	}
-}
-
-func (lm *lockManager) Release(locks []string) {
-	if len(locks) == 0 {
-		return
-	}
-	lm.mu.Lock()
-	for _, l := range locks {
-		delete(lm.active, l)
-	}
-	lm.cond.Broadcast()
-	lm.mu.Unlock()
 }

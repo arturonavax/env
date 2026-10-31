@@ -25,40 +25,64 @@ import (
 
 // Container holds the assembled composition root services and infrastructure singletons.
 type Container struct {
-	Platform   *platform.Info
-	Catalog    *catalog.Registry
-	Journal    *journal.FileJournal
-	Snapshots  *snapshot.Manager
-	Store      *state.Store
-	Runner     *security.Runner
-	Provider   providers.Provider
-	InstallSvc *app.InstallService
-	SyncSvc    *app.SyncService
-	DoctorSvc  *app.DoctorService
-	AuditSvc   *app.AuditService
+	Platform     *platform.Info
+	Catalog      *catalog.Registry
+	Journal      *journal.FileJournal
+	Snapshots    *snapshot.Manager
+	Store        *state.Store
+	Runner       *security.Runner
+	Provider     providers.Provider
+	InstallSvc   *app.InstallService
+	SyncSvc      *app.SyncService
+	DoctorSvc    *app.DoctorService
+	AuditSvc     *app.AuditService
 	HacksSvc     *app.HacksService
 	OpsSvc       *app.OpsService
 	ToolsSvc     *app.ToolsService
 	ToolRunner   *tools.Runner
 	ControlPlane *app.ControlPlaneService
+	DestroyerSvc *app.DestroyerService
+	SecuritySeal *security.OriginSeal
 	RepoRoot     string
-	Viper      *viper.Viper
-	Version    string
-	Commit     string
-	Date       string
+	Viper        *viper.Viper
+	Version      string
+	Commit       string
+	Date         string
 }
 
 // Config specifies runtime options for constructing a Container.
 type Config struct {
-	RepoRoot string
-	Version  string
-	Commit   string
-	Date     string
-	Offline  bool
+	RepoRoot      string
+	Version       string
+	Commit        string
+	Date          string
+	Offline       bool
+	TrustVerifier security.DirectoryTrustVerifier
 }
 
 // Option modifies Config.
 type Option func(*Config)
+
+// WithTrustVerifier allows injecting a custom directory trust verifier.
+func WithTrustVerifier(v security.DirectoryTrustVerifier) Option {
+	return func(c *Config) {
+		c.TrustVerifier = v
+	}
+}
+
+// Close closes runtime resources held by the container, including state storage and journals.
+func (c *Container) Close() error {
+	if c == nil {
+		return nil
+	}
+	var errs []error
+	if c.Store != nil {
+		if err := c.Store.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
 
 // WithRepoRoot sets an explicit repository root override.
 func WithRepoRoot(repoRoot string) Option {
@@ -99,14 +123,23 @@ func NewLazyContainer(opts ...Option) (*Container, error) {
 	v.AutomaticEnv()
 
 	cat := catalog.NewDefaultRegistry()
+	sealOpts := []security.SealOption{
+		security.WithSealRepoRoot(cfg.RepoRoot),
+		security.WithSealSkipDotfiles(true),
+	}
+	if cfg.TrustVerifier != nil {
+		sealOpts = append(sealOpts, security.WithSealTrustVerifier(cfg.TrustVerifier))
+	}
+	seal, _ := security.CreateOriginSeal(sealOpts...)
 
 	return &Container{
-		Platform: plat,
-		Catalog:  cat,
-		Viper:    v,
-		Version:  cfg.Version,
-		Commit:   cfg.Commit,
-		Date:     cfg.Date,
+		Platform:     plat,
+		Catalog:      cat,
+		SecuritySeal: seal,
+		Viper:        v,
+		Version:      cfg.Version,
+		Commit:       cfg.Commit,
+		Date:         cfg.Date,
 	}, nil
 }
 
@@ -137,6 +170,12 @@ func NewContainer(opts ...Option) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	var initSuccess bool
+	defer func() {
+		if !initSuccess && store != nil {
+			_ = store.Close()
+		}
+	}()
 
 	repoRoot := cfg.RepoRoot
 	if repoRoot == "" {
@@ -208,11 +247,23 @@ func NewContainer(opts ...Option) (*Container, error) {
 		return installSvc.Apply(ctx, plan)
 	})
 	toolsSvc := app.NewToolsService(toolReg, toolRunner, toolUpdater)
-	doctorSvc := app.NewDoctorService(plat, cat, app.WithDoctorStore(store))
+	doctorSvc := app.NewDoctorService(plat, cat, app.WithDoctorStore(store), app.WithDoctorRepoRoot(repoRoot))
 	auditSvc := app.NewAuditService(cat, prov, osvClient)
 	hacksSvc := app.NewHacksService(plat, hackReg, installRunner, snap, store, repoRoot)
 	opsSvc := app.NewOpsService(plat, installRunner)
 	controlPlane := app.NewControlPlaneService(plat, cat, installSvc, syncSvc, hacksSvc, toolsSvc, store)
+	destroyerSvc := app.NewDestroyerService(plat, cat, installSvc, syncSvc, store, app.WithDestroyerToolsRegistry(toolReg))
+	sealOpts := []security.SealOption{
+		security.WithSealRepoRoot(repoRoot),
+		security.WithSealUserDropIn(filepath.Join(plat.ConfigDir(), "manifests.d")),
+		security.WithSealTargetHome(plat.HomeDir()),
+	}
+	if cfg.TrustVerifier != nil {
+		sealOpts = append(sealOpts, security.WithSealTrustVerifier(cfg.TrustVerifier))
+	}
+	seal, _ := security.CreateOriginSeal(sealOpts...)
+
+	initSuccess = true
 
 	return &Container{
 		Platform:     plat,
@@ -231,6 +282,8 @@ func NewContainer(opts ...Option) (*Container, error) {
 		ToolsSvc:     toolsSvc,
 		ToolRunner:   toolRunner,
 		ControlPlane: controlPlane,
+		DestroyerSvc: destroyerSvc,
+		SecuritySeal: seal,
 		RepoRoot:     repoRoot,
 		Viper:        v,
 		Version:      cfg.Version,
@@ -239,10 +292,16 @@ func NewContainer(opts ...Option) (*Container, error) {
 	}, nil
 }
 
-// ResolveRepoRoot finds the env repository: configured path, walking up from cwd, persisted store root, or well-known user paths.
+// ResolveRepoRoot finds the env repository: configured path, env vars, walking up from cwd, persisted store root, or well-known user paths.
 func ResolveRepoRoot(configured, home, stored string) string {
 	if configured != "" && isDir(filepath.Join(configured, "manifests")) {
 		return configured
+	}
+	if envRepo := os.Getenv("ANX_REPO"); envRepo != "" && isDir(filepath.Join(envRepo, "manifests")) {
+		return envRepo
+	}
+	if envRepoRoot := os.Getenv("REPO_ROOT"); envRepoRoot != "" && isDir(filepath.Join(envRepoRoot, "manifests")) {
+		return envRepoRoot
 	}
 	cwd, err := os.Getwd()
 	if err == nil {
@@ -259,6 +318,7 @@ func ResolveRepoRoot(configured, home, stored string) string {
 		return stored
 	}
 	candidates := []string{
+		"/repo",
 		filepath.Join(home, "repos", "github.com", "arturonavax", "env"),
 		filepath.Join(home, ".local", "share", "anx", "repo"),
 		filepath.Join(home, "env"),

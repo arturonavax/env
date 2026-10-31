@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "env-installer-router",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-10-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "sh.arturonavax.dev/*",
+      "custom_domain": true
+    },
+    {
+      "pattern": "env.arturonavax.dev/*",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "GITHUB_USER": "arturonavax",
+    "GITHUB_REPO": "env",
+    "DEFAULT_BRANCH": "main",
+    "PERSONAL_WEBSITE_URL": "https://arturonavax.dev/env"
+  }
+}

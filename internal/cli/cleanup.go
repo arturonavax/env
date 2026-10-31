@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/arturonavax/env/internal/scriptgen"
+	"github.com/spf13/cobra"
 )
 
 type cleanupItem struct {

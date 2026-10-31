@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/bootstrap"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/journal"
@@ -39,31 +40,50 @@ type GlobalFlagState struct {
 	Profile      string
 	IncludeHacks bool
 	ScriptMode   bool
+	Destroyer    bool
+	Force        bool
 }
 
 // AppContext holds shared domain services injected into CLI commands.
 type AppContext struct {
-	Platform   *platform.Info
-	Catalog    *catalog.Registry
-	Journal    *journal.FileJournal
-	Snapshots  *snapshot.Manager
-	Store      *state.Store
-	Runner     *security.Runner
-	Provider   providers.Provider
-	InstallSvc *app.InstallService
-	SyncSvc    *app.SyncService
-	DoctorSvc  *app.DoctorService
-	AuditSvc   *app.AuditService
-	HacksSvc   *app.HacksService
-	OpsSvc     *app.OpsService
+	Platform     *platform.Info
+	Catalog      *catalog.Registry
+	Journal      *journal.FileJournal
+	Snapshots    *snapshot.Manager
+	Store        *state.Store
+	Runner       *security.Runner
+	Provider     providers.Provider
+	InstallSvc   *app.InstallService
+	SyncSvc      *app.SyncService
+	DoctorSvc    *app.DoctorService
+	AuditSvc     *app.AuditService
+	HacksSvc     *app.HacksService
+	OpsSvc       *app.OpsService
 	ToolsSvc     *app.ToolsService
 	ControlPlane *app.ControlPlaneService
+	DestroyerSvc *app.DestroyerService
+	SecuritySeal *security.OriginSeal
 	RepoRoot     string
-	Viper      *viper.Viper
-	Flags      GlobalFlagState
-	Version    string
-	Commit     string
-	Date       string
+	Viper        *viper.Viper
+	Flags        GlobalFlagState
+	Version      string
+	Commit       string
+	Date         string
+	container    *bootstrap.Container
+}
+
+// Close safely and idempotently closes all runtime resources held by the application context.
+func (a *AppContext) Close() error {
+	if a == nil {
+		return nil
+	}
+	if a.container != nil {
+		return a.container.Close()
+	}
+	if a.Store != nil {
+		return a.Store.Close()
+	}
+	return nil
 }
 
 // NewRootCommand creates the top-level anx Cobra command tree.
@@ -106,6 +126,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	pf.StringVar(&appCtx.Flags.Profile, "profile", "developer", "Target profile name")
 	pf.BoolVar(&appCtx.Flags.IncludeHacks, "include-hacks", false, "Include matched hardware workstation hacks during apply")
 	pf.BoolVar(&appCtx.Flags.ScriptMode, "script", false, "Output shell script preview of planned actions")
+	pf.BoolVar(&appCtx.Flags.Destroyer, "destroyer", false, "Destroyer mode: aggressively purge packages, tools, configurations, and state")
+	pf.BoolVar(&appCtx.Flags.Destroyer, "destroyer-reinstall", false, "Alias for --destroyer")
+	pf.BoolVar(&appCtx.Flags.Force, "force", false, "Force operation and bypass confirmation prompts")
 	_ = rootCmd.RegisterFlagCompletionFunc("format", staticCompletion("text", "json", "yaml"))
 	_ = rootCmd.RegisterFlagCompletionFunc("profile", profileCompletion(appCtx))
 	_ = rootCmd.RegisterFlagCompletionFunc("theme", staticCompletion(themeNames()...))
@@ -129,6 +152,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd.AddCommand(newSelfCmd(appCtx))
 	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
+	rootCmd.AddCommand(newResetCmd(appCtx))
+	rootCmd.AddCommand(newStateCmd(appCtx))
+	rootCmd.AddCommand(newJobsCmd(appCtx))
 
 	return rootCmd
 }
@@ -195,6 +221,9 @@ func ExecuteCLI(args []string, out, errOut io.Writer, version, commit, date stri
 		fmt.Fprintf(errOut, "Initialization error: %v\n", err)
 		return domain.ExitPreflightFailed
 	}
+	defer func() {
+		_ = appCtx.Close()
+	}()
 
 	rootCmd := NewRootCommand(appCtx)
 	rootCmd.SetArgs(args)

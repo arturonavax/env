@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/state"
+	"github.com/arturonavax/env/internal/storage/sqlite"
 )
 
 // InventoryFilter filters resources returned by Inventory.
@@ -58,6 +60,9 @@ type CommandService interface {
 	BuildPlan(ctx context.Context, req PlanRequest) (*domain.PlanSpec, error)
 	Apply(ctx context.Context, req ApplyRequest) (string, error)
 	Cancel(ctx context.Context, jobID string) error
+	ListJobs(ctx context.Context, limit int) ([]sqlite.JobRecord, error)
+	GetJob(ctx context.Context, jobID string) (sqlite.JobRecord, bool, error)
+	GetJobEvents(ctx context.Context, jobID string) ([]sqlite.EventRecord, error)
 }
 
 // ControlPlaneService coordinates queries and commands across domain services.
@@ -290,7 +295,7 @@ func (c *ControlPlaneService) Explain(ctx context.Context, rawID domain.Resource
 	return nil, fmt.Errorf("resource %q not found in packages, configurations, tools, hacks, or capabilities", rawID)
 }
 
-// BuildPlan produces an immutable PlanSpec.
+// BuildPlan produces an immutable PlanSpec and persists the plan record.
 func (c *ControlPlaneService) BuildPlan(ctx context.Context, req PlanRequest) (*domain.PlanSpec, error) {
 	if c.installSvc == nil {
 		return nil, fmt.Errorf("install service not available")
@@ -300,10 +305,27 @@ func (c *ControlPlaneService) BuildPlan(ctx context.Context, req PlanRequest) (*
 		return nil, err
 	}
 	execPlan.DryRun = req.DryRun
+
+	if c.store != nil && c.store.DB() != nil && !req.DryRun {
+		now := time.Now().UTC()
+		if err := c.store.DB().SavePlan(ctx, sqlite.PlanRecord{
+			PlanID:            execPlan.ID,
+			SchemaVersion:     1,
+			CanonicalIRDigest: execPlan.Digest(),
+			Target:            fmt.Sprintf("%s/%s", c.platform.OS(), c.platform.Arch()),
+			CreatedAt:         now,
+			ExpiresAt:         now.Add(24 * time.Hour),
+			Status:            "created",
+		}); err != nil {
+			return nil, fmt.Errorf("persisting execution plan: %w", err)
+		}
+	}
+
 	return execPlan.ToSpec(), nil
 }
 
-// Apply executes a planned change without regenerating an arbitrary unverified plan.
+// Apply executes a planned change without regenerating an arbitrary unverified plan,
+// tracking durable job lifecycle states and events in the database.
 func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (string, error) {
 	if c.installSvc == nil {
 		return "", fmt.Errorf("install service not available")
@@ -329,6 +351,56 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 		return plan.ID, nil
 	}
 
+	var db *sqlite.DB
+	if c.store != nil {
+		db = c.store.DB()
+	}
+
+	// Durable job lifecycle: queued
+	now := time.Now().UTC()
+	authTime := now
+	if db != nil {
+		if err := db.SavePlan(ctx, sqlite.PlanRecord{
+			PlanID:            plan.ID,
+			SchemaVersion:     1,
+			CanonicalIRDigest: plan.Digest(),
+			Target:            fmt.Sprintf("%s/%s", c.platform.OS(), c.platform.Arch()),
+			CreatedAt:         now,
+			ExpiresAt:         now.Add(24 * time.Hour),
+			AuthorizedAt:      &authTime,
+			AuthorizedBy:      "user",
+			Status:            "authorized",
+		}); err != nil {
+			return "", fmt.Errorf("persisting authorized plan: %w", err)
+		}
+
+		if err := db.CreateJob(ctx, sqlite.JobRecord{
+			JobID:          plan.ID,
+			PlanID:         plan.ID,
+			IdempotencyKey: req.IdempotencyKey,
+			State:          "queued",
+			Cursor:         0,
+			QueuedAt:       now,
+			Attempt:        1,
+		}); err != nil {
+			return "", fmt.Errorf("creating durable job: %w", err)
+		}
+
+		if err := db.AppendEvent(ctx, sqlite.EventRecord{
+			JobID:         plan.ID,
+			EventType:     "job.started",
+			SchemaVersion: 1,
+			PayloadJSON:   fmt.Sprintf(`{"plan_id":%q,"steps":%d}`, plan.ID, len(plan.Steps)),
+			Timestamp:     now,
+		}); err != nil {
+			return "", fmt.Errorf("recording job start event: %w", err)
+		}
+
+		if err := db.UpdateJobState(ctx, plan.ID, "running", 0); err != nil {
+			return "", fmt.Errorf("transitioning job to running: %w", err)
+		}
+	}
+
 	jobCtx, cancel := context.WithCancel(ctx)
 	c.mu.Lock()
 	c.activeJobs[plan.ID] = cancel
@@ -340,19 +412,100 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 	}()
 
 	err := c.installSvc.Apply(jobCtx, plan)
+
+	if db != nil {
+		finTime := time.Now().UTC()
+		if err != nil {
+			if errors.Is(err, context.Canceled) || jobCtx.Err() != nil {
+				_ = db.UpdateJobState(ctx, plan.ID, "cancelled", 130)
+				_ = db.AppendEvent(ctx, sqlite.EventRecord{
+					JobID:         plan.ID,
+					EventType:     "job.cancelled",
+					SchemaVersion: 1,
+					PayloadJSON:   `{"reason":"cancelled by user or signal"}`,
+					Timestamp:     finTime,
+				})
+			} else {
+				_ = db.UpdateJobState(ctx, plan.ID, "failed", 1)
+				_ = db.AppendEvent(ctx, sqlite.EventRecord{
+					JobID:         plan.ID,
+					EventType:     "job.failed",
+					SchemaVersion: 1,
+					PayloadJSON:   fmt.Sprintf(`{"error":%q}`, err.Error()),
+					Timestamp:     finTime,
+				})
+			}
+		} else {
+			if updateErr := db.UpdateJobState(ctx, plan.ID, "succeeded", 0); updateErr != nil {
+				_ = db.UpdateJobState(ctx, plan.ID, "needs_reconcile", 1)
+				_ = db.AppendEvent(ctx, sqlite.EventRecord{
+					JobID:         plan.ID,
+					EventType:     "job.needs_reconcile",
+					SchemaVersion: 1,
+					PayloadJSON:   fmt.Sprintf(`{"error":%q,"details":"external actions completed but state persistence failed"}`, updateErr.Error()),
+					Timestamp:     finTime,
+				})
+				return plan.ID, fmt.Errorf("actions succeeded but failed persisting completion state: %w", updateErr)
+			}
+			_ = db.AppendEvent(ctx, sqlite.EventRecord{
+				JobID:         plan.ID,
+				EventType:     "job.succeeded",
+				SchemaVersion: 1,
+				PayloadJSON:   fmt.Sprintf(`{"steps_completed":%d}`, len(plan.Steps)),
+				Timestamp:     finTime,
+			})
+		}
+	}
+
 	return plan.ID, err
 }
 
-// Cancel interrupts an active job.
-func (c *ControlPlaneService) Cancel(_ context.Context, jobID string) error {
+// Cancel interrupts an active job and records the cancellation event in SQLite.
+func (c *ControlPlaneService) Cancel(ctx context.Context, jobID string) error {
 	c.mu.Lock()
 	cancel, ok := c.activeJobs[jobID]
 	c.mu.Unlock()
+
+	if c.store != nil && c.store.DB() != nil {
+		_ = c.store.DB().UpdateJobState(ctx, jobID, "cancelled", 130)
+		_ = c.store.DB().AppendEvent(ctx, sqlite.EventRecord{
+			JobID:         jobID,
+			EventType:     "job.cancelled",
+			SchemaVersion: 1,
+			PayloadJSON:   `{"reason":"explicit cancel requested"}`,
+			Timestamp:     time.Now().UTC(),
+		})
+	}
+
 	if !ok {
-		return fmt.Errorf("job %s not found or already completed", jobID)
+		return fmt.Errorf("job %s not running in active process", jobID)
 	}
 	cancel()
 	return nil
+}
+
+// ListJobs returns the most recent execution jobs from durable SQLite storage.
+func (c *ControlPlaneService) ListJobs(ctx context.Context, limit int) ([]sqlite.JobRecord, error) {
+	if c.store == nil || c.store.DB() == nil {
+		return nil, fmt.Errorf("state storage not available")
+	}
+	return c.store.DB().ListJobs(ctx, limit)
+}
+
+// GetJob returns a specific job record from durable SQLite storage.
+func (c *ControlPlaneService) GetJob(ctx context.Context, jobID string) (sqlite.JobRecord, bool, error) {
+	if c.store == nil || c.store.DB() == nil {
+		return sqlite.JobRecord{}, false, fmt.Errorf("state storage not available")
+	}
+	return c.store.DB().GetJob(ctx, jobID)
+}
+
+// GetJobEvents returns chronological audit events for a job.
+func (c *ControlPlaneService) GetJobEvents(ctx context.Context, jobID string) ([]sqlite.EventRecord, error) {
+	if c.store == nil || c.store.DB() == nil {
+		return nil, fmt.Errorf("state storage not available")
+	}
+	return c.store.DB().GetEventsForJob(ctx, jobID)
 }
 
 func normalizeResourceID(id domain.ResourceID) string {

@@ -2,8 +2,8 @@ package configsync_test
 
 import (
 	"os"
-	"runtime"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 

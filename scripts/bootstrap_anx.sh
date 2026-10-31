@@ -4,14 +4,16 @@
 # Multi-platform Pre-Flight Analyzer & Golang Bootstrap for ANX Platform.
 #
 # Strategy:
-#   1. Pre-flight check for Go (>= 1.24).
-#   2. If missing or outdated:
+#   0. Tier 0: Pre-compiled verified release download (instant, zero compiler needed)
+#   1. Tier 0.5: Direct 'go install' if Go is present and requested
+#   2. Pre-flight check for Go (>= 1.27.3)
+#   3. If missing or outdated:
 #      - Tier 1: GVM (Go Version Manager) binary release
 #      - Tier 2: Personal standalone installer (src/remotes/install_golang.sh -i)
 #      - Tier 3: Native package manager (brew, pacman, dnf, apt, apk)
-#   3. Compile ANX binary with embedded version metadata.
-#   4. Symlink 'safe-suspend' -> 'anx' for multicall binary compatibility.
-#   5. Delegate forwarded arguments to ANX CLI.
+#   4. Compile ANX binary with embedded version metadata
+#   5. Symlink 'safe-suspend' -> 'anx' for multicall binary compatibility
+#   6. Delegate forwarded arguments to ANX CLI
 # ==============================================================================
 
 set -euo pipefail
@@ -74,47 +76,103 @@ try_download_release_binary() {
 		return 1
 	fi
 
-	local os_arch
+	local os_arch archive_name release_url default_sums_url sums_url
 	os_arch="$(detect_os_arch)"
-	local release_url="${ANX_RELEASE_URL:-https://github.com/arturonavax/env/releases/latest/download/anx_${os_arch}.tar.gz}"
+	archive_name="anx_${os_arch}.tar.gz"
+	release_url="${ANX_RELEASE_URL:-https://github.com/arturonavax/env/releases/latest/download/${archive_name}}"
+	default_sums_url="$(dirname "${release_url}")/SHA256SUMS"
+	sums_url="${ANX_SUMS_URL:-${default_sums_url}}"
 
-	log_step "Checking for pre-compiled ANX release binary (${os_arch})..."
+	log_step "Checking for pre-compiled verified ANX release binary (${os_arch})..."
 	if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
 		return 1
 	fi
 
 	local tmp_dir
 	tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t anx-release)"
-	local tarball="${tmp_dir}/anx.tar.gz"
+	local tarball="${tmp_dir}/${archive_name}"
+	local sums_file="${tmp_dir}/SHA256SUMS"
 
 	local dl_ok=0
 	if command -v curl >/dev/null 2>&1; then
-		if curl -fsSL --connect-timeout 4 --max-time 30 -o "${tarball}" "${release_url}" 2>/dev/null; then
+		if curl -fsSL --connect-timeout 4 --max-time 30 -o "${tarball}" "${release_url}" 2>/dev/null && \
+		   curl -fsSL --connect-timeout 4 --max-time 15 -o "${sums_file}" "${sums_url}" 2>/dev/null; then
 			dl_ok=1
 		fi
 	elif command -v wget >/dev/null 2>&1; then
-		if wget -q -T 30 -O "${tarball}" "${release_url}" 2>/dev/null; then
+		if wget -q -T 30 -O "${tarball}" "${release_url}" 2>/dev/null && \
+		   wget -q -T 15 -O "${sums_file}" "${sums_url}" 2>/dev/null; then
 			dl_ok=1
 		fi
 	fi
 
-	if [[ "${dl_ok}" -eq 1 && -s "${tarball}" ]]; then
-		log_info "Extracting release binary to ${DEST_BIN}..."
-		if tar -xzf "${tarball}" -C "${DEST_BIN}" 2>/dev/null; then
-			chmod +x "${DEST_BIN}/anx"
-			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
-			ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
-			if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
-				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
+	if [[ "${dl_ok}" -eq 1 && -s "${tarball}" && -s "${sums_file}" ]]; then
+		# Checksum verification before extraction
+		local want_sum computed_sum
+		want_sum=$(grep "${archive_name}" "${sums_file}" 2>/dev/null | awk '{print $1}' || true)
+		if [[ -n "${want_sum}" ]]; then
+			if command -v sha256sum >/dev/null 2>&1; then
+				computed_sum=$(sha256sum "${tarball}" | awk '{print $1}')
+			elif command -v shasum >/dev/null 2>&1; then
+				computed_sum=$(shasum -a 256 "${tarball}" | awk '{print $1}')
 			fi
-			rm -rf "${tmp_dir}"
-			log_success "ANX release binary successfully deployed to ${DEST_BIN}/anx"
-			return 0
+
+			if [[ -n "${computed_sum:-}" && "${computed_sum}" != "${want_sum}" ]]; then
+				log_warn "Checksum verification failed for ${archive_name}. Expected ${want_sum}, got ${computed_sum}"
+				rm -rf "${tmp_dir}"
+				return 1
+			fi
+			log_success "Checksum verified: ${want_sum}"
+		fi
+
+		# Safe isolated extraction
+		local extract_dir="${tmp_dir}/extracted"
+		mkdir -p "${extract_dir}"
+		if tar -xzf "${tarball}" -C "${extract_dir}" 2>/dev/null; then
+			if [[ -f "${extract_dir}/anx" ]]; then
+				chmod 0755 "${extract_dir}/anx"
+				# Self-test before placing into DEST_BIN
+				if "${extract_dir}/anx" version >/dev/null 2>&1; then
+					mv -f "${extract_dir}/anx" "${DEST_BIN}/anx"
+					ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+					ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
+					if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
+						ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
+					fi
+					rm -rf "${tmp_dir}"
+					log_success "ANX verified release binary successfully deployed to ${DEST_BIN}/anx"
+					return 0
+				fi
+			fi
 		fi
 	fi
 
 	rm -rf "${tmp_dir}"
-	log_info "Pre-compiled release not available or download skipped. Proceeding to source build."
+	log_info "Pre-compiled release not available or unverified. Proceeding with Go build."
+	return 1
+}
+
+try_go_install() {
+	if command -v go >/dev/null 2>&1; then
+		log_step "Installing ANX via 'go install github.com/arturonavax/env/cmd/anx@latest'..."
+		if go install -trimpath github.com/arturonavax/env/cmd/anx@latest; then
+			local gobin
+			gobin="$(go env GOBIN)"
+			[[ -z "${gobin}" ]] && gobin="$(go env GOPATH)/bin"
+			if [[ -x "${gobin}/anx" ]]; then
+				if [[ "${gobin}" != "${DEST_BIN}" ]]; then
+					ln -sf "${gobin}/anx" "${DEST_BIN}/anx"
+				fi
+				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
+				if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
+					ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/${BIN_NAME}"
+				fi
+				log_success "ANX successfully installed via 'go install' and linked to ${DEST_BIN}/anx"
+				return 0
+			fi
+		fi
+	fi
 	return 1
 }
 
@@ -157,14 +215,18 @@ install_go_tier1_gvm() {
 
 	if ! command -v gvm >/dev/null 2>&1; then
 		if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
+			set +u
 			# shellcheck source=/dev/null
-			source "${HOME}/.gvm/scripts/gvm"
+			source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
+			set -u
 		elif command -v curl >/dev/null 2>&1; then
 			log_info "Installing GVM..."
 			bash < <(curl -fsSL "https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer") || return 1
 			if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
+				set +u
 				# shellcheck source=/dev/null
-				source "${HOME}/.gvm/scripts/gvm"
+				source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
+				set -u
 			fi
 		fi
 	fi
@@ -288,6 +350,7 @@ main() {
 	echo -e "${BOLD_WHITE}==============================================================================${RESET}"
 
 	BIN_NAME="${ANX_BIN_NAME:-}"
+	local force_go_install=0
 	local forward_args=()
 
 	while [[ $# -gt 0 ]]; do
@@ -304,12 +367,27 @@ main() {
 				ANX_FORCE_SOURCE=1
 				shift
 				;;
+			--go-install)
+				force_go_install=1
+				shift
+				;;
 			*)
 				forward_args+=("$1")
 				shift
 				;;
 		esac
 	done
+
+	if [[ "${force_go_install}" -eq 1 ]]; then
+		if try_go_install; then
+			if [[ ${#forward_args[@]} -gt 0 ]]; then
+				exec "${DEST_BIN}/anx" "${forward_args[@]}"
+			else
+				log_success "Bootstrap complete! You can now run 'anx' or 'anx wizard'."
+				return 0
+			fi
+		fi
+	fi
 
 	# Tier 0: Attempt pre-compiled GitHub release download if not forcing source build
 	if try_download_release_binary; then

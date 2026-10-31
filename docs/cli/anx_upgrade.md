@@ -30,17 +30,20 @@ anx upgrade [flags]
 ### Options inherited from parent commands
 
 ```
-      --dry-run          Preview actions without mutating the system
-      --format string    Output format (text|json|yaml) (default "text")
-  -i, --interactive      Force interactive prompts
-      --no-color         Disable ANSI color rendering
-      --offline          Disable network queries
-      --profile string   Target profile name (default "developer")
-  -q, --quiet            Suppress non-essential output
-      --script           Output shell script preview of planned actions
-      --theme string     UI theme (see 'anx theme list') (default "tokyo-night")
-  -v, --verbose          Verbose execution logging
-  -y, --yes              Automatically answer yes to confirmations
+      --destroyer             Destroyer mode: aggressively purge packages, tools, configurations, and state
+      --destroyer-reinstall   Alias for --destroyer
+      --dry-run               Preview actions without mutating the system
+      --force                 Force operation and bypass confirmation prompts
+      --format string         Output format (text|json|yaml) (default "text")
+  -i, --interactive           Force interactive prompts
+      --no-color              Disable ANSI color rendering
+      --offline               Disable network queries
+      --profile string        Target profile name (default "developer")
+  -q, --quiet                 Suppress non-essential output
+      --script                Output shell script preview of planned actions
+      --theme string          UI theme (see 'anx theme list') (default "tokyo-night")
+  -v, --verbose               Verbose execution logging
+  -y, --yes                   Automatically answer yes to confirmations
 ```
 
 ### SEE ALSO

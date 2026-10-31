@@ -13,10 +13,11 @@ REPO_ROOT="${REPO_ROOT:-/repo}"
 echo "=== [E2E] Testing GitHub Release Binary Downloader ==="
 
 # Clean environment
-rm -rf "${DEST_BIN}/anx" "${DEST_BIN}/aitools" "${HOME}/.config/anx" "${HOME}/.local/state/anx"
+rm -rf "${DEST_BIN}/anx" "${DEST_BIN}/aitools" "${DEST_BIN}/safe-suspend" "${HOME}/.config/anx" "${HOME}/.local/state/anx" "${HOME}/.gvm"
 
 echo "-> 1. Running bootstrap in zero-Go environment with ANX_RELEASE_URL..."
 export ANX_RELEASE_URL="${MOCK_SERVER_URL}/releases/latest/download/anx_linux_amd64.tar.gz"
+export ANX_SUMS_URL="${MOCK_SERVER_URL}/releases/latest/download/SHA256SUMS"
 
 # Deliberately remove /usr/local/go/bin from PATH to guarantee zero-Go environment
 export PATH="${DEST_BIN}:/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin"

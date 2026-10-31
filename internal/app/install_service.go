@@ -90,6 +90,7 @@ func (s *InstallService) Plan(ctx context.Context, profileName string, requested
 	}
 
 	stepID := 1
+	installStepIDs := make(map[string]int, len(ordered))
 	for _, pkg := range ordered {
 		if len(pkg.SupportedOS) > 0 && !containsOS(pkg.SupportedOS, s.platform.OS()) {
 			continue
@@ -105,9 +106,11 @@ func (s *InstallService) Plan(ctx context.Context, profileName string, requested
 			Description: fmt.Sprintf("Install %s (%s)", pkg.Name, pkg.Description),
 			Provider:    s.provider.Name(),
 			Strategy:    string(pkg.Strategy),
+			DependsOn:   installDependencies(pkg, installStepIDs),
 			IsExclusive: true,
 			Status:      domain.StepPending,
 		})
+		installStepIDs[pkg.ID] = stepID
 		stepID++
 	}
 
@@ -120,14 +123,17 @@ func (s *InstallService) Plan(ctx context.Context, profileName string, requested
 			if !cfg.SupportsOS(s.platform.OS()) {
 				continue
 			}
+			target := s.platform.ExpandPath(cfg.TargetForOS(s.platform.OS()))
 			plan.Steps = append(plan.Steps, domain.PlanStep{
 				ID:          stepID,
 				ResourceID:  cfg.ID,
 				Action:      domain.ActionSync,
 				Description: fmt.Sprintf("Synchronize %s", cfg.Name),
 				SourcePath:  cfg.Source,
-				TargetPath:  s.platform.ExpandPath(cfg.TargetForOS(s.platform.OS())),
-				Status:      domain.StepPending,
+				TargetPath:  target,
+				// Serialize configs that write the same path while letting unrelated ones overlap.
+				Locks:  []string{"file:" + target},
+				Status: domain.StepPending,
 			})
 			stepID++
 		}
@@ -136,7 +142,19 @@ func (s *InstallService) Plan(ctx context.Context, profileName string, requested
 	return plan, nil
 }
 
-// Apply executes plan under an exclusive advisory lock with journaling and LIFO compensation on failure.
+// installDependencies maps a package's declared dependencies to the plan step IDs that install them.
+// Dependencies absent from stepIDs are already satisfied (installed or filtered out) and need no edge.
+func installDependencies(pkg domain.ManagedResource, stepIDs map[string]int) []int {
+	var deps []int
+	for _, dep := range pkg.DependsOn {
+		if id, ok := stepIDs[dep]; ok {
+			deps = append(deps, id)
+		}
+	}
+	return deps
+}
+
+// Apply executes plan under an exclusive advisory lock with journaling and compensation on failure.
 func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) error {
 	if plan == nil || len(plan.Steps) == 0 {
 		return nil

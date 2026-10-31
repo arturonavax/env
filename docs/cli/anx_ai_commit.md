@@ -26,18 +26,21 @@ anx ai commit [flags]
 ### Options inherited from parent commands
 
 ```
-      --config string    Path to ANX AI JSON/JSONC configuration file
-      --format string    Output format (text|json|yaml) (default "text")
-      --include-hacks    Include matched hardware workstation hacks during apply
-  -i, --interactive      Force interactive prompts
-      --no-color         Disable ANSI color rendering
-      --offline          Disable network queries
-      --profile string   Target profile name (default "developer")
-  -q, --quiet            Suppress non-essential output
-      --script           Output shell script preview of planned actions
-      --theme string     UI theme (see 'anx theme list') (default "tokyo-night")
-  -v, --verbose          Verbose execution logging
-  -y, --yes              Automatically answer yes to confirmations
+      --config string         Path to ANX AI JSON/JSONC configuration file
+      --destroyer             Destroyer mode: aggressively purge packages, tools, configurations, and state
+      --destroyer-reinstall   Alias for --destroyer
+      --force                 Force operation and bypass confirmation prompts
+      --format string         Output format (text|json|yaml) (default "text")
+      --include-hacks         Include matched hardware workstation hacks during apply
+  -i, --interactive           Force interactive prompts
+      --no-color              Disable ANSI color rendering
+      --offline               Disable network queries
+      --profile string        Target profile name (default "developer")
+  -q, --quiet                 Suppress non-essential output
+      --script                Output shell script preview of planned actions
+      --theme string          UI theme (see 'anx theme list') (default "tokyo-night")
+  -v, --verbose               Verbose execution logging
+  -y, --yes                   Automatically answer yes to confirmations
 ```
 
 ### SEE ALSO

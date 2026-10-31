@@ -15,32 +15,44 @@ anx self update [flags]
   # Preview update in dry-run mode
   anx self update --dry-run
 
-  # Apply verified update
+  # Apply verified update to latest stable release
   anx self update
+
+  # Update to a specific release tag (can upgrade or downgrade)
+  anx self update --tag v1.2.0
+
+  # Update via go install (using the Go toolchain)
+  anx self update --method go-install
 ```
 
 ### Options
 
 ```
-      --check   Check for available updates without applying
-  -h, --help    help for update
+      --check                Check for available updates without applying
+  -h, --help                 help for update
+      --include-prerelease   Include pre-releases when checking latest release
+      --method string        Update method (auto|release|go-install) (default "auto")
+      --tag string           Explicit release tag to update or downgrade to (e.g. v1.2.0)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --dry-run          Preview actions without mutating the system
-      --format string    Output format (text|json|yaml) (default "text")
-      --include-hacks    Include matched hardware workstation hacks during apply
-  -i, --interactive      Force interactive prompts
-      --no-color         Disable ANSI color rendering
-      --offline          Disable network queries
-      --profile string   Target profile name (default "developer")
-  -q, --quiet            Suppress non-essential output
-      --script           Output shell script preview of planned actions
-      --theme string     UI theme (see 'anx theme list') (default "tokyo-night")
-  -v, --verbose          Verbose execution logging
-  -y, --yes              Automatically answer yes to confirmations
+      --destroyer             Destroyer mode: aggressively purge packages, tools, configurations, and state
+      --destroyer-reinstall   Alias for --destroyer
+      --dry-run               Preview actions without mutating the system
+      --force                 Force operation and bypass confirmation prompts
+      --format string         Output format (text|json|yaml) (default "text")
+      --include-hacks         Include matched hardware workstation hacks during apply
+  -i, --interactive           Force interactive prompts
+      --no-color              Disable ANSI color rendering
+      --offline               Disable network queries
+      --profile string        Target profile name (default "developer")
+  -q, --quiet                 Suppress non-essential output
+      --script                Output shell script preview of planned actions
+      --theme string          UI theme (see 'anx theme list') (default "tokyo-night")
+  -v, --verbose               Verbose execution logging
+  -y, --yes                   Automatically answer yes to confirmations
 ```
 
 ### SEE ALSO

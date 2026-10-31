@@ -16,6 +16,7 @@ func TestNewContainer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create bootstrap container: %v", err)
 	}
+	t.Cleanup(func() { _ = c.Close() })
 
 	if c.Platform == nil {
 		t.Errorf("expected platform info in container")

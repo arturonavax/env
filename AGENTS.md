@@ -34,6 +34,9 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 │   ├── providers/          # Dispatcher (native, github_release, script, source, language)
 │   ├── configsync/         # Myers unified diff, bidirectional sync & 3-way merge
 │   ├── snapshot/           # Hierarchical snapshot manager (50MB quota)
+│   ├── state/              # Transactional SQLite state kernel (WAL mode, zero-data-loss migrations)
+│   ├── scheduler/          # DAG execution scheduler, job event streams & persistence
+│   ├── security/           # Zero-alloc secret scanner & anti-tamper digest verification
 │   ├── hacks/              # DMI/hardware detector & hack runner
 │   ├── ops/                # Multi-runtime rebuilder & Lynis optimizer
 │   ├── ai/                 # Go port of aitools (JSONC, harnesses, gitflow, RTC wake)
@@ -87,12 +90,16 @@ Comprehensive operational guide and architecture reference for AI coding agents 
 - **`./install.bat` / `scripts\bootstrap_anx.ps1` (Windows)**:
   - Automated Windows pre-flight check and Go bootstrap via official `go.dev` SHA-256 verified archive, compiling `anx.exe` and `aitools.exe` into `%LOCALAPPDATA%\Programs\anx\bin`.
 - **`anx [command]` (Master Environment CLI & TUI)**:
-  - `anx apply [--profile <name>] [--include-hacks]`: Apply desired state with DAG dependency resolution.
+  - `anx apply [--profile <name>] [--include-hacks] [--destroyer|--destroyer-reinstall] [--force|-y]`: Apply desired state with DAG dependency resolution. `--destroyer` triggers deep manifest-driven purging of packages, tools, and configurations prior to fresh reinstall with interactive confirmation.
   - `anx plan [--profile <name>]`: Dry-run preview of planned actions without modifying filesystem.
+  - `anx state [status|backup|verify|migrate|export]`: Inspect and manage the embedded transactional SQLite state database (`anx.db`) in WAL mode, create snapshots, and verify CAS blob integrity.
+  - `anx jobs [list|show|events|cancel]`: Monitor and manage background DAG scheduler jobs, durable execution states, and live event streams.
+  - `anx repo [clone|set|status]`: Manage remote dotfile repositories and decoupled manifest source trees for multi-repo isolation.
+  - `anx reset [--force|-y]`: Reset local state, manifests, or environment to a clean baseline.
   - `anx update [--fetch]`: Inspect repo commits, personal tools, and dotfile drifts for available updates (CWD-independent).
   - `anx upgrade [--dry-run] [--include-hacks]`: End-to-end upgrade: pull repo, update tools, apply package plans, and sync dotfiles.
   - `anx sync [--dry-run|--push]`: Reconcile dotfiles with Myers diff, 3-way merge, and smart-append markers.
-  - `anx capture [group|config-id] [--commit] [--push] [--wizard]`: Ingest live dotfiles into repo with branch creation and ownership-guarded push.
+  - `anx capture [group|config-id] [--commit] [--push] [--wizard]`: Ingest live dotfiles into repo with branch creation, secret scanning, and ownership-guarded push.
   - `anx backup [create|list|restore]`: Manage hierarchical snapshots (50MB quota).
   - `anx hacks [list|detect|info|apply]`: Detect and apply workstation/hardware optimizations declared in `manifests/hacks.yaml`.
   - `anx rebuild [all|go|rust|node|python|nvim]`: Recompile language toolchains.
@@ -106,6 +113,7 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - `anx doctor`: Run comprehensive diagnostic health checks (including orphan, deprecation, and archive remnant checks).
   - `anx audit [--profile <workstation|server|minimal>] [--report] [--script] [--ai] [--apply] [--packages]`: Run multi-level security compliance audits (`Critical`, `High`, `Medium`, `Low`, `Info`) and OSV tool vulnerability scans, generate standalone idempotent remediation scripts, or synthesize remediations via configured LLM harnesses.
   - Universal `--script` mode: Inspect executable Bash scripts across `apply`, `sync`, `optimize`, `audit`, `rebuild`, `capture`, and `cleanup`/`prune` prior to execution.
+  - Anti-Tamper & Origin Verification: Computes background cryptographic digests of manifest and dotfile sources, re-verifying before execution to prevent TOCTOU substitution attacks.
   - `anx dashboard` / `anx wizard`: Full-screen modular Bubble Tea v2 TUI with deprecation badges, hardware hack indicators, and interactive Security Audit tab with profile switching ('p') and remediation script generation ('s').
   - `anx tools [list|info|run|update|upgrade]`: Decoupled personal tools engine with isolated path (`~/.local/share/anx/bin`).
   - `anx tools ai [commit|pr|llm|quota|daemon]`: AI productivity suite (also available via shortcuts `anx tools llm`, `anx tools commit`, `anx tools pr`, `anx tools quota`, and root aliases `anx ai`, `anx llm`).
@@ -168,6 +176,11 @@ Comprehensive operational guide and architecture reference for AI coding agents 
   - Local Unix socket API (`herdr workspace`, `herdr pane`, `herdr wait`) for programmatic agent orchestration.
   - Zero nested-PTY scroll friction and robust terminal protocol parsing.
 - **Tmux Elimination**: Tmux compatibility has been completely purged across all dotfiles, VSCode/Cursor configs, and install scripts in favor of Herdr.
+- **Dotfile Isolation & Privacy Boundary**:
+  - `files/herdr/` in this repository **strictly and exclusively contains `config.toml`**.
+  - `~/.config/herdr` on host machines **MUST ALWAYS be an independent real directory**, never a directory symlink to `files/herdr/`.
+  - Herdr writes runtime session snapshots (`session-snapshots/`), session states (`session.json`), and UNIX domain sockets (`herdr.sock`) directly into `~/.config/herdr/`. Preserving `~/.config/herdr` as a real directory guarantees runtime state and local path history are never written into the repository tree.
+  - Manifest management in `manifests/configs.yaml` (`herdr-config`) explicitly targets `~/.config/herdr/config.toml` via granular 3-way synchronization, and `anx capture` enforces a fail-closed allowlist that rejects runtime session files.
 
 ### Lean Zsh, FZF & Starship Architecture
 
@@ -249,6 +262,16 @@ Documented root causes and mitigations for hardware/display edge cases:
    - Every generated script begins with defensive shell patterns (`set -euo pipefail`), target environment detection, and an explicit **AUDIT & ARCHITECTURAL BOUNDARY NOTICE**:
      - Documents that internal Go engine operations (goroutine pools, content-addressable storage, SQLite WAL transactions, Myers AST diff computations, zero-alloc secret scanners) are excluded by design as they exceed shell script boundaries.
      - Captures and serializes all host state mutations (package manager invocations, dotfile links, chmod, sysctl tunings, service restarts) for strict inspection prior to execution.
+
+3. **Repository Security & Privacy Audit Verification**:
+   - **Zero Secret Leakage**: Rigorously audited commit history (`git log -S / -G`), manifests, and dotfiles. No API keys, Cloudflare/GitHub tokens, or private SSH keys are tracked or exposed.
+   - **Offline Privacy Guarantee**: Tools handling persistent user state (e.g., Atuin SQLite shell history in `files/atuin/config.toml`) are configured strictly offline (`auto_sync = false`, `update_check = false`) with zero telemetry.
+   - **Dotfile Isolation Boundaries**: Tools generating runtime state (e.g., Herdr session snapshots, sockets) must never have their target configuration directories symlinked wholesale to repository source folders (`files/*`). Host configuration directories remain independent, while ANX manages only declared single-file assets (`config.toml`) via granular 3-way synchronization and fail-closed capture allowlists.
+
+4. **Transactional SQLite State Kernel & Anti-Tampering Security Engine**:
+   - **SQLite State Engine (`anx.db`)**: Replaces legacy `state.json` with an embedded, ACID-compliant SQLite engine in Write-Ahead Logging (`WAL`) mode. Enforces process-safe synchronization, preventing Win32 file-lock crashes and guaranteeing zero data loss during unexpected terminations.
+   - **CAS Blob Storage**: Ancestor configuration files for Myers 3-way merge are stored in a Content-Addressable Storage (CAS) table keyed by SHA-256 digests.
+   - **Anti-Tampering & TOCTOU Defense**: Before executing mutating operations (`apply`, `sync`, `tools update`, `--destroyer`), ANX computes cryptographic SHA-256 hashes of all manifest inputs and dotfile targets. Re-verification occurs atomically before writes, preventing Time-of-Check to Time-of-Use (TOCTOU) path substitution or payload tampering.
 
 ### Modern CLI Tooling Stack & Non-Destructive Alias Architecture
 

@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,6 +59,71 @@ func TestCLIDoctor(t *testing.T) {
 	}
 	if !strings.Contains(outBuf.String(), "ANX Health Doctor") {
 		t.Fatalf("expected doctor header, got: %s", outBuf.String())
+	}
+}
+
+func TestCLIDoctor_Fix(t *testing.T) {
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"doctor", "--fix", "--dry-run"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "ANX Health Doctor") {
+		t.Fatalf("expected doctor header, got: %s", outBuf.String())
+	}
+}
+
+func TestCLIRepo(t *testing.T) {
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"repo", "status"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "ANX Dotfiles Repository Status") {
+		t.Fatalf("expected repo status header, got: %s", outBuf.String())
+	}
+
+	outBuf.Reset()
+	errBuf.Reset()
+	code = cli.ExecuteCLI([]string{"repo", "clone", "--dry-run"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "dry-run: would clone") {
+		t.Fatalf("expected clone dry run output, got: %s", outBuf.String())
+	}
+}
+
+func TestCLIDestroyer_ResetDryRun(t *testing.T) {
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"reset", "--dry-run", "--yes"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "Destroyer Reinstall Plan (Dry-Run)") {
+		t.Fatalf("expected destroyer reinstall plan header, got: %s", outBuf.String())
+	}
+}
+
+func TestCLIDestroyer_UninstallDryRun(t *testing.T) {
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"reset", "--uninstall-only", "--dry-run", "--yes"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "Destroyer Uninstall Plan (Dry-Run)") {
+		t.Fatalf("expected destroyer uninstall plan header, got: %s", outBuf.String())
+	}
+}
+
+func TestCLIDestroyer_ApplyFlagDryRun(t *testing.T) {
+	var outBuf, errBuf bytes.Buffer
+	code := cli.ExecuteCLI([]string{"apply", "--destroyer", "--dry-run", "--yes"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "Destroyer Reinstall Plan (Dry-Run)") {
+		t.Fatalf("expected destroyer reinstall plan header, got: %s", outBuf.String())
 	}
 }
 
@@ -479,5 +546,23 @@ func TestCLISelfUpdate(t *testing.T) {
 	}
 	if err := cli.VerifyBinaryChecksum(tempFile, "bad-checksum"); err == nil {
 		t.Fatalf("expected checksum failure for bad hash, got nil")
+	}
+
+	// 4. Live update check against mock release API
+	releaseJSON := `{"tag_name":"v2.0.0","draft":false,"prerelease":false,"assets":[{"name":"anx_linux_amd64.tar.gz","browser_download_url":"http://127.0.0.1/archive","size":123}]}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(releaseJSON))
+	}))
+	defer srv.Close()
+
+	t.Setenv("ANX_RELEASE_API", srv.URL)
+	var chkOut, chkErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"self", "update", "--check"}, &chkOut, &chkErr, "v1.0.0", "", "")
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for self update check against mock server, got %d (err: %s)", code, chkErr.String())
+	}
+	if !strings.Contains(chkOut.String(), "Available version: v2.0.0") {
+		t.Fatalf("expected output to report available v2.0.0, got:\n%s", chkOut.String())
 	}
 }

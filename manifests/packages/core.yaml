@@ -1,6 +1,23 @@
 # Declarative Core System & Build Packages Manifest
 # Add or customize multi-distro / multi-OS package mappings here without modifying Go source code.
 packages:
+  - id: anx
+    name: ANX Environment Engine
+    category: core
+    description: Autonomous dotfile engine, package orchestrator, and multi-tool workspace manager
+    binary_name: anx
+    binary_aliases:
+      - aitools
+      - safe-suspend
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          url: https://raw.githubusercontent.com/arturonavax/env/main/install.sh
+          interpreter: sh
+          creates: "~/.local/bin/anx"
+
   - id: build-essential
     name: Build Essential Toolchain
     category: core-build

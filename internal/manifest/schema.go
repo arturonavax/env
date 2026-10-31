@@ -25,25 +25,25 @@ type ArchiveRecord struct {
 
 // PackageSpec defines a declarative multi-platform package or tool and its ordered installation strategies.
 type PackageSpec struct {
-	ID             string         `json:"id" yaml:"id"`
-	Name           string         `json:"name" yaml:"name"`
-	Category       string         `json:"category" yaml:"category"`
-	Description    string         `json:"description" yaml:"description"`
-	BinaryName     string         `json:"binary_name,omitempty" yaml:"binary_name,omitempty"`
-	BinaryAliases  []string       `json:"binary_aliases,omitempty" yaml:"binary_aliases,omitempty"`
-	VersionArgs    []string       `json:"version_args,omitempty" yaml:"version_args,omitempty"`
-	Ecosystem      string         `json:"ecosystem,omitempty" yaml:"ecosystem,omitempty"`
-	OSVPackage     string         `json:"osv_package,omitempty" yaml:"osv_package,omitempty"`
-	Tags           []string       `json:"tags,omitempty" yaml:"tags,omitempty"`
-	DependsOn      []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
-	OS             []string       `json:"os,omitempty" yaml:"os,omitempty"`
-	DesiredVersion string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
-	Deprecated     bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
-	DeprecatedReason string       `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
-	RecommendPurge bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
-	Replacement    string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
-	Archived       bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
-	Strategies     []StrategySpec `json:"strategies" yaml:"strategies"`
+	ID               string         `json:"id" yaml:"id"`
+	Name             string         `json:"name" yaml:"name"`
+	Category         string         `json:"category" yaml:"category"`
+	Description      string         `json:"description" yaml:"description"`
+	BinaryName       string         `json:"binary_name,omitempty" yaml:"binary_name,omitempty"`
+	BinaryAliases    []string       `json:"binary_aliases,omitempty" yaml:"binary_aliases,omitempty"`
+	VersionArgs      []string       `json:"version_args,omitempty" yaml:"version_args,omitempty"`
+	Ecosystem        string         `json:"ecosystem,omitempty" yaml:"ecosystem,omitempty"`
+	OSVPackage       string         `json:"osv_package,omitempty" yaml:"osv_package,omitempty"`
+	Tags             []string       `json:"tags,omitempty" yaml:"tags,omitempty"`
+	DependsOn        []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
+	OS               []string       `json:"os,omitempty" yaml:"os,omitempty"`
+	DesiredVersion   string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
+	Deprecated       bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason string         `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge   bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement      string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived         bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
+	Strategies       []StrategySpec `json:"strategies" yaml:"strategies"`
 }
 
 // SupportsOS reports whether the package supports the given runtime.GOOS value.

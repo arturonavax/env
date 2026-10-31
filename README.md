@@ -33,6 +33,9 @@ Orchestrated by the unified Go CLI/TUI platform **ANX** (`anx`) and powered by a
 │   ├── providers/          # Dispatcher (native, github_release, script, source, language)
 │   ├── configsync/         # Myers unified diff, bidirectional sync & 3-way merge
 │   ├── snapshot/           # Hierarchical snapshot manager (50MB quota)
+│   ├── state/              # Transactional SQLite state kernel (WAL mode, zero-data-loss migrations)
+│   ├── scheduler/          # DAG execution scheduler, job event streams & persistence
+│   ├── security/           # Zero-alloc secret scanner & anti-tamper digest verification
 │   ├── hacks/              # DMI/hardware detector & hack runner
 │   ├── ops/                # Multi-runtime rebuilder, power manager & Lynis optimizer
 │   ├── ai/                 # Go port of aitools (JSONC, harnesses, gitflow, RTC wake)
@@ -104,7 +107,7 @@ See [docs/remote_install.md](docs/remote_install.md) and [docs/cloudflare_worker
 
 ### Local Unix Bootstrap
 
-Bootstrap the environment on Linux or macOS. The bootstrap script automatically checks system prerequisites and guarantees Go `>= 1.24` using a resilient 3-tier strategy (**Tier 1 GVM priority** -> **Tier 2 standalone Go release** -> **Tier 3 native package manager**), compiles `bin/anx`, and launches the interactive setup wizard:
+Bootstrap the environment on Linux or macOS. The bootstrap script automatically checks system prerequisites and guarantees Go `>= 1.27.3` using a resilient 3-tier strategy (**Tier 1 GVM priority** -> **Tier 2 standalone Go release** -> **Tier 3 native package manager**), compiles `bin/anx`, and launches the interactive setup wizard:
 
 Clone repository:
 
@@ -128,6 +131,12 @@ Autonomous non-interactive installation:
 
 ```sh
 ./install.sh -y
+```
+
+Deep manifest-driven purge and complete environment reinstall ("destroyer"):
+
+```sh
+anx apply --destroyer-reinstall
 ```
 
 ---
@@ -330,9 +339,13 @@ Dotfiles & Backups:
 System, Hacks & Maintenance:
   cleanup     Safely detect and prune orphaned, deprecated, and archived components (alias: prune)
   hacks       Machine-specific hardware/OS optimizations (opt-in, never applied implicitly)
+  jobs        Inspect and control background DAG scheduler jobs and execution events
   optimize    Audit hardware/kernel/security and produce a guardrail-validated optimization script
   rebuild     Rebuild global tools after toolchain upgrades (Go, Rust, Node, Python, Neovim)
+  repo        Manage remote dotfile repositories and decoupled source trees (clone, set, status)
+  reset       Reset local state, manifests, or environment to pristine condition
   sleep       Hardware-safe power transitions, screen standby via DPMS, and hibernation diagnostics
+  state       Manage transactional SQLite state kernel (backup, verify, migrate, status, export)
   update      Inspect repository, personal tools, and dotfiles for available updates
   upgrade     End-to-end upgrade: pull repo, update tools, apply package plans, and sync dotfiles
 
@@ -343,7 +356,7 @@ Personal Tools & AI Suite:
 
 Diagnostics & Meta:
   alias       Create custom binary command alias/symlink (e.g. for forks or personal naming)
-  audit       Scan installed tools for known vulnerabilities (OSV.dev)
+  audit       Security compliance audit, vulnerability scanning (OSV), and script generation
   config      Show effective anx configuration and paths
   dashboard   Launch the full-screen interactive dashboard
   doc         Generate documentation, man pages (doc man), and markdown references (doc markdown)
@@ -352,6 +365,14 @@ Diagnostics & Meta:
   theme       List and persist UI themes (tokyo-night, catppuccin, gruvbox, dracula, etc.)
   version     Print version information
   wizard      Interactive environment setup wizard (use --yes for autonomous mode)
+
+Global Execution Flags:
+  --destroyer             Aggressively purge packages, tools, configurations and state before action
+  --destroyer-reinstall   Alias for --destroyer during apply operations
+  --script                Output standalone executable Bash script preview of all planned mutations
+  --dry-run               Preview actions without mutating the system
+  --force                 Force operation and bypass confirmation prompts
+  -y, --yes               Automatically answer yes to confirmations
 
 Additional Commands:
   completion  Generate or install shell completion script (--install for bash|zsh|fish|powershell)
@@ -442,13 +463,30 @@ anx tools ai daemon
 
 ---
 
-## 6. Lifecycle Memory, Deprecation & Cleanup Engine
+## 6. Transactional SQLite State Kernel & Lifecycle Engine
 
-### State Tracking & Orphan Detection
+### Embedded SQLite State Storage (WAL Mode)
 
-Every resource provisioned by `anx` is tracked in `~/.local/state/anx/state.json` alongside ancestor file contents for 3-way merges. When you switch profiles or remove a component from manifests, `anx` remembers that the resource was installed and surfaces it as **Orphaned**.
+State tracking is backed by an embedded, thread-safe SQLite database located at `~/.local/state/anx/anx.db` (with automatic legacy JSON migration). The SQLite kernel uses Write-Ahead Logging (WAL mode), immediate transactions, and automatic SHA-256 Content-Addressable Storage (CAS) for ancestor dotfiles:
 
-### Declarative Archives Registry
+- **Zero Data Loss**: Mutations are wrapped in strict ACID transactions with rollback guarantees.
+- **Concurrent Safety**: Process-level mutual exclusion protects concurrent CLI/TUI invocations against state corruption.
+- **Integrity Verification**: `anx state verify` scans database tables, Foreign Key constraints, and CAS blob hashes to detect disk corruption or tampering.
+
+Manage and inspect the state engine:
+
+```sh
+# View current database size, WAL mode, transaction counters, and managed resource counts
+anx state status
+
+# Create a timestamped, consistent snapshot backup of the database
+anx state backup
+
+# Verify database integrity and content-addressable storage blobs
+anx state verify
+```
+
+### Declarative Archives Registry & Cleanup Engine
 
 Decommissioned components are tracked historically in `manifests/archives.yaml`:
 - **`tmux`**: Decommissioned in favor of [Herdr](https://herdr.dev/) for native agent detection and zero nested PTY redraw friction.
@@ -563,9 +601,28 @@ Apply a specific hardware hack:
 anx hacks apply dell-precision-m6800
 ```
 
-### System Security & Hardware Optimizer (`anx optimize`)
+### System Security, Vulnerability Audit & Optimizer (`anx audit` & `anx optimize`)
 
-Runs Lynis security audits and profiles CPU, NVMe/SSD, and kernel parameters, enforcing 12 strict automated security guardrails before applying reversible optimization scripts.
+The platform integrates multi-layered cybersecurity auditing, vulnerability management, and reversible system optimization:
+
+- **Security Compliance & Vulnerability Audit (`anx audit`)**:
+  - Scans system security posture (`Critical`, `High`, `Medium`, `Low`, `Info`) across network firewalls, SSH, kernel sysctls, and UID 0 privileges.
+  - Queries OSV.dev for known vulnerabilities across installed personal tools.
+  - Tailors audit standards to compliance profiles: `workstation`, `server`, and `minimal`.
+  - Generates standalone, idempotent remediation scripts (`--script`) or synthesizes remediations via configured AI harnesses (`--ai`).
+  - Interactive Bubble Tea v2 TUI tab with profile switching ('p') and direct remediation script generation ('s').
+
+- **Universal Auditable Script Mode (`--script`)**:
+  - Available across all mutating commands (`apply`, `sync`, `optimize`, `audit`, `rebuild`, `capture`, `cleanup`/`prune`).
+  - Emits safe, defensive shell scripts (`set -euo pipefail`) serializing all planned mutations for strict human review prior to execution.
+
+- **Dotfile Isolation & Repository Privacy Boundaries**:
+  - Prohibits wholesale directory symlinks from `$HOME` to `files/` for applications generating runtime state (e.g., Herdr session snapshots, sockets).
+  - Dotfile assets are managed strictly at the single-file level (`~/.config/herdr/config.toml`), guaranteeing transient session data and local paths are never written into the Git repository tree.
+  - Fail-closed secret scanner in `anx capture` prevents staging or committing API keys, tokens, or private credentials.
+
+- **Hardware & Kernel Optimizer (`anx optimize`)**:
+  - Runs Lynis security audits and profiles CPU, NVMe/SSD, and kernel parameters, enforcing 12 strict automated security guardrails before applying reversible optimization scripts.
 
 ---
 

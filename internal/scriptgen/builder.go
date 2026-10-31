@@ -24,12 +24,13 @@ type ScriptSection struct {
 
 // AuditableScriptBuilder accumulates auditable system operations and translates them into a standalone Bash script.
 type AuditableScriptBuilder struct {
-	commandName string
-	targetHost  string
-	targetOS    string
-	targetArch  string
-	timestamp   time.Time
-	sections    []ScriptSection
+	commandName   string
+	targetHost    string
+	targetOS      string
+	targetArch    string
+	timestamp     time.Time
+	deterministic bool
+	sections      []ScriptSection
 }
 
 // NewBuilder constructs a new AuditableScriptBuilder with platform metadata.
@@ -54,11 +55,31 @@ func NewBuilder(commandName string, plat *platform.Info) *AuditableScriptBuilder
 	}
 }
 
+// SetDeterministic enables reproducible script rendering with a fixed timestamp.
+func (b *AuditableScriptBuilder) SetDeterministic(d bool) *AuditableScriptBuilder {
+	b.deterministic = d
+	return b
+}
+
+// SetTimestamp overrides the generation timestamp for reproducible scripts.
+func (b *AuditableScriptBuilder) SetTimestamp(t time.Time) *AuditableScriptBuilder {
+	b.timestamp = t
+	return b
+}
+
+// sanitizeComment strips linebreaks and control characters to prevent shell comment injection.
+func sanitizeComment(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return strings.TrimSpace(s)
+}
+
 // AddSection opens a new section for commands.
 func (b *AuditableScriptBuilder) AddSection(title, description string) *AuditableScriptBuilder {
 	b.sections = append(b.sections, ScriptSection{
-		Title:       title,
-		Description: description,
+		Title:       sanitizeComment(title),
+		Description: sanitizeComment(description),
 		Commands:    make([]ScriptCommand, 0, 4),
 	})
 	return b
@@ -71,8 +92,8 @@ func (b *AuditableScriptBuilder) AddCommand(cmd, comment string) *AuditableScrip
 	}
 	idx := len(b.sections) - 1
 	b.sections[idx].Commands = append(b.sections[idx].Commands, ScriptCommand{
-		Command: cmd,
-		Comment: comment,
+		Command: strings.TrimSpace(cmd),
+		Comment: sanitizeComment(comment),
 	})
 	return b
 }
@@ -83,9 +104,13 @@ func (b *AuditableScriptBuilder) Render() string {
 	sb.WriteString("#!/usr/bin/env bash\n")
 	sb.WriteString("# ==============================================================================\n")
 	sb.WriteString("# ANX AUDITABLE EXECUTION SCRIPT\n")
-	fmt.Fprintf(&sb, "# Command:   anx %s --script\n", b.commandName)
-	fmt.Fprintf(&sb, "# Platform:  %s (%s/%s)\n", b.targetHost, b.targetOS, b.targetArch)
-	fmt.Fprintf(&sb, "# Generated: %s\n", b.timestamp.Format(time.RFC3339))
+	fmt.Fprintf(&sb, "# Command:   anx %s --script\n", sanitizeComment(b.commandName))
+	fmt.Fprintf(&sb, "# Platform:  %s (%s/%s)\n", sanitizeComment(b.targetHost), sanitizeComment(b.targetOS), sanitizeComment(b.targetArch))
+	if b.deterministic {
+		sb.WriteString("# Generated: deterministic\n")
+	} else {
+		fmt.Fprintf(&sb, "# Generated: %s\n", b.timestamp.Format(time.RFC3339))
+	}
 	sb.WriteString("#\n")
 	sb.WriteString("# AUDIT & ARCHITECTURAL BOUNDARY NOTICE:\n")
 	sb.WriteString("# This shell script captures the auditable, host-level state transitions planned\n")
@@ -95,7 +120,7 @@ func (b *AuditableScriptBuilder) Render() string {
 	sb.WriteString("# - Goroutine scheduling, waitgroups, channel synchronization, and worker pools.\n")
 	sb.WriteString("# - Myers diff graph computations and 3-way AST merge evaluation.\n")
 	sb.WriteString("# - Content-Addressable Storage (CAS) digest verification and deduplication.\n")
-	sb.WriteString("# - SQLite WAL transactional journal persistence and local state tracking.\n")
+	sb.WriteString("# - Transactional store persistence and local state tracking.\n")
 	sb.WriteString("# - Zero-allocation secret scanning in-memory buffers.\n")
 	sb.WriteString("#\n")
 	sb.WriteString("# All system-modifying operations (packages, dotfiles, hardware parameters,\n")
@@ -121,7 +146,9 @@ func (b *AuditableScriptBuilder) Render() string {
 			if cmd.Comment != "" {
 				fmt.Fprintf(&sb, "# %s\n", cmd.Comment)
 			}
-			sb.WriteString(cmd.Command + "\n")
+			if cmd.Command != "" {
+				sb.WriteString(cmd.Command + "\n")
+			}
 		}
 		sb.WriteString("\n")
 	}
@@ -141,14 +168,40 @@ func TranslatePlan(plan *domain.ExecutionPlan, plat *platform.Info) string {
 		actionStr := string(step.Action)
 		b.AddSection(fmt.Sprintf("%s: %s", strings.ToUpper(actionStr), step.ResourceID), step.Description)
 
-		cmd := fmt.Sprintf("# Execute action %s on %s via provider %s (%s)", actionStr, step.ResourceID, step.Provider, step.Strategy)
+		comment := fmt.Sprintf("Execute action %s on %s via provider %s (%s)", actionStr, step.ResourceID, step.Provider, step.Strategy)
 		if step.TargetPath != "" && step.SourcePath != "" {
-			cmd = fmt.Sprintf("mkdir -p $(dirname %q) && cp -f %q %q", step.TargetPath, step.SourcePath, step.TargetPath)
+			cmd := fmt.Sprintf("mkdir -p $(dirname %q) && cp -f %q %q", step.TargetPath, step.SourcePath, step.TargetPath)
+			b.AddCommand(cmd, comment)
 		} else if step.Action == domain.ActionInstall {
-			cmd = fmt.Sprintf("echo 'Installing package %s (%s)...'", step.ResourceID, step.Provider)
+			pkgCmd := translatePackageInstall(step.ResourceID, step.Provider, plat)
+			b.AddCommand(pkgCmd, fmt.Sprintf("Installing package %s (%s)", step.ResourceID, step.Provider))
+		} else {
+			cmd := fmt.Sprintf("anx apply --resource %q", step.ResourceID)
+			b.AddCommand(cmd, comment)
 		}
-		b.AddCommand(cmd, fmt.Sprintf("Provider: %s", step.Provider))
 	}
 
 	return b.Render()
+}
+
+func translatePackageInstall(resourceID, provider string, plat *platform.Info) string {
+	distro := ""
+	if plat != nil {
+		distro = plat.Distribution()
+	}
+
+	switch {
+	case provider == "apt" || distro == "debian" || distro == "ubuntu":
+		return fmt.Sprintf("sudo apt-get install -y %q", resourceID)
+	case provider == "dnf" || distro == "fedora":
+		return fmt.Sprintf("sudo dnf install -y %q", resourceID)
+	case provider == "pacman" || distro == "arch":
+		return fmt.Sprintf("sudo pacman -S --noconfirm %q", resourceID)
+	case provider == "brew" || (plat != nil && plat.OS() == "darwin"):
+		return fmt.Sprintf("brew install %q", resourceID)
+	case provider == "apk" || distro == "alpine":
+		return fmt.Sprintf("sudo apk add %q", resourceID)
+	default:
+		return fmt.Sprintf("anx apply --resource %q", resourceID)
+	}
 }

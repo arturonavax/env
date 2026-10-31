@@ -98,6 +98,9 @@ func runWizard(cmd *cobra.Command, appCtx *AppContext) error {
 		tui.WithWizardConfigDiffs(diffs),
 		tui.WithWizardSyncService(appCtx.SyncSvc),
 		tui.WithWizardHacksService(appCtx.HacksSvc),
+		tui.WithWizardDestroyerSvc(appCtx.DestroyerSvc),
+		tui.WithWizardDestroyerMode(appCtx.Flags.Destroyer),
+		tui.WithWizardSecuritySeal(appCtx.SecuritySeal),
 	), tea.WithContext(cmd.Context()))
 	_, err := p.Run()
 	return err
@@ -123,6 +126,7 @@ type statusPayload struct {
 	RepoRoot     string   `json:"repo_root" yaml:"repo_root"`
 	Profile      string   `json:"profile" yaml:"profile"`
 	PackageCount int      `json:"package_count" yaml:"package_count"`
+	SecuritySeal string   `json:"security_seal,omitempty" yaml:"security_seal,omitempty"`
 	Installed    []string `json:"installed" yaml:"installed"`
 	Missing      []string `json:"missing" yaml:"missing"`
 }
@@ -136,6 +140,9 @@ func runStatus(cmd *cobra.Command, appCtx *AppContext) error {
 		Profile: appCtx.Store.ActiveProfile(), PackageCount: len(rows),
 		Installed: []string{}, Missing: []string{},
 	}
+	if appCtx.SecuritySeal != nil {
+		payload.SecuritySeal = appCtx.SecuritySeal.ShortDigest()
+	}
 	for _, r := range rows {
 		if r.Installed {
 			payload.Installed = append(payload.Installed, r.ID)
@@ -148,6 +155,15 @@ func runStatus(cmd *cobra.Command, appCtx *AppContext) error {
 		fmt.Fprintln(w, st.Header.Render("ANX Environment Status"))
 		fmt.Fprintf(w, "  OS: %s/%s (%s)  WSL: %v  Termux: %v\n", p.OS(), p.Arch(), p.Distribution(), p.IsWSL(), p.IsTermux())
 		fmt.Fprintf(w, "  Home: %s\n  State: %s\n  Repo: %s\n  Profile: %s\n", p.HomeDir(), p.StateDir(), appCtx.RepoRoot, payload.Profile)
+		if appCtx.SecuritySeal != nil {
+			sealBadge := st.Success.Render("[VERIFIED ✓]")
+			if appCtx.SecuritySeal.InsecureOrigin {
+				sealBadge = st.Warning.Render(fmt.Sprintf("[INSECURE: %s]", appCtx.SecuritySeal.InsecureReason))
+			}
+			fmt.Fprintf(w, "  Security Seal: %s %s (Manifests: %s, Dotfiles: %s)\n",
+				appCtx.SecuritySeal.ShortDigest(), sealBadge,
+				appCtx.SecuritySeal.ShortManifestDigest(), appCtx.SecuritySeal.ShortDotfilesDigest())
+		}
 		fmt.Fprintf(w, "\n  Packages: %d installed / %d missing\n", len(payload.Installed), len(payload.Missing))
 		printRows(w, appCtx, rows)
 	})
@@ -206,7 +222,8 @@ was selected, including its origin manifest, active profile, dependencies, and w
 }
 
 func newDoctorCmd(appCtx *AppContext) *cobra.Command {
-	return &cobra.Command{
+	var fix bool
+	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run system health checks and diagnostics",
 		Args:  cobra.NoArgs,
@@ -215,7 +232,7 @@ func newDoctorCmd(appCtx *AppContext) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emit(cmd, appCtx, checks, func(w io.Writer) {
+			err = emit(cmd, appCtx, checks, func(w io.Writer) {
 				st := styles(appCtx)
 				fmt.Fprintln(w, st.Header.Render("ANX Health Doctor"))
 				for _, c := range checks {
@@ -232,10 +249,41 @@ func newDoctorCmd(appCtx *AppContext) *cobra.Command {
 					}
 				}
 			})
+			if err != nil {
+				return err
+			}
+
+			if fix {
+				missingPkgs := make([]string, 0, len(checks))
+				for _, c := range checks {
+					if (c.Verdict == app.VerdictWarn || c.Verdict == app.VerdictFail) && c.PackageID != "" {
+						missingPkgs = append(missingPkgs, c.PackageID)
+					}
+				}
+				if len(missingPkgs) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "\n[Remediation] Installing missing dependencies: %s\n", strings.Join(missingPkgs, ", "))
+					if err := runApply(cmd, appCtx, "", missingPkgs); err != nil {
+						return fmt.Errorf("failed to install missing dependencies: %w", err)
+					}
+				}
+			} else {
+				hasRemediations := false
+				for _, c := range checks {
+					if (c.Verdict == app.VerdictWarn || c.Verdict == app.VerdictFail) && c.PackageID != "" {
+						hasRemediations = true
+						break
+					}
+				}
+				if hasRemediations && isTerminal(cmd) {
+					fmt.Fprintln(cmd.OutOrStdout(), "\nTip: Run 'anx doctor --fix' to automatically install missing dependencies.")
+				}
+			}
+			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&fix, "fix", false, "Automatically install missing dependencies and remediate diagnostic warnings")
+	return cmd
 }
-
 
 func newThemeCmd(appCtx *AppContext) *cobra.Command {
 	cmd := &cobra.Command{Use: "theme", Short: "List and persist UI themes"}
@@ -404,8 +452,8 @@ func newCompletionCmd(root *cobra.Command, appCtx *AppContext) *cobra.Command {
 	var install bool
 
 	cmd := &cobra.Command{
-		Use:       "completion <bash|zsh|fish|powershell>",
-		Short:     "Generate or install shell completion script",
+		Use:   "completion <bash|zsh|fish|powershell>",
+		Short: "Generate or install shell completion script",
 		Long: `Generate or install automatic completion scripts for bash, zsh, fish, or powershell.
 
 Pass --install to write the completion file directly to your shell's user completion path.`,

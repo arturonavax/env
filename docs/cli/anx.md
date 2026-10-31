@@ -9,19 +9,22 @@ anx [flags]
 ### Options
 
 ```
-      --dry-run          Preview actions without mutating the system
-      --format string    Output format (text|json|yaml) (default "text")
-  -h, --help             help for anx
-      --include-hacks    Include matched hardware workstation hacks during apply
-  -i, --interactive      Force interactive prompts
-      --no-color         Disable ANSI color rendering
-      --offline          Disable network queries
-      --profile string   Target profile name (default "developer")
-  -q, --quiet            Suppress non-essential output
-      --script           Output shell script preview of planned actions
-      --theme string     UI theme (see 'anx theme list') (default "tokyo-night")
-  -v, --verbose          Verbose execution logging
-  -y, --yes              Automatically answer yes to confirmations
+      --destroyer             Destroyer mode: aggressively purge packages, tools, configurations, and state
+      --destroyer-reinstall   Alias for --destroyer
+      --dry-run               Preview actions without mutating the system
+      --force                 Force operation and bypass confirmation prompts
+      --format string         Output format (text|json|yaml) (default "text")
+  -h, --help                  help for anx
+      --include-hacks         Include matched hardware workstation hacks during apply
+  -i, --interactive           Force interactive prompts
+      --no-color              Disable ANSI color rendering
+      --offline               Disable network queries
+      --profile string        Target profile name (default "developer")
+  -q, --quiet                 Suppress non-essential output
+      --script                Output shell script preview of planned actions
+      --theme string          UI theme (see 'anx theme list') (default "tokyo-night")
+  -v, --verbose               Verbose execution logging
+  -y, --yes                   Automatically answer yes to confirmations
 ```
 
 ### SEE ALSO
@@ -44,6 +47,7 @@ anx [flags]
 * [anx history](anx_history.md)	 - Display the transaction journal
 * [anx info](anx_info.md)	 - Show a package definition, strategies and resolved install source
 * [anx install](anx_install.md)	 - Install packages (and their declared dependencies)
+* [anx jobs](anx_jobs.md)	 - Inspect and manage durable background execution jobs and events
 * [anx list](anx_list.md)	 - List catalog packages with their installation state
 * [anx llm](anx_llm.md)	 - Query AI models non-interactively (shortcut for 'anx tools ai llm')
 * [anx ls](anx_ls.md)	 - List directory contents via capability abstraction (eza with ls fallback)
@@ -51,11 +55,14 @@ anx [flags]
 * [anx plan](anx_plan.md)	 - Display the dry-run execution plan for the desired state
 * [anx profile](anx_profile.md)	 - Inspect and select configuration profiles
 * [anx rebuild](anx_rebuild.md)	 - Rebuild global tools after toolchain upgrades
+* [anx repo](anx_repo.md)	 - Manage the linked dotfiles repository and configuration assets
+* [anx reset](anx_reset.md)	 - Destroyer mode: aggressively purge and reinstall the environment from scratch
 * [anx resume](anx_resume.md)	 - Resume an interrupted apply (completed steps are skipped idempotently)
 * [anx rollback](anx_rollback.md)	 - Restore the most recent pre-change configuration snapshot
 * [anx search](anx_search.md)	 - Search the declarative catalog by id, name, category or description
 * [anx self](anx_self.md)	 - Manage the ANX binary and self-update lifecycle
 * [anx sleep](anx_sleep.md)	 - Execute hardware-safe suspend, screen standby, or hibernation
+* [anx state](anx_state.md)	 - Manage transactional SQLite database and state migrations
 * [anx status](anx_status.md)	 - Inspect platform, packages and sync state
 * [anx sync](anx_sync.md)	 - Deploy dotfiles with true 3-way merge (or --push to capture them back into the repo)
 * [anx theme](anx_theme.md)	 - List and persist UI themes
