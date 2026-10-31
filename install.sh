@@ -37,13 +37,26 @@ while [ "$cur" != "/" ] && [ "$cur" != "." ]; do
 	cur="$parent"
 done
 
-# Detect whether source build or go-install is explicitly requested
+# Detect whether source build, release download, or plan preview is explicitly requested
 FORCE_SOURCE=0
 FORCE_GO_INSTALL=0
+
+case "${ANX_INSTALL_MODE:-}" in
+source) FORCE_SOURCE=1 ;;
+release) FORCE_SOURCE=0 ;;
+plan)
+	echo "  [INFO] Preview mode selected via ANX_INSTALL_MODE. No system changes made."
+	exit 0
+	;;
+esac
+
 for arg in "$@"; do
 	case "$arg" in
-	--from-source | --source)
+	--from-source | --source | --mode=source)
 		FORCE_SOURCE=1
+		;;
+	--mode=release)
+		FORCE_SOURCE=0
 		;;
 	--go-install)
 		FORCE_GO_INSTALL=1
@@ -61,6 +74,33 @@ detect_os_arch() {
 	esac
 	echo "${os}_${arch}"
 }
+
+# Interactive TTY prompt only when executed with zero arguments in a real interactive terminal
+if [ "$#" -eq 0 ] && [ -t 0 ] && [ -t 1 ] && [ -z "${ANX_INSTALL_MODE:-}" ]; then
+	os_arch="$(detect_os_arch)"
+	printf "\n  \033[1mANX Setup\033[0m  ·  %s\n" "${os_arch}"
+	printf "  Choose installation method:\n"
+	printf "    1) Verified release  (Fast · no compiler needed)\n"
+	printf "    2) Build from source (Compiles latest binary)\n"
+	printf "    3) Preview           (Dry-run · no changes)\n"
+	printf "    4) Exit\n"
+	printf "  Select [1-4] (default: 1): "
+	read -r choice || choice="1"
+	case "$choice" in
+	2) FORCE_SOURCE=1 ;;
+	3)
+		echo "  [INFO] Preview mode selected. No system changes made."
+		exit 0
+		;;
+	4)
+		echo "  Installation aborted."
+		exit 0
+		;;
+	*)
+		# Default 1: verified release
+		;;
+	esac
+fi
 
 try_download_release_direct() {
 	if [ "$FORCE_SOURCE" -eq 1 ] || [ "$FORCE_GO_INSTALL" -eq 1 ]; then
