@@ -1,6 +1,6 @@
 # Production Edge Router: Cloudflare Worker Guide
 
-Comprehensive architecture, operational reference, and deployment manual for serving `env.arturonavax.dev` as an intelligent, zero-latency edge distribution router using Cloudflare Workers, the Cloudflare CLI (`cf`), and Wrangler.
+Comprehensive architecture, operational reference, and deployment manual for serving `sh.arturonavax.dev` (and `env.arturonavax.dev`) as an intelligent, zero-latency edge distribution router using Cloudflare Workers, the Cloudflare CLI (`cf`), and Wrangler.
 
 ---
 
@@ -8,7 +8,7 @@ Comprehensive architecture, operational reference, and deployment manual for ser
 
 Modern developer tooling ecosystems (such as Docker via `get.docker.com`, Rust via `sh.rustup.rs`, Bun via `bun.sh`, and Astral UV via `astral.sh/uv`) distribute their setup scripts through edge routers rather than raw static links.
 
-Deploying a Cloudflare Worker on `env.arturonavax.dev` provides four architectural advantages:
+Deploying a Cloudflare Worker on `sh.arturonavax.dev` provides four architectural advantages:
 
 1. **Intelligent User-Agent Content Negotiation**:
    - **POSIX Shell Clients (`curl`, `wget`, `httpie`, `fetch`, `sh`)**: Automatically serves `install.sh` (`text/plain; charset=utf-8`).
@@ -58,15 +58,15 @@ sequenceDiagram
             GH-->>CF: 200 OK with file body
             CF->>Cache: Store in edge cache (s-maxage=3600)
         end
-        CF-->>User: 200 OK (text/plain; charset=utf-8)
+        CF-->>User: 200 OK (text/plain#59; charset=utf-8)
     else Root path (/) & PowerShell User-Agent
         CF->>Cache: Check cache key for /install.ps1
         Cache-->>CF: Return cached install.ps1
-        CF-->>User: 200 OK (text/plain; charset=utf-8)
+        CF-->>User: 200 OK (text/plain#59; charset=utf-8)
     else Root path (/) & curl / wget / POSIX User-Agent
         CF->>Cache: Check cache key for /install.sh
         Cache-->>CF: Return cached install.sh
-        CF-->>User: 200 OK (text/plain; charset=utf-8)
+        CF-->>User: 200 OK (text/plain#59; charset=utf-8)
     else Root path (/) & Web Browser User-Agent
         CF-->>User: 302 Found (Location: https://arturonavax.dev/env)
         User->>Web: Follow redirect to website
@@ -578,7 +578,7 @@ After deploying the Worker, run these tests to verify that every user-agent clas
 Should return the first lines of `install.sh`:
 
 ```bash
-curl -fsSL https://env.arturonavax.dev | head -n 15
+curl -fsSL https://sh.arturonavax.dev | head -n 15
 ```
 
 ---
@@ -588,7 +588,7 @@ curl -fsSL https://env.arturonavax.dev | head -n 15
 Should stream the shell installer cleanly:
 
 ```bash
-wget -qO- https://env.arturonavax.dev | head -n 15
+wget -qO- https://sh.arturonavax.dev | head -n 15
 ```
 
 ---
@@ -598,17 +598,17 @@ wget -qO- https://env.arturonavax.dev | head -n 15
 Should return the first lines of `install.ps1`:
 
 ```bash
-curl -fsSL -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) PowerShell/7.4.0" https://env.arturonavax.dev | head -n 15
+curl -fsSL -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) PowerShell/7.4.0" https://sh.arturonavax.dev | head -n 15
 ```
 
 ---
 
 ### 4. Test Interactive Web Browser Navigation
 
-Should return HTTP 302 Found redirecting to `https://arturonavax.dev/env`:
+Should return HTTP 302 Found redirecting to `https://arturonavax.dev/env` (or raw script on `sh.`):
 
 ```bash
-curl -I -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" https://env.arturonavax.dev
+curl -I -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" https://sh.arturonavax.dev
 ```
 
 ---
@@ -618,19 +618,19 @@ curl -I -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTM
 Verify direct subpath access for Unix:
 
 ```bash
-curl -fsSL https://env.arturonavax.dev/install.sh | head -n 15
+curl -fsSL https://sh.arturonavax.dev/install.sh | head -n 15
 ```
 
 Verify direct subpath access for Windows PowerShell:
 
 ```bash
-curl -fsSL https://env.arturonavax.dev/install.ps1 | head -n 15
+curl -fsSL https://sh.arturonavax.dev/install.ps1 | head -n 15
 ```
 
 Verify direct subpath access for Windows CMD:
 
 ```bash
-curl -fsSL https://env.arturonavax.dev/install.bat | head -n 15
+curl -fsSL https://sh.arturonavax.dev/install.bat | head -n 15
 ```
 
 ---
@@ -640,7 +640,7 @@ curl -fsSL https://env.arturonavax.dev/install.bat | head -n 15
 Should return HTML containing OpenGraph metadata tags:
 
 ```bash
-curl -fsSL -H "User-Agent: Discordbot/2.0" https://env.arturonavax.dev | grep -E "og:title|og:description|twitter:card"
+curl -fsSL -H "User-Agent: Discordbot/2.0" https://sh.arturonavax.dev | grep -E "og:title|og:description|twitter:card"
 ```
 
 ---
@@ -652,13 +652,13 @@ Execute two consecutive requests and verify the cache header flips from `MISS` t
 First request (populates cache):
 
 ```bash
-curl -s -D - https://env.arturonavax.dev/install.sh -o /dev/null | grep -E "HTTP/|X-Router-Cache|CF-Cache-Status"
+curl -s -D - https://sh.arturonavax.dev/install.sh -o /dev/null | grep -E "HTTP/|X-Router-Cache|CF-Cache-Status"
 ```
 
 Second request (served from edge cache):
 
 ```bash
-curl -s -D - https://env.arturonavax.dev/install.sh -o /dev/null | grep -E "HTTP/|X-Router-Cache|CF-Cache-Status"
+curl -s -D - https://sh.arturonavax.dev/install.sh -o /dev/null | grep -E "HTTP/|X-Router-Cache|CF-Cache-Status"
 ```
 
 ---

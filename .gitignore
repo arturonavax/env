@@ -13,6 +13,9 @@ lv-settings.lua
 .codegraph/
 .engram/
 .claude/
+# Cloudflare local state & caches
+.cloudflare/
+.wrangler/
 # Python byte-code & caches
 __pycache__/
 *.py[cod]

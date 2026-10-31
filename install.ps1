@@ -2,8 +2,8 @@
 # install.ps1
 # Primary Windows entry point and remote bootstrap for ANX Platform.
 # Usage:
-#   irm https://env.arturonavax.dev/install.ps1 | iex
-#   irm https://raw.githubusercontent.com/arturonavax/env/main/install.ps1 | iex
+#   irm https://sh.arturonavax.dev | iex
+#   irm https://sh.arturonavax.dev/install.ps1 | iex
 # ==============================================================================
 
 [CmdletBinding()]

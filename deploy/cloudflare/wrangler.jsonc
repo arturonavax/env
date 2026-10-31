@@ -6,11 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "routes": [
     {
-      "pattern": "sh.arturonavax.dev/*",
-      "custom_domain": true
-    },
-    {
-      "pattern": "env.arturonavax.dev/*",
+      "pattern": "sh.arturonavax.dev",
       "custom_domain": true
     }
   ],

@@ -15,13 +15,13 @@ Comprehensive guide for deploying and configuring the zero-dependency remote boo
 Connects standard input to controlling terminal (`/dev/tty`) automatically when piped, enabling the full interactive Bubble Tea wizard:
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh
+curl -fsSL https://sh.arturonavax.dev/install.sh | sh
 ```
 
 #### Shorthand via Cloudflare Edge Worker
 
 ```sh
-curl -fsSL https://env.arturonavax.dev | sh
+curl -fsSL https://sh.arturonavax.dev | sh
 ```
 
 #### Autonomous Unattended Provisioning
@@ -29,7 +29,7 @@ curl -fsSL https://env.arturonavax.dev | sh
 Applies desired state non-interactively for CI/CD runners or headless cloud workstations:
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
+curl -fsSL https://sh.arturonavax.dev/install.sh | sh -s -- -y --profile developer
 ```
 
 #### Safe Dry-Run Execution Plan Preview
@@ -37,7 +37,7 @@ curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile develo
 Inspects the DAG execution plan and reports planned actions without touching the filesystem:
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
+curl -fsSL https://sh.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
 ---
@@ -47,19 +47,19 @@ curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 #### Interactive Guided Setup
 
 ```powershell
-irm https://env.arturonavax.dev/install.ps1 | iex
+irm https://sh.arturonavax.dev/install.ps1 | iex
 ```
 
 #### Shorthand via Cloudflare Edge Worker
 
 ```powershell
-irm https://env.arturonavax.dev | iex
+irm https://sh.arturonavax.dev | iex
 ```
 
 #### Autonomous Unattended Provisioning
 
 ```powershell
-& ([scriptblock]::Create((irm https://env.arturonavax.dev/install.ps1))) -Yes -Profile developer
+& ([scriptblock]::Create((irm https://sh.arturonavax.dev/install.ps1))) -Yes -Profile developer
 ```
 
 ---
@@ -67,7 +67,7 @@ irm https://env.arturonavax.dev | iex
 ### Windows (Command Prompt - CMD)
 
 ```bat
-curl -fsSL https://env.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
+curl -fsSL https://sh.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 ```
 
 ---
@@ -96,34 +96,16 @@ flowchart TD
 
 ---
 
-## 3. Subdomain Configuration (`env.arturonavax.dev`)
+## 3. Subdomain Configuration (`sh.arturonavax.dev`)
 
-In previous iterations, the subdomain pointed to the legacy `src/remotes/` folder. With the unified ANX Platform, all bootstrap entry points reside cleanly at the repository root.
+With the unified ANX Platform, all bootstrap entry points reside cleanly at the repository root and are served dynamically by the Cloudflare Edge Worker.
 
-### Method A: Cloudflare URL Redirect Rule (Zero Maintenance)
+### Universal Cloudflare Worker (Edge Routing & OS Detection)
 
-In your Cloudflare dashboard (or DNS provider):
-1. Navigate to **Rules** -> **Redirect Rules** (or **Page Rules**).
-2. Configure rule:
-   - **Incoming Request**: `Hostname equals env.arturonavax.dev`
-   - **Target URL**: `https://raw.githubusercontent.com/arturonavax/env/main/${1}`
-   - **Status Code**: `302 Temporary Redirect`
-
-This enables:
-- `https://env.arturonavax.dev/install.sh` -> points to `/install.sh`
-- `https://env.arturonavax.dev/install.ps1` -> points to `/install.ps1`
-- `https://env.arturonavax.dev/install.bat` -> points to `/install.bat`
-- `https://env.arturonavax.dev/scripts/install_golang.sh` -> points to standalone Go installer
-
----
-
-### Method B: Universal Cloudflare Worker (Edge Routing & OS Detection)
-
-If you want users to be able to run `curl -fsSL https://env.arturonavax.dev | sh` without typing `/install.sh`:
-
-Deploy the production Cloudflare Edge Worker on `env.arturonavax.dev/*` documented in detail in [docs/cloudflare_worker.md](cloudflare_worker.md).
+The production Cloudflare Edge Worker operates on `sh.arturonavax.dev` (code located in `deploy/cloudflare/` and documented in [docs/cloudflare_worker.md](cloudflare_worker.md)).
 
 With this Worker active:
-- **Linux/macOS/BSD/Raspberry Pi**: `curl -fsSL https://env.arturonavax.dev | sh`
-- **Windows (PowerShell)**: `irm https://env.arturonavax.dev | iex`
-- **Web Browsers**: Automatically redirects visitors to `https://arturonavax.dev/env`
+- **Linux/macOS/BSD/Raspberry Pi**: `curl -fsSL https://sh.arturonavax.dev | sh`
+- **Windows (PowerShell)**: `irm https://sh.arturonavax.dev | iex`
+- **Explicit Subpaths**: Transparently forwards `/install.sh`, `/install.ps1`, `/install.bat`, etc.
+- **Web Browsers**: Automatically redirects visitors to `https://arturonavax.dev/env` (or returns `install.sh` on `sh.`)

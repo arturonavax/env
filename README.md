@@ -53,32 +53,26 @@ Orchestrated by the unified Go CLI/TUI platform **ANX** (`anx`) and powered by a
 
 ### One-Line Remote Installation
 
-Bootstrap directly from `env.arturonavax.dev`:
+Bootstrap directly from `sh.arturonavax.dev`:
 
 #### Linux, macOS, BSD & Raspberry Pi (POSIX sh)
 
 Interactive guided installation (default in interactive terminal):
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh
-```
-
-Shorthand via Cloudflare Edge Worker:
-
-```sh
-curl -fsSL https://env.arturonavax.dev | sh
+curl -fsSL https://sh.arturonavax.dev | sh
 ```
 
 Autonomous unattended provisioning (zero prompts):
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- -y --profile developer
+curl -fsSL https://sh.arturonavax.dev/install.sh | sh -s -- -y --profile developer
 ```
 
 Safe dry-run preview (previews touched files without modifying the system):
 
 ```sh
-curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
+curl -fsSL https://sh.arturonavax.dev/install.sh | sh -s -- --plan
 ```
 
 #### Windows 10 / 11 (PowerShell)
@@ -86,19 +80,19 @@ curl -fsSL https://env.arturonavax.dev/install.sh | sh -s -- --plan
 Interactive installation:
 
 ```powershell
-irm https://env.arturonavax.dev/install.ps1 | iex
+irm https://sh.arturonavax.dev | iex
 ```
 
 Autonomous unattended provisioning:
 
 ```powershell
-& ([scriptblock]::Create((irm https://env.arturonavax.dev/install.ps1))) -Yes -Profile developer
+& ([scriptblock]::Create((irm https://sh.arturonavax.dev/install.ps1))) -Yes -Profile developer
 ```
 
 #### Windows (Command Prompt - CMD)
 
 ```bat
-curl -fsSL https://env.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
+curl -fsSL https://sh.arturonavax.dev/install.bat -o %TEMP%\install.bat && %TEMP%\install.bat
 ```
 
 See [docs/remote_install.md](docs/remote_install.md) and [docs/cloudflare_worker.md](docs/cloudflare_worker.md) for full subdomain configuration and Cloudflare Edge Worker deployment.
