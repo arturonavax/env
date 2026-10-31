@@ -1,0 +1,11 @@
+# Shared minimal E2E runtime. Compile the static binary once in CI.
+ARG BASE_IMAGE=debian:bookworm-slim
+FROM ${BASE_IMAGE}
+COPY tests/e2e/.artifacts/anx /usr/local/bin/anx
+COPY manifests /repo/manifests
+COPY files /repo/files
+COPY tests/e2e/scripts/test_matrix_smoke.sh /repo/tests/e2e/scripts/test_matrix_smoke.sh
+ENV HOME=/tmp/anx-home XDG_CONFIG_HOME=/tmp/anx-home/.config XDG_STATE_HOME=/tmp/anx-home/.local/state XDG_CACHE_HOME=/tmp/anx-home/.cache
+WORKDIR /repo
+USER 65532:65532
+ENTRYPOINT ["/bin/sh", "/repo/tests/e2e/scripts/test_matrix_smoke.sh"]
