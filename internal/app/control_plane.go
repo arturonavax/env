@@ -308,7 +308,7 @@ func (c *ControlPlaneService) BuildPlan(ctx context.Context, req PlanRequest) (*
 
 	if c.store != nil && c.store.DB() != nil && !req.DryRun {
 		now := time.Now().UTC()
-		_ = c.store.DB().SavePlan(ctx, sqlite.PlanRecord{
+		if err := c.store.DB().SavePlan(ctx, sqlite.PlanRecord{
 			PlanID:            execPlan.ID,
 			SchemaVersion:     1,
 			CanonicalIRDigest: execPlan.Digest(),
@@ -316,7 +316,9 @@ func (c *ControlPlaneService) BuildPlan(ctx context.Context, req PlanRequest) (*
 			CreatedAt:         now,
 			ExpiresAt:         now.Add(24 * time.Hour),
 			Status:            "created",
-		})
+		}); err != nil {
+			return nil, fmt.Errorf("persisting execution plan: %w", err)
+		}
 	}
 
 	return execPlan.ToSpec(), nil
@@ -358,7 +360,7 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 	now := time.Now().UTC()
 	authTime := now
 	if db != nil {
-		_ = db.SavePlan(ctx, sqlite.PlanRecord{
+		if err := db.SavePlan(ctx, sqlite.PlanRecord{
 			PlanID:            plan.ID,
 			SchemaVersion:     1,
 			CanonicalIRDigest: plan.Digest(),
@@ -368,9 +370,11 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 			AuthorizedAt:      &authTime,
 			AuthorizedBy:      "user",
 			Status:            "authorized",
-		})
+		}); err != nil {
+			return "", fmt.Errorf("persisting authorized plan: %w", err)
+		}
 
-		_ = db.CreateJob(ctx, sqlite.JobRecord{
+		if err := db.CreateJob(ctx, sqlite.JobRecord{
 			JobID:          plan.ID,
 			PlanID:         plan.ID,
 			IdempotencyKey: req.IdempotencyKey,
@@ -378,17 +382,23 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 			Cursor:         0,
 			QueuedAt:       now,
 			Attempt:        1,
-		})
+		}); err != nil {
+			return "", fmt.Errorf("creating durable job: %w", err)
+		}
 
-		_ = db.AppendEvent(ctx, sqlite.EventRecord{
+		if err := db.AppendEvent(ctx, sqlite.EventRecord{
 			JobID:         plan.ID,
 			EventType:     "job.started",
 			SchemaVersion: 1,
 			PayloadJSON:   fmt.Sprintf(`{"plan_id":%q,"steps":%d}`, plan.ID, len(plan.Steps)),
 			Timestamp:     now,
-		})
+		}); err != nil {
+			return "", fmt.Errorf("recording job start event: %w", err)
+		}
 
-		_ = db.UpdateJobState(ctx, plan.ID, "running", 0)
+		if err := db.UpdateJobState(ctx, plan.ID, "running", 0); err != nil {
+			return "", fmt.Errorf("transitioning job to running: %w", err)
+		}
 	}
 
 	jobCtx, cancel := context.WithCancel(ctx)
@@ -426,7 +436,17 @@ func (c *ControlPlaneService) Apply(ctx context.Context, req ApplyRequest) (stri
 				})
 			}
 		} else {
-			_ = db.UpdateJobState(ctx, plan.ID, "succeeded", 0)
+			if updateErr := db.UpdateJobState(ctx, plan.ID, "succeeded", 0); updateErr != nil {
+				_ = db.UpdateJobState(ctx, plan.ID, "needs_reconcile", 1)
+				_ = db.AppendEvent(ctx, sqlite.EventRecord{
+					JobID:         plan.ID,
+					EventType:     "job.needs_reconcile",
+					SchemaVersion: 1,
+					PayloadJSON:   fmt.Sprintf(`{"error":%q,"details":"external actions completed but state persistence failed"}`, updateErr.Error()),
+					Timestamp:     finTime,
+				})
+				return plan.ID, fmt.Errorf("actions succeeded but failed persisting completion state: %w", updateErr)
+			}
 			_ = db.AppendEvent(ctx, sqlite.EventRecord{
 				JobID:         plan.ID,
 				EventType:     "job.succeeded",
