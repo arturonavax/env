@@ -136,9 +136,9 @@ func newUninstallCmd(appCtx *AppContext) *cobra.Command {
 		purgeConfigs    bool
 	)
 	cmd := &cobra.Command{
-		Use:               "uninstall [package...]",
-		Aliases:           []string{"remove"},
-		Short:             "Remove managed packages (or --system to teardown the anx platform)",
+		Use:     "uninstall [package...]",
+		Aliases: []string{"remove"},
+		Short:   "Remove managed packages (or --system to teardown the anx platform)",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if systemUninstall || appCtx.Flags.Destroyer {
 				return nil
@@ -459,54 +459,7 @@ func renderPlanScript(w io.Writer, appCtx *AppContext, plan *domain.ExecutionPla
 	if appCtx != nil {
 		plat = appCtx.Platform
 	}
-	b := scriptgen.NewBuilder("apply", plat)
-	if plan == nil || len(plan.Steps) == 0 {
-		fmt.Fprint(w, b.Render())
-		return nil
-	}
-
-	for i, st := range plan.Steps {
-		sectionTitle := fmt.Sprintf("Step %d: %s %s [%s]", i+1, st.Action, st.ResourceID, st.Provider)
-		b.AddSection(sectionTitle, st.Description)
-
-		if st.Strategy == "github_release" || st.Strategy == "script" {
-			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Install %s via %s", st.ResourceID, st.Strategy))
-			continue
-		}
-		switch {
-		case strings.HasPrefix(st.Provider, "native:apt"):
-			pkg := strings.TrimPrefix(st.Provider, "native:apt (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo apt-get update -y && sudo apt-get install -y %s", pkg), "Native APT package manager")
-		case strings.HasPrefix(st.Provider, "native:pacman"):
-			pkg := strings.TrimPrefix(st.Provider, "native:pacman (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo pacman -S --noconfirm --needed %s", pkg), "Native Pacman package manager")
-		case strings.HasPrefix(st.Provider, "native:dnf"):
-			pkg := strings.TrimPrefix(st.Provider, "native:dnf (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("sudo dnf install -y %s", pkg), "Native DNF package manager")
-		case strings.HasPrefix(st.Provider, "native:brew"):
-			pkg := strings.TrimPrefix(st.Provider, "native:brew (")
-			pkg = strings.TrimSuffix(pkg, ")")
-			if pkg == "" {
-				pkg = st.ResourceID
-			}
-			b.AddCommand(fmt.Sprintf("brew install %s", pkg), "Homebrew package manager")
-		default:
-			b.AddCommand(fmt.Sprintf("anx install %s", st.ResourceID), fmt.Sprintf("Fallback install via %s", st.Provider))
-		}
-	}
-
-	fmt.Fprint(w, b.Render())
-	return nil
+	script := scriptgen.TranslatePlan(plan, plat)
+	_, err := fmt.Fprint(w, script)
+	return err
 }
