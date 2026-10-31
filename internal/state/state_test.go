@@ -1,8 +1,10 @@
 package state
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -58,6 +60,102 @@ func TestStorePersistenceAndConfigBases(t *testing.T) {
 	}
 	if _, ok := reopened.GetResource("ripgrep"); ok {
 		t.Fatal("expected ripgrep removed")
+	}
+}
+
+// STATE-01: In-process concurrent writes must be linearizable and race-free.
+func TestStoreConcurrentInProcessWrites(t *testing.T) {
+	dir := t.TempDir()
+	store, err := OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const workers = 16
+	const writesPerWorker = 20
+
+	var wg sync.WaitGroup
+	for w := range workers {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for i := range writesPerWorker {
+				resID := fmt.Sprintf("pkg-w%d-%d", workerID, i)
+				rec := InstalledRecord{
+					ResourceID:   resID,
+					Version:      fmt.Sprintf("%d.0.0", i),
+					Provider:     "test",
+					ManagedByAnx: true,
+				}
+				if err := store.RecordResource(rec); err != nil {
+					t.Errorf("worker %d failed recording %s: %v", workerID, resID, err)
+					return
+				}
+			}
+		}(w)
+	}
+	wg.Wait()
+
+	// Verify all records exist
+	all := store.AllResources()
+	expectedCount := workers * writesPerWorker
+	if len(all) != expectedCount {
+		t.Fatalf("expected %d records in store, got %d", expectedCount, len(all))
+	}
+
+	// Verify durability after reopening
+	reopened, err := OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reopenedAll := reopened.AllResources()
+	if len(reopenedAll) != expectedCount {
+		t.Fatalf("reopened store has %d records, want %d", len(reopenedAll), expectedCount)
+	}
+}
+
+// STATE-01: Multi-process simulation (multiple Store instances targeting the same directory).
+func TestStoreMultiProcessSimulation(t *testing.T) {
+	dir := t.TempDir()
+	const instances = 4
+	const writesPerInstance = 10
+
+	var wg sync.WaitGroup
+	for inst := range instances {
+		wg.Add(1)
+		go func(instanceID int) {
+			defer wg.Done()
+			// Each instance opens its own Store object simulating a separate process
+			s, err := OpenStore(dir)
+			if err != nil {
+				t.Errorf("instance %d OpenStore: %v", instanceID, err)
+				return
+			}
+
+			for i := range writesPerInstance {
+				resID := fmt.Sprintf("multi-inst-%d-%d", instanceID, i)
+				rec := InstalledRecord{
+					ResourceID:   resID,
+					Version:      "1.0",
+					ManagedByAnx: true,
+				}
+				if err := s.RecordResource(rec); err != nil {
+					t.Errorf("instance %d record %s: %v", instanceID, resID, err)
+					return
+				}
+			}
+		}(inst)
+	}
+	wg.Wait()
+
+	finalStore, err := OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := finalStore.AllResources()
+	expected := instances * writesPerInstance
+	if len(all) != expected {
+		t.Fatalf("multi-instance concurrent writes: expected %d records, got %d", expected, len(all))
 	}
 }
 

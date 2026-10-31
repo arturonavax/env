@@ -6,7 +6,7 @@
 # Raspberry Pi, Alpine, Android Termux, and BSD.
 #
 # Supports both local repository invocation and remote piped execution:
-#   curl -fsSL https://env.arturonavax.dev/install.sh | sh
+#   curl -fsSL https://sh.arturonavax.dev | sh
 #   curl -fsSL https://env.arturonavax.dev | sh
 # ==============================================================================
 
@@ -20,7 +20,9 @@ if [ ! -t 0 ] && [ -c /dev/tty ]; then
 	fi
 fi
 
-# Locate repository root or clone on remote curl execution
+DEST_BIN="${HOME}/.local/bin"
+
+# Locate repository root if running inside an existing checkout
 REPO_ROOT=""
 cur="${PWD:-.}"
 while [ "$cur" != "/" ] && [ "$cur" != "." ]; do
@@ -35,9 +37,147 @@ while [ "$cur" != "/" ] && [ "$cur" != "." ]; do
 	cur="$parent"
 done
 
+# Detect whether source build or go-install is explicitly requested
+FORCE_SOURCE=0
+FORCE_GO_INSTALL=0
+for arg in "$@"; do
+	case "$arg" in
+	--from-source | --source)
+		FORCE_SOURCE=1
+		;;
+	--go-install)
+		FORCE_GO_INSTALL=1
+		;;
+	esac
+done
+
+detect_os_arch() {
+	os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+	arch="$(uname -m)"
+	case "$arch" in
+	x86_64 | amd64) arch="amd64" ;;
+	aarch64 | arm64) arch="arm64" ;;
+	*) arch="amd64" ;;
+	esac
+	echo "${os}_${arch}"
+}
+
+try_download_release_direct() {
+	if [ "$FORCE_SOURCE" -eq 1 ] || [ "$FORCE_GO_INSTALL" -eq 1 ]; then
+		return 1
+	fi
+
+	os_arch="$(detect_os_arch)"
+	archive_name="anx_${os_arch}.tar.gz"
+	release_url="${ANX_RELEASE_URL:-https://github.com/arturonavax/env/releases/latest/download/${archive_name}}"
+	default_sums_url="$(dirname "${release_url}")/SHA256SUMS"
+	sums_url="${ANX_SUMS_URL:-${default_sums_url}}"
+
+	if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+		return 1
+	fi
+
+	tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t anx-release)"
+	tarball="${tmp_dir}/${archive_name}"
+	sums_file="${tmp_dir}/SHA256SUMS"
+
+	dl_ok=0
+	if command -v curl >/dev/null 2>&1; then
+		if curl -fsSL --connect-timeout 4 --max-time 30 -o "$tarball" "$release_url" 2>/dev/null && \
+		   curl -fsSL --connect-timeout 4 --max-time 15 -o "$sums_file" "$sums_url" 2>/dev/null; then
+			dl_ok=1
+		fi
+	elif command -v wget >/dev/null 2>&1; then
+		if wget -q -T 30 -O "$tarball" "$release_url" 2>/dev/null && \
+		   wget -q -T 15 -O "$sums_file" "$sums_url" 2>/dev/null; then
+			dl_ok=1
+		fi
+	fi
+
+	if [ "$dl_ok" -eq 1 ] && [ -s "$tarball" ] && [ -s "$sums_file" ]; then
+		# Checksum verification
+		want_sum="$(grep "${archive_name}" "$sums_file" 2>/dev/null | awk '{print $1}' || true)"
+		if [ -n "$want_sum" ]; then
+			computed_sum=""
+			if command -v sha256sum >/dev/null 2>&1; then
+				computed_sum="$(sha256sum "$tarball" | awk '{print $1}')"
+			elif command -v shasum >/dev/null 2>&1; then
+				computed_sum="$(shasum -a 256 "$tarball" | awk '{print $1}')"
+			fi
+
+			if [ -n "$computed_sum" ] && [ "$computed_sum" != "$want_sum" ]; then
+				echo "  [WARN] Release asset checksum mismatch. Falling back to source build." >&2
+				rm -rf "$tmp_dir"
+				return 1
+			fi
+		fi
+
+		mkdir -p "${tmp_dir}/extract"
+		if tar -xzf "$tarball" -C "${tmp_dir}/extract" 2>/dev/null; then
+			if [ -f "${tmp_dir}/extract/anx" ]; then
+				chmod 0755 "${tmp_dir}/extract/anx"
+				if "${tmp_dir}/extract/anx" version >/dev/null 2>&1; then
+					mkdir -p "$DEST_BIN"
+					mv -f "${tmp_dir}/extract/anx" "${DEST_BIN}/anx"
+					ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+					ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
+					rm -rf "$tmp_dir"
+					echo "  [OK] ANX verified release binary deployed to ${DEST_BIN}/anx."
+					return 0
+				fi
+			fi
+		fi
+	fi
+
+	rm -rf "$tmp_dir"
+	return 1
+}
+
+try_go_install_direct() {
+	if [ "$FORCE_SOURCE" -eq 1 ] && [ "$FORCE_GO_INSTALL" -eq 0 ]; then
+		return 1
+	fi
+
+	if command -v go >/dev/null 2>&1; then
+		echo "  [INFO] Installing ANX via 'go install github.com/arturonavax/env/cmd/anx@latest'..."
+		if go install -trimpath github.com/arturonavax/env/cmd/anx@latest; then
+			gobin="$(go env GOBIN)"
+			[ -z "$gobin" ] && gobin="$(go env GOPATH)/bin"
+			if [ -x "${gobin}/anx" ]; then
+				mkdir -p "$DEST_BIN"
+				if [ "${gobin}" != "${DEST_BIN}" ]; then
+					ln -sf "${gobin}/anx" "${DEST_BIN}/anx"
+				fi
+				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/aitools"
+				ln -sf "${DEST_BIN}/anx" "${DEST_BIN}/safe-suspend"
+				echo "  [OK] ANX successfully installed via 'go install'."
+				return 0
+			fi
+		fi
+	fi
+	return 1
+}
+
+# If remote execution (no local repo), prioritize pre-compiled release, then go-install, then source clone
 if [ -z "${REPO_ROOT}" ]; then
+	if [ "$FORCE_GO_INSTALL" -eq 1 ]; then
+		if try_go_install_direct; then
+			exec "${DEST_BIN}/anx" "$@"
+		fi
+	fi
+
+	if [ "$FORCE_SOURCE" -eq 0 ]; then
+		if try_download_release_direct; then
+			exec "${DEST_BIN}/anx" "$@"
+		fi
+		if try_go_install_direct; then
+			exec "${DEST_BIN}/anx" "$@"
+		fi
+	fi
+
+	# Fallback to source clone
 	TARGET_REPO="${ANX_REPO_DIR:-${HOME}/.local/share/anx/repo}"
-	echo "  [INFO] Remote curl execution detected: bootstrapping repository into ${TARGET_REPO}..."
+	echo "  [INFO] Bootstrapping repository into ${TARGET_REPO}..."
 	mkdir -p "$(dirname "${TARGET_REPO}")"
 	if [ -d "${TARGET_REPO}/.git" ]; then
 		git -C "${TARGET_REPO}" pull --rebase origin main 2>/dev/null || true
@@ -49,11 +189,9 @@ if [ -z "${REPO_ROOT}" ]; then
 		elif command -v git >/dev/null 2>&1; then
 			git clone --depth 1 "${GIT_REMOTE_URL}" "${TARGET_REPO}"
 		elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-			echo "  [INFO] 'git' not found; fetching repository archive via curl & tar..."
 			mkdir -p "${TARGET_REPO}"
 			curl -fsSL "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
 		elif command -v wget >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-			echo "  [INFO] 'git' not found; fetching repository archive via wget & tar..."
 			mkdir -p "${TARGET_REPO}"
 			wget -qO- "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
 		else
@@ -77,6 +215,8 @@ Modes & Commands:
   -y, --yes, --non-interactive  Run unattended non-interactive installation (zero prompts).
   -p, --plan, plan              Preview execution plan and touched files without modifying system.
   --check, check                Run platform diagnosis and health checks (doctor).
+  --from-source                 Force compilation from local source repository.
+  --go-install                  Install ANX using standard 'go install'.
   --uninstall-plan              Preview uninstallation teardown plan.
 
 Profiles & Targets:
@@ -90,7 +230,7 @@ Examples:
   sh ./install.sh               # Interactive guided setup (in TTY)
   sh ./install.sh --plan        # Preview installation plan (dry-run)
   sh ./install.sh all -y        # Unattended complete installation
-  sh ./install.sh --check       # Run diagnostic health check
+  sh ./install.sh --go-install  # Install via 'go install'
 EOF
 }
 

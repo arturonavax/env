@@ -39,6 +39,8 @@ type GlobalFlagState struct {
 	Profile      string
 	IncludeHacks bool
 	ScriptMode   bool
+	Destroyer    bool
+	Force        bool
 }
 
 // AppContext holds shared domain services injected into CLI commands.
@@ -58,6 +60,8 @@ type AppContext struct {
 	OpsSvc     *app.OpsService
 	ToolsSvc     *app.ToolsService
 	ControlPlane *app.ControlPlaneService
+	DestroyerSvc *app.DestroyerService
+	SecuritySeal *security.OriginSeal
 	RepoRoot     string
 	Viper      *viper.Viper
 	Flags      GlobalFlagState
@@ -106,6 +110,9 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	pf.StringVar(&appCtx.Flags.Profile, "profile", "developer", "Target profile name")
 	pf.BoolVar(&appCtx.Flags.IncludeHacks, "include-hacks", false, "Include matched hardware workstation hacks during apply")
 	pf.BoolVar(&appCtx.Flags.ScriptMode, "script", false, "Output shell script preview of planned actions")
+	pf.BoolVar(&appCtx.Flags.Destroyer, "destroyer", false, "Destroyer mode: aggressively purge packages, tools, configurations, and state")
+	pf.BoolVar(&appCtx.Flags.Destroyer, "destroyer-reinstall", false, "Alias for --destroyer")
+	pf.BoolVar(&appCtx.Flags.Force, "force", false, "Force operation and bypass confirmation prompts")
 	_ = rootCmd.RegisterFlagCompletionFunc("format", staticCompletion("text", "json", "yaml"))
 	_ = rootCmd.RegisterFlagCompletionFunc("profile", profileCompletion(appCtx))
 	_ = rootCmd.RegisterFlagCompletionFunc("theme", staticCompletion(themeNames()...))
@@ -129,6 +136,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd.AddCommand(newSelfCmd(appCtx))
 	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
+	rootCmd.AddCommand(newResetCmd(appCtx))
 
 	return rootCmd
 }

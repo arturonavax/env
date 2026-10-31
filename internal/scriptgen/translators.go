@@ -15,9 +15,10 @@ func TranslateSync(group string, configs []string, plat *platform.Info) string {
 	b.AddSection(fmt.Sprintf("Synchronize Dotfile Group [%s]", group), "Reconcile canonical configuration assets")
 
 	for _, cfg := range configs {
+		cmd := fmt.Sprintf("anx sync --group %q", group)
 		b.AddCommand(
-			fmt.Sprintf("echo 'Synchronizing dotfile: %s'", cfg),
-			fmt.Sprintf("Asset: %s", cfg),
+			cmd,
+			fmt.Sprintf("Asset: %s (3-way merge and template evaluation handled by ANX control plane)", cfg),
 		)
 	}
 	return b.Render()

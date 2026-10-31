@@ -41,6 +41,8 @@ type Container struct {
 	ToolsSvc     *app.ToolsService
 	ToolRunner   *tools.Runner
 	ControlPlane *app.ControlPlaneService
+	DestroyerSvc *app.DestroyerService
+	SecuritySeal *security.OriginSeal
 	RepoRoot     string
 	Viper      *viper.Viper
 	Version    string
@@ -99,14 +101,19 @@ func NewLazyContainer(opts ...Option) (*Container, error) {
 	v.AutomaticEnv()
 
 	cat := catalog.NewDefaultRegistry()
+	seal, _ := security.CreateOriginSeal(
+		security.WithSealRepoRoot(cfg.RepoRoot),
+		security.WithSealSkipDotfiles(true),
+	)
 
 	return &Container{
-		Platform: plat,
-		Catalog:  cat,
-		Viper:    v,
-		Version:  cfg.Version,
-		Commit:   cfg.Commit,
-		Date:     cfg.Date,
+		Platform:     plat,
+		Catalog:      cat,
+		SecuritySeal: seal,
+		Viper:        v,
+		Version:      cfg.Version,
+		Commit:       cfg.Commit,
+		Date:         cfg.Date,
 	}, nil
 }
 
@@ -208,11 +215,17 @@ func NewContainer(opts ...Option) (*Container, error) {
 		return installSvc.Apply(ctx, plan)
 	})
 	toolsSvc := app.NewToolsService(toolReg, toolRunner, toolUpdater)
-	doctorSvc := app.NewDoctorService(plat, cat, app.WithDoctorStore(store))
+	doctorSvc := app.NewDoctorService(plat, cat, app.WithDoctorStore(store), app.WithDoctorRepoRoot(repoRoot))
 	auditSvc := app.NewAuditService(cat, prov, osvClient)
 	hacksSvc := app.NewHacksService(plat, hackReg, installRunner, snap, store, repoRoot)
 	opsSvc := app.NewOpsService(plat, installRunner)
 	controlPlane := app.NewControlPlaneService(plat, cat, installSvc, syncSvc, hacksSvc, toolsSvc, store)
+	destroyerSvc := app.NewDestroyerService(plat, cat, installSvc, syncSvc, store, app.WithDestroyerToolsRegistry(toolReg))
+	seal, _ := security.CreateOriginSeal(
+		security.WithSealRepoRoot(repoRoot),
+		security.WithSealUserDropIn(filepath.Join(plat.ConfigDir(), "manifests.d")),
+		security.WithSealTargetHome(plat.HomeDir()),
+	)
 
 	return &Container{
 		Platform:     plat,
@@ -231,6 +244,8 @@ func NewContainer(opts ...Option) (*Container, error) {
 		ToolsSvc:     toolsSvc,
 		ToolRunner:   toolRunner,
 		ControlPlane: controlPlane,
+		DestroyerSvc: destroyerSvc,
+		SecuritySeal: seal,
 		RepoRoot:     repoRoot,
 		Viper:        v,
 		Version:      cfg.Version,
@@ -239,10 +254,16 @@ func NewContainer(opts ...Option) (*Container, error) {
 	}, nil
 }
 
-// ResolveRepoRoot finds the env repository: configured path, walking up from cwd, persisted store root, or well-known user paths.
+// ResolveRepoRoot finds the env repository: configured path, env vars, walking up from cwd, persisted store root, or well-known user paths.
 func ResolveRepoRoot(configured, home, stored string) string {
 	if configured != "" && isDir(filepath.Join(configured, "manifests")) {
 		return configured
+	}
+	if envRepo := os.Getenv("ANX_REPO"); envRepo != "" && isDir(filepath.Join(envRepo, "manifests")) {
+		return envRepo
+	}
+	if envRepoRoot := os.Getenv("REPO_ROOT"); envRepoRoot != "" && isDir(filepath.Join(envRepoRoot, "manifests")) {
+		return envRepoRoot
 	}
 	cwd, err := os.Getwd()
 	if err == nil {
@@ -259,6 +280,7 @@ func ResolveRepoRoot(configured, home, stored string) string {
 		return stored
 	}
 	candidates := []string{
+		"/repo",
 		filepath.Join(home, "repos", "github.com", "arturonavax", "env"),
 		filepath.Join(home, ".local", "share", "anx", "repo"),
 		filepath.Join(home, "env"),

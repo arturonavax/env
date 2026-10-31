@@ -3,7 +3,9 @@ package tools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -108,41 +110,72 @@ func LoadRegistry(opts ...Option) (*Registry, error) {
 		homeDir:  home,
 	}
 
-	// 1. Load embedded tools.yaml
+	// 1. Load embedded tools.yaml (a broken embedded manifest is a build defect: always fatal)
 	if data, err := fs.ReadFile(manifests.EmbeddedFS, "tools.yaml"); err == nil {
 		if err := r.mergeYAML("embedded:tools.yaml", data); err != nil {
 			return nil, err
 		}
 	}
 
-	// 2. Overlay repository manifests/tools.yaml or manifests/tools/*.yaml
+	// Overlays are fail-closed: an invalid manifest is reported with its file name instead of being
+	// silently dropped, which would leave the operator running a different tool set than declared.
+	var overlayErrs []error
+
+	// 2. Overlay repository manifests/tools.yaml and manifests/tools/*.yaml. Only these paths are
+	// read: manifests/ also holds packages, configs and hacks that are not tool manifests.
 	if cfg.repoToolsDir != "" {
-		if info, err := os.Stat(cfg.repoToolsDir); err == nil {
-			if info.IsDir() {
-				_ = r.loadFromDir(cfg.repoToolsDir)
-			} else {
-				if data, err := os.ReadFile(cfg.repoToolsDir); err == nil {
-					_ = r.mergeYAML(cfg.repoToolsDir, data)
-				}
-			}
-		}
+		overlayErrs = append(overlayErrs, r.loadRepoOverlay(cfg.repoToolsDir)...)
 	}
 
 	// 3. Overlay user drop-ins from ~/.config/anx/tools.d/
 	if cfg.userToolsDir != "" {
 		if info, err := os.Stat(cfg.userToolsDir); err == nil && info.IsDir() {
-			_ = r.loadFromDir(cfg.userToolsDir)
+			overlayErrs = append(overlayErrs, r.loadFromDir(cfg.userToolsDir)...)
 		}
 	}
 
+	if err := errors.Join(overlayErrs...); err != nil {
+		return nil, fmt.Errorf("loading tool overlays: %w", err)
+	}
 	return r, nil
 }
 
-func (r *Registry) loadFromDir(root string) error {
+// loadRepoOverlay loads the tool manifests a repository may ship: tools.yaml and tools/*.yaml.
+// A file path (instead of a directory) is loaded as a single manifest.
+func (r *Registry) loadRepoOverlay(path string) []error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil // an absent overlay is normal, not a failure
+	}
+	if !info.IsDir() {
+		return r.loadFile(path)
+	}
+
+	var errs []error
+	single := filepath.Join(path, "tools.yaml")
+	if fi, err := os.Stat(single); err == nil && !fi.IsDir() {
+		errs = append(errs, r.loadFile(single)...)
+	}
+	if sub := filepath.Join(path, "tools"); dirExists(sub) {
+		errs = append(errs, r.loadFromDir(sub)...)
+	}
+	return errs
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// loadFromDir merges every *.yaml/*.yml file below root in sorted order, collecting all failures.
+func (r *Registry) loadFromDir(root string) []error {
 	paths := []string{}
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+	var errs []error
+
+	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			errs = append(errs, fmt.Errorf("walking %q: %w", path, walkErr))
+			return nil
 		}
 		if d.IsDir() {
 			return nil
@@ -153,34 +186,52 @@ func (r *Registry) loadFromDir(root string) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
+	if walkErr != nil {
+		errs = append(errs, walkErr)
 	}
 	slices.Sort(paths)
 
 	for _, p := range paths {
-		data, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		_ = r.mergeYAML(p, data)
+		errs = append(errs, r.loadFile(p)...)
+	}
+	return errs
+}
+
+func (r *Registry) loadFile(path string) []error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []error{fmt.Errorf("reading tools YAML %q: %w", path, err)}
+	}
+	if err := r.mergeYAML(path, data); err != nil {
+		return []error{err}
 	}
 	return nil
 }
 
+// mergeYAML decodes strictly (unknown keys are typos, not extensions), validates every manifest
+// and merges them atomically: either the whole document is accepted or none of it is.
 func (r *Registry) mergeYAML(source string, data []byte) error {
 	var doc toolsDocument
-	if err := yaml.Unmarshal(data, &doc); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&doc); err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Errorf("parsing tools YAML %q: %w", source, err)
+	}
+
+	seen := make(map[string]struct{}, len(doc.Tools))
+	for _, t := range doc.Tools {
+		if err := ValidateManifest(t); err != nil {
+			return fmt.Errorf("%q: %w", source, err)
+		}
+		if _, dup := seen[t.ID]; dup {
+			return fmt.Errorf("%q: %w: tool %q is defined twice", source, ErrInvalidManifest, t.ID)
+		}
+		seen[t.ID] = struct{}{}
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	for _, t := range doc.Tools {
-		if strings.TrimSpace(t.ID) == "" {
-			continue
-		}
 		r.tools[t.ID] = t
 	}
 	return nil

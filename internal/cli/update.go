@@ -49,6 +49,8 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 				RepoClean: true,
 			}
 
+			renderSecuritySealBanner(cmd.OutOrStdout(), appCtx)
+
 			// 1. Check Git Repository
 			if isGitRepo(repo) {
 				if curBranch, err := gitCurrentBranch(ctx, repo); err == nil {
@@ -167,6 +169,13 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 				fmt.Fprintln(out, st.Highlight.Render("Previewing ANX Environment Upgrade (Dry-Run Mode)..."))
 			} else {
 				fmt.Fprintln(out, st.Header.Render("Starting ANX Environment Upgrade..."))
+			}
+
+			if !appCtx.Flags.ScriptMode && !appCtx.Flags.Quiet {
+				renderSecuritySealBanner(out, appCtx)
+			}
+			if err := verifySecuritySeal(cmd, appCtx); err != nil {
+				return err
 			}
 
 			// Step 1: Git Pull (if in git and clean)

@@ -6,6 +6,8 @@
 [CmdletBinding()]
 param(
     [string]$BinName = $env:ANX_BIN_NAME,
+    [switch]$FromSource = $false,
+    [switch]$GoInstall = $false,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ForwardArgs
 )
@@ -127,55 +129,148 @@ function Install-GoWingetOrScoop {
     return $false
 }
 
+function Try-DownloadReleaseBinary {
+    if ($FromSource) { return $false }
+
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+    $archiveName = "anx_windows_$arch.zip"
+    $releaseUrl = "https://github.com/arturonavax/env/releases/latest/download/$archiveName"
+    $sumsUrl = "https://github.com/arturonavax/env/releases/latest/download/SHA256SUMS"
+
+    Write-Step "Checking for verified pre-compiled ANX release ($archiveName)..."
+    try {
+        $tempDir = Join-Path $env:TEMP ("anx-release-" + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+        $zipPath = Join-Path $tempDir $archiveName
+        $sumsPath = Join-Path $tempDir "SHA256SUMS"
+
+        Invoke-WebRequest -Uri $releaseUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 30
+        Invoke-WebRequest -Uri $sumsUrl -OutFile $sumsPath -UseBasicParsing -TimeoutSec 15
+
+        if ((Test-Path $zipPath) -and (Test-Path $sumsPath)) {
+            $sumsContent = Get-Content -Path $sumsPath -Raw
+            $match = [regex]::Match($sumsContent, "([a-fA-F0-9]{64})\s+\*?" + [regex]::Escape($archiveName))
+            if ($match.Success) {
+                $expectedHash = $match.Groups[1].Value.ToLower()
+                $actualHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+                if ($actualHash -ne $expectedHash) {
+                    Write-WarnMsg "Release checksum mismatch! Expected $expectedHash, got $actualHash"
+                    Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+                    return $false
+                }
+                Write-Success "Release checksum verified: $actualHash"
+            }
+
+            $extractDir = Join-Path $tempDir "extract"
+            Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+            $anxStaged = Join-Path $extractDir "anx.exe"
+            if (Test-Path $anxStaged) {
+                # Self test
+                & $anxStaged version | Out-Null
+                $targetExe = Join-Path $DestDir "anx.exe"
+                Move-Item -Path $anxStaged -Destination $targetExe -Force
+                Copy-Item -Path $targetExe -Destination (Join-Path $DestDir "safe-suspend.exe") -Force
+                Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Success "Deployed verified release binary to $targetExe"
+                return $true
+            }
+        }
+        Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    } catch {
+        # Fall back to compilation
+    }
+    return $false
+}
+
+function Try-GoInstall {
+    if (Get-Command "go" -ErrorAction SilentlyContinue) {
+        Write-Step "Installing ANX via 'go install github.com/arturonavax/env/cmd/anx@latest'..."
+        try {
+            & go install -trimpath github.com/arturonavax/env/cmd/anx@latest
+            $gobin = (& go env GOBIN)
+            if (-not $gobin) {
+                $gobin = Join-Path (& go env GOPATH) "bin"
+            }
+            $built = Join-Path $gobin "anx.exe"
+            if (Test-Path $built) {
+                $targetExe = Join-Path $DestDir "anx.exe"
+                Copy-Item -Path $built -Destination $targetExe -Force
+                Copy-Item -Path $targetExe -Destination (Join-Path $DestDir "safe-suspend.exe") -Force
+                Write-Success "Installed via 'go install' and deployed to $targetExe"
+                return $true
+            }
+        } catch { }
+    }
+    return $false
+}
+
 Write-Host "==============================================================================" -ForegroundColor White
 Write-Host "  ANX Platform Bootstrap (Windows)" -ForegroundColor White
 Write-Host "==============================================================================" -ForegroundColor White
 
-if (-not (Test-GoVersion)) {
-    Write-WarnMsg "Go (>= 1.24) not detected. Initiating automated bootstrap..."
-    $installed = Install-GoWindowsArchive
-    if (-not $installed) {
-        $installed = Install-GoWingetOrScoop
-    }
-    if (-not (Test-GoVersion)) {
-        Write-ErrMsg "Could not bootstrap Go. Please install Go manually from https://go.dev/dl/."
+if ($GoInstall) {
+    if (Try-GoInstall) {
+        # Proceed to dispatch
+    } else {
+        Write-ErrMsg "Failed to install via 'go install'."
         exit 1
+    }
+} elseif (-not $FromSource) {
+    if (Try-DownloadReleaseBinary) {
+        # Verified release deployed
+    } elseif (Try-GoInstall) {
+        # Installed via go install
     }
 }
 
-$goVer = (& go version)
-Write-Success "Go runtime ready: $goVer"
-
-# Build ANX
-Write-Step "Building ANX binary for Windows..."
-Push-Location $RepoRoot
-try {
-    $ver = "1.0.0"
-    $commit = "dev"
-    $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
-
-    if (Get-Command "git" -ErrorAction SilentlyContinue) {
-        $gVer = (& git describe --tags --always 2>$null)
-        if ($gVer) { $ver = $gVer }
-        $gCommit = (& git rev-parse --short HEAD 2>$null)
-        if ($gCommit) { $commit = $gCommit }
+$anxInstalled = Join-Path $DestDir "anx.exe"
+if (-not (Test-Path $anxInstalled)) {
+    if (-not (Test-GoVersion)) {
+        Write-WarnMsg "Go (>= $MinMajor.$MinMinor.$MinPatch) not detected. Initiating automated bootstrap..."
+        $installed = Install-GoWindowsArchive
+        if (-not $installed) {
+            $installed = Install-GoWingetOrScoop
+        }
+        if (-not (Test-GoVersion)) {
+            Write-ErrMsg "Could not bootstrap Go. Please install Go manually from https://go.dev/dl/."
+            exit 1
+        }
     }
 
-    $anxExe = Join-Path $DestDir "anx.exe"
-    $safeSuspendExe = Join-Path $DestDir "safe-suspend.exe"
+    $goVer = (& go version)
+    Write-Success "Go runtime ready: $goVer"
 
-    & go build -ldflags "-s -w -X main.Version=$ver -X main.Commit=$commit -X main.Date=$date" -o $anxExe .\cmd\anx
-    Copy-Item $anxExe $safeSuspendExe -Force
-    Remove-Item (Join-Path $DestDir "aitools.exe") -ErrorAction SilentlyContinue
-    Write-Success "Built $anxExe (alias: safe-suspend.exe)"
+    # Build ANX
+    Write-Step "Building ANX binary for Windows..."
+    Push-Location $RepoRoot
+    try {
+        $ver = "1.0.0"
+        $commit = "dev"
+        $date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
 
-    if ($BinName -and $BinName -ne "anx") {
-        $customExe = Join-Path $DestDir "$BinName.exe"
-        Copy-Item $anxExe $customExe -Force
-        Write-Success "Created custom binary alias: $customExe -> $anxExe"
+        if (Get-Command "git" -ErrorAction SilentlyContinue) {
+            $gVer = (& git describe --tags --always 2>$null)
+            if ($gVer) { $ver = $gVer }
+            $gCommit = (& git rev-parse --short HEAD 2>$null)
+            if ($gCommit) { $commit = $gCommit }
+        }
+
+        $anxExe = Join-Path $DestDir "anx.exe"
+        $safeSuspendExe = Join-Path $DestDir "safe-suspend.exe"
+
+        & go build -ldflags "-s -w -X main.Version=$ver -X main.Commit=$commit -X main.Date=$date" -o $anxExe .\cmd\anx
+        Copy-Item $anxExe $safeSuspendExe -Force
+        Remove-Item (Join-Path $DestDir "aitools.exe") -ErrorAction SilentlyContinue
+        Write-Success "Built $anxExe (alias: safe-suspend.exe)"
+
+        if ($BinName -and $BinName -ne "anx") {
+            $customExe = Join-Path $DestDir "$BinName.exe"
+            Copy-Item $anxExe $customExe -Force
+            Write-Success "Created custom binary alias: $customExe -> $anxExe"
+        }
+    } finally {
+        Pop-Location
     }
-} finally {
-    Pop-Location
 }
 
 # Update PATH
