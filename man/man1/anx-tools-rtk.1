@@ -19,8 +19,20 @@ High-speed LLM terminal output compressor proxy (saves 60-90% prompt tokens)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--destroyer\fP[=false]
+	Destroyer mode: aggressively purge packages, tools, configurations, and state
+
+.PP
+\fB--destroyer-reinstall\fP[=false]
+	Alias for --destroyer
+
+.PP
 \fB--dry-run\fP[=false]
 	Preview actions without mutating the system
+
+.PP
+\fB--force\fP[=false]
+	Force operation and bypass confirmation prompts
 
 .PP
 \fB--format\fP="text"

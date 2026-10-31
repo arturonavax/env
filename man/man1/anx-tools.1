@@ -21,8 +21,20 @@ while built-in engines (such as aitools) provide zero-dependency standalone fall
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--destroyer\fP[=false]
+	Destroyer mode: aggressively purge packages, tools, configurations, and state
+
+.PP
+\fB--destroyer-reinstall\fP[=false]
+	Alias for --destroyer
+
+.PP
 \fB--dry-run\fP[=false]
 	Preview actions without mutating the system
+
+.PP
+\fB--force\fP[=false]
+	Force operation and bypass confirmation prompts
 
 .PP
 \fB--format\fP="text"
@@ -70,7 +82,7 @@ while built-in engines (such as aitools) provide zero-dependency standalone fall
 
 
 .SH SEE ALSO
-\fBanx(1)\fP, \fBanx-tools-ai(1)\fP, \fBanx-tools-commit(1)\fP, \fBanx-tools-delta(1)\fP, \fBanx-tools-difft(1)\fP, \fBanx-tools-herdr(1)\fP, \fBanx-tools-info(1)\fP, \fBanx-tools-list(1)\fP, \fBanx-tools-llm(1)\fP, \fBanx-tools-pr(1)\fP, \fBanx-tools-quota(1)\fP, \fBanx-tools-rtk(1)\fP, \fBanx-tools-run(1)\fP, \fBanx-tools-tealdeer(1)\fP, \fBanx-tools-update(1)\fP, \fBanx-tools-upgrade(1)\fP, \fBanx-tools-usql(1)\fP
+\fBanx(1)\fP, \fBanx-tools-ai(1)\fP, \fBanx-tools-commit(1)\fP, \fBanx-tools-delta(1)\fP, \fBanx-tools-difft(1)\fP, \fBanx-tools-herdr(1)\fP, \fBanx-tools-info(1)\fP, \fBanx-tools-list(1)\fP, \fBanx-tools-llm(1)\fP, \fBanx-tools-pr(1)\fP, \fBanx-tools-quota(1)\fP, \fBanx-tools-rtk(1)\fP, \fBanx-tools-run(1)\fP, \fBanx-tools-security-audit(1)\fP, \fBanx-tools-tealdeer(1)\fP, \fBanx-tools-update(1)\fP, \fBanx-tools-upgrade(1)\fP, \fBanx-tools-usql(1)\fP
 
 
 .SH HISTORY
