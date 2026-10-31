@@ -92,25 +92,45 @@ fi
 
 if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 	os_arch="$(detect_os_arch)" || exit 1
+	if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+		if command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
+			BOLD="$(tput bold 2>/dev/null || printf '\033[1m')"
+			DIM="$(tput dim 2>/dev/null || printf '\033[2m')"
+			RESET="$(tput sgr0 2>/dev/null || printf '\033[0m')"
+			CYAN="$(tput setaf 6 2>/dev/null || printf '\033[36m')"
+		else
+			BOLD="$(printf '\033[1m')"
+			DIM="$(printf '\033[2m')"
+			RESET="$(printf '\033[0m')"
+			CYAN="$(printf '\033[36m')"
+		fi
+	else
+		BOLD=""
+		DIM=""
+		RESET=""
+		CYAN=""
+	fi
+
 	prompt_out() {
 		if [ -n "$TTY_DEV" ]; then
-			printf "%s" "$*" >"$TTY_DEV"
+			printf "%b" "$*" >"$TTY_DEV"
 		else
-			printf "%s" "$*"
+			printf "%b" "$*"
 		fi
 	}
-	prompt_out "\n  \033[1mANX Setup\033[0m  ·  ${os_arch}\n"
-	prompt_out "  Choose installation method:\n"
-	prompt_out "    1) Verified release  (Fast · no compiler needed)\n"
-	prompt_out "    2) Build from source (Compiles latest binary)\n"
-	prompt_out "    3) Preview           (Dry-run · no changes)\n"
-	prompt_out "    4) Exit\n"
+	prompt_out "\n  ${BOLD}ANX Setup${RESET}  ·  ${CYAN}${os_arch}${RESET}\n"
+	prompt_out "  ${DIM}Choose installation method:${RESET}\n"
+	prompt_out "    ${BOLD}1)${RESET} Verified release  ${DIM}(Fast · no compiler needed)${RESET}\n"
+	prompt_out "    ${BOLD}2)${RESET} Build from source ${DIM}(Compiles latest binary)${RESET}\n"
+	prompt_out "    ${BOLD}3)${RESET} Preview           ${DIM}(Dry-run · no changes)${RESET}\n"
+	prompt_out "    ${BOLD}4)${RESET} Exit\n\n"
 	prompt_out "  Select [1-4] (default: 1): "
 	if [ -n "$TTY_DEV" ]; then
 		read -r choice <"$TTY_DEV" || choice="1"
 	else
 		read -r choice || choice="1"
 	fi
+	prompt_out "\n"
 	case "$choice" in
 	2) FORCE_SOURCE=1 ;;
 	3)
