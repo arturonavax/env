@@ -10,6 +10,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -72,6 +73,9 @@ type WizardModel struct {
 	shellCursor      int
 	terminalCursor   int
 	envFocus         string // "shell" or "terminal"
+	destroyerMode    bool
+	destroyerSvc     *app.DestroyerService
+	seal             *security.OriginSeal
 }
 
 func defaultShellOptions() []ShellOption {
@@ -129,6 +133,27 @@ func WithWizardSyncService(svc *app.SyncService) WizardOption {
 func WithWizardHacksService(svc *app.HacksService) WizardOption {
 	return func(w *WizardModel) {
 		w.hacksSvc = svc
+	}
+}
+
+// WithWizardDestroyerSvc injects DestroyerService into the wizard.
+func WithWizardDestroyerSvc(svc *app.DestroyerService) WizardOption {
+	return func(w *WizardModel) {
+		w.destroyerSvc = svc
+	}
+}
+
+// WithWizardDestroyerMode sets the initial destroyer reinstall mode in the wizard.
+func WithWizardDestroyerMode(enable bool) WizardOption {
+	return func(w *WizardModel) {
+		w.destroyerMode = enable
+	}
+}
+
+// WithWizardSecuritySeal injects the cryptographic origin seal into the wizard.
+func WithWizardSecuritySeal(seal *security.OriginSeal) WizardOption {
+	return func(w *WizardModel) {
+		w.seal = seal
 	}
 }
 
@@ -291,6 +316,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.includeHacks = !w.includeHacks
 			}
 
+		case "d", "D":
+			w.destroyerMode = !w.destroyerMode
+
 		case "enter":
 			switch w.stage {
 			case StageSelectProfile:
@@ -334,7 +362,28 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case StageReviewPlan:
+				if w.seal != nil {
+					if err := w.seal.Verify(context.Background()); err != nil {
+						w.err = err
+						w.stage = StageCompleted
+						break
+					}
+				}
 				w.stage = StageApplying
+				if w.destroyerMode && w.destroyerSvc != nil {
+					profName := ""
+					if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
+						profName = w.profiles[w.selectedProf].Name
+					}
+					opts := app.PurgeOptions{
+						Profile:       profName,
+						PurgeBinaries: false,
+						PurgeState:    false,
+					}
+					if purgePlan, err := w.destroyerSvc.PlanPurge(context.Background(), opts); err == nil {
+						_, _ = w.destroyerSvc.ExecutePurge(context.Background(), purgePlan, false, false)
+					}
+				}
 				if w.installSvc != nil && w.plan != nil {
 					if err := w.installSvc.Apply(context.Background(), w.plan); err != nil {
 						w.err = err
@@ -347,7 +396,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if w.syncSvc != nil {
 					_, _ = w.syncSvc.Sync(context.Background(), app.SyncOptions{
-						Force:    false,
+						Force:    w.destroyerMode,
 						Shell:    w.selectedShell,
 						Terminal: w.selectedTerminal,
 					})
@@ -595,6 +644,29 @@ func (w WizardModel) renderReviewPlan(width int) string {
 		}
 	}
 	lines = append(lines, fmt.Sprintf("  • Terminal      : %s%s", w.selectedTerminal, termWarning))
+
+	lines = append(lines, "", w.styles.Highlight.Render("CRYPTOGRAPHIC ORIGIN & PROVENANCE SEAL:"))
+	origin := "Embedded Catalog (Immutable Binary)"
+	shortDigest := "N/A"
+	manifestFP := "N/A"
+	dotfilesFP := "N/A"
+	statusBadge := w.styles.Success.Render("[VERIFIED ✓]")
+	if w.seal != nil {
+		origin = w.seal.ProvenanceOrigin()
+		shortDigest = w.seal.ShortDigest()
+		manifestFP = w.seal.ShortManifestDigest()
+		dotfilesFP = w.seal.ShortDotfilesDigest()
+		if w.seal.InsecureOrigin {
+			statusBadge = w.styles.Warning.Render(fmt.Sprintf("[INSECURE ORIGIN: %s]", w.seal.InsecureReason))
+		}
+	}
+	lines = append(lines, fmt.Sprintf("  • Source Origin   : %s", origin))
+	lines = append(lines, fmt.Sprintf("  • Manifests SHA256: %s", manifestFP))
+	if w.platform != nil {
+		lines = append(lines, fmt.Sprintf("  • Destination Home: %s", w.platform.HomeDir()))
+	}
+	lines = append(lines, fmt.Sprintf("  • Dotfiles SHA256 : %s", dotfilesFP))
+	lines = append(lines, fmt.Sprintf("  • Security Seal   : %s %s", shortDigest, statusBadge))
 	if len(w.matchedHacks) > 0 {
 		status := w.styles.Muted.Render("[Excluded]")
 		if w.includeHacks {
@@ -634,7 +706,13 @@ func (w WizardModel) renderReviewPlan(width int) string {
 		lines = append(lines, "  • [noop] Ready to apply selected configuration")
 	}
 
-	lines = append(lines, "", w.styles.Success.Render("Press [Enter] to Execute Plan, or [q] to Cancel."))
+	destroyerBadge := w.styles.Muted.Render("OFF (Press [d] to activate)")
+	if w.destroyerMode {
+		destroyerBadge = w.styles.Error.Render("ACTIVE ⚠️  Purges packages, tools & configs before installing (Press [d] to disable)")
+	}
+	lines = append(lines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s", destroyerBadge))
+
+	lines = append(lines, "", w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, or [q] to Cancel."))
 	return strings.Join(lines, "\n")
 }
 

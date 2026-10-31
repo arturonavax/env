@@ -26,12 +26,13 @@ func BuildLazyAppContext(version, commit, date string) (*AppContext, error) {
 	}
 
 	return &AppContext{
-		Platform: container.Platform,
-		Catalog:  container.Catalog,
-		Viper:    container.Viper,
-		Version:  version,
-		Commit:   commit,
-		Date:     date,
+		Platform:     container.Platform,
+		Catalog:      container.Catalog,
+		SecuritySeal: container.SecuritySeal,
+		Viper:        container.Viper,
+		Version:      version,
+		Commit:       commit,
+		Date:         date,
 	}, nil
 }
 
@@ -58,6 +59,8 @@ func BuildAppContext(version, commit, date string) (*AppContext, error) {
 		OpsSvc:     container.OpsSvc,
 		ToolsSvc:     container.ToolsSvc,
 		ControlPlane: container.ControlPlane,
+		DestroyerSvc: container.DestroyerSvc,
+		SecuritySeal: container.SecuritySeal,
 		RepoRoot:     container.RepoRoot,
 		Viper:      container.Viper,
 		Version:    version,

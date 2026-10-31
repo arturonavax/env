@@ -13,7 +13,9 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /build/bin/anx ./cmd/anx
 RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /build/bin/mock-server ./tests/e2e/mock_server/main.go
-RUN mkdir -p /build/releases && tar -czf /build/releases/anx_linux_amd64.tar.gz -C /build/bin anx
+RUN mkdir -p /build/releases && \
+    tar -czf /build/releases/anx_linux_amd64.tar.gz -C /build/bin anx && \
+    (cd /build/releases && sha256sum anx_linux_amd64.tar.gz > SHA256SUMS)
 
 # Stage 2: Minimal runtime testing harness
 FROM alpine:3.20 AS runtime

@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"net/http"
@@ -48,9 +49,36 @@ func main() {
 		http.Error(w, "install.sh not found", http.StatusNotFound)
 	})
 
-	// Serve GitHub release tarballs
+	// Serve GitHub release tarballs and SHA256SUMS
 	mux.HandleFunc("/releases/latest/download/", func(w http.ResponseWriter, r *http.Request) {
 		filename := strings.TrimPrefix(r.URL.Path, "/releases/latest/download/")
+		if filename == "SHA256SUMS" {
+			sumsPath := filepath.Join(staticDir, "SHA256SUMS")
+			if _, err := os.Stat(sumsPath); os.IsNotExist(err) {
+				// Ensure tarball exists
+				if _, err := os.Stat(tarballPath); os.IsNotExist(err) {
+					if err := createReleaseTarball(repoDir, tarballPath); err != nil {
+						log.Printf("[ERR] Failed to create release tarball for SHA256SUMS: %v", err)
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+				}
+				data, err := os.ReadFile(tarballPath)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				sum := fmt.Sprintf("%x  anx_linux_amd64.tar.gz\n", sha256.Sum256(data))
+				if err := os.WriteFile(sumsPath, []byte(sum), 0o644); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.ServeFile(w, r, sumsPath)
+			return
+		}
+
 		filePath := filepath.Join(staticDir, filename)
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			filePath = tarballPath

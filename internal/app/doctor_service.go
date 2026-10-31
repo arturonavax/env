@@ -11,6 +11,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/state"
 )
 
@@ -29,6 +30,7 @@ type DoctorCheck struct {
 	Verdict     CheckVerdict `json:"verdict"`
 	Message     string       `json:"message"`
 	Remediation string       `json:"remediation,omitempty"`
+	PackageID   string       `json:"package_id,omitempty"`
 }
 
 // DoctorOption configures optional DoctorService dependencies.
@@ -41,11 +43,19 @@ func WithDoctorStore(store *state.Store) DoctorOption {
 	}
 }
 
+// WithDoctorRepoRoot injects the resolved repository root.
+func WithDoctorRepoRoot(repoRoot string) DoctorOption {
+	return func(d *DoctorService) {
+		d.repoRoot = repoRoot
+	}
+}
+
 // DoctorService evaluates system health, missing tools, and configuration drift.
 type DoctorService struct {
 	platform *platform.Info
 	catalog  *catalog.Registry
 	store    *state.Store
+	repoRoot string
 }
 
 // NewDoctorService creates a DoctorService.
@@ -71,7 +81,68 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 			d.platform.OS(), d.platform.Arch(), d.platform.Distribution(), d.platform.IsWSL(), d.platform.IsTermux()),
 	})
 
-	// 2. State Directory Permissions
+	// 2. Repository Root & Declarative Manifest Source
+	if d.repoRoot != "" && isDir(filepath.Join(d.repoRoot, "manifests")) {
+		checks = append(checks, DoctorCheck{
+			Name:    "Repository Root",
+			Verdict: VerdictPass,
+			Message: fmt.Sprintf("Local repository active at %s", d.repoRoot),
+		})
+	} else {
+		checks = append(checks, DoctorCheck{
+			Name:        "Repository Root",
+			Verdict:     VerdictWarn,
+			Message:     "Operating from embedded manifest catalog (no local dotfiles repo linked)",
+			Remediation: "Clone repository with 'git clone https://github.com/arturonavax/env.git' or set ANX_REPO",
+		})
+	}
+
+	// 2b. Origin Security Seal & Directory Trust
+	seal, sErr := security.CreateOriginSeal(
+		security.WithSealRepoRoot(d.repoRoot),
+		security.WithSealUserDropIn(filepath.Join(d.platform.ConfigDir(), "manifests.d")),
+		security.WithSealTargetHome(d.platform.HomeDir()),
+	)
+	if sErr != nil {
+		checks = append(checks, DoctorCheck{
+			Name:        "Origin Security Seal",
+			Verdict:     VerdictFail,
+			Message:     fmt.Sprintf("Failed to compute origin cryptographic seal: %v", sErr),
+			Remediation: "Ensure manifest files and dotfile directories exist and have readable permissions",
+		})
+	} else if seal.InsecureOrigin {
+		checks = append(checks, DoctorCheck{
+			Name:        "Origin Security Seal",
+			Verdict:     VerdictFail,
+			Message:     fmt.Sprintf("Insecure origin permissions detected: %s", seal.InsecureReason),
+			Remediation: fmt.Sprintf("Run 'chmod 755 %s' to remove world-writable permissions", seal.RepoRoot),
+		})
+	} else {
+		checks = append(checks, DoctorCheck{
+			Name:    "Origin Security Seal",
+			Verdict: VerdictPass,
+			Message: fmt.Sprintf("Cryptographically sealed (Fingerprint: %s, Assets: %d)", seal.ShortDigest(), seal.AssetCount),
+		})
+	}
+
+	// 3. System Package Manager
+	pm := d.platform.PrimaryPackageManager()
+	if pm != "" && pm != "unknown" {
+		checks = append(checks, DoctorCheck{
+			Name:    "Package Manager",
+			Verdict: VerdictPass,
+			Message: fmt.Sprintf("Detected system package manager: %s", pm),
+		})
+	} else {
+		checks = append(checks, DoctorCheck{
+			Name:        "Package Manager",
+			Verdict:     VerdictWarn,
+			Message:     "No standard native package manager detected for automatic dependencies",
+			Remediation: "Install Homebrew, apt, dnf, pacman, or apk",
+		})
+	}
+
+	// 4. State Directory Permissions
 	stateDir := d.platform.StateDir()
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		checks = append(checks, DoctorCheck{
@@ -88,22 +159,41 @@ func (d *DoctorService) Diagnose(ctx context.Context) ([]DoctorCheck, error) {
 		})
 	}
 
-	// 3. Essential Tools Inspection
-	essentialTools := []string{"git", "curl", "zsh", "rg", "nvim"}
+	// 5. Essential Tools & Toolchains Inspection
+	type toolDef struct {
+		binary    string
+		packageID string
+		minVer    string
+	}
+	essentialTools := []toolDef{
+		{binary: "git", packageID: "git"},
+		{binary: "curl", packageID: "curl"},
+		{binary: "zsh", packageID: "zsh"},
+		{binary: "rg", packageID: "ripgrep"},
+		{binary: "nvim", packageID: "neovim"},
+		{binary: "go", packageID: "golang", minVer: "1.27.3"},
+	}
 	for _, tool := range essentialTools {
-		path, err := exec.LookPath(tool)
+		path, err := exec.LookPath(tool.binary)
 		if err != nil {
 			checks = append(checks, DoctorCheck{
-				Name:        fmt.Sprintf("Tool: %s", tool),
+				Name:        fmt.Sprintf("Tool: %s", tool.binary),
 				Verdict:     VerdictWarn,
-				Message:     fmt.Sprintf("%s is not in PATH", tool),
-				Remediation: fmt.Sprintf("Run 'anx install %s'", tool),
+				Message:     fmt.Sprintf("%s is not in PATH", tool.binary),
+				Remediation: fmt.Sprintf("Run 'anx install %s'", tool.packageID),
+				PackageID:   tool.packageID,
 			})
 		} else {
+			detail := fmt.Sprintf("Found at %s", path)
+			if tool.binary == "go" {
+				if out, err := exec.Command(path, "version").Output(); err == nil {
+					detail = fmt.Sprintf("Found at %s (%s)", path, strings.TrimSpace(string(out)))
+				}
+			}
 			checks = append(checks, DoctorCheck{
-				Name:    fmt.Sprintf("Tool: %s", tool),
+				Name:    fmt.Sprintf("Tool: %s", tool.binary),
 				Verdict: VerdictPass,
-				Message: fmt.Sprintf("Found at %s", path),
+				Message: detail,
 			})
 		}
 	}
@@ -210,4 +300,9 @@ func (d *DoctorService) HealthStatus(checks []DoctorCheck) domain.HealthStatus {
 		return domain.HealthWarning
 	}
 	return domain.HealthHealthy
+}
+
+func isDir(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.IsDir()
 }

@@ -29,6 +29,8 @@ services:
     environment:
       - MOCK_SERVER_URL=http://mock-server:8080
       - REPO_ROOT=/repo
+      - ANX_REPO=/repo
+      - ANX_GIT_URL=/repo
     networks:
       - e2e-net
     command: ["/repo/tests/e2e/scripts/run_all.sh"]
@@ -44,6 +46,8 @@ services:
     environment:
       - MOCK_SERVER_URL=http://mock-server:8080
       - REPO_ROOT=/repo
+      - ANX_REPO=/repo
+      - ANX_GIT_URL=/repo
     networks:
       - e2e-net
     command: ["/repo/tests/e2e/scripts/run_all.sh"]

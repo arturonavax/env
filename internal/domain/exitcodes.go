@@ -13,6 +13,7 @@ const (
 	ExitPreflightFailed   = 3
 	ExitConflictOrAudit   = 4
 	ExitRollbackOrPartial = 5
+	ExitSecurityViolation = 6
 	ExitInterrupted       = 130
 )
 

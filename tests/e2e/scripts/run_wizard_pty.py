@@ -53,8 +53,15 @@ def run_wizard():
 
     start_time = time.time()
     step_idx = 0
+    exit_code = 0
 
-    while time.time() - start_time < 30:  # 30-second total timeout
+    while time.time() - start_time < 90:  # 90-second total timeout
+        # Check if child process has already terminated
+        w_pid, status = os.waitpid(pid, os.WNOHANG)
+        if w_pid == pid:
+            exit_code = os.waitstatus_to_exitcode(status)
+            break
+
         r, _, _ = select.select([master_fd], [], [], 0.5)
         if r:
             try:
@@ -65,18 +72,26 @@ def run_wizard():
             except OSError:
                 break
 
-        # Send next keystroke periodically
-        if step_idx < len(keystrokes):
-            time.sleep(0.4)
+        # Send next keystroke to advance stages
+        if step_idx < 4:
+            time.sleep(0.5)
             try:
                 os.write(master_fd, keystrokes[step_idx])
                 step_idx += 1
             except OSError:
                 break
+        else:
+            # After plan confirmation, send Enter periodically to exit StageCompleted as soon as it finishes
+            time.sleep(1.0)
+            try:
+                os.write(master_fd, b"\r")
+            except OSError:
+                break
 
     os.close(master_fd)
-    _, status = os.waitpid(pid, 0)
-    exit_code = os.waitstatus_to_exitcode(status)
+    if w_pid != pid:
+        _, status = os.waitpid(pid, 0)
+        exit_code = os.waitstatus_to_exitcode(status)
 
     full_output = b"".join(output_chunks).decode("utf-8", errors="replace")
     print(f"[INFO] Wizard PTY completed with exit code: {exit_code}")

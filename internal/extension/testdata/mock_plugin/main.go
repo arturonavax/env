@@ -30,6 +30,23 @@ func main() {
 		if err := json.Unmarshal([]byte(line), &req); err != nil {
 			continue
 		}
+		if strings.Contains(exeName, "envprobe") {
+			cwd, _ := os.Getwd()
+			name := fmt.Sprintf("secret=%q;cwd=%s", os.Getenv("ANX_TEST_SECRET"), cwd)
+			out, _ := json.Marshal(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      req.ID,
+				"result": map[string]any{
+					"name": name, "version": "1.0", "protocol_version": "1.0", "permissions": []string{},
+				},
+			})
+			fmt.Println(string(out))
+			continue
+		}
+		if strings.Contains(exeName, "flood") {
+			fmt.Println(strings.Repeat("A", 4*1024*1024)) // single oversized message
+			continue
+		}
 		if strings.Contains(exeName, "incompatible") {
 			fmt.Printf("{\"jsonrpc\":\"2.0\",\"id\":%d,\"result\":{\"name\":\"bad\",\"version\":\"2.0\",\"protocol_version\":\"99.0\",\"permissions\":[]}}\n", req.ID)
 			continue
