@@ -9,6 +9,7 @@ import (
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/security"
+	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -46,6 +47,8 @@ type Deps struct {
 	Doctor   *app.DoctorService
 	Audit    *app.AuditService
 	Hacks    *app.HacksService
+	Sync     *app.SyncService
+	Store    *state.Store
 	Theme    *theme.Palette
 	Styles   *theme.Styles
 }

@@ -78,6 +78,9 @@ func runDestroyerReinstall(cmd *cobra.Command, appCtx *AppContext, profile strin
 	if err != nil {
 		return err
 	}
+	if !appCtx.Flags.DryRun && profile != "" && appCtx.Store != nil {
+		_ = appCtx.Store.SetActiveProfile(profile)
+	}
 
 	return emit(cmd, appCtx, res, func(w io.Writer) {
 		mode := "Executed"

@@ -70,6 +70,8 @@ func runDashboard(cmd *cobra.Command, appCtx *AppContext) error {
 		Doctor:   appCtx.DoctorSvc,
 		Audit:    appCtx.AuditSvc,
 		Hacks:    appCtx.HacksSvc,
+		Sync:     appCtx.SyncSvc,
+		Store:    appCtx.Store,
 		Theme:    &pal,
 	}), tea.WithContext(cmd.Context()))
 	_, err := p.Run()
@@ -101,8 +103,14 @@ func runWizard(cmd *cobra.Command, appCtx *AppContext) error {
 		tui.WithWizardDestroyerSvc(appCtx.DestroyerSvc),
 		tui.WithWizardDestroyerMode(appCtx.Flags.Destroyer),
 		tui.WithWizardSecuritySeal(appCtx.SecuritySeal),
+		tui.WithWizardStore(appCtx.Store),
 	), tea.WithContext(cmd.Context()))
-	_, err := p.Run()
+	finalM, err := p.Run()
+	if err == nil && appCtx.Store != nil {
+		if wm, ok := finalM.(tui.WizardModel); ok && wm.IsCompleted() && wm.ChosenProfile() != "" {
+			_ = appCtx.Store.SetActiveProfile(wm.ChosenProfile())
+		}
+	}
 	return err
 }
 

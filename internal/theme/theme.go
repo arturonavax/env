@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Palette holds the semantic color tokens for a theme.
@@ -162,10 +163,17 @@ func NewStyles(p Palette) *Styles {
 			Foreground(p.Cyan).
 			Bold(true),
 		SelectedRow: lipgloss.NewStyle().
-			Foreground(p.Background).
+			Foreground(lipgloss.Color("#15161e")).
 			Background(p.Accent).
 			Bold(true),
 	}
+}
+
+// RenderSelectedRow renders text on the focused/accent background, stripping inner ANSI color codes
+// to prevent color resets (\x1b[0m) or nested light colors that make text light and unreadable on red accents.
+func (s *Styles) RenderSelectedRow(text string) string {
+	clean := ansi.Strip(text)
+	return s.SelectedRow.Render(clean)
 }
 
 // DefaultStyles returns the default Tokyo Night styles.

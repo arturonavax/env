@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/security"
+	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -96,6 +98,8 @@ type WizardModel struct {
 	selectedProf     int
 	packages         []domain.ManagedResource
 	selectedPkgs     map[string]bool
+	pkgMap           map[string]domain.ManagedResource
+	requiredBy       map[string][]string
 	pkgCursor        int
 	pkgScrollOffset  int
 	planScrollOffset int
@@ -127,6 +131,7 @@ type WizardModel struct {
 	destroyerMode    bool
 	destroyerSvc     *app.DestroyerService
 	seal             *security.OriginSeal
+	store            *state.Store
 }
 
 func defaultShellOptions() []ShellOption {
@@ -208,6 +213,26 @@ func WithWizardSecuritySeal(seal *security.OriginSeal) WizardOption {
 	}
 }
 
+// WithWizardStore injects the transactional state store into the wizard.
+func WithWizardStore(store *state.Store) WizardOption {
+	return func(w *WizardModel) {
+		w.store = store
+	}
+}
+
+// ChosenProfile returns the currently selected profile name in the wizard.
+func (w WizardModel) ChosenProfile() string {
+	if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
+		return w.profiles[w.selectedProf].Name
+	}
+	return ""
+}
+
+// IsCompleted returns true if the wizard finished applying successfully.
+func (w WizardModel) IsCompleted() bool {
+	return w.stage == StageCompleted && w.err == nil
+}
+
 // NewWizardModel creates an upfront interactive wizard model.
 func NewWizardModel(
 	plat *platform.Info,
@@ -222,8 +247,31 @@ func NewWizardModel(
 		profs = cat.ListProfiles()
 	}
 
-	selected := make(map[string]bool)
+	pkgMap := make(map[string]domain.ManagedResource, len(pkgs))
+	requiredBy := make(map[string][]string)
 	for _, p := range pkgs {
+		pkgMap[p.ID] = p
+		for _, dep := range p.DependsOn {
+			requiredBy[dep] = append(requiredBy[dep], p.ID)
+		}
+	}
+	for k := range requiredBy {
+		sort.Strings(requiredBy[k])
+	}
+
+	var directTools []domain.ManagedResource
+	var dependencies []domain.ManagedResource
+	for _, p := range pkgs {
+		if len(requiredBy[p.ID]) > 0 {
+			dependencies = append(dependencies, p)
+		} else {
+			directTools = append(directTools, p)
+		}
+	}
+	orderedPkgs := append(directTools, dependencies...)
+
+	selected := make(map[string]bool)
+	for _, p := range orderedPkgs {
 		selected[p.ID] = true // Default select all
 	}
 
@@ -262,8 +310,10 @@ func NewWizardModel(
 		installSvc:       svc,
 		profiles:         profs,
 		selectedProf:     0,
-		packages:         pkgs,
+		packages:         orderedPkgs,
 		selectedPkgs:     selected,
+		pkgMap:           pkgMap,
+		requiredBy:       requiredBy,
 		pkgCursor:        0,
 		shells:           shells,
 		terminals:        terminals,
@@ -409,7 +459,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case " ":
+		case " ", "space":
 			if w.stage == StageSelectEnvironment {
 				if w.envFocus == "shell" && w.shellCursor < len(w.shells) {
 					w.selectedShell = w.shells[w.shellCursor].ID
@@ -418,7 +468,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			} else if w.stage == StageSelectPackages && len(w.packages) > 0 {
 				pkgID := w.packages[w.pkgCursor].ID
-				w.selectedPkgs[pkgID] = !w.selectedPkgs[pkgID]
+				w.togglePackage(pkgID)
 			}
 
 		case "h":
@@ -438,6 +488,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						w.selectedPkgs = make(map[string]bool)
 						for _, p := range resolved {
 							w.selectedPkgs[p] = true
+						}
+						for _, p := range resolved {
+							w.markDependencies(p)
 						}
 					}
 				}
@@ -497,6 +550,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					w.syncSvc,
 					w.selectedShell,
 					w.selectedTerminal,
+					w.store,
 					progressChan,
 				)
 				return w, tea.Batch(waitForProgressCmd(progressChan), tickSpinnerCmd())
@@ -580,6 +634,12 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case wizardApplyDoneMsg:
 		w.err = msg.err
+		if msg.err == nil && w.store != nil {
+			prof := w.ChosenProfile()
+			if prof != "" {
+				_ = w.store.SetActiveProfile(prof)
+			}
+		}
 		w.stage = StageCompleted
 		return w, nil
 
@@ -602,6 +662,39 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (w *WizardModel) adjustPkgScroll() {
 	availHeight := w.visiblePkgLines()
 	w.pkgScrollOffset = AdjustScrollOffset(w.pkgCursor, w.pkgScrollOffset, availHeight, len(w.packages))
+}
+
+func (w *WizardModel) togglePackage(pkgID string) {
+	newVal := !w.selectedPkgs[pkgID]
+	w.selectedPkgs[pkgID] = newVal
+
+	if newVal {
+		w.markDependencies(pkgID)
+	} else {
+		w.unmarkDependents(pkgID)
+	}
+}
+
+func (w *WizardModel) markDependencies(pkgID string) {
+	p, ok := w.pkgMap[pkgID]
+	if !ok {
+		return
+	}
+	for _, dep := range p.DependsOn {
+		if !w.selectedPkgs[dep] {
+			w.selectedPkgs[dep] = true
+			w.markDependencies(dep)
+		}
+	}
+}
+
+func (w *WizardModel) unmarkDependents(pkgID string) {
+	for _, parentID := range w.requiredBy[pkgID] {
+		if w.selectedPkgs[parentID] {
+			w.selectedPkgs[parentID] = false
+			w.unmarkDependents(parentID)
+		}
+	}
 }
 
 func (w WizardModel) visiblePkgLines() int {
@@ -650,6 +743,7 @@ func runWizardApplyWorker(
 	syncSvc *app.SyncService,
 	selectedShell string,
 	selectedTerminal string,
+	store *state.Store,
 	progressChan chan<- tea.Msg,
 ) {
 	ctx := context.Background()
@@ -799,6 +893,10 @@ func runWizardApplyWorker(
 		Percent:     100,
 	}
 
+	if store != nil && profName != "" {
+		_ = store.SetActiveProfile(profName)
+	}
+
 	progressChan <- wizardApplyDoneMsg{err: nil}
 }
 
@@ -868,7 +966,7 @@ func (w WizardModel) renderSelectProfile(width int) string {
 		}
 		item := fmt.Sprintf("%s%-15s : %s", cursor, prof.Name, prof.Description)
 		if i == w.selectedProf {
-			lines = append(lines, w.styles.SelectedRow.Render(AnsiTruncate(item, width-4)))
+			lines = append(lines, w.styles.RenderSelectedRow(AnsiTruncate(item, width-4)))
 		} else {
 			lines = append(lines, AnsiTruncate(item, width-4))
 		}
@@ -915,7 +1013,7 @@ func (w WizardModel) renderSelectEnvironment(width int) string {
 		}
 		row := fmt.Sprintf("%s%s %-8s %-18s : %s", cursor, radio, sh.Name, badge, sh.Description)
 		if w.envFocus == "shell" && i == w.shellCursor {
-			lines = append(lines, w.styles.SelectedRow.Render(AnsiTruncate(row, width-4)))
+			lines = append(lines, w.styles.RenderSelectedRow(AnsiTruncate(row, width-4)))
 		} else {
 			lines = append(lines, AnsiTruncate(row, width-4))
 		}
@@ -949,7 +1047,7 @@ func (w WizardModel) renderSelectEnvironment(width int) string {
 		}
 		row := fmt.Sprintf("%s%s %-18s %-16s : %s", cursor, radio, term.Name, badge, term.Description)
 		if w.envFocus == "terminal" && i == w.terminalCursor {
-			lines = append(lines, w.styles.SelectedRow.Render(AnsiTruncate(row, width-4)))
+			lines = append(lines, w.styles.RenderSelectedRow(AnsiTruncate(row, width-4)))
 		} else {
 			lines = append(lines, AnsiTruncate(row, width-4))
 		}
@@ -970,7 +1068,7 @@ func (w WizardModel) renderSelectEnvironment(width int) string {
 func (w WizardModel) renderSelectPackages(width, height int) string {
 	headerLines := []string{
 		w.styles.Highlight.Render(fmt.Sprintf("STAGE 3/5: CUSTOMIZE TOOLS & PACKAGES (%d/%d)", w.pkgCursor+1, len(w.packages))),
-		"Toggle components to include or exclude from your workstation:",
+		"Toggle components (marking a tool auto-selects its dependencies; unmarking a dependency deselects dependent tools):",
 		"",
 	}
 
@@ -1004,9 +1102,20 @@ func (w WizardModel) renderSelectPackages(width, height int) string {
 		if p.Deprecated {
 			depBadge = " " + w.styles.Warning.Render("[Deprecated]")
 		}
-		row := fmt.Sprintf("%s%s %-12s %-12s%s : %s", cursor, check, p.ID, p.Category, depBadge, p.Description)
+
+		isDep := len(w.requiredBy[p.ID]) > 0
+		typeTag := w.styles.Highlight.Render("[Tool]")
+		depDetail := ""
+		if isDep {
+			typeTag = w.styles.Muted.Render("[Dep]")
+			depDetail = fmt.Sprintf(" (dep of: %s)", strings.Join(w.requiredBy[p.ID], ", "))
+		} else if len(p.DependsOn) > 0 {
+			depDetail = fmt.Sprintf(" (requires: %s)", strings.Join(p.DependsOn, ", "))
+		}
+
+		row := fmt.Sprintf("%s%s %s %-14s %-10s%s : %s%s", cursor, check, typeTag, p.ID, p.Category, depBadge, p.Description, depDetail)
 		if i == w.pkgCursor {
-			lines = append(lines, w.styles.Highlight.Render(AnsiTruncate(row, width-4)))
+			lines = append(lines, w.styles.RenderSelectedRow(AnsiTruncate(row, width-4)))
 		} else {
 			lines = append(lines, AnsiTruncate(row, width-4))
 		}

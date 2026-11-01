@@ -79,12 +79,19 @@ func WithPlatform(plat *platform.Info) Option {
 }
 
 // Registry manages declarative tool definitions, dynamic discovery, and status resolution.
+type versionCacheEntry struct {
+	version string
+	modTime int64
+}
+
 type Registry struct {
-	mu       sync.RWMutex
-	tools    map[string]domain.ToolManifest
-	lookPath LookPathFunc
-	plat     *platform.Info
-	homeDir  string
+	mu           sync.RWMutex
+	tools        map[string]domain.ToolManifest
+	lookPath     LookPathFunc
+	plat         *platform.Info
+	homeDir      string
+	versionCache map[string]versionCacheEntry
+	vMu          sync.RWMutex
 }
 
 // LoadRegistry instantiates a Registry loading embedded manifests and user overlays.
@@ -380,10 +387,23 @@ func (r *Registry) CheckStatus(ctx context.Context, id string) (domain.ToolStatu
 }
 
 func (r *Registry) detectVersion(ctx context.Context, execPath string, args []string) string {
+	var modTime int64
+	if fi, err := os.Stat(execPath); err == nil {
+		modTime = fi.ModTime().UnixNano()
+		r.vMu.RLock()
+		if r.versionCache != nil {
+			if entry, ok := r.versionCache[execPath]; ok && entry.modTime == modTime && entry.version != "" {
+				r.vMu.RUnlock()
+				return entry.version
+			}
+		}
+		r.vMu.RUnlock()
+	}
+
 	if len(args) == 0 {
 		args = []string{"--version"}
 	}
-	vCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	vCtx, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
 	defer cancel()
 
 	cmd := exec.CommandContext(vCtx, execPath, args...)
@@ -401,17 +421,46 @@ func (r *Registry) detectVersion(ctx context.Context, execPath string, args []st
 	if len(line) > 40 {
 		line = line[:40]
 	}
+
+	if line != "" {
+		r.vMu.Lock()
+		if r.versionCache == nil {
+			r.versionCache = make(map[string]versionCacheEntry)
+		}
+		r.versionCache[execPath] = versionCacheEntry{
+			version: line,
+			modTime: modTime,
+		}
+		r.vMu.Unlock()
+	}
+
 	return line
 }
 
-// ListStatuses returns the live operational status for every registered tool.
+// ListStatuses returns the live operational status for every registered tool concurrently.
 func (r *Registry) ListStatuses(ctx context.Context) []domain.ToolStatus {
 	all := r.List()
+	statuses := make([]domain.ToolStatus, len(all))
+	valid := make([]bool, len(all))
+
+	var wg sync.WaitGroup
+	wg.Add(len(all))
+	for i, m := range all {
+		go func(idx int, toolID string) {
+			defer wg.Done()
+			st, err := r.CheckStatus(ctx, toolID)
+			if err == nil {
+				statuses[idx] = st
+				valid[idx] = true
+			}
+		}(i, m.ID)
+	}
+	wg.Wait()
+
 	out := make([]domain.ToolStatus, 0, len(all))
-	for _, m := range all {
-		st, err := r.CheckStatus(ctx, m.ID)
-		if err == nil {
-			out = append(out, st)
+	for i := range statuses {
+		if valid[i] {
+			out = append(out, statuses[i])
 		}
 	}
 	return out

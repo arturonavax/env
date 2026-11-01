@@ -6,8 +6,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/catalog"
+	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/security"
+	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/theme"
 )
 
@@ -518,5 +520,124 @@ func TestWizardEscBackwardNavigation(t *testing.T) {
 	w = nm.(WizardModel)
 	if !w.quitting {
 		t.Fatalf("expected quitting to be true after esc on StageSelectProfile")
+	}
+}
+
+func TestWizardPackageDependenciesAutoSelection(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	plat := platform.Detect()
+	w := NewWizardModel(plat, cat, nil)
+
+	// Inject a custom package hierarchy to verify auto-selection and auto-deselection
+	toolA := domain.ManagedResource{ID: "tool-a", DependsOn: []string{"dep-b"}}
+	depB := domain.ManagedResource{ID: "dep-b", DependsOn: []string{"dep-c"}}
+	depC := domain.ManagedResource{ID: "dep-c"}
+
+	w.packages = []domain.ManagedResource{toolA, depB, depC}
+	w.pkgMap = map[string]domain.ManagedResource{
+		"tool-a": toolA,
+		"dep-b":  depB,
+		"dep-c":  depC,
+	}
+	w.requiredBy = map[string][]string{
+		"dep-b": {"tool-a"},
+		"dep-c": {"dep-b"},
+	}
+	w.selectedPkgs = map[string]bool{
+		"tool-a": false,
+		"dep-b":  false,
+		"dep-c":  false,
+	}
+	w.stage = StageSelectPackages
+	w.pkgCursor = 0 // On tool-a
+
+	// Press space to enable tool-a -> should transitively select dep-b and dep-c
+	nm, _ := w.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
+	w = nm.(WizardModel)
+	if !w.selectedPkgs["tool-a"] || !w.selectedPkgs["dep-b"] || !w.selectedPkgs["dep-c"] {
+		t.Fatalf("expected tool-a, dep-b, and dep-c to all be marked true, got: %+v", w.selectedPkgs)
+	}
+
+	// Move cursor to dep-c (index 2) and press space to disable dep-c
+	w.pkgCursor = 2
+	nm, _ = w.Update(tea.KeyPressMsg{Code: ' ', Text: " "})
+	w = nm.(WizardModel)
+	if w.selectedPkgs["dep-c"] {
+		t.Fatalf("expected dep-c to be false")
+	}
+	// Because dep-c was unmarked, dep-b (depends on c) and tool-a (depends on b) must both be unmarked!
+	if w.selectedPkgs["dep-b"] || w.selectedPkgs["tool-a"] {
+		t.Fatalf("expected dep-b and tool-a to be auto-unmarked when dep-c is unmarked, got: %+v", w.selectedPkgs)
+	}
+}
+
+func TestWizardProfilePersistence(t *testing.T) {
+	tempDir := t.TempDir()
+	store, err := state.OpenStore(tempDir)
+	if err != nil {
+		t.Fatalf("failed to open store: %v", err)
+	}
+	defer store.Close()
+
+	cat := catalog.NewDefaultRegistry()
+	plat := platform.Detect()
+	w := NewWizardModel(plat, cat, nil, WithWizardStore(store))
+
+	// Find index of "full" profile if available, or first profile
+	fullIdx := 0
+	for i, p := range w.profiles {
+		if p.Name == "full" {
+			fullIdx = i
+			break
+		}
+	}
+	w.selectedProf = fullIdx
+	targetProfile := w.profiles[fullIdx].Name
+
+	// Deliver successful apply done message
+	nm, _ := w.Update(wizardApplyDoneMsg{err: nil})
+	w = nm.(WizardModel)
+
+	if !w.IsCompleted() {
+		t.Fatalf("expected wizard to be completed")
+	}
+	if w.ChosenProfile() != targetProfile {
+		t.Fatalf("expected chosen profile %q, got %q", targetProfile, w.ChosenProfile())
+	}
+	if store.ActiveProfile() != targetProfile {
+		t.Fatalf("expected persisted active profile to be %q, got %q", targetProfile, store.ActiveProfile())
+	}
+}
+
+func TestConfigsIntegrationStatus(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Jump to TabConfigs (tab 3)
+	nm, _ := m.Update(tea.KeyPressMsg{Text: "3"})
+	m = nm.(Model)
+	if m.ActiveTab() != TabConfigs {
+		t.Fatalf("expected TabConfigs, got %v", m.ActiveTab())
+	}
+
+	view := m.View()
+	content := view.Content
+	if !strings.Contains(content, "[Integrated ✓]") && !strings.Contains(content, "[Not Integrated ✗]") {
+		t.Fatalf("expected configs tab to display integration badges, got:\n%s", content)
+	}
+}
+
+func TestRenderSelectedRowContrast(t *testing.T) {
+	pal := theme.ByName("tokyo-night")
+	st := theme.NewStyles(pal)
+
+	// An input with nested ANSI color codes and resets
+	nestedInput := "\x1b[32m[✓]\x1b[0m \x1b[1;36mripgrep\x1b[0m : Fast search"
+	rendered := st.RenderSelectedRow(nestedInput)
+
+	// Rendered text must not contain inner ANSI color codes leaking before reset
+	if strings.Contains(rendered, "\x1b[32m") || strings.Contains(rendered, "\x1b[1;36m") {
+		t.Fatalf("expected inner ANSI color codes to be stripped in RenderSelectedRow, got: %q", rendered)
 	}
 }

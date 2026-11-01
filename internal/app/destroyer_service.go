@@ -422,6 +422,10 @@ func (d *DestroyerService) DestroyerReinstall(
 		_, _ = d.syncSvc.Sync(ctx, SyncOptions{Force: true})
 	}
 
+	if d.store != nil && profile != "" {
+		_ = d.store.SetActiveProfile(profile)
+	}
+
 	return res, nil
 }
 

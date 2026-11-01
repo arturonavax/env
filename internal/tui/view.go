@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -165,6 +166,14 @@ func (m Model) renderOverview(w, h int) string {
 func (m Model) renderPackages(w, h int) string {
 	header := m.styles.Highlight.Render(fmt.Sprintf("MANAGED PACKAGES & SYSTEM TOOLCHAINS (%d/%d)", m.selectedIdx+1, len(m.packages)))
 	items := make([]string, 0, len(m.packages))
+
+	requiredBy := make(map[string][]string)
+	for _, p := range m.packages {
+		for _, dep := range p.DependsOn {
+			requiredBy[dep] = append(requiredBy[dep], p.ID)
+		}
+	}
+
 	for i, p := range m.packages {
 		prefix := "  "
 		if i == m.selectedIdx {
@@ -174,9 +183,20 @@ func (m Model) renderPackages(w, h int) string {
 		if p.Deprecated {
 			statusTag = m.styles.Warning.Render("[Deprecated]")
 		}
-		row := fmt.Sprintf("%s%-14s %-12s %-32s %s", prefix, p.ID, p.Category, p.Description, statusTag)
+
+		isDep := len(requiredBy[p.ID]) > 0
+		kindBadge := m.styles.Highlight.Render("[Tool]")
+		depInfo := ""
+		if isDep {
+			kindBadge = m.styles.Muted.Render("[Dep]")
+			depInfo = fmt.Sprintf(" (dep of: %s)", strings.Join(requiredBy[p.ID], ", "))
+		} else if len(p.DependsOn) > 0 {
+			depInfo = fmt.Sprintf(" (requires: %s)", strings.Join(p.DependsOn, ", "))
+		}
+
+		row := fmt.Sprintf("%s%s %-14s %-10s %s : %s%s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description, depInfo)
 		if i == m.selectedIdx {
-			items = append(items, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
@@ -192,13 +212,26 @@ func (m Model) renderConfigs(w, h int) string {
 		if i == m.selectedIdx {
 			prefix = "> "
 		}
-		tag := ""
-		if c.Deprecated {
-			tag = " " + m.styles.Warning.Render("[Deprecated]")
+
+		targetPath := c.Target
+		if m.deps.Platform != nil {
+			targetPath = m.deps.Platform.ExpandPath(c.TargetForOS(m.deps.Platform.OS()))
 		}
-		row := fmt.Sprintf("%s%-16s %-26s -> %s%s", prefix, c.ID, c.Source, c.Target, tag)
+
+		var statusTag string
+		if fi, err := os.Lstat(targetPath); err == nil && fi != nil {
+			statusTag = m.styles.Success.Render("[Integrated ✓]")
+		} else {
+			statusTag = m.styles.Muted.Render("[Not Integrated ✗]")
+		}
+
+		if c.Deprecated {
+			statusTag += " " + m.styles.Warning.Render("[Deprecated]")
+		}
+
+		row := fmt.Sprintf("%s%-18s %s  %-24s -> %s", prefix, c.ID, statusTag, c.Source, c.Target)
 		if i == m.selectedIdx {
-			items = append(items, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
@@ -245,7 +278,7 @@ func (m Model) renderHacks(w, h int) string {
 		status := m.styles.Success.Render("[Matched]")
 		row := fmt.Sprintf("%s%-24s %s  %s", prefix, hk.ID, status, hk.Description)
 		if i == m.selectedIdx {
-			items = append(items, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
@@ -272,7 +305,7 @@ func (m Model) renderDoctor(w, h int) string {
 			row += " " + m.styles.Muted.Render(fmt.Sprintf("(Remediation: %s)", c.Remediation))
 		}
 		if i == m.selectedIdx {
-			items = append(items, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
@@ -366,7 +399,7 @@ func (m Model) renderSecurity(w, h int) string {
 				}
 				row := fmt.Sprintf("%s%s %s", prefix, badge, f.Title)
 				if i == m.selectedIdx {
-					findingItems = append(findingItems, m.styles.SelectedRow.Render(row))
+					findingItems = append(findingItems, m.styles.RenderSelectedRow(row))
 				} else {
 					findingItems = append(findingItems, row)
 				}
