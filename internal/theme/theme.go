@@ -22,12 +22,12 @@ type Palette struct {
 	Border     color.Color
 }
 
-// TokyoNightPalette is the standard Tokyo Night dark palette.
+// TokyoNightPalette is the standard Tokyo Night dark palette with red accent.
 var TokyoNightPalette = Palette{
 	Name:       "tokyo-night",
 	Background: lipgloss.Color("#1a1b26"),
 	Foreground: lipgloss.Color("#c0caf5"),
-	Accent:     lipgloss.Color("#7aa2f7"),
+	Accent:     lipgloss.Color("#f7768e"),
 	Cyan:       lipgloss.Color("#7dcfff"),
 	Purple:     lipgloss.Color("#bb9af7"),
 	Green:      lipgloss.Color("#9ece6a"),
@@ -37,12 +37,12 @@ var TokyoNightPalette = Palette{
 	Border:     lipgloss.Color("#3b4261"),
 }
 
-// TokyoNightStormPalette is the slightly darker Tokyo Night Storm palette.
+// TokyoNightStormPalette is the slightly darker Tokyo Night Storm palette with red accent.
 var TokyoNightStormPalette = Palette{
 	Name:       "tokyo-night-storm",
 	Background: lipgloss.Color("#24283b"),
 	Foreground: lipgloss.Color("#c0caf5"),
-	Accent:     lipgloss.Color("#7aa2f7"),
+	Accent:     lipgloss.Color("#f7768e"),
 	Cyan:       lipgloss.Color("#7dcfff"),
 	Purple:     lipgloss.Color("#bb9af7"),
 	Green:      lipgloss.Color("#9ece6a"),

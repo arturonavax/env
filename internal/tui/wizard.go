@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
@@ -25,6 +26,18 @@ const (
 	StageApplying
 	StageCompleted
 )
+
+type wizardApplyDoneMsg struct {
+	err error
+}
+
+type wizardSpinnerTickMsg time.Time
+
+func tickSpinnerCmd() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(t time.Time) tea.Msg {
+		return wizardSpinnerTickMsg(t)
+	})
+}
 
 // ShellOption defines a selectable shell with feature indicators.
 type ShellOption struct {
@@ -57,6 +70,9 @@ type WizardModel struct {
 	packages         []domain.ManagedResource
 	selectedPkgs     map[string]bool
 	pkgCursor        int
+	pkgScrollOffset  int
+	planScrollOffset int
+	spinnerFrame     int
 	plan             *domain.ExecutionPlan
 	progressMsg      string
 	err              error
@@ -266,6 +282,11 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if w.pkgCursor > 0 {
 					w.pkgCursor--
 				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				if w.planScrollOffset > 0 {
+					w.planScrollOffset--
+				}
 			}
 
 		case "down", "j":
@@ -288,6 +309,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if w.pkgCursor < len(w.packages)-1 {
 					w.pkgCursor++
 				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				w.planScrollOffset++
 			}
 
 		case "tab", "left", "right":
@@ -362,46 +386,26 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case StageReviewPlan:
-				if w.seal != nil {
-					if err := w.seal.Verify(context.Background()); err != nil {
-						w.err = err
-						w.stage = StageCompleted
-						break
-					}
-				}
 				w.stage = StageApplying
-				if w.destroyerMode && w.destroyerSvc != nil {
-					profName := ""
-					if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
-						profName = w.profiles[w.selectedProf].Name
-					}
-					opts := app.PurgeOptions{
-						Profile:       profName,
-						PurgeBinaries: false,
-						PurgeState:    false,
-					}
-					if purgePlan, err := w.destroyerSvc.PlanPurge(context.Background(), opts); err == nil {
-						_, _ = w.destroyerSvc.ExecutePurge(context.Background(), purgePlan, false, false)
-					}
+				profName := ""
+				if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
+					profName = w.profiles[w.selectedProf].Name
 				}
-				if w.installSvc != nil && w.plan != nil {
-					if err := w.installSvc.Apply(context.Background(), w.plan); err != nil {
-						w.err = err
-					}
-				}
-				if w.hacksSvc != nil && w.includeHacks && len(w.matchedHacks) > 0 {
-					for _, hk := range w.matchedHacks {
-						_, _ = w.hacksSvc.Apply(context.Background(), hk.ID)
-					}
-				}
-				if w.syncSvc != nil {
-					_, _ = w.syncSvc.Sync(context.Background(), app.SyncOptions{
-						Force:    w.destroyerMode,
-						Shell:    w.selectedShell,
-						Terminal: w.selectedTerminal,
-					})
-				}
-				w.stage = StageCompleted
+				cmd := runWizardApplyCmd(
+					w.seal,
+					w.destroyerMode,
+					w.destroyerSvc,
+					profName,
+					w.installSvc,
+					w.plan,
+					w.hacksSvc,
+					w.includeHacks,
+					w.matchedHacks,
+					w.syncSvc,
+					w.selectedShell,
+					w.selectedTerminal,
+				)
+				return w, tea.Batch(cmd, tickSpinnerCmd())
 
 			case StageCompleted:
 				w.quitting = true
@@ -409,12 +413,93 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case wizardApplyDoneMsg:
+		w.err = msg.err
+		w.stage = StageCompleted
+		return w, nil
+
+	case wizardSpinnerTickMsg:
+		if w.stage == StageApplying {
+			w.spinnerFrame++
+			return w, tickSpinnerCmd()
+		}
+		return w, nil
+
 	case tea.WindowSizeMsg:
 		w.width = msg.Width
 		w.height = msg.Height
+		w.adjustPkgScroll()
 	}
 
 	return w, nil
+}
+
+func (w *WizardModel) adjustPkgScroll() {
+	availHeight := w.height - 4 - 3 - 4
+	if availHeight < 5 {
+		availHeight = 5
+	}
+	w.pkgScrollOffset = AdjustScrollOffset(w.pkgCursor, w.pkgScrollOffset, availHeight, len(w.packages))
+}
+
+func runWizardApplyCmd(
+	seal *security.OriginSeal,
+	destroyerMode bool,
+	destroyerSvc *app.DestroyerService,
+	profName string,
+	installSvc *app.InstallService,
+	plan *domain.ExecutionPlan,
+	hacksSvc *app.HacksService,
+	includeHacks bool,
+	matchedHacks []domain.HackProfile,
+	syncSvc *app.SyncService,
+	selectedShell string,
+	selectedTerminal string,
+) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+
+		if seal != nil {
+			if err := seal.Verify(ctx); err != nil {
+				return wizardApplyDoneMsg{err: err}
+			}
+		}
+
+		if destroyerMode && destroyerSvc != nil {
+			opts := app.PurgeOptions{
+				Profile:       profName,
+				PurgeBinaries: false,
+				PurgeState:    false,
+			}
+			if purgePlan, err := destroyerSvc.PlanPurge(ctx, opts); err == nil {
+				_, _ = destroyerSvc.ExecutePurge(ctx, purgePlan, false, false)
+			}
+		}
+
+		if installSvc != nil && plan != nil {
+			if err := installSvc.Apply(ctx, plan); err != nil {
+				return wizardApplyDoneMsg{err: err}
+			}
+		}
+
+		if hacksSvc != nil && includeHacks && len(matchedHacks) > 0 {
+			for _, hk := range matchedHacks {
+				_, _ = hacksSvc.Apply(ctx, hk.ID)
+			}
+		}
+
+		if syncSvc != nil {
+			if _, err := syncSvc.Sync(ctx, app.SyncOptions{
+				Force:    destroyerMode,
+				Shell:    selectedShell,
+				Terminal: selectedTerminal,
+			}); err != nil {
+				return wizardApplyDoneMsg{err: err}
+			}
+		}
+
+		return wizardApplyDoneMsg{err: nil}
+	}
 }
 
 // View renders the current stage of the interactive wizard (Bubble Tea v2).
@@ -440,11 +525,19 @@ func (w WizardModel) View() tea.View {
 	case StageSelectEnvironment:
 		body = w.renderSelectEnvironment(availWidth)
 	case StageSelectPackages:
-		body = w.renderSelectPackages(availWidth)
+		body = w.renderSelectPackages(availWidth, availHeight)
 	case StageReviewPlan:
-		body = w.renderReviewPlan(availWidth)
+		body = w.renderReviewPlan(availWidth, availHeight)
 	case StageApplying:
-		body = w.styles.Highlight.Render("Applying planned components and synchronizing dotfiles...\nPlease wait...")
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		frame := frames[w.spinnerFrame%len(frames)]
+		spinner := w.styles.Header.Render(frame)
+		title := w.styles.Highlight.Render("Applying planned components and synchronizing dotfiles...")
+		body = fmt.Sprintf("\n  %s  %s\n\n  %s\n  %s",
+			spinner, title,
+			w.styles.Muted.Render("• Executing package installations, hacks, and dotfile reconciliation in background..."),
+			w.styles.Muted.Render("• Please wait, this may take a moment..."),
+		)
 	case StageCompleted:
 		body = w.renderCompleted(availWidth)
 	}
@@ -580,14 +673,34 @@ func (w WizardModel) renderSelectEnvironment(width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (w WizardModel) renderSelectPackages(width int) string {
-	lines := []string{
-		w.styles.Highlight.Render("STAGE 3/5: CUSTOMIZE TOOLS & PACKAGES"),
+func (w WizardModel) renderSelectPackages(width, height int) string {
+	headerLines := []string{
+		w.styles.Highlight.Render(fmt.Sprintf("STAGE 3/5: CUSTOMIZE TOOLS & PACKAGES (%d/%d)", w.pkgCursor+1, len(w.packages))),
 		"Toggle components to include or exclude from your workstation:",
 		"",
 	}
 
-	for i, p := range w.packages {
+	availHeight := height - len(headerLines) - 5
+	if availHeight < 5 {
+		availHeight = 5
+	}
+
+	pkgScrollOffset := AdjustScrollOffset(w.pkgCursor, w.pkgScrollOffset, availHeight, len(w.packages))
+	start := pkgScrollOffset
+	end := start + availHeight
+	if end > len(w.packages) {
+		end = len(w.packages)
+	}
+
+	lines := make([]string, 0, len(headerLines)+availHeight+4)
+	lines = append(lines, headerLines...)
+
+	if start > 0 {
+		lines = append(lines, w.styles.Muted.Render(fmt.Sprintf("  ▲ ... (%d more packages above)", start)))
+	}
+
+	for i := start; i < end; i++ {
+		p := w.packages[i]
 		cursor := "  "
 		if i == w.pkgCursor {
 			cursor = "> "
@@ -608,6 +721,10 @@ func (w WizardModel) renderSelectPackages(width int) string {
 		}
 	}
 
+	if end < len(w.packages) {
+		lines = append(lines, w.styles.Muted.Render(fmt.Sprintf("  ▼ ... (%d more packages below)", len(w.packages)-end)))
+	}
+
 	if len(w.matchedHacks) > 0 {
 		status := w.styles.Muted.Render("NO (press 'h' to include)")
 		if w.includeHacks {
@@ -620,22 +737,22 @@ func (w WizardModel) renderSelectPackages(width int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (w WizardModel) renderReviewPlan(width int) string {
+func (w WizardModel) renderReviewPlan(width, height int) string {
 	planID := "preview"
 	stepCount := 0
 	if w.plan != nil {
 		planID = w.plan.ID
 		stepCount = len(w.plan.Steps)
 	}
-	lines := []string{
+	allLines := []string{
 		w.styles.Highlight.Render("STAGE 4/5: REVIEW EXECUTION PLAN"),
 		fmt.Sprintf("Plan ID: %s | Total Actions: %d", planID, stepCount),
 		w.styles.Muted.Render("• Automatic pre-mutation backups will be created before touching any file."),
 		w.styles.Muted.Render("• Transaction journal will record each step for rollback safety."),
 	}
 
-	lines = append(lines, "", w.styles.Highlight.Render("TARGET ENVIRONMENT:"))
-	lines = append(lines, fmt.Sprintf("  • Primary Shell : %s (Zsh source of truth)", w.selectedShell))
+	allLines = append(allLines, "", w.styles.Highlight.Render("TARGET ENVIRONMENT:"))
+	allLines = append(allLines, fmt.Sprintf("  • Primary Shell : %s (Zsh source of truth)", w.selectedShell))
 	termWarning := ""
 	for _, t := range w.terminals {
 		if t.ID == w.selectedTerminal && t.Warning != "" {
@@ -643,9 +760,9 @@ func (w WizardModel) renderReviewPlan(width int) string {
 			break
 		}
 	}
-	lines = append(lines, fmt.Sprintf("  • Terminal      : %s%s", w.selectedTerminal, termWarning))
+	allLines = append(allLines, fmt.Sprintf("  • Terminal      : %s%s", w.selectedTerminal, termWarning))
 
-	lines = append(lines, "", w.styles.Highlight.Render("CRYPTOGRAPHIC ORIGIN & PROVENANCE SEAL:"))
+	allLines = append(allLines, "", w.styles.Highlight.Render("CRYPTOGRAPHIC ORIGIN & PROVENANCE SEAL:"))
 	origin := "Embedded Catalog (Immutable Binary)"
 	shortDigest := "N/A"
 	manifestFP := "N/A"
@@ -660,21 +777,21 @@ func (w WizardModel) renderReviewPlan(width int) string {
 			statusBadge = w.styles.Warning.Render(fmt.Sprintf("[INSECURE ORIGIN: %s]", w.seal.InsecureReason))
 		}
 	}
-	lines = append(lines, fmt.Sprintf("  • Source Origin   : %s", origin))
-	lines = append(lines, fmt.Sprintf("  • Manifests SHA256: %s", manifestFP))
+	allLines = append(allLines, fmt.Sprintf("  • Source Origin   : %s", origin))
+	allLines = append(allLines, fmt.Sprintf("  • Manifests SHA256: %s", manifestFP))
 	if w.platform != nil {
-		lines = append(lines, fmt.Sprintf("  • Destination Home: %s", w.platform.HomeDir()))
+		allLines = append(allLines, fmt.Sprintf("  • Destination Home: %s", w.platform.HomeDir()))
 	}
-	lines = append(lines, fmt.Sprintf("  • Dotfiles SHA256 : %s", dotfilesFP))
-	lines = append(lines, fmt.Sprintf("  • Security Seal   : %s %s", shortDigest, statusBadge))
+	allLines = append(allLines, fmt.Sprintf("  • Dotfiles SHA256 : %s", dotfilesFP))
+	allLines = append(allLines, fmt.Sprintf("  • Security Seal   : %s %s", shortDigest, statusBadge))
 	if len(w.matchedHacks) > 0 {
 		status := w.styles.Muted.Render("[Excluded]")
 		if w.includeHacks {
 			status = w.styles.Success.Render("[Included ✓]")
 		}
-		lines = append(lines, "", w.styles.Highlight.Render(fmt.Sprintf("⚡ HARDWARE WORKSTATION HACKS %s (Press [h] to toggle)", status)))
+		allLines = append(allLines, "", w.styles.Highlight.Render(fmt.Sprintf("⚡ HARDWARE WORKSTATION HACKS %s (Press [h] to toggle)", status)))
 		for _, hk := range w.matchedHacks {
-			lines = append(lines, fmt.Sprintf("  • %-20s : %s", hk.ID, hk.Description))
+			allLines = append(allLines, fmt.Sprintf("  • %-20s : %s", hk.ID, hk.Description))
 		}
 	}
 
@@ -685,35 +802,70 @@ func (w WizardModel) renderReviewPlan(width int) string {
 		}
 	}
 	if len(drifted) > 0 {
-		lines = append(lines, "", w.styles.Warning.Render(fmt.Sprintf("⚠️  DOTFILE DRIFTS DETECTED (%d configs with differences):", len(drifted))))
+		allLines = append(allLines, "", w.styles.Warning.Render(fmt.Sprintf("⚠️  DOTFILE DRIFTS DETECTED (%d configs with differences):", len(drifted))))
 		for _, d := range drifted {
 			sum := d.Summary
 			if sum == "" {
 				sum = d.State
 			}
-			lines = append(lines, fmt.Sprintf("  • %-22s [%s] (%s)", d.ConfigID, d.State, sum))
+			allLines = append(allLines, fmt.Sprintf("  • %-22s [%s] (%s)", d.ConfigID, d.State, sum))
 		}
-		lines = append(lines, w.styles.Muted.Render("  Dotfiles will be automatically synchronized via safe 3-way merge."))
+		allLines = append(allLines, w.styles.Muted.Render("  Dotfiles will be automatically synchronized via safe 3-way merge."))
 	}
 
-	lines = append(lines, "", w.styles.Highlight.Render("PLANNED ACTIONS:"))
+	allLines = append(allLines, "", w.styles.Highlight.Render("PLANNED ACTIONS:"))
 
 	if w.plan != nil {
 		for _, s := range w.plan.Steps {
-			lines = append(lines, fmt.Sprintf("  • [%s] %s", s.Action, AnsiTruncate(s.Description, width-15)))
+			allLines = append(allLines, fmt.Sprintf("  • [%s] %s", s.Action, AnsiTruncate(s.Description, width-15)))
 		}
 	} else {
-		lines = append(lines, "  • [noop] Ready to apply selected configuration")
+		allLines = append(allLines, "  • [noop] Ready to apply selected configuration")
 	}
 
 	destroyerBadge := w.styles.Muted.Render("OFF (Press [d] to activate)")
 	if w.destroyerMode {
 		destroyerBadge = w.styles.Error.Render("ACTIVE ⚠️  Purges packages, tools & configs before installing (Press [d] to disable)")
 	}
-	lines = append(lines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s", destroyerBadge))
+	allLines = append(allLines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s", destroyerBadge))
 
-	lines = append(lines, "", w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, or [q] to Cancel."))
-	return strings.Join(lines, "\n")
+	for i := range allLines {
+		allLines[i] = AnsiTruncate(allLines[i], width-4)
+	}
+
+	availHeight := height - 3
+	if availHeight < 5 {
+		availHeight = 5
+	}
+
+	totalLines := len(allLines)
+	maxOffset := totalLines - availHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	offset := w.planScrollOffset
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	end := offset + availHeight
+	if end > totalLines {
+		end = totalLines
+	}
+
+	visibleLines := allLines[offset:end]
+
+	var footer string
+	if totalLines > availHeight {
+		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down] Scroll Plan (%d-%d/%d)  [Enter] Execute  [d] Destroyer  [q] Cancel", offset+1, end, totalLines))
+	} else {
+		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, or [q] to Cancel.")
+	}
+
+	return strings.Join(append(visibleLines, "", footer), "\n")
 }
 
 func (w WizardModel) renderCompleted(width int) string {

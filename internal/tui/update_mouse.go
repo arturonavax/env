@@ -52,10 +52,12 @@ func (m Model) handleMouse(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.selectedIdx > 0 {
 				m.selectedIdx--
 			}
+			m.adjustScroll()
 		case tea.MouseWheelDown:
 			if m.selectedIdx < m.maxSelectedIndex() {
 				m.selectedIdx++
 			}
+			m.adjustScroll()
 		}
 	}
 

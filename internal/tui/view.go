@@ -163,8 +163,8 @@ func (m Model) renderOverview(w, h int) string {
 }
 
 func (m Model) renderPackages(w, h int) string {
-	lines := make([]string, 0, len(m.packages)+2)
-	lines = append(lines, m.styles.Highlight.Render("MANAGED PACKAGES & SYSTEM TOOLCHAINS"))
+	header := m.styles.Highlight.Render(fmt.Sprintf("MANAGED PACKAGES & SYSTEM TOOLCHAINS (%d/%d)", m.selectedIdx+1, len(m.packages)))
+	items := make([]string, 0, len(m.packages))
 	for i, p := range m.packages {
 		prefix := "  "
 		if i == m.selectedIdx {
@@ -176,17 +176,17 @@ func (m Model) renderPackages(w, h int) string {
 		}
 		row := fmt.Sprintf("%s%-14s %-12s %-32s %s", prefix, p.ID, p.Category, p.Description, statusTag)
 		if i == m.selectedIdx {
-			lines = append(lines, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.SelectedRow.Render(row))
 		} else {
-			lines = append(lines, row)
+			items = append(items, row)
 		}
 	}
-	return BuildPanel(m.styles, lines, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, m.selectedIdx, m.scrollOffset, w, h, true)
 }
 
 func (m Model) renderConfigs(w, h int) string {
-	lines := make([]string, 0, len(m.configs)+2)
-	lines = append(lines, m.styles.Highlight.Render("MANAGED CONFIGURATION ASSETS (files/)"))
+	header := m.styles.Highlight.Render(fmt.Sprintf("MANAGED CONFIGURATION ASSETS (%d/%d)", m.selectedIdx+1, len(m.configs)))
+	items := make([]string, 0, len(m.configs))
 	for i, c := range m.configs {
 		prefix := "  "
 		if i == m.selectedIdx {
@@ -198,12 +198,12 @@ func (m Model) renderConfigs(w, h int) string {
 		}
 		row := fmt.Sprintf("%s%-16s %-26s -> %s%s", prefix, c.ID, c.Source, c.Target, tag)
 		if i == m.selectedIdx {
-			lines = append(lines, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.SelectedRow.Render(row))
 		} else {
-			lines = append(lines, row)
+			items = append(items, row)
 		}
 	}
-	return BuildPanel(m.styles, lines, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, m.selectedIdx, m.scrollOffset, w, h, true)
 }
 
 func (m Model) renderAI(w, h int) string {
@@ -228,13 +228,14 @@ func (m Model) renderAI(w, h int) string {
 }
 
 func (m Model) renderHacks(w, h int) string {
-	lines := []string{
-		m.styles.Highlight.Render("HARDWARE & MACHINE-SPECIFIC HACKS"),
+	headerLines := []string{
+		m.styles.Highlight.Render(fmt.Sprintf("HARDWARE & MACHINE-SPECIFIC HACKS (%d/%d)", m.selectedIdx+1, len(m.detectedHacks))),
 		"Declarative workstation hacks with DMI and hardware auto-detection:",
 		"",
 	}
+	items := make([]string, 0, len(m.detectedHacks))
 	if len(m.detectedHacks) == 0 {
-		lines = append(lines, m.styles.Muted.Render("• No matching hardware hacks detected for this workstation."))
+		items = append(items, m.styles.Muted.Render("• No matching hardware hacks detected for this workstation."))
 	}
 	for i, hk := range m.detectedHacks {
 		prefix := "  "
@@ -244,30 +245,39 @@ func (m Model) renderHacks(w, h int) string {
 		status := m.styles.Success.Render("[Matched]")
 		row := fmt.Sprintf("%s%-24s %s  %s", prefix, hk.ID, status, hk.Description)
 		if i == m.selectedIdx {
-			lines = append(lines, m.styles.SelectedRow.Render(row))
+			items = append(items, m.styles.SelectedRow.Render(row))
 		} else {
-			lines = append(lines, row)
+			items = append(items, row)
 		}
 	}
-	return BuildPanel(m.styles, lines, w, h, true)
+	return BuildScrollablePanel(m.styles, headerLines, items, m.selectedIdx, m.scrollOffset, w, h, true)
 }
 
 func (m Model) renderDoctor(w, h int) string {
-	lines := make([]string, 0, len(m.doctorChecks)+2)
-	lines = append(lines, m.styles.Highlight.Render("ENVIRONMENT HEALTH DIAGNOSTICS"))
-	for _, c := range m.doctorChecks {
+	header := m.styles.Highlight.Render(fmt.Sprintf("ENVIRONMENT HEALTH DIAGNOSTICS (%d/%d)", m.selectedIdx+1, len(m.doctorChecks)))
+	items := make([]string, 0, len(m.doctorChecks))
+	for i, c := range m.doctorChecks {
+		prefix := "  "
+		if i == m.selectedIdx {
+			prefix = "> "
+		}
 		badge := m.styles.Success.Render("[PASS]")
 		if c.Verdict == app.VerdictWarn {
 			badge = m.styles.Warning.Render("[WARN]")
 		} else if c.Verdict == app.VerdictFail {
 			badge = m.styles.Error.Render("[FAIL]")
 		}
-		lines = append(lines, fmt.Sprintf("%s %-25s : %s", badge, c.Name, c.Message))
+		row := fmt.Sprintf("%s%s %-25s : %s", prefix, badge, c.Name, c.Message)
 		if c.Remediation != "" {
-			lines = append(lines, m.styles.Muted.Render(fmt.Sprintf("       Remediation: %s", c.Remediation)))
+			row += " " + m.styles.Muted.Render(fmt.Sprintf("(Remediation: %s)", c.Remediation))
+		}
+		if i == m.selectedIdx {
+			items = append(items, m.styles.SelectedRow.Render(row))
+		} else {
+			items = append(items, row)
 		}
 	}
-	return BuildPanel(m.styles, lines, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, m.selectedIdx, m.scrollOffset, w, h, true)
 }
 
 func (m Model) renderHistory(w, h int) string {
@@ -317,20 +327,25 @@ func (m Model) renderSecurity(w, h int) string {
 			}
 		}
 
-		leftLines := []string{
+		findingCount := 0
+		if m.securityReport != nil {
+			findingCount = len(m.securityReport.Findings)
+		}
+		leftHeader := []string{
 			m.styles.Highlight.Render("SYSTEM SECURITY AUDIT & COMPLIANCE"),
 			fmt.Sprintf("• Profile:         [%s] (press 'p' to switch)", strings.ToUpper(profName)),
 			fmt.Sprintf("• Hardening Score: %s", scoreStr),
 			fmt.Sprintf("• Summary:         Crit: %d | High: %d | Med: %d | Low: %d", critCount, highCount, medCount, lowCount),
 			"",
-			m.styles.Highlight.Render("AUDIT FINDINGS:"),
+			m.styles.Highlight.Render(fmt.Sprintf("AUDIT FINDINGS (%d/%d):", m.selectedIdx+1, findingCount)),
 		}
 
+		findingItems := make([]string, 0)
 		if m.securityReport == nil || len(m.securityReport.Findings) == 0 {
 			if m.securityReport != nil {
-				leftLines = append(leftLines, m.styles.Success.Render("✓ No security risks detected for this profile."))
+				findingItems = append(findingItems, m.styles.Success.Render("✓ No security risks detected for this profile."))
 			} else {
-				leftLines = append(leftLines, m.styles.Muted.Render("• Running security audit..."))
+				findingItems = append(findingItems, m.styles.Muted.Render("• Running security audit..."))
 			}
 		} else {
 			for i, f := range m.securityReport.Findings {
@@ -351,9 +366,9 @@ func (m Model) renderSecurity(w, h int) string {
 				}
 				row := fmt.Sprintf("%s%s %s", prefix, badge, f.Title)
 				if i == m.selectedIdx {
-					leftLines = append(leftLines, m.styles.SelectedRow.Render(row))
+					findingItems = append(findingItems, m.styles.SelectedRow.Render(row))
 				} else {
-					leftLines = append(leftLines, row)
+					findingItems = append(findingItems, row)
 				}
 			}
 		}
@@ -413,7 +428,7 @@ func (m Model) renderSecurity(w, h int) string {
 			}
 		}
 
-		leftPanel := BuildPanel(m.styles, leftLines, leftW, h, m.focusedPanel == "left")
+		leftPanel := BuildScrollablePanel(m.styles, leftHeader, findingItems, m.selectedIdx, m.scrollOffset, leftW, h, m.focusedPanel == "left")
 		rightPanel := BuildPanel(m.styles, rightLines, rightW, h, m.focusedPanel == "right")
 		return JoinHorizontal(leftPanel, rightPanel, 2)
 	}
@@ -423,9 +438,15 @@ func (m Model) renderSecurity(w, h int) string {
 	}
 	if m.securityReport != nil {
 		lines = append(lines, fmt.Sprintf("Profile: %s | Score: %d/100", m.securityProfile, m.securityReport.HardeningScore))
-		for _, f := range m.securityReport.Findings {
-			lines = append(lines, fmt.Sprintf("[%s] %s", f.Severity, f.Title))
+		findingItems := make([]string, 0, len(m.securityReport.Findings))
+		for i, f := range m.securityReport.Findings {
+			prefix := "  "
+			if i == m.selectedIdx {
+				prefix = "> "
+			}
+			findingItems = append(findingItems, fmt.Sprintf("%s[%s] %s", prefix, f.Severity, f.Title))
 		}
+		return BuildScrollablePanel(m.styles, lines, findingItems, m.selectedIdx, m.scrollOffset, w, h, true)
 	}
 	return BuildPanel(m.styles, lines, w, h, true)
 }

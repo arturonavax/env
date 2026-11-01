@@ -89,11 +89,11 @@ case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
 	*[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) has_utf8=1 ;;
 esac
 
-TN_PURPLE=""
-TN_BLUE=""
 TN_CYAN=""
 TN_GREEN=""
 TN_ORANGE=""
+TN_RED=""
+TN_ACCENT=""
 TN_DIM=""
 TN_BOLD=""
 TN_RESET=""
@@ -106,32 +106,32 @@ fi
 
 if [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
 	if [ "${COLORTERM:-}" = "truecolor" ] || [ "${COLORTERM:-}" = "24bit" ]; then
-		# Tokyo Night 24-bit TrueColor
-		TN_PURPLE="\033[38;2;187;154;247m"
-		TN_BLUE="\033[38;2;122;162;247m"
+		# Tokyo Night 24-bit TrueColor (red accent #f7768e)
 		TN_CYAN="\033[38;2;125;207;255m"
 		TN_GREEN="\033[38;2;115;218;202m"
 		TN_ORANGE="\033[38;2;255;158;100m"
+		TN_RED="\033[38;2;247;118;142m"
+		TN_ACCENT="$TN_RED"
 		TN_DIM="\033[38;2;86;95;137m"
 		TN_BOLD="\033[1m"
 		TN_RESET="\033[0m"
 	elif command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 256 ] || case "${TERM:-}" in *256color*) true ;; *) false ;; esac; then
 		# Tokyo Night 256-color palette
-		TN_PURPLE="\033[38;5;141m"
-		TN_BLUE="\033[38;5;111m"
 		TN_CYAN="\033[38;5;117m"
 		TN_GREEN="\033[38;5;79m"
 		TN_ORANGE="\033[38;5;215m"
+		TN_RED="\033[38;5;204m"
+		TN_ACCENT="$TN_RED"
 		TN_DIM="\033[38;5;60m"
 		TN_BOLD="\033[1m"
 		TN_RESET="\033[0m"
 	elif command -v tput >/dev/null 2>&1 && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ] || [ -t 1 ] || [ -n "$TTY_DEV" ]; then
 		# Standard 8/16-color ANSI fallback
-		TN_PURPLE="\033[1;35m"
-		TN_BLUE="\033[1;34m"
 		TN_CYAN="\033[1;36m"
 		TN_GREEN="\033[1;32m"
 		TN_ORANGE="\033[1;33m"
+		TN_RED="\033[1;31m"
+		TN_ACCENT="$TN_RED"
 		TN_DIM="\033[2m"
 		TN_BOLD="\033[1m"
 		TN_RESET="\033[0m"
@@ -188,15 +188,15 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 		has_release=1
 	fi
 
-	prompt_out "\n  ${TN_PURPLE}${SYM_DIAMOND}${TN_RESET}  ${TN_BOLD}ANX Setup${TN_RESET}  ${TN_DIM}${SYM_DOT}${TN_RESET}  ${TN_CYAN}${os_arch}${TN_RESET}\n"
+	prompt_out "\n  ${TN_ACCENT}${SYM_DIAMOND}${TN_RESET}  ${TN_BOLD}ANX Setup${TN_RESET}  ${TN_DIM}${SYM_DOT}${TN_RESET}  ${TN_CYAN}${os_arch}${TN_RESET}\n"
 	prompt_out "  ${TN_DIM}Choose installation method:${TN_RESET}\n"
 
 	if [ "$has_release" -eq 1 ]; then
-		prompt_out "    ${TN_BLUE}${TN_BOLD}1)${TN_RESET} Verified release   ${TN_GREEN}(Fast · pre-compiled binary)${TN_RESET}\n"
-		prompt_out "    ${TN_BLUE}${TN_BOLD}2)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
-		prompt_out "    ${TN_BLUE}${TN_BOLD}3)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
-		prompt_out "    ${TN_BLUE}${TN_BOLD}4)${TN_RESET} Exit\n\n"
-		prompt_out "  Select [1-4] (default: 1): "
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}1)${TN_RESET} Verified release   ${TN_GREEN}(Fast · pre-compiled binary)${TN_RESET}\n"
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}2)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}3)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}4)${TN_RESET} Exit\n\n"
+		prompt_out "  Select [1-4] (${TN_DIM}default: 1${TN_RESET}): "
 		if [ -n "$TTY_DEV" ]; then
 			read -r choice <"$TTY_DEV" || choice="1"
 		else
@@ -222,10 +222,10 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 			;;
 		esac
 	else
-		prompt_out "    ${TN_BLUE}${TN_BOLD}1)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
-		prompt_out "    ${TN_BLUE}${TN_BOLD}2)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
-		prompt_out "    ${TN_BLUE}${TN_BOLD}3)${TN_RESET} Exit\n\n"
-		prompt_out "  Select [1-3] (default: 1): "
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}1)${TN_RESET} Build from source  ${TN_ORANGE}(Compiles latest binary)${TN_RESET}\n"
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}2)${TN_RESET} Preview            ${TN_DIM}(Dry-run · no changes)${TN_RESET}\n"
+		prompt_out "    ${TN_ACCENT}${TN_BOLD}3)${TN_RESET} Exit\n\n"
+		prompt_out "  Select [1-3] (${TN_DIM}default: 1${TN_RESET}): "
 		if [ -n "$TTY_DEV" ]; then
 			read -r choice <"$TTY_DEV" || choice="1"
 		else

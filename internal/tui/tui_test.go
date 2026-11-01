@@ -285,3 +285,145 @@ func TestSecurityAuditTabAndShortcuts(t *testing.T) {
 		t.Fatalf("expected status message mentioning script, got: %s", curr.statusMsg)
 	}
 }
+
+func TestAdjustScrollOffset(t *testing.T) {
+	// 80 items, 10 visible lines
+	// 1. Initial state
+	offset := AdjustScrollOffset(0, 0, 10, 80)
+	if offset != 0 {
+		t.Fatalf("expected offset 0, got %d", offset)
+	}
+
+	// 2. Cursor at line 9 (still in view)
+	offset = AdjustScrollOffset(9, 0, 10, 80)
+	if offset != 0 {
+		t.Fatalf("expected offset 0 at cursor 9, got %d", offset)
+	}
+
+	// 3. Cursor moves to line 10 -> offset slides to 1
+	offset = AdjustScrollOffset(10, 0, 10, 80)
+	if offset != 1 {
+		t.Fatalf("expected offset 1 at cursor 10, got %d", offset)
+	}
+
+	// 4. Cursor moves back up to 9 while offset is 1 -> offset stays 1 (no erratic jump)
+	offset = AdjustScrollOffset(9, 1, 10, 80)
+	if offset != 1 {
+		t.Fatalf("expected offset 1 at cursor 9, got %d", offset)
+	}
+
+	// 5. Cursor moves up to 0 while offset is 1 -> offset slides to 0
+	offset = AdjustScrollOffset(0, 1, 10, 80)
+	if offset != 0 {
+		t.Fatalf("expected offset 0 at cursor 0, got %d", offset)
+	}
+
+	// 6. Fewer items than visible lines
+	offset = AdjustScrollOffset(2, 5, 10, 5)
+	if offset != 0 {
+		t.Fatalf("expected offset 0 when totalItems < visibleLines, got %d", offset)
+	}
+}
+
+func TestBuildScrollablePanel(t *testing.T) {
+	pal := theme.ByName("tokyo-night")
+	st := theme.NewStyles(pal)
+
+	header := []string{"TEST HEADER"}
+	items := make([]string, 50)
+	for i := 0; i < 50; i++ {
+		items[i] = strings.Repeat("item ", 5)
+	}
+
+	// height 12 -> innerHeight 10 -> availItemLines 9
+	panel := BuildScrollablePanel(st, header, items, 15, 0, 60, 12, true)
+	lines := strings.Split(panel, "\n")
+	if len(lines) != 12 {
+		t.Fatalf("expected exactly 12 lines, got %d", len(lines))
+	}
+	if !strings.Contains(panel, "TEST HEADER") {
+		t.Fatalf("expected panel to contain header")
+	}
+}
+
+func TestWizardScrollAndAsyncApply(t *testing.T) {
+	deps := newTestDeps(t)
+	wiz := NewWizardModel(deps.Platform, deps.Catalog, nil)
+	wiz.width = 100
+	wiz.height = 20 // small height to enforce scrolling
+
+	// Stage 1 -> Stage 2
+	nm, _ := wiz.Update(tea.KeyPressMsg{Text: "enter"})
+	w := nm.(WizardModel)
+
+	// Stage 2 -> Stage 3 (Packages)
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StageSelectPackages {
+		t.Fatalf("expected StageSelectPackages, got %v", w.stage)
+	}
+
+	// Scroll down in packages
+	for i := 0; i < 15; i++ {
+		nm, _ = w.Update(tea.KeyPressMsg{Text: "j"})
+		w = nm.(WizardModel)
+	}
+	if w.pkgCursor != 15 {
+		t.Fatalf("expected pkgCursor 15, got %d", w.pkgCursor)
+	}
+	if w.pkgScrollOffset == 0 {
+		t.Fatalf("expected pkgScrollOffset > 0 after scrolling down 15 items in 20-row terminal")
+	}
+
+	// View packages
+	pkgView := w.View().Content
+	if !strings.Contains(pkgView, "STAGE 3/5") {
+		t.Fatalf("expected stage 3 view")
+	}
+
+	// Advance to Review Plan
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StageReviewPlan {
+		t.Fatalf("expected StageReviewPlan, got %v", w.stage)
+	}
+
+	// Scroll plan down with j
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "j"})
+	w = nm.(WizardModel)
+	if w.planScrollOffset != 1 {
+		t.Fatalf("expected planScrollOffset 1, got %d", w.planScrollOffset)
+	}
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "k"})
+	w = nm.(WizardModel)
+	if w.planScrollOffset != 0 {
+		t.Fatalf("expected planScrollOffset 0 after k, got %d", w.planScrollOffset)
+	}
+
+	// Press Enter to apply -> MUST transition to StageApplying immediately and return tea.Cmd (non-blocking!)
+	nm, cmd := w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StageApplying {
+		t.Fatalf("expected StageApplying after enter on StageReviewPlan, got %v", w.stage)
+	}
+	if cmd == nil {
+		t.Fatalf("expected non-nil tea.Cmd for async execution")
+	}
+
+	// Check applying view has spinner / progress text
+	applyingView := w.View().Content
+	if !strings.Contains(applyingView, "Applying planned components") {
+		t.Fatalf("expected applying view message, got: %s", applyingView)
+	}
+
+	// Deliver completion message
+	nm, _ = w.Update(wizardApplyDoneMsg{err: nil})
+	w = nm.(WizardModel)
+	if w.stage != StageCompleted {
+		t.Fatalf("expected StageCompleted after wizardApplyDoneMsg, got %v", w.stage)
+	}
+	completedView := w.View().Content
+	if !strings.Contains(completedView, "SUCCESSFULLY") {
+		t.Fatalf("expected success message in completedView, got: %s", completedView)
+	}
+}

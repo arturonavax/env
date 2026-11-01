@@ -43,27 +43,35 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "1":
 		m.activeTab = TabOverview
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "2":
 		m.activeTab = TabPackages
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "3":
 		m.activeTab = TabConfigs
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "4":
 		m.activeTab = TabAI
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "5":
 		m.activeTab = TabHacks
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "6":
 		m.activeTab = TabDoctor
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "7":
 		m.activeTab = TabHistory
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 	case "8":
 		m.activeTab = TabSecurity
 		m.selectedIdx = 0
+		m.scrollOffset = 0
 
 	case "j", "down":
 		m.selectedIdx++
@@ -71,11 +79,13 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.selectedIdx > maxIdx {
 			m.selectedIdx = maxIdx
 		}
+		m.adjustScroll()
 
 	case "k", "up":
 		if m.selectedIdx > 0 {
 			m.selectedIdx--
 		}
+		m.adjustScroll()
 
 	case "h", "left":
 		m.focusedPanel = "left"
@@ -176,4 +186,27 @@ func (m Model) maxSelectedIndex() int {
 		}
 	}
 	return 0
+}
+
+func (m *Model) adjustScroll() {
+	visibleLines := m.visibleItemLines()
+	totalItems := m.maxSelectedIndex() + 1
+	m.scrollOffset = AdjustScrollOffset(m.selectedIdx, m.scrollOffset, visibleLines, totalItems)
+}
+
+func (m Model) visibleItemLines() int {
+	availHeight := m.height - 4 - 2 // header, tabs, status, borders
+	if availHeight < 4 {
+		availHeight = 4
+	}
+	switch m.activeTab {
+	case TabPackages, TabConfigs, TabDoctor:
+		return availHeight - 1
+	case TabHacks:
+		return availHeight - 3
+	case TabSecurity:
+		return availHeight - 6
+	default:
+		return availHeight
+	}
 }
