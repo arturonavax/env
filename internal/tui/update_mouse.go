@@ -51,7 +51,8 @@ func (m Model) handleMouse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Vertical list selection: use relative Y coordinate + scrollOffset
-		contentStartY := 3 // Header + Tabs + Panel top border
+		// Header (row 0) + Tabs (row 1) + Panel top border (row 2) + Panel headerLine (row 3) -> Items start at row 4
+		contentStartY := 4
 		relY := msg.Y - contentStartY
 		if relY >= 0 {
 			targetIdx := m.scrollOffset + relY

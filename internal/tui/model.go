@@ -28,6 +28,7 @@ type Model struct {
 	packages                 []domain.ManagedResource
 	tools                    []domain.ManagedResource
 	depsList                 []domain.ManagedResource
+	expandedPkgID            string
 	inspectingPackage        *domain.ManagedResource
 	toolsSelectedIdx         int
 	toolsScrollOffset        int

@@ -3,8 +3,10 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
 	aicli "github.com/arturonavax/env/internal/ai/cli"
@@ -204,25 +206,41 @@ func newToolsQuotaShortcut(appCtx *AppContext) *cobra.Command {
 	}
 }
 
+func terminalWidth(cmd *cobra.Command) int {
+	if f, ok := cmd.OutOrStdout().(*os.File); ok {
+		if w, _, err := term.GetSize(f.Fd()); err == nil && w > 0 {
+			return w
+		}
+	}
+	if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil && w > 0 {
+		return w
+	}
+	return 80
+}
+
 func isExternalApart(s domain.ToolStatus) bool {
 	id := strings.ToLower(s.ID)
 	if id == "ai" || id == "kos" {
 		return true
 	}
-	if s.UpdateStrategy == "external" || s.UpdateStrategy == "anx_self" {
-		return true
+	if s.UpdateStrategy == "package" {
+		return false
 	}
-	return false
+	return true
 }
 
-func renderToolRow(w io.Writer, st *theme.Styles, s domain.ToolStatus) {
+func renderAdaptiveToolRow(w io.Writer, st *theme.Styles, s domain.ToolStatus, targetWidth int) {
 	lang := s.Language
 	if lang == "" {
 		lang = "any"
 	}
 	target := s.ActiveTarget
-	if len(target) > 32 {
-		target = target[:29] + "..."
+	if len(target) > targetWidth {
+		if targetWidth > 6 {
+			target = target[:targetWidth-3] + "..."
+		} else {
+			target = target[:targetWidth]
+		}
 	}
 	statusStr := st.Success.Render("[Available]")
 	if s.Version != "" && s.Version != "available" {
@@ -232,10 +250,11 @@ func renderToolRow(w io.Writer, st *theme.Styles, s domain.ToolStatus) {
 	paddedID := fmt.Sprintf("%-14s", s.ID)
 	renderedID := st.Highlight.Render(paddedID)
 
-	fmt.Fprintf(w, "  %s %-12s %-8s %-32s %s\n",
+	fmt.Fprintf(w, "  %s %-12s %-8s %-*s %s\n",
 		renderedID,
 		s.Category,
 		lang,
+		targetWidth,
 		target,
 		statusStr,
 	)
@@ -244,43 +263,46 @@ func renderToolRow(w io.Writer, st *theme.Styles, s domain.ToolStatus) {
 func runToolsList(cmd *cobra.Command, appCtx *AppContext) error {
 	statuses := appCtx.ToolsSvc.ListFast(cmd.Context())
 
-	var managedTools []domain.ToolStatus
 	var externalTools []domain.ToolStatus
-
 	for _, s := range statuses {
 		if !s.Available {
 			continue
 		}
 		if isExternalApart(s) {
 			externalTools = append(externalTools, s)
-		} else {
-			managedTools = append(managedTools, s)
 		}
 	}
 
-	return emit(cmd, appCtx, statuses, func(w io.Writer) {
+	termW := terminalWidth(cmd)
+	if termW < 40 {
+		termW = 40
+	}
+
+	// Calculate adaptive target width:
+	// Fixed columns: margin(2) + ID(14) + space(1) + Category(12) + space(1) + Lang(8) + space(1) + Status(12) = 51
+	targetWidth := termW - 53
+	if targetWidth < 18 {
+		targetWidth = 18
+	} else if targetWidth > 55 {
+		targetWidth = 55
+	}
+
+	divLen := min(termW-2, 14+12+8+targetWidth+14+6)
+	divider := strings.Repeat("─", max(35, divLen))
+
+	return emit(cmd, appCtx, externalTools, func(w io.Writer) {
 		st := styles(appCtx)
-		fmt.Fprintln(w, st.Header.Render("ANX MANAGED TOOLS (Herramientas gestionadas por anx)"))
-		if len(managedTools) == 0 {
-			fmt.Fprintln(w, st.Muted.Render("  No managed tools currently available."))
-		} else {
-			fmt.Fprintln(w, st.Muted.Render(fmt.Sprintf("  %-14s %-12s %-8s %-32s %s", "TOOL ID", "CATEGORY", "LANG", "ACTIVE TARGET", "STATUS")))
-			fmt.Fprintln(w, st.Muted.Render("  -----------------------------------------------------------------------------------------------"))
-			for _, s := range managedTools {
-				renderToolRow(w, st, s)
-			}
+		fmt.Fprintln(w, st.Header.Render("External Developer Tools & Suites (Herramientas Externas)"))
+		if len(externalTools) == 0 {
+			fmt.Fprintln(w, st.Muted.Render("  No external extensions or tools currently registered/available."))
+			fmt.Fprintln(w, st.Muted.Render("  Drop custom manifests in ~/.config/anx/tools.d/ to register personal tools."))
+			return
 		}
 
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, st.Header.Render("EXTERNAL EXTENSIONS & SUITES (Herramientas externas aparte)"))
-		if len(externalTools) == 0 {
-			fmt.Fprintln(w, st.Muted.Render("  No external extensions currently available."))
-		} else {
-			fmt.Fprintln(w, st.Muted.Render(fmt.Sprintf("  %-14s %-12s %-8s %-32s %s", "TOOL ID", "CATEGORY", "LANG", "ACTIVE TARGET", "STATUS")))
-			fmt.Fprintln(w, st.Muted.Render("  -----------------------------------------------------------------------------------------------"))
-			for _, s := range externalTools {
-				renderToolRow(w, st, s)
-			}
+		fmt.Fprintf(w, "  %-14s %-12s %-8s %-*s %s\n", "TOOL ID", "CATEGORY", "LANG", targetWidth, "ACTIVE TARGET", "STATUS")
+		fmt.Fprintf(w, "  %s\n", st.Muted.Render(divider))
+		for _, s := range externalTools {
+			renderAdaptiveToolRow(w, st, s, targetWidth)
 		}
 	})
 }

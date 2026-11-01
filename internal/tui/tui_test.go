@@ -679,16 +679,16 @@ func TestDashboardMouseClickPreservesScrollOffset(t *testing.T) {
 	m.scrollOffset = 10
 	m.toolsScrollOffset = 10
 
-	// Click row 5 (relY = 5 - 3 = 2)
+	// Click row 6 (contentStartY = 4: Header=0, Tabs=1, Border=2, InnerHeader=3 -> relY = 6 - 4 = 2)
 	clickMsg := tea.MouseClickMsg{
 		X:      10,
-		Y:      5,
+		Y:      6,
 		Button: tea.MouseLeft,
 	}
 	nm, _ = m.Update(clickMsg)
 	curr := nm.(Model)
 
-	expectedIdx := 10 + (5 - 3) // scrollOffset (10) + relY (2) = 12
+	expectedIdx := 10 + (6 - 4) // scrollOffset (10) + relY (2) = 12
 	if curr.selectedIdx != expectedIdx {
 		t.Fatalf("expected clicked row to select targetIdx %d with scrollOffset, got %d", expectedIdx, curr.selectedIdx)
 	}
@@ -721,7 +721,7 @@ func TestDashboardVimHalfPageNavigation(t *testing.T) {
 	}
 }
 
-func TestDashboardPackageInspector(t *testing.T) {
+func TestDashboardPackageInPlaceUnfoldingAndPreview(t *testing.T) {
 	deps := newTestDeps(t)
 	m := NewModel(deps)
 	m.SetDimensions(120, 40)
@@ -730,26 +730,44 @@ func TestDashboardPackageInspector(t *testing.T) {
 	nm, _ := m.Update(tea.KeyPressMsg{Text: "2"})
 	m = nm.(Model)
 
-	// Press Enter to open inspector
+	// 1. Check quick preview badge in list without pressing Enter
+	initialView := m.View().Content
+	if !strings.Contains(initialView, "deps)") && !strings.Contains(initialView, "dep)") {
+		t.Fatalf("expected quick preview dependency badge in list, got:\n%s", initialView)
+	}
+
+	// 2. Press Enter to unfold in-place (without leaving packages view)
 	nm, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
 	m = nm.(Model)
-	if m.inspectingPackage == nil {
-		t.Fatalf("expected inspectingPackage to be set on enter")
+	if m.expandedPkgID == "" {
+		t.Fatalf("expected expandedPkgID to be set on enter")
 	}
 
-	view := m.View().Content
-	if !strings.Contains(view, "PACKAGE DEPENDENCY INSPECTOR") {
-		t.Fatalf("expected inspector modal title in view, got:\n%s", view)
+	expandedView := m.View().Content
+	if !strings.Contains(expandedView, "├─ Dependencies:") {
+		t.Fatalf("expected in-place unfolded dependencies in view, got:\n%s", expandedView)
 	}
-	if !strings.Contains(view, "DEPENDENCIES REQUIRED") {
-		t.Fatalf("expected dependencies section in inspector modal")
+	if !strings.Contains(expandedView, "├─ Required by:") {
+		t.Fatalf("expected in-place unfolded required by in view")
+	}
+	if !strings.Contains(expandedView, "TOOLS (") || !strings.Contains(expandedView, "DEPENDENCIES (") {
+		t.Fatalf("expected dual-pane list headers to remain visible during in-place unfolding")
 	}
 
-	// Press Esc to close
+	// 3. Press Enter again to toggle collapse
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = nm.(Model)
+	if m.expandedPkgID != "" {
+		t.Fatalf("expected expandedPkgID to be empty after second enter")
+	}
+
+	// 4. Press Enter then Esc to collapse
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = nm.(Model)
 	nm, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
 	m = nm.(Model)
-	if m.inspectingPackage != nil {
-		t.Fatalf("expected inspectingPackage to be nil after esc")
+	if m.expandedPkgID != "" {
+		t.Fatalf("expected expandedPkgID to be empty after esc")
 	}
 }
 

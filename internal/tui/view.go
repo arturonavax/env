@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
-	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/security"
 )
 
@@ -231,55 +230,6 @@ func (m Model) renderOverview(w, h int) string {
 	return BuildPanel(m.styles, lines, w, h, true)
 }
 
-func (m Model) renderPackageDetail(pkg domain.ManagedResource, requiredBy map[string][]string, w, h int) string {
-	var lines []string
-	header := m.styles.Header.Render(fmt.Sprintf("PACKAGE DEPENDENCY INSPECTOR: %s (%s)", pkg.Name, pkg.ID))
-	lines = append(lines, header, "")
-
-	lines = append(lines, fmt.Sprintf("• Category:    %s", pkg.Category))
-	statusStr := m.styles.Success.Render("[Available]")
-	if pkg.Deprecated {
-		statusStr = m.styles.Warning.Render("[Deprecated]")
-	}
-	lines = append(lines, fmt.Sprintf("• Status:      %s", statusStr))
-	if pkg.BinaryName != "" {
-		lines = append(lines, fmt.Sprintf("• Binary:      %s", pkg.BinaryName))
-	}
-	if pkg.Ecosystem != "" {
-		lines = append(lines, fmt.Sprintf("• Ecosystem:   %s", pkg.Ecosystem))
-	}
-	lines = append(lines, fmt.Sprintf("• Description: %s", pkg.Description))
-	lines = append(lines, "")
-
-	// 1. Dependencies that this package requires
-	lines = append(lines, m.styles.Highlight.Render("DEPENDENCIES REQUIRED (DependsOn):"))
-	if len(pkg.DependsOn) > 0 {
-		for _, dep := range pkg.DependsOn {
-			lines = append(lines, fmt.Sprintf("  • %-16s (declared prerequisite)", dep))
-		}
-	} else {
-		lines = append(lines, m.styles.Muted.Render("  None (Standalone component without prerequisite packages)"))
-	}
-	lines = append(lines, "")
-
-	// 2. Tools or packages that depend on this package
-	lines = append(lines, m.styles.Highlight.Render("REQUIRED AS DEPENDENCY BY (Tools depending on this):"))
-	dependents := requiredBy[pkg.ID]
-	if len(dependents) > 0 {
-		for _, parent := range dependents {
-			lines = append(lines, fmt.Sprintf("  • %-16s (requires %s to function)", parent, pkg.ID))
-		}
-	} else {
-		lines = append(lines, m.styles.Muted.Render("  None (Direct tool / Root component, not required by others)"))
-	}
-	lines = append(lines, "")
-
-	lines = append(lines, m.styles.Highlight.Render("NAVIGATION:"))
-	lines = append(lines, "• Press [Enter] or [Esc] to return to packages list")
-
-	return BuildPanel(m.styles, lines, w, h, true)
-}
-
 func (m Model) renderPackages(w, h int) string {
 	requiredBy := make(map[string][]string)
 	for _, p := range m.packages {
@@ -288,17 +238,19 @@ func (m Model) renderPackages(w, h int) string {
 		}
 	}
 
-	if m.inspectingPackage != nil {
-		return m.renderPackageDetail(*m.inspectingPackage, requiredBy, w, h)
-	}
-
 	if m.isWideLayout() {
 		leftW, rightW := m.calculateDualPaneWidths()
 
 		// Left Panel: TOOLS
-		leftHeader := m.styles.Highlight.Render(fmt.Sprintf("TOOLS (%d/%d) — Press [Enter] to inspect", m.toolsSelectedIdx+1, len(m.tools)))
-		toolItems := make([]string, 0, len(m.tools))
+		leftHeader := m.styles.Highlight.Render(fmt.Sprintf("TOOLS (%d/%d) — Press [Enter] to unfold details", m.toolsSelectedIdx+1, len(m.tools)))
+		toolItems := make([]string, 0, len(m.tools)+4)
+		cursorLine := m.toolsSelectedIdx
+		lineIdx := 0
+
 		for i, p := range m.tools {
+			if i == m.toolsSelectedIdx {
+				cursorLine = lineIdx
+			}
 			prefix := "  "
 			if m.focusedPanel == "left" && i == m.toolsSelectedIdx {
 				prefix = "> "
@@ -308,19 +260,60 @@ func (m Model) renderPackages(w, h int) string {
 				statusTag = m.styles.Warning.Render("[Deprecated]")
 			}
 			kindBadge := m.styles.Highlight.Render("[Tool]")
-			// Clean description without inline (dep of: ...) or (requires: ...)
-			row := fmt.Sprintf("%s%s %-15s %-10s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+
+			numDeps := len(p.DependsOn)
+			var assocBadge string
+			if numDeps == 1 {
+				assocBadge = m.styles.Muted.Render("(1 dep)   ")
+			} else {
+				assocBadge = m.styles.Muted.Render(fmt.Sprintf("(%d deps)  ", numDeps))
+			}
+
+			row := fmt.Sprintf("%s%s %-14s %s %-10s %s  %s", prefix, kindBadge, p.ID, assocBadge, p.Category, statusTag, p.Description)
 			if m.focusedPanel == "left" && i == m.toolsSelectedIdx {
 				toolItems = append(toolItems, m.styles.RenderSelectedRow(row))
 			} else {
 				toolItems = append(toolItems, row)
 			}
+			lineIdx++
+
+			// In-place dropdown / expansion right beneath this package
+			if m.expandedPkgID == p.ID {
+				depStr := "None (standalone component)"
+				if len(p.DependsOn) > 0 {
+					depStr = strings.Join(p.DependsOn, ", ")
+				}
+				reqStr := "None (direct user tool)"
+				if len(requiredBy[p.ID]) > 0 {
+					reqStr = strings.Join(requiredBy[p.ID], ", ")
+				}
+				binName := p.BinaryName
+				if binName == "" {
+					binName = p.ID
+				}
+				eco := p.Ecosystem
+				if eco == "" {
+					eco = "Native"
+				}
+
+				d1 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Dependencies:"), depStr)
+				d2 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Required by: "), reqStr)
+				d3 := fmt.Sprintf("      %s Binary: %s | Ecosystem: %s", m.styles.Muted.Render("└─ Details:    "), binName, eco)
+				toolItems = append(toolItems, d1, d2, d3)
+				lineIdx += 3
+			}
 		}
 
 		// Right Panel: DEPENDENCIES
-		rightHeader := m.styles.Highlight.Render(fmt.Sprintf("DEPENDENCIES (%d/%d) — Press [Enter] to inspect", m.depsSelectedIdx+1, len(m.depsList)))
-		depItems := make([]string, 0, len(m.depsList))
+		rightHeader := m.styles.Highlight.Render(fmt.Sprintf("DEPENDENCIES (%d/%d) — Press [Enter] to unfold details", m.depsSelectedIdx+1, len(m.depsList)))
+		depItems := make([]string, 0, len(m.depsList)+4)
+		depCursorLine := m.depsSelectedIdx
+		depLineIdx := 0
+
 		for i, p := range m.depsList {
+			if i == m.depsSelectedIdx {
+				depCursorLine = depLineIdx
+			}
 			prefix := "  "
 			if m.focusedPanel == "right" && i == m.depsSelectedIdx {
 				prefix = "> "
@@ -330,17 +323,52 @@ func (m Model) renderPackages(w, h int) string {
 				statusTag = m.styles.Warning.Render("[Deprecated]")
 			}
 			kindBadge := m.styles.Muted.Render("[Dep] ")
-			// Clean description without inline (dep of: ...) or (requires: ...)
-			row := fmt.Sprintf("%s%s %-15s %-12s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+
+			numTools := len(requiredBy[p.ID])
+			var assocBadge string
+			if numTools == 1 {
+				assocBadge = m.styles.Highlight.Render("(1 tool)  ")
+			} else {
+				assocBadge = m.styles.Highlight.Render(fmt.Sprintf("(%d tools) ", numTools))
+			}
+
+			row := fmt.Sprintf("%s%s %-14s %s %-12s %s  %s", prefix, kindBadge, p.ID, assocBadge, p.Category, statusTag, p.Description)
 			if m.focusedPanel == "right" && i == m.depsSelectedIdx {
 				depItems = append(depItems, m.styles.RenderSelectedRow(row))
 			} else {
 				depItems = append(depItems, row)
 			}
+			depLineIdx++
+
+			// In-place dropdown / expansion right beneath this dependency
+			if m.expandedPkgID == p.ID {
+				depStr := "None (standalone prerequisite)"
+				if len(p.DependsOn) > 0 {
+					depStr = strings.Join(p.DependsOn, ", ")
+				}
+				reqStr := "None"
+				if len(requiredBy[p.ID]) > 0 {
+					reqStr = strings.Join(requiredBy[p.ID], ", ")
+				}
+				binName := p.BinaryName
+				if binName == "" {
+					binName = p.ID
+				}
+				eco := p.Ecosystem
+				if eco == "" {
+					eco = "Native"
+				}
+
+				d1 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Dependencies:"), depStr)
+				d2 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Required by: "), reqStr)
+				d3 := fmt.Sprintf("      %s Binary: %s | Ecosystem: %s", m.styles.Muted.Render("└─ Details:    "), binName, eco)
+				depItems = append(depItems, d1, d2, d3)
+				depLineIdx += 3
+			}
 		}
 
-		leftPanel := BuildScrollablePanel(m.styles, []string{leftHeader}, toolItems, m.toolsSelectedIdx, m.toolsScrollOffset, leftW, h, m.focusedPanel == "left")
-		rightPanel := BuildScrollablePanel(m.styles, []string{rightHeader}, depItems, m.depsSelectedIdx, m.depsScrollOffset, rightW, h, m.focusedPanel == "right")
+		leftPanel := BuildScrollablePanel(m.styles, []string{leftHeader}, toolItems, cursorLine, m.toolsScrollOffset, leftW, h, m.focusedPanel == "left")
+		rightPanel := BuildScrollablePanel(m.styles, []string{rightHeader}, depItems, depCursorLine, m.depsScrollOffset, rightW, h, m.focusedPanel == "right")
 		return JoinHorizontal(leftPanel, rightPanel, 2)
 	}
 
@@ -348,17 +376,25 @@ func (m Model) renderPackages(w, h int) string {
 	activeItems := m.tools
 	activeIdx := m.toolsSelectedIdx
 	activeOffset := m.toolsScrollOffset
-	activeTitle := fmt.Sprintf("[ TOOLS (%d) ]   Dependencies (%d) — [h/l to switch, Enter to inspect]", len(m.tools), len(m.depsList))
+	activeTitle := fmt.Sprintf("[ TOOLS (%d) ]   Dependencies (%d) — [h/l switch, Enter details]", len(m.tools), len(m.depsList))
+	isTools := true
 	if m.focusedPanel == "right" {
 		activeItems = m.depsList
 		activeIdx = m.depsSelectedIdx
 		activeOffset = m.depsScrollOffset
-		activeTitle = fmt.Sprintf("Tools (%d)   [ DEPENDENCIES (%d) ] — [h/l to switch, Enter to inspect]", len(m.tools), len(m.depsList))
+		activeTitle = fmt.Sprintf("Tools (%d)   [ DEPENDENCIES (%d) ] — [h/l switch, Enter details]", len(m.tools), len(m.depsList))
+		isTools = false
 	}
 
 	header := m.styles.Highlight.Render(activeTitle)
-	items := make([]string, 0, len(activeItems))
+	items := make([]string, 0, len(activeItems)+4)
+	cursorLine := activeIdx
+	lineIdx := 0
+
 	for i, p := range activeItems {
+		if i == activeIdx {
+			cursorLine = lineIdx
+		}
 		prefix := "  "
 		if i == activeIdx {
 			prefix = "> "
@@ -368,17 +404,56 @@ func (m Model) renderPackages(w, h int) string {
 			statusTag = m.styles.Warning.Render("[Deprecated]")
 		}
 		kindBadge := m.styles.Highlight.Render("[Tool]")
-		if !p.IsDirectTool(requiredBy) {
+		var assocBadge string
+		if isTools {
+			numDeps := len(p.DependsOn)
+			if numDeps == 1 {
+				assocBadge = m.styles.Muted.Render("(1 dep)   ")
+			} else {
+				assocBadge = m.styles.Muted.Render(fmt.Sprintf("(%d deps)  ", numDeps))
+			}
+		} else {
 			kindBadge = m.styles.Muted.Render("[Dep] ")
+			numTools := len(requiredBy[p.ID])
+			if numTools == 1 {
+				assocBadge = m.styles.Highlight.Render("(1 tool)  ")
+			} else {
+				assocBadge = m.styles.Highlight.Render(fmt.Sprintf("(%d tools) ", numTools))
+			}
 		}
-		row := fmt.Sprintf("%s%s %-15s %-10s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+		row := fmt.Sprintf("%s%s %-14s %s %-10s %s  %s", prefix, kindBadge, p.ID, assocBadge, p.Category, statusTag, p.Description)
 		if i == activeIdx {
 			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
+		lineIdx++
+
+		if m.expandedPkgID == p.ID {
+			depStr := "None"
+			if len(p.DependsOn) > 0 {
+				depStr = strings.Join(p.DependsOn, ", ")
+			}
+			reqStr := "None"
+			if len(requiredBy[p.ID]) > 0 {
+				reqStr = strings.Join(requiredBy[p.ID], ", ")
+			}
+			binName := p.BinaryName
+			if binName == "" {
+				binName = p.ID
+			}
+			eco := p.Ecosystem
+			if eco == "" {
+				eco = "Native"
+			}
+			d1 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Dependencies:"), depStr)
+			d2 := fmt.Sprintf("      %s %s", m.styles.Highlight.Render("├─ Required by: "), reqStr)
+			d3 := fmt.Sprintf("      %s Binary: %s | Ecosystem: %s", m.styles.Muted.Render("└─ Details:    "), binName, eco)
+			items = append(items, d1, d2, d3)
+			lineIdx += 3
+		}
 	}
-	return BuildScrollablePanel(m.styles, []string{header}, items, activeIdx, activeOffset, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, cursorLine, activeOffset, w, h, true)
 }
 
 func (m Model) renderConfigs(w, h int) string {

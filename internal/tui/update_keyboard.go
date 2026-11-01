@@ -17,8 +17,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "q", "ctrl+c":
-		if m.inspectingPackage != nil {
-			m.inspectingPackage = nil
+		if m.expandedPkgID != "" {
+			m.expandedPkgID = ""
 			return m, nil
 		}
 		m.quitting = true
@@ -29,26 +29,28 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "enter":
-		if m.inspectingPackage != nil {
-			m.inspectingPackage = nil
-			return m, nil
-		}
 		if m.activeTab == TabPackages {
+			var pkgID string
 			if m.focusedPanel == "right" && len(m.depsList) > 0 && m.depsSelectedIdx < len(m.depsList) {
-				pkg := m.depsList[m.depsSelectedIdx]
-				m.inspectingPackage = &pkg
-				return m, nil
+				pkgID = m.depsList[m.depsSelectedIdx].ID
+			} else if len(m.tools) > 0 && m.toolsSelectedIdx < len(m.tools) {
+				pkgID = m.tools[m.toolsSelectedIdx].ID
 			}
-			if len(m.tools) > 0 && m.toolsSelectedIdx < len(m.tools) {
-				pkg := m.tools[m.toolsSelectedIdx]
-				m.inspectingPackage = &pkg
+			if pkgID != "" {
+				if m.expandedPkgID == pkgID {
+					m.expandedPkgID = ""
+				} else {
+					m.expandedPkgID = pkgID
+				}
+				m.adjustScroll()
 				return m, nil
 			}
 		}
 
 	case "esc":
-		if m.inspectingPackage != nil {
-			m.inspectingPackage = nil
+		if m.expandedPkgID != "" {
+			m.expandedPkgID = ""
+			m.adjustScroll()
 			return m, nil
 		}
 		if m.showHelp {
