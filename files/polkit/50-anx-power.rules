@@ -1,0 +1,15 @@
+// /etc/polkit-1/rules.d/50-anx-power.rules
+// Created by ANX development environment
+// Allows users in sudo group to suspend, hibernate, and manage system power without GUI popups.
+
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.login1.suspend" ||
+         action.id == "org.freedesktop.login1.suspend-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.hibernate" ||
+         action.id == "org.freedesktop.login1.hibernate-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.reboot") &&
+        subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+});

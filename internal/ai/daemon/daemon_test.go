@@ -109,13 +109,14 @@ func TestWakeCycleGuardrailAbortsSuspendOnProbeFailureAndSuspendsOnSuccess(t *te
 		LookupHost:  func(context.Context, string) ([]string, error) { return []string{"127.0.0.1"}, nil },
 	}
 
-	// Case 1: Failing wake probe MUST abort system suspend!
-	t.Run("aborts suspend when wake probe fails", func(t *testing.T) {
+	// Case 1: Failing wake probe aborts suspend when AutoResuspend is false
+	t.Run("aborts suspend when wake probe fails and autoresuspend is disabled", func(t *testing.T) {
 		t.Parallel()
 
 		home := t.TempDir()
 		store := config.NewStateStore(filepath.Join(home, "state"))
 		cfg, _ := config.DefaultConfig()
+		cfg.Daemon.AutoWake.AutoResuspend = false
 		cfg.Targets = []config.TargetConfig{
 			{
 				ID:            "gemini",
@@ -152,7 +153,55 @@ func TestWakeCycleGuardrailAbortsSuspendOnProbeFailureAndSuspendsOnSuccess(t *te
 			t.Fatal("expected RunWakeCycle error when wake probe fails")
 		}
 		if !res.AbortedSuspend || res.Suspended || suspendCount.Load() != 0 {
-			t.Fatalf("expected suspend guardrail to abort suspend; got res=%+v suspendCount=%d", res, suspendCount.Load())
+			t.Fatalf("expected suspend guardrail to abort suspend when autoresuspend is false; got res=%+v suspendCount=%d", res, suspendCount.Load())
+		}
+	})
+
+	// Case 1b: Failing wake probe still triggers safe suspend when AutoResuspend is true (unattended middle-of-night safety)
+	t.Run("resuspends safely when wake probe fails and autoresuspend is enabled", func(t *testing.T) {
+		t.Parallel()
+
+		home := t.TempDir()
+		store := config.NewStateStore(filepath.Join(home, "state"))
+		cfg, _ := config.DefaultConfig()
+		cfg.Daemon.AutoWake.AutoResuspend = true
+		cfg.Targets = []config.TargetConfig{
+			{
+				ID:            "gemini",
+				Name:          "Gemini",
+				Tool:          "agy",
+				Enabled:       true,
+				TelemetryType: "timed_fallback",
+				WakeCommand:   []string{"agy", "-p", "Reply with: 1"},
+			},
+		}
+
+		execMock := &mockCmdExec{failWake: true}
+		qSvc := quota.NewService(cfg, store, quota.WithExecutor(execMock))
+
+		var suspendCount atomic.Int32
+		mgr := daemon.NewManager(
+			cfg,
+			store,
+			qSvc,
+			daemon.WithPlatform(platform.NewTestInfo(platform.TestInfoParams{OS: "linux", HomeDir: home})),
+			daemon.WithCommandExecutor(execMock),
+			daemon.WithLookPath(func(string) (string, error) { return "", errors.New("none") }),
+			daemon.WithConnectivity(connOpts),
+			daemon.WithSleepDelay(func(context.Context, time.Duration) error { return nil }),
+			daemon.WithSuspendFunc(func(context.Context) (string, error) {
+				suspendCount.Add(1)
+				return "mock-suspend", nil
+			}),
+		)
+
+		var out bytes.Buffer
+		res, cycleErr := mgr.RunWakeCycle(context.Background(), &out)
+		if cycleErr == nil {
+			t.Fatal("expected RunWakeCycle error when wake probe fails")
+		}
+		if res.AbortedSuspend || !res.Suspended || suspendCount.Load() != 1 {
+			t.Fatalf("expected unattended cycle to resuspend despite probe failure; got res=%+v suspendCount=%d", res, suspendCount.Load())
 		}
 	})
 

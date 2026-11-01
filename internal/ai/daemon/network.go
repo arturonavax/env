@@ -23,10 +23,10 @@ type ConnectivityOptions struct {
 	LookupHost  func(ctx context.Context, host string) ([]string, error)
 }
 
-// DefaultConnectivityOptions returns production connectivity probe defaults (45s timeout).
+// DefaultConnectivityOptions returns production connectivity probe defaults (120s timeout).
 func DefaultConnectivityOptions(timeout time.Duration) ConnectivityOptions {
 	if timeout <= 0 {
-		timeout = 45 * time.Second
+		timeout = 120 * time.Second
 	}
 	return ConnectivityOptions{
 		Endpoints:   append([]string{}, defaultProbeEndpoints...),

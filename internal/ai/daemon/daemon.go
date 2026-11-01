@@ -204,7 +204,7 @@ func NewManager(
 		plat:           plat,
 		exec:           security.NewRunner(20 * time.Second),
 		lookPath:       exec.LookPath,
-		connectivity:   DefaultConnectivityOptions(45 * time.Second),
+		connectivity:   DefaultConnectivityOptions(120 * time.Second),
 		httpClient:     &http.Client{Timeout: 5 * time.Second, Transport: transport},
 		rtcWakePath:    "/sys/class/rtc/rtc0/wakealarm",
 		telegramAPIURL: "https://api.telegram.org",
@@ -650,14 +650,33 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 	// 1. Verify network reconnect
 	fmt.Fprintf(out, "Awaiting network connectivity (timeout %s)...\n", m.connectivity.Timeout)
 	if netErr := WaitForConnectivityWithOptions(ctx, m.connectivity); netErr != nil {
-		res.AbortedSuspend = true
 		res.AbortReason = "network connectivity timeout"
-		msg := "Internet connectivity unavailable after wakeup. Aborting suspend; system remains awake."
+		msg := "Internet connectivity unavailable after wakeup."
 		fmt.Fprintln(out, msg)
 		_ = m.store.AppendLog("ERROR", "NETWORK_TIMEOUT", msg, nil)
 		m.Notify(ctx, "ANX AI: Wakeup Failed", msg, "critical")
 		if aw.Enabled {
 			_, _, _ = m.ScheduleNextRTC(ctx, aw.Time)
+		}
+		if aw.AutoResuspend {
+			delay := time.Duration(aw.ResuspendDelaySec) * time.Second
+			if delay < 0 {
+				delay = 0
+			}
+			msgSuspend := fmt.Sprintf("Network unavailable; resuspending in %ds...", aw.ResuspendDelaySec)
+			fmt.Fprintln(out, msgSuspend)
+			_ = m.store.AppendLog("INFO", "SUSPEND_PENDING", msgSuspend, nil)
+			_ = m.sleepDelay(ctx, delay)
+			method, susErr := m.SafeSuspend(ctx)
+			if susErr != nil {
+				_ = m.store.AppendLog("ERROR", "SUSPEND_FAILED", susErr.Error(), nil)
+				return res, fmt.Errorf("safe suspend after network timeout failed: %w", susErr)
+			}
+			res.Suspended = true
+			res.SuspendMethod = method
+			_ = m.store.AppendLog("INFO", "SUSPEND_SUCCESS", "Suspended via "+method, nil)
+		} else {
+			res.AbortedSuspend = true
 		}
 		return res, fmt.Errorf("wake cycle network guardrail: %w", netErr)
 	}
@@ -674,9 +693,8 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 	res.WakeReport = wakeRep
 
 	if wakeErr != nil || (wakeRep != nil && !wakeRep.AllSucceeded()) {
-		res.AbortedSuspend = true
 		res.AbortReason = "target wakeup probe failure"
-		msg := "One or more model wakeup probes failed. Aborting suspend; system remains awake for inspection."
+		msg := "One or more model wakeup probes failed."
 		fmt.Fprintln(out, msg)
 		_ = m.store.AppendLog("ERROR", "WAKE_FAILED", msg, nil)
 		m.Notify(ctx, "ANX AI: Wakeup Failed", msg, "critical")
@@ -685,6 +703,26 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		}
 		if wakeErr == nil {
 			wakeErr = errors.New("wakeup probe reported target failures")
+		}
+		if aw.AutoResuspend {
+			delay := time.Duration(aw.ResuspendDelaySec) * time.Second
+			if delay < 0 {
+				delay = 0
+			}
+			msgSuspend := fmt.Sprintf("Wake probes failed; resuspending in %ds...", aw.ResuspendDelaySec)
+			fmt.Fprintln(out, msgSuspend)
+			_ = m.store.AppendLog("INFO", "SUSPEND_PENDING", msgSuspend, nil)
+			_ = m.sleepDelay(ctx, delay)
+			method, susErr := m.SafeSuspend(ctx)
+			if susErr != nil {
+				_ = m.store.AppendLog("ERROR", "SUSPEND_FAILED", susErr.Error(), nil)
+				return res, fmt.Errorf("safe suspend after probe failure failed: %w", susErr)
+			}
+			res.Suspended = true
+			res.SuspendMethod = method
+			_ = m.store.AppendLog("INFO", "SUSPEND_SUCCESS", "Suspended via "+method, nil)
+		} else {
+			res.AbortedSuspend = true
 		}
 		return res, fmt.Errorf("wake cycle probe guardrail: %w", wakeErr)
 	}
@@ -733,13 +771,19 @@ func (m *Manager) SafeSuspend(ctx context.Context) (string, error) {
 	switch m.plat.OS() {
 	case "linux":
 		if _, err := m.lookPath("systemctl"); err == nil {
-			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "systemctl", "suspend"); rErr == nil {
+			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "systemctl", "--no-ask-password", "suspend"); rErr == nil {
 				return "systemctl suspend", nil
+			}
+			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "sudo", "-n", "systemctl", "--no-ask-password", "suspend"); rErr == nil {
+				return "sudo systemctl suspend", nil
 			}
 		}
 		if _, err := m.lookPath("loginctl"); err == nil {
-			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "loginctl", "suspend"); rErr == nil {
+			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "loginctl", "--no-ask-password", "suspend"); rErr == nil {
 				return "loginctl suspend", nil
+			}
+			if _, rErr := m.exec.RunWithInput(ctx, security.RunOptions{Timeout: 10 * time.Second}, "sudo", "-n", "loginctl", "--no-ask-password", "suspend"); rErr == nil {
+				return "sudo loginctl suspend", nil
 			}
 		}
 		if _, err := m.lookPath("pm-suspend"); err == nil {

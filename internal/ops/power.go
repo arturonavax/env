@@ -342,14 +342,14 @@ func (pm *PowerManager) SuspendToIdle(ctx context.Context) error {
 	if !pm.dryRun {
 		if err := os.WriteFile(memSleepPath, []byte("s2idle\n"), 0o644); err != nil {
 			// Try via sudo if write fails
-			_ = exec.CommandContext(ctx, "sudo", "sh", "-c", "echo s2idle > "+memSleepPath).Run()
+			_ = pm.runCommand(ctx, "sudo", "sh", "-c", "echo s2idle > "+memSleepPath)
 		}
 	}
 
 	pm.logStep("Suspending system to idle state...")
 	if !pm.dryRun {
-		if err := exec.CommandContext(ctx, "systemctl", "suspend").Run(); err != nil {
-			_ = exec.CommandContext(ctx, "sudo", "systemctl", "suspend").Run()
+		if err := pm.runCommand(ctx, "systemctl", "--no-ask-password", "suspend"); err != nil {
+			_ = pm.runCommand(ctx, "sudo", "systemctl", "--no-ask-password", "suspend")
 		}
 	}
 
@@ -379,14 +379,14 @@ func (pm *PowerManager) DeepVTSuspend(ctx context.Context) error {
 
 	pm.logStep(fmt.Sprintf("Switching to console tty%s to release DRM master...", targetVT))
 	if !pm.dryRun {
-		_ = exec.CommandContext(ctx, "sudo", "chvt", targetVT).Run()
+		_ = pm.runCommand(ctx, "sudo", "chvt", targetVT)
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	pm.logStep("Invoking systemctl suspend...")
 	if !pm.dryRun {
-		if err := exec.CommandContext(ctx, "systemctl", "suspend").Run(); err != nil {
-			_ = exec.CommandContext(ctx, "sudo", "systemctl", "suspend").Run()
+		if err := pm.runCommand(ctx, "systemctl", "--no-ask-password", "suspend"); err != nil {
+			_ = pm.runCommand(ctx, "sudo", "systemctl", "--no-ask-password", "suspend")
 		}
 		pm.logStep("Resumed from sleep. Waiting for DisplayPort link training...")
 		time.Sleep(1 * time.Second)
@@ -394,11 +394,11 @@ func (pm *PowerManager) DeepVTSuspend(ctx context.Context) error {
 
 	pm.logStep(fmt.Sprintf("Restoring graphical session on tty%s...", origVT))
 	if !pm.dryRun {
-		_ = exec.CommandContext(ctx, "sudo", "chvt", origVT).Run()
+		_ = pm.runCommand(ctx, "sudo", "chvt", origVT)
 		time.Sleep(500 * time.Millisecond)
 		if os.Getenv("DISPLAY") != "" {
 			if _, err := exec.LookPath("xrandr"); err == nil {
-				_ = exec.CommandContext(ctx, "xrandr", "--auto").Run()
+				_ = pm.runCommand(ctx, "xrandr", "--auto")
 			}
 		}
 	}
@@ -431,13 +431,21 @@ func (pm *PowerManager) Hibernate(ctx context.Context) error {
 	pm.logStep("Flushing disks and initiating hibernation...")
 	if !pm.dryRun {
 		syncFilesystems()
-		if err := exec.CommandContext(ctx, "systemctl", "hibernate").Run(); err != nil {
-			return exec.CommandContext(ctx, "sudo", "systemctl", "hibernate").Run()
+		if err := pm.runCommand(ctx, "systemctl", "--no-ask-password", "hibernate"); err != nil {
+			return pm.runCommand(ctx, "sudo", "systemctl", "--no-ask-password", "hibernate")
 		}
 	}
 
 	pm.logSuccess("System resumed from disk hibernation.")
 	return nil
+}
+
+func (pm *PowerManager) runCommand(ctx context.Context, binary string, args ...string) error {
+	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = pm.out
+	cmd.Stderr = pm.out
+	return cmd.Run()
 }
 
 func (pm *PowerManager) lockDesktopSession(ctx context.Context) {

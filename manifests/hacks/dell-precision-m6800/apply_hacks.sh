@@ -583,4 +583,15 @@ fi
 systemctl --user stop quota-primer.timer quota-primer.service 2>/dev/null || true
 systemctl --user disable quota-primer.timer quota-primer.service 2>/dev/null || true
 
+# ------------------------------------------------------------------------------
+# 7. Polkit Power Rules (Headless / Non-GUI Suspend)
+# ------------------------------------------------------------------------------
+if [ -d "/etc/polkit-1/rules.d" ] && [ -f "./files/polkit/50-anx-power.rules" ]; then
+    echo "--> [7/7] Installing Polkit power rules (headless / non-GUI suspend)..."
+    if sudo -n true 2>/dev/null; then
+        sudo cp -f "./files/polkit/50-anx-power.rules" "/etc/polkit-1/rules.d/50-anx-power.rules"
+        sudo chmod 644 "/etc/polkit-1/rules.d/50-anx-power.rules"
+    fi
+fi
+
 echo "==> Dell Precision M6800 hacks successfully applied!"
