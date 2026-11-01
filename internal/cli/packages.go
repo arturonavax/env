@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,9 +13,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/scriptgen"
+	"github.com/arturonavax/env/internal/security"
 )
 
 func packageCommands(appCtx *AppContext) []*cobra.Command {
@@ -99,6 +102,27 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 	if !appCtx.Flags.Quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "Applying plan %s (%d steps)...\n", plan.ID, len(plan.Steps))
 	}
+
+	needsSudo := (appCtx.InstallSvc != nil && appCtx.InstallSvc.PlanRequiresSudo(plan)) ||
+		(appCtx.Flags.IncludeHacks && appCtx.HacksSvc != nil && hacksRequireSudo(cmd.Context(), appCtx.HacksSvc))
+
+	if needsSudo {
+		if !security.IsSudoAuthenticated() {
+			if !isTerminal(cmd) {
+				return domain.NewExitError(
+					domain.ExitPreflightFailed,
+					errors.New("administrator privileges (sudo) required; run 'sudo -v' prior to non-interactive execution"),
+				)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "==> Administrator privileges (sudo) required for package operations.")
+			if err := security.AuthenticateSudoCLI(); err != nil {
+				return fmt.Errorf("sudo authentication failed: %w", err)
+			}
+		}
+		stopKeepalive := security.StartSudoKeepalive(cmd.Context())
+		defer stopKeepalive()
+	}
+
 	if err := appCtx.InstallSvc.Apply(cmd.Context(), plan); err != nil {
 		return err
 	}
@@ -462,4 +486,19 @@ func renderPlanScript(w io.Writer, appCtx *AppContext, plan *domain.ExecutionPla
 	script := scriptgen.TranslatePlan(plan, plat)
 	_, err := fmt.Fprint(w, script)
 	return err
+}
+
+func hacksRequireSudo(ctx context.Context, hacksSvc *app.HacksService) bool {
+	if hacksSvc == nil {
+		return false
+	}
+	_, matched := hacksSvc.Detect(ctx)
+	for _, hk := range matched {
+		for _, st := range hk.Steps {
+			if st.Privileged {
+				return true
+			}
+		}
+	}
+	return false
 }

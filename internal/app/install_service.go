@@ -5,20 +5,24 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/execution"
 	"github.com/arturonavax/env/internal/journal"
+	"github.com/arturonavax/env/internal/manifest"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/providers"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/snapshot"
 	"github.com/arturonavax/env/internal/state"
 )
 
 // InstallService orchestrates planning and execution of packages and configuration sync steps.
 type InstallService struct {
+	mu         sync.RWMutex
 	platform   *platform.Info
 	catalog    *catalog.Registry
 	journal    *journal.FileJournal
@@ -59,7 +63,15 @@ func NewInstallService(deps InstallDeps) *InstallService {
 
 // SetOnProgress sets or updates the progress event listener.
 func (s *InstallService) SetOnProgress(h EventHandler) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.onProgress = h
+}
+
+func (s *InstallService) getOnProgress() EventHandler {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.onProgress
 }
 
 // Plan resolves requested packages (or a profile) into a dependency-ordered plan.
@@ -176,6 +188,11 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		return nil
 	}
 
+	if s.platform != nil && s.platform.HasSudo() && !s.platform.IsRoot() && security.IsSudoAuthenticated() {
+		stopKeepalive := security.StartSudoKeepalive(ctx)
+		defer stopKeepalive()
+	}
+
 	lock, err := state.AcquireLock(s.platform.StateDir(), "apply")
 	if err != nil {
 		return domain.NewExitError(domain.ExitPreflightFailed, err)
@@ -209,8 +226,8 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		if res.Error != nil {
 			step.Error = res.Error.Error()
 		}
-		if s.onProgress != nil {
-			s.onProgress(ProgressEvent{
+		if progressFn := s.getOnProgress(); progressFn != nil {
+			progressFn(ProgressEvent{
 				StepID: step.ID, TotalSteps: len(plan.Steps), ResourceID: step.ResourceID,
 				Action: step.Action, Description: step.Description, Status: res.Status, Error: step.Error,
 			})
@@ -404,4 +421,62 @@ func containsOS(list []string, goos string) bool {
 		}
 	}
 	return false
+}
+
+// PlanRequiresSudo checks if any step in plan requires root/sudo privileges on this host.
+func (s *InstallService) PlanRequiresSudo(plan *domain.ExecutionPlan) bool {
+	if s.platform == nil || s.platform.IsRoot() || s.platform.IsTermux() || s.platform.OS() == "windows" || !s.platform.HasSudo() {
+		return false
+	}
+	if plan == nil || len(plan.Steps) == 0 {
+		return false
+	}
+	for _, step := range plan.Steps {
+		if step.Action != domain.ActionInstall && step.Action != domain.ActionUninstall {
+			continue
+		}
+		if s.catalog != nil {
+			if spec, ok := s.catalog.GetPackageSpec(step.ResourceID); ok {
+				if s.packageSpecRequiresSudo(spec) {
+					return true
+				}
+				continue
+			}
+		}
+		pm := s.platform.PrimaryPackageManager()
+		if isNativeSudoPM(pm) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *InstallService) packageSpecRequiresSudo(spec manifest.PackageSpec) bool {
+	if s.platform == nil || s.platform.IsRoot() || s.platform.IsTermux() || s.platform.OS() == "windows" || !s.platform.HasSudo() {
+		return false
+	}
+	for _, st := range spec.Strategies {
+		if st.Type == string(domain.StrategyNative) {
+			for _, pm := range s.platform.PackageManagers() {
+				if isNativeSudoPM(pm) {
+					if pkgs, ok := st.Packages[pm]; ok && len(pkgs) > 0 {
+						return true
+					}
+					if repos, ok := st.Repositories[pm]; ok && len(repos) > 0 {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func isNativeSudoPM(pm string) bool {
+	switch pm {
+	case "apt", "dnf", "pacman", "zypper", "apk":
+		return true
+	default:
+		return false
+	}
 }

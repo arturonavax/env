@@ -224,3 +224,56 @@ func TestSyncPostSyncErrorSurfacesAsPartial(t *testing.T) {
 		t.Fatalf("expected error to capture stderr, got: %v", err)
 	}
 }
+
+func TestInstallServicePlanRequiresSudo(t *testing.T) {
+	home := t.TempDir()
+	platLinuxSudo := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		HasSudo:         true,
+		IsRoot:          false,
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	platRoot := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		HasSudo:         true,
+		IsRoot:          true,
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	platNoSudo := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		HasSudo:         false,
+		IsRoot:          false,
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		StateDir:        filepath.Join(home, "state"),
+	})
+
+	cat := catalog.NewDefaultRegistry()
+	svcLinuxSudo := app.NewInstallService(app.InstallDeps{Platform: platLinuxSudo, Catalog: cat})
+	svcRoot := app.NewInstallService(app.InstallDeps{Platform: platRoot, Catalog: cat})
+	svcNoSudo := app.NewInstallService(app.InstallDeps{Platform: platNoSudo, Catalog: cat})
+
+	planWithGit := &domain.ExecutionPlan{
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "git", Action: domain.ActionInstall},
+		},
+	}
+	emptyPlan := &domain.ExecutionPlan{}
+
+	if !svcLinuxSudo.PlanRequiresSudo(planWithGit) {
+		t.Errorf("expected PlanRequiresSudo(git) on Linux with sudo and apt to be true")
+	}
+	if svcRoot.PlanRequiresSudo(planWithGit) {
+		t.Errorf("expected PlanRequiresSudo for root user to be false")
+	}
+	if svcNoSudo.PlanRequiresSudo(planWithGit) {
+		t.Errorf("expected PlanRequiresSudo for host without sudo to be false")
+	}
+	if svcLinuxSudo.PlanRequiresSudo(emptyPlan) {
+		t.Errorf("expected PlanRequiresSudo for empty plan to be false")
+	}
+}

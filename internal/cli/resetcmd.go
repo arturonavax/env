@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/security"
 )
 
 func newResetCmd(appCtx *AppContext) *cobra.Command {
@@ -71,6 +72,22 @@ func runDestroyerReinstall(cmd *cobra.Command, appCtx *AppContext, profile strin
 	if appCtx.Flags.DryRun {
 		fmt.Fprintln(out, st.Header.Render("Destroyer Reinstall Plan (Dry-Run):"))
 	} else {
+		if appCtx.Platform != nil && appCtx.Platform.HasSudo() && !appCtx.Platform.IsRoot() {
+			if !security.IsSudoAuthenticated() {
+				if !isTerminal(cmd) {
+					return domain.NewExitError(
+						domain.ExitPreflightFailed,
+						errors.New("administrator privileges (sudo) required; run 'sudo -v' prior to non-interactive execution"),
+					)
+				}
+				fmt.Fprintln(out, "==> Administrator privileges (sudo) required for system package operations.")
+				if err := security.AuthenticateSudoCLI(); err != nil {
+					return fmt.Errorf("sudo authentication failed: %w", err)
+				}
+			}
+			stopKeepalive := security.StartSudoKeepalive(cmd.Context())
+			defer stopKeepalive()
+		}
 		fmt.Fprintln(out, st.Header.Render("Executing Destroyer Reinstall..."))
 	}
 
@@ -126,6 +143,22 @@ func runDestroyerUninstall(cmd *cobra.Command, appCtx *AppContext, profile strin
 	if appCtx.Flags.DryRun {
 		fmt.Fprintln(out, st.Header.Render("Destroyer Uninstall Plan (Dry-Run):"))
 	} else {
+		if appCtx.Platform != nil && appCtx.Platform.HasSudo() && !appCtx.Platform.IsRoot() {
+			if !security.IsSudoAuthenticated() {
+				if !isTerminal(cmd) {
+					return domain.NewExitError(
+						domain.ExitPreflightFailed,
+						errors.New("administrator privileges (sudo) required; run 'sudo -v' prior to non-interactive execution"),
+					)
+				}
+				fmt.Fprintln(out, "==> Administrator privileges (sudo) required for system package operations.")
+				if err := security.AuthenticateSudoCLI(); err != nil {
+					return fmt.Errorf("sudo authentication failed: %w", err)
+				}
+			}
+			stopKeepalive := security.StartSudoKeepalive(cmd.Context())
+			defer stopKeepalive()
+		}
 		fmt.Fprintln(out, st.Header.Render("Executing Destroyer Uninstall..."))
 	}
 

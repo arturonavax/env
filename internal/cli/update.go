@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/security"
 )
 
 // UpdateCheckSummary holds the status of updates across repo, tools, and configs.
@@ -270,6 +272,22 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 				} else {
 					fmt.Fprintf(out, "    Applying %d package actions...\n", len(plan.Steps))
 					if !appCtx.Flags.DryRun {
+						if appCtx.InstallSvc.PlanRequiresSudo(plan) {
+							if !security.IsSudoAuthenticated() {
+								if !isTerminal(cmd) {
+									return domain.NewExitError(
+										domain.ExitPreflightFailed,
+										errors.New("administrator privileges (sudo) required; run 'sudo -v' prior to non-interactive execution"),
+									)
+								}
+								fmt.Fprintln(out, "  Administrator privileges (sudo) required for package upgrade.")
+								if err := security.AuthenticateSudoCLI(); err != nil {
+									return fmt.Errorf("sudo authentication failed: %w", err)
+								}
+							}
+							stopKeepalive := security.StartSudoKeepalive(ctx)
+							defer stopKeepalive()
+						}
 						if err := appCtx.InstallSvc.Apply(ctx, plan); err != nil {
 							return fmt.Errorf("package installation failed: %w", err)
 						}

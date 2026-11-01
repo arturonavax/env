@@ -1,10 +1,14 @@
 package tui
 
 import (
+	"errors"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
@@ -794,5 +798,114 @@ func TestDashboardOverviewUpdateCheck(t *testing.T) {
 	}
 	if !strings.Contains(view, "2 configuratio") {
 		t.Fatalf("expected config drifts in overview view, got:\n%s", view)
+	}
+}
+
+func TestWizardSudoAuthenticationFlow(t *testing.T) {
+	home := t.TempDir()
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		HasSudo:         true,
+		IsRoot:          false,
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	cat := catalog.NewDefaultRegistry()
+	installSvc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat})
+
+	sudoAuthenticated := false
+	wiz := NewWizardModel(
+		plat,
+		cat,
+		installSvc,
+		WithWizardSudoChecker(func() bool { return sudoAuthenticated }),
+		WithWizardSudoAuthCmd(func() *exec.Cmd { return exec.Command("true") }),
+	)
+
+	// Step through to StageReviewPlan
+	nm, _ := wiz.Update(tea.KeyPressMsg{Text: "enter"}) // profile -> env
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})   // env -> packages
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})   // packages -> planning
+	w := nm.(WizardModel)
+
+	planWithGit := &domain.ExecutionPlan{
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "git", Action: domain.ActionInstall},
+		},
+	}
+	nm, _ = w.Update(wizardPlanDoneMsg{plan: planWithGit, diffs: nil, err: nil})
+	w = nm.(WizardModel)
+	if w.stage != StageReviewPlan {
+		t.Fatalf("expected StageReviewPlan, got %v", w.stage)
+	}
+
+	// 1. Unauthenticated: Press Enter to apply -> MUST stay in StageReviewPlan and return ExecProcess Cmd
+	nm, cmd := w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StageReviewPlan {
+		t.Fatalf("expected to remain on StageReviewPlan while authenticating sudo, got %v", w.stage)
+	}
+	if cmd == nil {
+		t.Fatalf("expected non-nil tea.Cmd for sudo authentication")
+	}
+
+	// 2. Auth failed (wrong password) -> MUST record sudoErr and stay on StageReviewPlan
+	nm, _ = w.Update(wizardSudoAuthMsg{err: errors.New("incorrect password")})
+	w = nm.(WizardModel)
+	w.width = 120
+	w.height = 50
+	if w.stage != StageReviewPlan {
+		t.Fatalf("expected StageReviewPlan after auth failure, got %v", w.stage)
+	}
+	if w.sudoErr == nil {
+		t.Fatalf("expected non-nil sudoErr after auth failure")
+	}
+	view := w.View().Content
+	if !strings.Contains(view, "Sudo authentication failed") {
+		t.Fatalf("expected failure alert in view, got: %s", view)
+	}
+
+	// 3. Auth succeeded -> MUST clear sudoErr and transition to StageApplying
+	nm, cmdApply := w.Update(wizardSudoAuthMsg{err: nil})
+	w = nm.(WizardModel)
+	if w.stage != StageApplying {
+		t.Fatalf("expected StageApplying after successful auth, got %v", w.stage)
+	}
+	if w.sudoErr != nil {
+		t.Fatalf("expected nil sudoErr after successful auth, got %v", w.sudoErr)
+	}
+	if cmdApply == nil {
+		t.Fatalf("expected non-nil tea.Cmd to kick off apply worker")
+	}
+
+	// 4. Pre-authenticated flow: when sudoAuthenticated is true, Enter proceeds directly
+	sudoAuthenticated = true
+	installSvcPreAuth := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat})
+	wizPreAuth := NewWizardModel(
+		plat,
+		cat,
+		installSvcPreAuth,
+		WithWizardSudoChecker(func() bool { return sudoAuthenticated }),
+	)
+	nm, _ = wizPreAuth.Update(tea.KeyPressMsg{Text: "enter"})
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})
+	wPre := nm.(WizardModel)
+	planWithGit2 := &domain.ExecutionPlan{
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "git", Action: domain.ActionInstall},
+		},
+	}
+	nm, _ = wPre.Update(wizardPlanDoneMsg{plan: planWithGit2, diffs: nil, err: nil})
+	wPre = nm.(WizardModel)
+
+	nm, cmdDirect := wPre.Update(tea.KeyPressMsg{Text: "enter"})
+	wPre = nm.(WizardModel)
+	if wPre.stage != StageApplying {
+		t.Fatalf("expected StageApplying directly when pre-authenticated, got %v", wPre.stage)
+	}
+	if cmdDirect == nil {
+		t.Fatalf("expected non-nil tea.Cmd for direct apply")
 	}
 }

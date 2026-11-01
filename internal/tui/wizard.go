@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -31,6 +32,10 @@ const (
 )
 
 type wizardApplyDoneMsg struct {
+	err error
+}
+
+type wizardSudoAuthMsg struct {
 	err error
 }
 
@@ -132,6 +137,9 @@ type WizardModel struct {
 	destroyerSvc     *app.DestroyerService
 	seal             *security.OriginSeal
 	store            *state.Store
+	sudoErr          error
+	sudoCheckFn      func() bool
+	sudoAuthCmdFn    func() *exec.Cmd
 }
 
 func defaultShellOptions() []ShellOption {
@@ -217,6 +225,24 @@ func WithWizardSecuritySeal(seal *security.OriginSeal) WizardOption {
 func WithWizardStore(store *state.Store) WizardOption {
 	return func(w *WizardModel) {
 		w.store = store
+	}
+}
+
+// WithWizardSudoChecker overrides the sudo credential check function (primarily for testing).
+func WithWizardSudoChecker(fn func() bool) WizardOption {
+	return func(w *WizardModel) {
+		if fn != nil {
+			w.sudoCheckFn = fn
+		}
+	}
+}
+
+// WithWizardSudoAuthCmd overrides the sudo auth command factory (primarily for testing).
+func WithWizardSudoAuthCmd(fn func() *exec.Cmd) WizardOption {
+	return func(w *WizardModel) {
+		if fn != nil {
+			w.sudoAuthCmdFn = fn
+		}
 	}
 }
 
@@ -322,6 +348,8 @@ func NewWizardModel(
 		shellCursor:      shellIdx,
 		terminalCursor:   termIdx,
 		envFocus:         "shell",
+		sudoCheckFn:      security.IsSudoAuthenticated,
+		sudoAuthCmdFn:    security.NewSudoAuthCmd,
 		width:            80,
 		height:           24,
 	}
@@ -517,43 +545,16 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return w, tea.Batch(cmd, tickSpinnerCmd())
 
 			case StageReviewPlan:
-				w.stage = StageApplying
-				profName := ""
-				if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
-					profName = w.profiles[w.selectedProf].Name
-				}
-				selectedList := make([]string, 0, len(w.selectedPkgs))
-				for id, enabled := range w.selectedPkgs {
-					if enabled {
-						selectedList = append(selectedList, id)
+				if w.needsSudo() && w.sudoCheckFn != nil && !w.sudoCheckFn() {
+					authCmd := security.NewSudoAuthCmd()
+					if w.sudoAuthCmdFn != nil {
+						authCmd = w.sudoAuthCmdFn()
 					}
+					return w, tea.ExecProcess(authCmd, func(err error) tea.Msg {
+						return wizardSudoAuthMsg{err: err}
+					})
 				}
-
-				progressChan := make(chan tea.Msg, 128)
-				w.progressChan = progressChan
-				w.progressStep = 0
-				w.progressTotal = 1
-				w.progressPhase = "Initializing"
-				w.progressPercent = 0
-
-				go runWizardApplyWorker(
-					w.seal,
-					w.destroyerMode,
-					w.destroyerSvc,
-					profName,
-					w.installSvc,
-					w.plan,
-					selectedList,
-					w.hacksSvc,
-					w.includeHacks,
-					w.matchedHacks,
-					w.syncSvc,
-					w.selectedShell,
-					w.selectedTerminal,
-					w.store,
-					progressChan,
-				)
-				return w, tea.Batch(waitForProgressCmd(progressChan), tickSpinnerCmd())
+				return w.startApplying()
 
 			case StageCompleted:
 				w.quitting = true
@@ -632,6 +633,14 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		w.progressPercent = msg.Percent
 		return w, waitForProgressCmd(w.progressChan)
 
+	case wizardSudoAuthMsg:
+		if msg.err != nil {
+			w.sudoErr = msg.err
+			return w, nil
+		}
+		w.sudoErr = nil
+		return w.startApplying()
+
 	case wizardApplyDoneMsg:
 		w.err = msg.err
 		if msg.err == nil && w.store != nil {
@@ -709,6 +718,68 @@ func (w WizardModel) visiblePkgLines() int {
 	return avail
 }
 
+func (w WizardModel) needsSudo() bool {
+	if w.platform == nil || w.platform.IsRoot() || w.platform.IsTermux() || w.platform.OS() == "windows" || !w.platform.HasSudo() {
+		return false
+	}
+	if w.destroyerMode {
+		return true
+	}
+	if w.includeHacks {
+		for _, hk := range w.matchedHacks {
+			for _, st := range hk.Steps {
+				if st.Privileged {
+					return true
+				}
+			}
+		}
+	}
+	if w.installSvc != nil && w.plan != nil {
+		return w.installSvc.PlanRequiresSudo(w.plan)
+	}
+	return false
+}
+
+func (w WizardModel) startApplying() (tea.Model, tea.Cmd) {
+	w.stage = StageApplying
+	profName := ""
+	if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
+		profName = w.profiles[w.selectedProf].Name
+	}
+	selectedList := make([]string, 0, len(w.selectedPkgs))
+	for id, enabled := range w.selectedPkgs {
+		if enabled {
+			selectedList = append(selectedList, id)
+		}
+	}
+
+	progressChan := make(chan tea.Msg, 128)
+	w.progressChan = progressChan
+	w.progressStep = 0
+	w.progressTotal = 1
+	w.progressPhase = "Initializing"
+	w.progressPercent = 0
+
+	go runWizardApplyWorker(
+		w.seal,
+		w.destroyerMode,
+		w.destroyerSvc,
+		profName,
+		w.installSvc,
+		w.plan,
+		selectedList,
+		w.hacksSvc,
+		w.includeHacks,
+		w.matchedHacks,
+		w.syncSvc,
+		w.selectedShell,
+		w.selectedTerminal,
+		w.store,
+		progressChan,
+	)
+	return w, tea.Batch(waitForProgressCmd(progressChan), tickSpinnerCmd())
+}
+
 func runWizardPlanCmd(installSvc *app.InstallService, syncSvc *app.SyncService, selectedList []string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -746,7 +817,13 @@ func runWizardApplyWorker(
 	store *state.Store,
 	progressChan chan<- tea.Msg,
 ) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if security.IsSudoAuthenticated() {
+		stopKeepalive := security.StartSudoKeepalive(ctx)
+		defer stopKeepalive()
+	}
 
 	// 1. Verify Origin Seal
 	if seal != nil {
@@ -1237,6 +1314,12 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	}
 	allLines = append(allLines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s", destroyerBadge))
 
+	if w.sudoErr != nil {
+		allLines = append(allLines, "", w.styles.Error.Render(fmt.Sprintf("❌ SUDO AUTHENTICATION FAILED: %v (Press [Enter] to retry authentication)", w.sudoErr)))
+	} else if w.needsSudo() {
+		allLines = append(allLines, "", w.styles.Warning.Render("🔒 Administrator privileges (sudo) required. You will be prompted in the terminal upon confirmation."))
+	}
+
 	for i := range allLines {
 		allLines[i] = AnsiTruncate(allLines[i], width-4)
 	}
@@ -1267,7 +1350,9 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	visibleLines := allLines[offset:end]
 
 	var footer string
-	if totalLines > availHeight {
+	if w.sudoErr != nil {
+		footer = w.styles.Error.Render("Sudo authentication failed. Press [Enter] to retry password entry, [Esc] Back, or [q] Cancel.")
+	} else if totalLines > availHeight {
 		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down] Scroll Plan (%d-%d/%d)  [Enter] Execute  [d] Destroyer  [Esc] Back  [q] Cancel", offset+1, end, totalLines))
 	} else {
 		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, [Esc] Back, or [q] to Cancel.")

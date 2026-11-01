@@ -101,23 +101,23 @@ func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]stri
 	case "apt":
 		cmd, args := d.maybeSudo("apt-get", append([]string{"install", "-y", "--no-install-recommends"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "dnf":
 		cmd, args := d.maybeSudo("dnf", append([]string{"install", "-y"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "pacman":
 		cmd, args := d.maybeSudo("pacman", append([]string{"-S", "--noconfirm", "--needed"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "zypper":
 		cmd, args := d.maybeSudo("zypper", append([]string{"--non-interactive", "install"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "apk":
 		cmd, args := d.maybeSudo("apk", append([]string{"add", "--no-cache"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "brew":
 		_, err := d.runner.RunWithOptions(ctx, "", env, "brew", append([]string{"install"}, pkgs...)...)
 		return err
@@ -161,23 +161,23 @@ func (d *Dispatcher) uninstallNative(ctx context.Context, matrix map[string][]st
 	case "apt":
 		cmd, args := d.maybeSudo("apt-get", append([]string{"remove", "-y"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "dnf":
 		cmd, args := d.maybeSudo("dnf", append([]string{"remove", "-y"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "pacman":
 		cmd, args := d.maybeSudo("pacman", append([]string{"-Rns", "--noconfirm"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "zypper":
 		cmd, args := d.maybeSudo("zypper", append([]string{"--non-interactive", "remove"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "apk":
 		cmd, args := d.maybeSudo("apk", append([]string{"del"}, pkgs...)...)
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
-		return err
+		return wrapSudoAuthErr(err)
 	case "brew":
 		_, err := d.runner.RunWithOptions(ctx, "", env, "brew", append([]string{"uninstall"}, pkgs...)...)
 		return err
@@ -207,4 +207,14 @@ func (d *Dispatcher) maybeSudo(binary string, args ...string) (string, []string)
 	sudoArgs = append(sudoArgs, "-n", binary)
 	sudoArgs = append(sudoArgs, args...)
 	return "sudo", sudoArgs
+}
+
+func wrapSudoAuthErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "interactive authentication is required") {
+		return fmt.Errorf("sudo authentication required or credentials expired (run 'sudo -v' to authenticate): %w", err)
+	}
+	return err
 }
