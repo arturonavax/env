@@ -135,7 +135,7 @@ func (e *Engine) ExecuteTasks(
 			}
 		}
 		if execErr == nil {
-			r.dispatch(runCtx, e)
+			r.dispatch(runCtx, e, notify)
 		}
 		if r.running == 0 {
 			break
@@ -192,7 +192,7 @@ func newRun(tasks []Task, g *graph) *run {
 
 // dispatch starts ready tasks while worker slots and their locks are available. Tasks whose locks
 // are busy are skipped (not blocked on), so one contended resource never starves unrelated work.
-func (r *run) dispatch(ctx context.Context, e *Engine) {
+func (r *run) dispatch(ctx context.Context, e *Engine, notify func(Result)) {
 	for r.running < e.maxWorkers {
 		pos := r.firstRunnable()
 		if pos < 0 {
@@ -205,6 +205,10 @@ func (r *run) dispatch(ctx context.Context, e *Engine) {
 			r.held[l] = struct{}{}
 		}
 		r.running++
+		r.results[idx] = Result{StepID: r.tasks[idx].Step.ID, Status: domain.StepRunning}
+		if notify != nil {
+			notify(r.results[idx])
+		}
 
 		go func() {
 			r.done <- completion{idx: idx, res: e.runSingleTask(ctx, &r.tasks[idx])}

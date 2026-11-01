@@ -909,3 +909,91 @@ func TestWizardSudoAuthenticationFlow(t *testing.T) {
 		t.Fatalf("expected non-nil tea.Cmd for direct apply")
 	}
 }
+
+func TestWizardApplyingMultiProgressConcurrentWorkers(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	plat := platform.Detect()
+	wiz := NewWizardModel(plat, cat, nil)
+	wiz.stage = StageApplying
+	wiz.progressTotal = 10
+	wiz.progressPercent = 30
+
+	// 1. Dispatch 3 concurrent tasks
+	nm, _ := wiz.Update(wizardProgressMsg{
+		StepID:      1,
+		TotalSteps:  10,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "git",
+		Description: "Fast distributed version control",
+		Status:      domain.StepRunning,
+		Percent:     35,
+	})
+	nm, _ = nm.Update(wizardProgressMsg{
+		StepID:      2,
+		TotalSteps:  10,
+		Phase:       "Installing",
+		Action:      "download",
+		ResourceID:  "ghostty",
+		Description: "Ghostty GPU terminal",
+		Status:      domain.StepRunning,
+		Percent:     35,
+	})
+	nm, _ = nm.Update(wizardProgressMsg{
+		StepID:      3,
+		TotalSteps:  10,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "herdr",
+		Description: "Herdr terminal multiplexer",
+		Status:      domain.StepRunning,
+		Percent:     35,
+	})
+
+	w := nm.(WizardModel)
+	if len(w.activeWorkers) != 3 {
+		t.Fatalf("expected 3 active workers, got %d", len(w.activeWorkers))
+	}
+
+	rendered := w.renderApplying(100)
+	if !strings.Contains(rendered, "CONCURRENT WORKERS (3 executing in parallel)") {
+		t.Errorf("expected concurrent workers section header, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "git") || !strings.Contains(rendered, "ghostty") || !strings.Contains(rendered, "herdr") {
+		t.Errorf("expected all 3 workers in rendered output, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "[DOWNLOAD]") || !strings.Contains(rendered, "[INSTALL]") {
+		t.Errorf("expected action badges in rendered output, got:\n%s", rendered)
+	}
+
+	// 2. Complete step 1 (git)
+	nm, _ = w.Update(wizardProgressMsg{
+		StepID:      1,
+		TotalSteps:  10,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "git",
+		Description: "Fast distributed version control",
+		Status:      domain.StepSuccess,
+		Percent:     45,
+	})
+	w = nm.(WizardModel)
+
+	if len(w.activeWorkers) != 2 {
+		t.Fatalf("expected 2 active workers after step 1 finished, got %d", len(w.activeWorkers))
+	}
+	if w.completedSteps != 1 {
+		t.Fatalf("expected 1 completed step, got %d", w.completedSteps)
+	}
+
+	renderedAfter := w.renderApplying(100)
+	if !strings.Contains(renderedAfter, "CONCURRENT WORKERS (2 executing in parallel)") {
+		t.Errorf("expected 2 concurrent workers header, got:\n%s", renderedAfter)
+	}
+	if !strings.Contains(renderedAfter, "RECENTLY COMPLETED:") {
+		t.Errorf("expected recently completed section, got:\n%s", renderedAfter)
+	}
+	if !strings.Contains(renderedAfter, "✔ git") {
+		t.Errorf("expected git with success badge in recently completed, got:\n%s", renderedAfter)
+	}
+}

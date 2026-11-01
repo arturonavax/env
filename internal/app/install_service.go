@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -74,6 +75,131 @@ func (s *InstallService) getOnProgress() EventHandler {
 	return s.onProgress
 }
 
+// baseToolRank defines explicit priority order for core environment tools.
+// Base tools must always be installed before other direct tools and dependencies
+// so that a functional core environment is guaranteed even if later steps fail.
+var baseToolRank = map[string]int{
+	"git":     1,
+	"curl":    2,
+	"ghostty": 3,
+	"zsh":     4,
+	"herdr":   5,
+	"neovim":  6,
+	"nvim":    6,
+	"anx":     7,
+}
+
+// PrioritizePackageIDs reorders package IDs into an optimal topological sequence:
+// Tier 0: Base core tools (git, curl, ghostty, zsh, herdr, neovim/nvim, anx)
+// Tier 1: Direct interactive user tools (defined in domain.DirectToolsSet)
+// Tier 2: Dependencies directly or transitively required by direct tools
+// Tier 3: Standalone / unlinked dependencies
+func (s *InstallService) PrioritizePackageIDs(ids []string) []string {
+	if len(ids) <= 1 {
+		return slices.Clone(ids)
+	}
+
+	toolDeps := make(map[string]bool)
+	if s.catalog != nil {
+		var collectDeps func(id string)
+		collectDeps = func(id string) {
+			if spec, ok := s.catalog.GetPackageSpec(id); ok {
+				for _, dep := range spec.DependsOn {
+					depNorm := strings.ToLower(dep)
+					if !toolDeps[depNorm] {
+						toolDeps[depNorm] = true
+						collectDeps(depNorm)
+					}
+				}
+			}
+		}
+		for toolID := range domain.DirectToolsSet {
+			collectDeps(strings.ToLower(toolID))
+		}
+	}
+
+	type rankedID struct {
+		id   string
+		tier int
+		rank int
+	}
+
+	ranked := make([]rankedID, len(ids))
+	for i, id := range ids {
+		norm := strings.ToLower(id)
+		var tier, rank int
+		if r, ok := baseToolRank[norm]; ok {
+			tier = 0
+			rank = r
+		} else if _, ok := domain.DirectToolsSet[norm]; ok {
+			tier = 1
+			rank = 0
+		} else if toolDeps[norm] {
+			tier = 2
+			rank = 0
+		} else {
+			tier = 3
+			rank = 0
+		}
+		ranked[i] = rankedID{id: id, tier: tier, rank: rank}
+	}
+
+	slices.SortStableFunc(ranked, func(a, b rankedID) int {
+		if a.tier != b.tier {
+			return a.tier - b.tier
+		}
+		if a.tier == 0 && a.rank != b.rank {
+			return a.rank - b.rank
+		}
+		return strings.Compare(a.id, b.id)
+	})
+
+	result := make([]string, len(ranked))
+	for i, r := range ranked {
+		result[i] = r.id
+	}
+	return result
+}
+
+// determinePackageLocks derives fine-grained lock domains for pkg to prevent package manager
+// database contention while permitting concurrent execution of independent downloads, language runtimes,
+// and file synchronization.
+func (s *InstallService) determinePackageLocks(pkg domain.ManagedResource) []string {
+	locks := []string{"pkg:" + pkg.ID}
+	if pkg.BinaryName != "" {
+		locks = append(locks, "bin:"+pkg.BinaryName)
+	}
+
+	strat := pkg.Strategy
+	if strat == "" {
+		strat = domain.StrategyNative
+	}
+
+	switch strat {
+	case domain.StrategyNative:
+		pmLock := "lock:pm-native"
+		if s.platform != nil {
+			switch s.platform.OS() {
+			case "darwin":
+				pmLock = "lock:pm-brew"
+			case "windows":
+				pmLock = "lock:pm-windows"
+			}
+		}
+		locks = append(locks, pmLock)
+	case domain.StrategyLanguagePkg:
+		eco := pkg.Ecosystem
+		if eco == "" {
+			eco = "generic"
+		}
+		locks = append(locks, "runtime:"+eco)
+	case domain.StrategyGitHubRelease, domain.StrategyBinary, domain.StrategyScript, domain.StrategySource:
+		// Standalone strategies do not hold a shared package manager lock, enabling concurrent downloads and builds.
+	}
+
+	return locks
+}
+
 // Plan resolves requested packages (or a profile) into a dependency-ordered plan.
 // Already-installed packages are skipped, making Apply idempotent and Resume trivial.
 func (s *InstallService) Plan(ctx context.Context, profileName string, requested []string) (*domain.ExecutionPlan, error) {
@@ -107,7 +233,8 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 		includeConfigs = true
 	}
 
-	ordered, err := s.catalog.ResolveInstallOrder(ids)
+	prioritizedIDs := s.PrioritizePackageIDs(ids)
+	ordered, err := s.catalog.ResolveInstallOrder(prioritizedIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +259,8 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 			Provider:    s.provider.Name(),
 			Strategy:    string(pkg.Strategy),
 			DependsOn:   installDependencies(pkg, installStepIDs),
-			IsExclusive: true,
+			Locks:       s.determinePackageLocks(pkg),
+			IsExclusive: false,
 			Status:      domain.StepPending,
 		})
 		installStepIDs[pkg.ID] = stepID
@@ -253,7 +381,7 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 }
 
 func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.Task {
-	task := execution.Task{Step: step, Exclusive: step.IsExclusive}
+	task := execution.Task{Step: step, Exclusive: step.IsExclusive, Locks: step.Locks}
 
 	switch step.Action {
 	case domain.ActionInstall:

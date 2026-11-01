@@ -72,9 +72,48 @@ func TestInstallServicePlanResolvesProfileAndOrdersDeps(t *testing.T) {
 		t.Fatalf("unexpected plan: %+v", plan)
 	}
 	for _, s := range plan.Steps {
-		if s.Action == domain.ActionInstall && !s.IsExclusive {
-			t.Fatalf("install step %s must be exclusive", s.ResourceID)
+		if s.Action == domain.ActionInstall && len(s.Locks) == 0 {
+			t.Fatalf("install step %s must declare locks for fine-grained concurrency", s.ResourceID)
 		}
+	}
+}
+
+func TestInstallServicePrioritizePackageIDs(t *testing.T) {
+	fx := newFixture(t)
+	svc := app.NewInstallService(app.InstallDeps{
+		Platform: fx.plat, Catalog: fx.cat, Snapshots: fx.snap, Store: fx.store,
+	})
+
+	input := []string{"ripgrep", "unlinked-pkg", "ghostty", "neovim", "zsh", "herdr", "git"}
+	prioritized := svc.PrioritizePackageIDs(input)
+
+	// Base tools must come first in priority order: git, ghostty, zsh, herdr, neovim
+	expectedBasePrefix := []string{"git", "ghostty", "zsh", "herdr", "neovim"}
+	if len(prioritized) != len(input) {
+		t.Fatalf("expected %d packages, got %d", len(input), len(prioritized))
+	}
+	for i, expected := range expectedBasePrefix {
+		if prioritized[i] != expected {
+			t.Errorf("pos %d: expected %s, got %s", i, expected, prioritized[i])
+		}
+	}
+
+	// ripgrep (Tier 1 direct tool) must come before unlinked-pkg (Tier 3)
+	rgIdx := -1
+	unlinkedIdx := -1
+	for i, id := range prioritized {
+		if id == "ripgrep" {
+			rgIdx = i
+		}
+		if id == "unlinked-pkg" {
+			unlinkedIdx = i
+		}
+	}
+	if rgIdx == -1 || unlinkedIdx == -1 {
+		t.Fatalf("missing ripgrep or unlinked-pkg in prioritized list: %v", prioritized)
+	}
+	if rgIdx >= unlinkedIdx {
+		t.Errorf("expected ripgrep (idx %d) before unlinked-pkg (idx %d)", rgIdx, unlinkedIdx)
 	}
 }
 

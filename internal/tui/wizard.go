@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -39,6 +40,14 @@ type wizardSudoAuthMsg struct {
 	err error
 }
 
+type activeWorkerSlot struct {
+	StepID      int
+	ResourceID  string
+	Action      string
+	Description string
+	StartedAt   time.Time
+}
+
 type wizardProgressMsg struct {
 	StepID      int
 	TotalSteps  int
@@ -46,6 +55,7 @@ type wizardProgressMsg struct {
 	Action      string
 	ResourceID  string
 	Description string
+	Status      domain.StepStatus
 	Percent     int
 }
 
@@ -116,9 +126,13 @@ type WizardModel struct {
 	progressAction   string
 	progressResource string
 	progressDesc     string
-	progressPercent  int
-	progressChan     chan tea.Msg
-	progressMsg      string
+	progressPercent   int
+	progressChan      chan tea.Msg
+	progressMsg       string
+	activeWorkers     map[int]activeWorkerSlot
+	activeWorkerOrder []int
+	recentCompleted   []string
+	completedSteps    int
 	err              error
 	quitting         bool
 	matchedHacks     []domain.HackProfile
@@ -348,10 +362,13 @@ func NewWizardModel(
 		shellCursor:      shellIdx,
 		terminalCursor:   termIdx,
 		envFocus:         "shell",
-		sudoCheckFn:      security.IsSudoAuthenticated,
-		sudoAuthCmdFn:    security.NewSudoAuthCmd,
-		width:            80,
-		height:           24,
+		sudoCheckFn:       security.IsSudoAuthenticated,
+		sudoAuthCmdFn:     security.NewSudoAuthCmd,
+		activeWorkers:     make(map[int]activeWorkerSlot),
+		activeWorkerOrder: make([]int, 0),
+		recentCompleted:   make([]string, 0),
+		width:             80,
+		height:            24,
 	}
 
 	for _, opt := range opts {
@@ -631,6 +648,48 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		w.progressResource = msg.ResourceID
 		w.progressDesc = msg.Description
 		w.progressPercent = msg.Percent
+
+		if w.activeWorkers == nil {
+			w.activeWorkers = make(map[int]activeWorkerSlot)
+		}
+
+		if msg.Status == domain.StepRunning {
+			if _, exists := w.activeWorkers[msg.StepID]; !exists {
+				w.activeWorkerOrder = append(w.activeWorkerOrder, msg.StepID)
+			}
+			w.activeWorkers[msg.StepID] = activeWorkerSlot{
+				StepID:      msg.StepID,
+				ResourceID:  msg.ResourceID,
+				Action:      msg.Action,
+				Description: msg.Description,
+				StartedAt:   time.Now(),
+			}
+		} else if msg.Status == domain.StepSuccess || msg.Status == domain.StepFailed {
+			if _, exists := w.activeWorkers[msg.StepID]; exists {
+				delete(w.activeWorkers, msg.StepID)
+				for i, id := range w.activeWorkerOrder {
+					if id == msg.StepID {
+						w.activeWorkerOrder = append(w.activeWorkerOrder[:i], w.activeWorkerOrder[i+1:]...)
+						break
+					}
+				}
+				w.completedSteps++
+				badge := "✔"
+				if msg.Status == domain.StepFailed {
+					badge = "✖"
+				}
+				act := msg.Action
+				if act == "" {
+					act = "install"
+				}
+				rec := fmt.Sprintf("%s %s [%s]", badge, msg.ResourceID, strings.ToUpper(act))
+				w.recentCompleted = append(w.recentCompleted, rec)
+				if len(w.recentCompleted) > 5 {
+					w.recentCompleted = w.recentCompleted[len(w.recentCompleted)-5:]
+				}
+			}
+		}
+
 		return w, waitForProgressCmd(w.progressChan)
 
 	case wizardSudoAuthMsg:
@@ -897,10 +956,15 @@ func runWizardApplyWorker(
 
 	if installSvc != nil && activePlan != nil && len(activePlan.Steps) > 0 {
 		totalInstallSteps := len(activePlan.Steps)
+		var completedSteps atomic.Int32
 		installSvc.SetOnProgress(func(ev app.ProgressEvent) {
+			if ev.Status == domain.StepSuccess || ev.Status == domain.StepFailed {
+				completedSteps.Add(1)
+			}
+			done := int(completedSteps.Load())
 			pct := 35
 			if totalInstallSteps > 0 {
-				pct = 35 + (ev.StepID * 45 / totalInstallSteps)
+				pct = 35 + (done * 45 / totalInstallSteps)
 			}
 			progressChan <- wizardProgressMsg{
 				StepID:      ev.StepID,
@@ -909,6 +973,7 @@ func runWizardApplyWorker(
 				Action:      string(ev.Action),
 				ResourceID:  ev.ResourceID,
 				Description: ev.Description,
+				Status:      ev.Status,
 				Percent:     pct,
 			}
 		})
@@ -1412,6 +1477,32 @@ func (w WizardModel) renderProgressBar(percent, barWidth int) string {
 	return fmt.Sprintf("[%s%s] %3d%%", w.styles.Header.Render(barFilled), w.styles.Muted.Render(barEmpty), percent)
 }
 
+func (w WizardModel) renderWorkerPulseBar(frame, barWidth int) string {
+	if barWidth < 8 {
+		barWidth = 8
+	}
+	period := barWidth * 2
+	pos := frame % period
+	if pos >= barWidth {
+		pos = period - 1 - pos
+	}
+	var b strings.Builder
+	b.WriteString("[")
+	for i := 0; i < barWidth; i++ {
+		dist := i - pos
+		if dist < 0 {
+			dist = -dist
+		}
+		if dist <= 1 {
+			b.WriteString(w.styles.Header.Render("█"))
+		} else {
+			b.WriteString(w.styles.Muted.Render("░"))
+		}
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
 func (w WizardModel) renderApplying(width int) string {
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	frame := frames[w.spinnerFrame%len(frames)]
@@ -1433,31 +1524,76 @@ func (w WizardModel) renderApplying(width int) string {
 	}
 
 	stepInfo := ""
-	if w.progressTotal > 0 && w.progressStep > 0 {
-		stepInfo = fmt.Sprintf(" (Step %d/%d)", w.progressStep, w.progressTotal)
+	if w.progressTotal > 0 {
+		if w.completedSteps > 0 {
+			stepInfo = fmt.Sprintf(" (%d/%d steps completed)", w.completedSteps, w.progressTotal)
+		} else if w.progressStep > 0 {
+			stepInfo = fmt.Sprintf(" (Step %d/%d)", w.progressStep, w.progressTotal)
+		}
 	}
 
 	progressBar := w.renderProgressBar(w.progressPercent, barWidth) + w.styles.Muted.Render(stepInfo)
-
-	desc := w.progressDesc
-	if desc == "" {
-		desc = "Preparing operations..."
-	}
-
-	actionBadge := ""
-	if w.progressAction != "" {
-		actionBadge = fmt.Sprintf("[%s] ", strings.ToUpper(w.progressAction))
-	}
 
 	lines := []string{
 		title,
 		"",
 		fmt.Sprintf("  %s", progressBar),
-		"",
-		fmt.Sprintf("  %s%s", w.styles.Success.Render(actionBadge), desc),
-		"",
-		w.styles.Muted.Render("  • Background worker running atomically with transactional journal."),
-		w.styles.Muted.Render("  • Please do not interrupt until operations complete..."),
 	}
+
+	if len(w.activeWorkers) > 0 {
+		lines = append(lines, "", fmt.Sprintf("  %s", w.styles.Header.Render(fmt.Sprintf("CONCURRENT WORKERS (%d executing in parallel):", len(w.activeWorkers)))))
+		maxWorkersToShow := 4
+		for i, id := range w.activeWorkerOrder {
+			if i >= maxWorkersToShow {
+				remaining := len(w.activeWorkerOrder) - maxWorkersToShow
+				lines = append(lines, fmt.Sprintf("   %s", w.styles.Muted.Render(fmt.Sprintf("... and %d more workers in flight", remaining))))
+				break
+			}
+			slot := w.activeWorkers[id]
+			wSpinner := frames[(w.spinnerFrame+id)%len(frames)]
+			elapsed := time.Since(slot.StartedAt).Round(100 * time.Millisecond)
+			if elapsed < 0 || slot.StartedAt.IsZero() {
+				elapsed = 0
+			}
+			act := strings.ToUpper(slot.Action)
+			if act == "" {
+				act = "INSTALL"
+			}
+			pulseBar := w.renderWorkerPulseBar(w.spinnerFrame+id, 12)
+			lines = append(lines, fmt.Sprintf("   %s %s %s %s %s",
+				w.styles.Header.Render(wSpinner),
+				w.styles.Success.Render("["+act+"]"),
+				w.styles.Highlight.Render(slot.ResourceID),
+				pulseBar,
+				w.styles.Muted.Render(fmt.Sprintf("(%s)", elapsed.String())),
+			))
+			if slot.Description != "" {
+				lines = append(lines, fmt.Sprintf("       %s", w.styles.Muted.Render(slot.Description)))
+			}
+		}
+	} else {
+		desc := w.progressDesc
+		if desc == "" {
+			desc = "Preparing operations..."
+		}
+		actionBadge := ""
+		if w.progressAction != "" {
+			actionBadge = fmt.Sprintf("[%s] ", strings.ToUpper(w.progressAction))
+		}
+		lines = append(lines, "", fmt.Sprintf("  %s%s", w.styles.Success.Render(actionBadge), desc))
+	}
+
+	if len(w.recentCompleted) > 0 {
+		lines = append(lines, "", w.styles.Muted.Render("  RECENTLY COMPLETED:"))
+		for _, item := range w.recentCompleted {
+			lines = append(lines, fmt.Sprintf("   %s", w.styles.Success.Render(item)))
+		}
+	}
+
+	lines = append(lines, "",
+		w.styles.Muted.Render("  • Base tools prioritized first (ghostty, zsh, herdr, neovim)."),
+		w.styles.Muted.Render("  • DAG scheduler executes independent downloads, builds, and syncs concurrently."),
+		w.styles.Muted.Render("  • Transactional journal active; operations are compensated on failure."))
+
 	return strings.Join(lines, "\n")
 }
