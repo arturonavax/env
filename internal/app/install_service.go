@@ -57,9 +57,20 @@ func NewInstallService(deps InstallDeps) *InstallService {
 	}
 }
 
+// SetOnProgress sets or updates the progress event listener.
+func (s *InstallService) SetOnProgress(h EventHandler) {
+	s.onProgress = h
+}
+
 // Plan resolves requested packages (or a profile) into a dependency-ordered plan.
 // Already-installed packages are skipped, making Apply idempotent and Resume trivial.
 func (s *InstallService) Plan(ctx context.Context, profileName string, requested []string) (*domain.ExecutionPlan, error) {
+	return s.PlanWithReinstall(ctx, profileName, requested, false)
+}
+
+// PlanWithReinstall resolves requested packages into a dependency-ordered plan.
+// If force is true, already-installed checks are bypassed to schedule fresh installation steps.
+func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName string, requested []string, force bool) (*domain.ExecutionPlan, error) {
 	now := time.Now()
 	plan := &domain.ExecutionPlan{
 		ID:        fmt.Sprintf("plan-%d", now.UnixNano()),
@@ -95,9 +106,11 @@ func (s *InstallService) Plan(ctx context.Context, profileName string, requested
 		if len(pkg.SupportedOS) > 0 && !containsOS(pkg.SupportedOS, s.platform.OS()) {
 			continue
 		}
-		installed, _, _ := s.provider.IsInstalled(ctx, pkg)
-		if installed {
-			continue
+		if !force {
+			installed, _, _ := s.provider.IsInstalled(ctx, pkg)
+			if installed {
+				continue
+			}
 		}
 		plan.Steps = append(plan.Steps, domain.PlanStep{
 			ID:          stepID,

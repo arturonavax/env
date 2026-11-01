@@ -16,9 +16,7 @@ set -eu
 # only when handing off to child processes at the end of installation,
 # preserving the incoming curl pipe during script execution.
 dispatch_exec() {
-	if [ -n "${TTY_DEV:-}" ] && [ -c "${TTY_DEV:-}" ]; then
-		exec "$@" <"$TTY_DEV"
-	elif [ -c /dev/tty ] && [ ! -t 0 ]; then
+	if [ -c /dev/tty ] && ( : </dev/tty ) 2>/dev/null; then
 		exec "$@" </dev/tty
 	else
 		exec "$@"
@@ -100,7 +98,7 @@ TN_RESET=""
 
 # Detect controlling terminal for interactive execution
 TTY_DEV=""
-if [ -c /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]; then
+if [ -c /dev/tty ] && ( : </dev/tty ) 2>/dev/null; then
 	TTY_DEV="/dev/tty"
 fi
 

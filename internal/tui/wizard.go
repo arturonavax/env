@@ -22,6 +22,7 @@ const (
 	StageSelectProfile WizardStage = iota
 	StageSelectEnvironment
 	StageSelectPackages
+	StagePlanning
 	StageReviewPlan
 	StageApplying
 	StageCompleted
@@ -29,6 +30,32 @@ const (
 
 type wizardApplyDoneMsg struct {
 	err error
+}
+
+type wizardProgressMsg struct {
+	StepID      int
+	TotalSteps  int
+	Phase       string
+	Action      string
+	ResourceID  string
+	Description string
+	Percent     int
+}
+
+type wizardPlanDoneMsg struct {
+	plan  *domain.ExecutionPlan
+	diffs []app.ConfigDiff
+	err   error
+}
+
+func waitForProgressCmd(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return msg
+	}
 }
 
 type wizardSpinnerTickMsg time.Time
@@ -74,6 +101,14 @@ type WizardModel struct {
 	planScrollOffset int
 	spinnerFrame     int
 	plan             *domain.ExecutionPlan
+	progressStep     int
+	progressTotal    int
+	progressPhase    string
+	progressAction   string
+	progressResource string
+	progressDesc     string
+	progressPercent  int
+	progressChan     chan tea.Msg
 	progressMsg      string
 	err              error
 	quitting         bool
@@ -237,6 +272,8 @@ func NewWizardModel(
 		shellCursor:      shellIdx,
 		terminalCursor:   termIdx,
 		envFocus:         "shell",
+		width:            80,
+		height:           24,
 	}
 
 	for _, opt := range opts {
@@ -261,6 +298,28 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			w.quitting = true
 			return w, tea.Quit
+
+		case "esc":
+			switch w.stage {
+			case StageSelectProfile:
+				w.quitting = true
+				return w, tea.Quit
+			case StageSelectEnvironment:
+				w.stage = StageSelectProfile
+				return w, nil
+			case StageSelectPackages:
+				w.stage = StageSelectEnvironment
+				return w, nil
+			case StagePlanning:
+				w.stage = StageSelectPackages
+				return w, nil
+			case StageReviewPlan:
+				w.stage = StageSelectPackages
+				return w, nil
+			case StageCompleted:
+				w.quitting = true
+				return w, tea.Quit
+			}
 
 		case "up", "k":
 			switch w.stage {
@@ -312,6 +371,33 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.adjustPkgScroll()
 			case StageReviewPlan:
 				w.planScrollOffset++
+			}
+
+		case "pgup", "ctrl+u":
+			switch w.stage {
+			case StageSelectPackages:
+				w.pkgCursor -= 5
+				if w.pkgCursor < 0 {
+					w.pkgCursor = 0
+				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				w.planScrollOffset -= 5
+				if w.planScrollOffset < 0 {
+					w.planScrollOffset = 0
+				}
+			}
+
+		case "pgdown", "ctrl+d":
+			switch w.stage {
+			case StageSelectPackages:
+				w.pkgCursor += 5
+				if w.pkgCursor >= len(w.packages) {
+					w.pkgCursor = len(w.packages) - 1
+				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				w.planScrollOffset += 5
 			}
 
 		case "tab", "left", "right":
@@ -373,17 +459,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						selectedList = append(selectedList, id)
 					}
 				}
-				if w.installSvc != nil {
-					plan, err := w.installSvc.Plan(context.Background(), "", selectedList)
-					if err != nil {
-						w.err = err
-					} else {
-						w.plan = plan
-						w.stage = StageReviewPlan
-					}
-				} else {
-					w.stage = StageReviewPlan
-				}
+				w.stage = StagePlanning
+				cmd := runWizardPlanCmd(w.installSvc, w.syncSvc, selectedList)
+				return w, tea.Batch(cmd, tickSpinnerCmd())
 
 			case StageReviewPlan:
 				w.stage = StageApplying
@@ -391,21 +469,37 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
 					profName = w.profiles[w.selectedProf].Name
 				}
-				cmd := runWizardApplyCmd(
+				selectedList := make([]string, 0, len(w.selectedPkgs))
+				for id, enabled := range w.selectedPkgs {
+					if enabled {
+						selectedList = append(selectedList, id)
+					}
+				}
+
+				progressChan := make(chan tea.Msg, 128)
+				w.progressChan = progressChan
+				w.progressStep = 0
+				w.progressTotal = 1
+				w.progressPhase = "Initializing"
+				w.progressPercent = 0
+
+				go runWizardApplyWorker(
 					w.seal,
 					w.destroyerMode,
 					w.destroyerSvc,
 					profName,
 					w.installSvc,
 					w.plan,
+					selectedList,
 					w.hacksSvc,
 					w.includeHacks,
 					w.matchedHacks,
 					w.syncSvc,
 					w.selectedShell,
 					w.selectedTerminal,
+					progressChan,
 				)
-				return w, tea.Batch(cmd, tickSpinnerCmd())
+				return w, tea.Batch(waitForProgressCmd(progressChan), tickSpinnerCmd())
 
 			case StageCompleted:
 				w.quitting = true
@@ -413,13 +507,84 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			switch w.stage {
+			case StageSelectProfile:
+				if w.selectedProf > 0 {
+					w.selectedProf--
+				}
+			case StageSelectEnvironment:
+				if w.envFocus == "shell" && w.shellCursor > 0 {
+					w.shellCursor--
+				} else if w.envFocus == "terminal" && w.terminalCursor > 0 {
+					w.terminalCursor--
+				}
+			case StageSelectPackages:
+				if w.pkgCursor > 0 {
+					w.pkgCursor--
+				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				if w.planScrollOffset > 0 {
+					w.planScrollOffset--
+				}
+			}
+		case tea.MouseWheelDown:
+			switch w.stage {
+			case StageSelectProfile:
+				if w.selectedProf < len(w.profiles)-1 {
+					w.selectedProf++
+				}
+			case StageSelectEnvironment:
+				if w.envFocus == "shell" && w.shellCursor < len(w.shells)-1 {
+					w.shellCursor++
+				} else if w.envFocus == "terminal" && w.terminalCursor < len(w.terminals)-1 {
+					w.terminalCursor++
+				}
+			case StageSelectPackages:
+				if w.pkgCursor < len(w.packages)-1 {
+					w.pkgCursor++
+				}
+				w.adjustPkgScroll()
+			case StageReviewPlan:
+				w.planScrollOffset++
+			}
+		}
+
+	case wizardPlanDoneMsg:
+		if w.stage != StagePlanning {
+			return w, nil
+		}
+		if msg.err != nil {
+			w.err = msg.err
+			w.stage = StageCompleted
+			return w, nil
+		}
+		w.plan = msg.plan
+		w.configDiffs = msg.diffs
+		w.planScrollOffset = 0
+		w.stage = StageReviewPlan
+		return w, nil
+
+	case wizardProgressMsg:
+		w.progressStep = msg.StepID
+		w.progressTotal = msg.TotalSteps
+		w.progressPhase = msg.Phase
+		w.progressAction = msg.Action
+		w.progressResource = msg.ResourceID
+		w.progressDesc = msg.Description
+		w.progressPercent = msg.Percent
+		return w, waitForProgressCmd(w.progressChan)
+
 	case wizardApplyDoneMsg:
 		w.err = msg.err
 		w.stage = StageCompleted
 		return w, nil
 
 	case wizardSpinnerTickMsg:
-		if w.stage == StageApplying {
+		if w.stage == StageApplying || w.stage == StagePlanning {
 			w.spinnerFrame++
 			return w, tickSpinnerCmd()
 		}
@@ -435,71 +600,206 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (w *WizardModel) adjustPkgScroll() {
-	availHeight := w.height - 4 - 3 - 4
-	if availHeight < 5 {
-		availHeight = 5
-	}
+	availHeight := w.visiblePkgLines()
 	w.pkgScrollOffset = AdjustScrollOffset(w.pkgCursor, w.pkgScrollOffset, availHeight, len(w.packages))
 }
 
-func runWizardApplyCmd(
+func (w WizardModel) visiblePkgLines() int {
+	h := w.height - 4
+	if h < 6 {
+		h = 6
+	}
+	avail := h - 3 - 5
+	if avail < 5 {
+		avail = 5
+	}
+	return avail
+}
+
+func runWizardPlanCmd(installSvc *app.InstallService, syncSvc *app.SyncService, selectedList []string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		var plan *domain.ExecutionPlan
+		var err error
+		if installSvc != nil {
+			plan, err = installSvc.Plan(ctx, "", selectedList)
+		}
+		var diffs []app.ConfigDiff
+		if syncSvc != nil {
+			diffs, _ = syncSvc.Diff(ctx, "all")
+		}
+		return wizardPlanDoneMsg{
+			plan:  plan,
+			diffs: diffs,
+			err:   err,
+		}
+	}
+}
+
+func runWizardApplyWorker(
 	seal *security.OriginSeal,
 	destroyerMode bool,
 	destroyerSvc *app.DestroyerService,
 	profName string,
 	installSvc *app.InstallService,
 	plan *domain.ExecutionPlan,
+	selectedList []string,
 	hacksSvc *app.HacksService,
 	includeHacks bool,
 	matchedHacks []domain.HackProfile,
 	syncSvc *app.SyncService,
 	selectedShell string,
 	selectedTerminal string,
-) tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
+	progressChan chan<- tea.Msg,
+) {
+	ctx := context.Background()
 
-		if seal != nil {
-			if err := seal.Verify(ctx); err != nil {
-				return wizardApplyDoneMsg{err: err}
-			}
+	// 1. Verify Origin Seal
+	if seal != nil {
+		progressChan <- wizardProgressMsg{
+			StepID:      1,
+			TotalSteps:  1,
+			Phase:       "Verification",
+			Action:      "verify",
+			ResourceID:  "origin-seal",
+			Description: "Verifying cryptographic origin seal...",
+			Percent:     2,
 		}
-
-		if destroyerMode && destroyerSvc != nil {
-			opts := app.PurgeOptions{
-				Profile:       profName,
-				PurgeBinaries: false,
-				PurgeState:    false,
-			}
-			if purgePlan, err := destroyerSvc.PlanPurge(ctx, opts); err == nil {
-				_, _ = destroyerSvc.ExecutePurge(ctx, purgePlan, false, false)
-			}
+		if err := seal.Verify(ctx); err != nil {
+			progressChan <- wizardApplyDoneMsg{err: err}
+			return
 		}
-
-		if installSvc != nil && plan != nil {
-			if err := installSvc.Apply(ctx, plan); err != nil {
-				return wizardApplyDoneMsg{err: err}
-			}
-		}
-
-		if hacksSvc != nil && includeHacks && len(matchedHacks) > 0 {
-			for _, hk := range matchedHacks {
-				_, _ = hacksSvc.Apply(ctx, hk.ID)
-			}
-		}
-
-		if syncSvc != nil {
-			if _, err := syncSvc.Sync(ctx, app.SyncOptions{
-				Force:    destroyerMode,
-				Shell:    selectedShell,
-				Terminal: selectedTerminal,
-			}); err != nil {
-				return wizardApplyDoneMsg{err: err}
-			}
-		}
-
-		return wizardApplyDoneMsg{err: nil}
 	}
+
+	// 2. Destroyer Purge Phase
+	if destroyerMode && destroyerSvc != nil {
+		progressChan <- wizardProgressMsg{
+			StepID:      0,
+			TotalSteps:  1,
+			Phase:       "Purging (Destroyer)",
+			Action:      "plan",
+			ResourceID:  "destroyer",
+			Description: "Planning deep system purge...",
+			Percent:     5,
+		}
+		opts := app.PurgeOptions{
+			Profile:       profName,
+			PurgeBinaries: false,
+			PurgeState:    false,
+		}
+		if purgePlan, err := destroyerSvc.PlanPurge(ctx, opts); err == nil {
+			destroyerSvc.SetOnProgress(func(step, total int, item string) {
+				pct := 5
+				if total > 0 {
+					pct = 5 + (step * 25 / total)
+				}
+				progressChan <- wizardProgressMsg{
+					StepID:      step,
+					TotalSteps:  total,
+					Phase:       "Purging (Destroyer)",
+					Action:      "purge",
+					ResourceID:  item,
+					Description: "Purging " + item,
+					Percent:     pct,
+				}
+			})
+			_, _ = destroyerSvc.ExecutePurge(ctx, purgePlan, false, false)
+		}
+	}
+
+	// 3. Install Phase
+	activePlan := plan
+	if destroyerMode && installSvc != nil {
+		progressChan <- wizardProgressMsg{
+			StepID:      0,
+			TotalSteps:  1,
+			Phase:       "Planning Reinstall",
+			Action:      "plan",
+			ResourceID:  "packages",
+			Description: "Generating fresh install plan for selected packages...",
+			Percent:     32,
+		}
+		if freshPlan, err := installSvc.PlanWithReinstall(ctx, profName, selectedList, true); err == nil && freshPlan != nil {
+			activePlan = freshPlan
+		}
+	}
+
+	if installSvc != nil && activePlan != nil && len(activePlan.Steps) > 0 {
+		totalInstallSteps := len(activePlan.Steps)
+		installSvc.SetOnProgress(func(ev app.ProgressEvent) {
+			pct := 35
+			if totalInstallSteps > 0 {
+				pct = 35 + (ev.StepID * 45 / totalInstallSteps)
+			}
+			progressChan <- wizardProgressMsg{
+				StepID:      ev.StepID,
+				TotalSteps:  totalInstallSteps,
+				Phase:       "Installing",
+				Action:      string(ev.Action),
+				ResourceID:  ev.ResourceID,
+				Description: ev.Description,
+				Percent:     pct,
+			}
+		})
+		if err := installSvc.Apply(ctx, activePlan); err != nil {
+			progressChan <- wizardApplyDoneMsg{err: err}
+			return
+		}
+	}
+
+	// 4. Hacks Phase
+	if hacksSvc != nil && includeHacks && len(matchedHacks) > 0 {
+		totalHacks := len(matchedHacks)
+		for i, hk := range matchedHacks {
+			pct := 80
+			if totalHacks > 0 {
+				pct = 80 + ((i + 1) * 10 / totalHacks)
+			}
+			progressChan <- wizardProgressMsg{
+				StepID:      i + 1,
+				TotalSteps:  totalHacks,
+				Phase:       "Hardware Hacks",
+				Action:      "apply",
+				ResourceID:  hk.ID,
+				Description: hk.Description,
+				Percent:     pct,
+			}
+			_, _ = hacksSvc.Apply(ctx, hk.ID)
+		}
+	}
+
+	// 5. Sync Phase
+	if syncSvc != nil {
+		progressChan <- wizardProgressMsg{
+			StepID:      1,
+			TotalSteps:  1,
+			Phase:       "Dotfile Sync",
+			Action:      "merge",
+			ResourceID:  "dotfiles",
+			Description: "Reconciling dotfiles with 3-way merge...",
+			Percent:     95,
+		}
+		if _, err := syncSvc.Sync(ctx, app.SyncOptions{
+			Force:    destroyerMode,
+			Shell:    selectedShell,
+			Terminal: selectedTerminal,
+		}); err != nil {
+			progressChan <- wizardApplyDoneMsg{err: err}
+			return
+		}
+	}
+
+	progressChan <- wizardProgressMsg{
+		StepID:      1,
+		TotalSteps:  1,
+		Phase:       "Complete",
+		Action:      "done",
+		ResourceID:  "complete",
+		Description: "All components reconciled successfully.",
+		Percent:     100,
+	}
+
+	progressChan <- wizardApplyDoneMsg{err: nil}
 }
 
 // View renders the current stage of the interactive wizard (Bubble Tea v2).
@@ -526,18 +826,12 @@ func (w WizardModel) View() tea.View {
 		body = w.renderSelectEnvironment(availWidth)
 	case StageSelectPackages:
 		body = w.renderSelectPackages(availWidth, availHeight)
+	case StagePlanning:
+		body = w.renderPlanning(availWidth)
 	case StageReviewPlan:
 		body = w.renderReviewPlan(availWidth, availHeight)
 	case StageApplying:
-		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		frame := frames[w.spinnerFrame%len(frames)]
-		spinner := w.styles.Header.Render(frame)
-		title := w.styles.Highlight.Render("Applying planned components and synchronizing dotfiles...")
-		body = fmt.Sprintf("\n  %s  %s\n\n  %s\n  %s",
-			spinner, title,
-			w.styles.Muted.Render("• Executing package installations, hacks, and dotfile reconciliation in background..."),
-			w.styles.Muted.Render("• Please wait, this may take a moment..."),
-		)
+		body = w.renderApplying(availWidth)
 	case StageCompleted:
 		body = w.renderCompleted(availWidth)
 	}
@@ -580,7 +874,7 @@ func (w WizardModel) renderSelectProfile(width int) string {
 		}
 	}
 
-	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Up/Down / j/k] Select  [Enter] Confirm Profile  [h] Toggle Hacks  [q] Quit"))
+	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Up/Down / j/k] Select  [Enter] Confirm Profile  [h] Toggle Hacks  [Esc / q] Quit"))
 	return strings.Join(lines, "\n")
 }
 
@@ -669,7 +963,7 @@ func (w WizardModel) renderSelectEnvironment(width int) string {
 		}
 	}
 
-	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Tab / Left / Right] Switch Focus  [Up/Down / j/k] Navigate  [Space] Select  [Enter] Confirm & Next  [q] Quit"))
+	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Tab / Left / Right] Switch Focus  [Up/Down / j/k] Navigate  [Space] Select  [Enter] Confirm & Next  [Esc] Back  [q] Quit"))
 	return strings.Join(lines, "\n")
 }
 
@@ -680,10 +974,7 @@ func (w WizardModel) renderSelectPackages(width, height int) string {
 		"",
 	}
 
-	availHeight := height - len(headerLines) - 5
-	if availHeight < 5 {
-		availHeight = 5
-	}
+	availHeight := w.visiblePkgLines()
 
 	pkgScrollOffset := AdjustScrollOffset(w.pkgCursor, w.pkgScrollOffset, availHeight, len(w.packages))
 	start := pkgScrollOffset
@@ -733,7 +1024,7 @@ func (w WizardModel) renderSelectPackages(width, height int) string {
 		lines = append(lines, "", fmt.Sprintf("⚡ Include hardware workstation hacks: %s", status))
 	}
 
-	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Up/Down / j/k] Navigate  [Space] Toggle  [h] Toggle Hacks  [Enter] Review Plan  [q] Quit"))
+	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Up/Down / j/k] Navigate  [Space] Toggle  [h] Toggle Hacks  [Enter] Review Plan  [Esc] Back  [q] Quit"))
 	return strings.Join(lines, "\n")
 }
 
@@ -860,9 +1151,9 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 
 	var footer string
 	if totalLines > availHeight {
-		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down] Scroll Plan (%d-%d/%d)  [Enter] Execute  [d] Destroyer  [q] Cancel", offset+1, end, totalLines))
+		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down] Scroll Plan (%d-%d/%d)  [Enter] Execute  [d] Destroyer  [Esc] Back  [q] Cancel", offset+1, end, totalLines))
 	} else {
-		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, or [q] to Cancel.")
+		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, [Esc] Back, or [q] to Cancel.")
 	}
 
 	return strings.Join(append(visibleLines, "", footer), "\n")
@@ -880,4 +1171,91 @@ func (w WizardModel) renderCompleted(width int) string {
 		"Next Steps:",
 		"  • Restart your terminal or run 'zsh' to load new configs.",
 		"  • Run 'anx doctor' anytime to verify your environment health.")
+}
+
+func (w WizardModel) renderPlanning(width int) string {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frame := frames[w.spinnerFrame%len(frames)]
+	spinner := w.styles.Header.Render(frame)
+	title := w.styles.Highlight.Render("Resolving dependency graph and building execution plan...")
+
+	lines := []string{
+		fmt.Sprintf("  %s  %s", spinner, title),
+		"",
+		w.styles.Muted.Render("  • Solving package dependencies and provider execution order..."),
+		w.styles.Muted.Render("  • Inspecting dotfile diffs and drift states across repositories..."),
+		w.styles.Muted.Render("  • Please wait, calculating optimal deterministic plan..."),
+		"",
+		w.styles.Muted.Render("  Navigation: [Esc] Return to Packages"),
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (w WizardModel) renderProgressBar(percent, barWidth int) string {
+	if barWidth < 10 {
+		barWidth = 10
+	}
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	filled := (percent * barWidth) / 100
+	empty := barWidth - filled
+
+	barFilled := strings.Repeat("█", filled)
+	barEmpty := strings.Repeat("░", empty)
+
+	return fmt.Sprintf("[%s%s] %3d%%", w.styles.Header.Render(barFilled), w.styles.Muted.Render(barEmpty), percent)
+}
+
+func (w WizardModel) renderApplying(width int) string {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	frame := frames[w.spinnerFrame%len(frames)]
+	spinner := w.styles.Header.Render(frame)
+
+	phase := w.progressPhase
+	if phase == "" {
+		phase = "Initializing"
+	}
+
+	title := fmt.Sprintf("  %s %s: %s", spinner, w.styles.Header.Render("STAGE 5/5"), w.styles.Highlight.Render(phase))
+
+	barWidth := width - 24
+	if barWidth > 40 {
+		barWidth = 40
+	}
+	if barWidth < 15 {
+		barWidth = 15
+	}
+
+	stepInfo := ""
+	if w.progressTotal > 0 && w.progressStep > 0 {
+		stepInfo = fmt.Sprintf(" (Step %d/%d)", w.progressStep, w.progressTotal)
+	}
+
+	progressBar := w.renderProgressBar(w.progressPercent, barWidth) + w.styles.Muted.Render(stepInfo)
+
+	desc := w.progressDesc
+	if desc == "" {
+		desc = "Preparing operations..."
+	}
+
+	actionBadge := ""
+	if w.progressAction != "" {
+		actionBadge = fmt.Sprintf("[%s] ", strings.ToUpper(w.progressAction))
+	}
+
+	lines := []string{
+		title,
+		"",
+		fmt.Sprintf("  %s", progressBar),
+		"",
+		fmt.Sprintf("  %s%s", w.styles.Success.Render(actionBadge), desc),
+		"",
+		w.styles.Muted.Render("  • Background worker running atomically with transactional journal."),
+		w.styles.Muted.Render("  • Please do not interrupt until operations complete..."),
+	}
+	return strings.Join(lines, "\n")
 }

@@ -63,6 +63,12 @@ type DestroyerService struct {
 	installSvc *InstallService
 	syncSvc    *SyncService
 	store      *state.Store
+	onProgress func(step, total int, item string)
+}
+
+// SetOnProgress sets the callback to report individual purge step completions.
+func (d *DestroyerService) SetOnProgress(h func(step, total int, item string)) {
+	d.onProgress = h
 }
 
 // NewDestroyerService constructs a DestroyerService.
@@ -281,13 +287,29 @@ func (d *DestroyerService) ExecutePurge(
 	}
 
 	// 1. Uninstall managed packages
+	totalPurgeItems := len(plan.PackagesToUninstall) + len(plan.ConfigTargets) + len(plan.ArchiveCleanupPaths) + len(plan.ToolsDirectories) + len(plan.Binaries) + len(plan.CacheDirectories)
+	if purgeState {
+		totalPurgeItems += len(plan.StateDirectories)
+	}
+	purgeStep := 0
+	report := func(item string) {
+		purgeStep++
+		if d.onProgress != nil {
+			d.onProgress(purgeStep, totalPurgeItems, item)
+		}
+	}
+
 	if len(plan.PackagesToUninstall) > 0 && d.installSvc != nil {
-		_ = d.installSvc.Uninstall(ctx, plan.PackagesToUninstall)
+		for _, pkgID := range plan.PackagesToUninstall {
+			report("package: " + pkgID)
+			_ = d.installSvc.Uninstall(ctx, []string{pkgID})
+		}
 		res.UninstalledPackages = len(plan.PackagesToUninstall)
 	}
 
 	// 2. Purge configuration targets with declared markers
 	for _, target := range plan.ConfigTargets {
+		report("config: " + filepath.Base(target))
 		markerStart, markerEnd := "", ""
 		if markers, ok := plan.ConfigMarkers[target]; ok {
 			markerStart = markers[0]
@@ -301,6 +323,7 @@ func (d *DestroyerService) ExecutePurge(
 
 	// 3. Purge archive cleanup paths declared in manifests/archives.yaml
 	for _, target := range plan.ArchiveCleanupPaths {
+		report("archive: " + filepath.Base(target))
 		if err := os.RemoveAll(target); err == nil {
 			res.PurgedConfigs++
 			res.PurgedPaths = append(res.PurgedPaths, target)
@@ -309,6 +332,7 @@ func (d *DestroyerService) ExecutePurge(
 
 	// 4. Purge personal tools directories
 	for _, dir := range plan.ToolsDirectories {
+		report("tool: " + filepath.Base(dir))
 		if err := os.RemoveAll(dir); err == nil {
 			res.PurgedPaths = append(res.PurgedPaths, dir)
 		}
@@ -316,6 +340,7 @@ func (d *DestroyerService) ExecutePurge(
 
 	// 5. Purge platform binaries if discovered
 	for _, binPath := range plan.Binaries {
+		report("binary: " + filepath.Base(binPath))
 		if err := os.Remove(binPath); err == nil {
 			res.PurgedPaths = append(res.PurgedPaths, binPath)
 		}
@@ -323,6 +348,7 @@ func (d *DestroyerService) ExecutePurge(
 
 	// 6. Purge caches
 	for _, dir := range plan.CacheDirectories {
+		report("cache: " + filepath.Base(dir))
 		if err := os.RemoveAll(dir); err == nil {
 			res.PurgedPaths = append(res.PurgedPaths, dir)
 		}
@@ -331,12 +357,13 @@ func (d *DestroyerService) ExecutePurge(
 	// 7. Purge state directories if requested
 	if purgeState {
 		for _, dir := range plan.StateDirectories {
+			report("state: " + filepath.Base(dir))
 			if err := os.RemoveAll(dir); err == nil {
 				res.PurgedPaths = append(res.PurgedPaths, dir)
 			}
 		}
 	} else if d.store != nil {
-		// Reset store records without deleting directory structure
+		report("state store reset")
 		_ = d.store.Reset()
 	}
 

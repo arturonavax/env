@@ -211,11 +211,21 @@ func TestWizardModelWorkflow(t *testing.T) {
 	nm, _ = w.Update(tea.KeyPressMsg{Text: " "})
 	w = nm.(WizardModel)
 
-	// Enter advances to StageReviewPlan
-	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	// Enter advances to StagePlanning asynchronously
+	nm, cmd := w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StagePlanning {
+		t.Fatalf("expected StagePlanning after enter, got %v", w.stage)
+	}
+	if cmd == nil {
+		t.Fatalf("expected non-nil tea.Cmd for async planning")
+	}
+
+	// Deliver wizardPlanDoneMsg
+	nm, _ = w.Update(wizardPlanDoneMsg{plan: nil, diffs: nil, err: nil})
 	w = nm.(WizardModel)
 	if w.stage != StageReviewPlan {
-		t.Fatalf("expected StageReviewPlan after enter, got %v", w.stage)
+		t.Fatalf("expected StageReviewPlan after plan done, got %v", w.stage)
 	}
 
 	// View renders without panic
@@ -381,8 +391,18 @@ func TestWizardScrollAndAsyncApply(t *testing.T) {
 		t.Fatalf("expected stage 3 view")
 	}
 
-	// Advance to Review Plan
-	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	// Advance to Review Plan via StagePlanning
+	nm, cmdPlan := w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StagePlanning {
+		t.Fatalf("expected StagePlanning after enter on StageSelectPackages, got %v", w.stage)
+	}
+	if cmdPlan == nil {
+		t.Fatalf("expected non-nil tea.Cmd for async planning")
+	}
+
+	// Deliver wizardPlanDoneMsg
+	nm, _ = w.Update(wizardPlanDoneMsg{plan: nil, diffs: nil, err: nil})
 	w = nm.(WizardModel)
 	if w.stage != StageReviewPlan {
 		t.Fatalf("expected StageReviewPlan, got %v", w.stage)
@@ -410,10 +430,29 @@ func TestWizardScrollAndAsyncApply(t *testing.T) {
 		t.Fatalf("expected non-nil tea.Cmd for async execution")
 	}
 
-	// Check applying view has spinner / progress text
+	// Check applying view has STAGE 5/5
 	applyingView := w.View().Content
-	if !strings.Contains(applyingView, "Applying planned components") {
-		t.Fatalf("expected applying view message, got: %s", applyingView)
+	if !strings.Contains(applyingView, "STAGE 5/5") {
+		t.Fatalf("expected STAGE 5/5 in applying view message, got: %s", applyingView)
+	}
+
+	// Deliver progress message
+	nm, _ = w.Update(wizardProgressMsg{
+		StepID:      3,
+		TotalSteps:  10,
+		Phase:       "Purging (Destroyer)",
+		Action:      "purge",
+		ResourceID:  "nvim",
+		Description: "Purging ~/.config/nvim",
+		Percent:     30,
+	})
+	w = nm.(WizardModel)
+	if w.progressPercent != 30 {
+		t.Fatalf("expected progressPercent 30, got %d", w.progressPercent)
+	}
+	progView := w.View().Content
+	if !strings.Contains(progView, "30%") || !strings.Contains(progView, "Purging (Destroyer)") {
+		t.Fatalf("expected progress and phase in applying view, got: %s", progView)
 	}
 
 	// Deliver completion message
@@ -425,5 +464,59 @@ func TestWizardScrollAndAsyncApply(t *testing.T) {
 	completedView := w.View().Content
 	if !strings.Contains(completedView, "SUCCESSFULLY") {
 		t.Fatalf("expected success message in completedView, got: %s", completedView)
+	}
+}
+
+func TestWizardEscBackwardNavigation(t *testing.T) {
+	deps := newTestDeps(t)
+	wiz := NewWizardModel(deps.Platform, deps.Catalog, nil)
+
+	// Stage 1 (Profile) -> Stage 2 (Environment)
+	nm, _ := wiz.Update(tea.KeyPressMsg{Text: "enter"})
+	w := nm.(WizardModel)
+	if w.stage != StageSelectEnvironment {
+		t.Fatalf("expected StageSelectEnvironment, got %v", w.stage)
+	}
+
+	// Stage 2 (Environment) -> Stage 3 (Packages)
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StageSelectPackages {
+		t.Fatalf("expected StageSelectPackages, got %v", w.stage)
+	}
+
+	// Stage 3 (Packages) -> StagePlanning
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "enter"})
+	w = nm.(WizardModel)
+	if w.stage != StagePlanning {
+		t.Fatalf("expected StagePlanning, got %v", w.stage)
+	}
+
+	// Esc in StagePlanning -> returns to StageSelectPackages
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "esc"})
+	w = nm.(WizardModel)
+	if w.stage != StageSelectPackages {
+		t.Fatalf("expected StageSelectPackages after esc on StagePlanning, got %v", w.stage)
+	}
+
+	// Esc in StageSelectPackages -> returns to StageSelectEnvironment
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "esc"})
+	w = nm.(WizardModel)
+	if w.stage != StageSelectEnvironment {
+		t.Fatalf("expected StageSelectEnvironment after esc on StageSelectPackages, got %v", w.stage)
+	}
+
+	// Esc in StageSelectEnvironment -> returns to StageSelectProfile
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "esc"})
+	w = nm.(WizardModel)
+	if w.stage != StageSelectProfile {
+		t.Fatalf("expected StageSelectProfile after esc on StageSelectEnvironment, got %v", w.stage)
+	}
+
+	// Esc in StageSelectProfile -> quits
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "esc"})
+	w = nm.(WizardModel)
+	if !w.quitting {
+		t.Fatalf("expected quitting to be true after esc on StageSelectProfile")
 	}
 }
