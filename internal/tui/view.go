@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
+	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/security"
 )
 
@@ -100,6 +101,28 @@ func (m Model) renderStatusBar() string {
 }
 
 func (m Model) renderOverview(w, h int) string {
+	// 1. Health Status Calculations & Badges
+	fails := 0
+	warns := 0
+	for _, c := range m.doctorChecks {
+		if c.Verdict == app.VerdictFail {
+			fails++
+		} else if c.Verdict == app.VerdictWarn {
+			warns++
+		}
+	}
+
+	var healthBanner string
+	if len(m.doctorChecks) == 0 {
+		healthBanner = m.styles.Muted.Render("⟳ HEALTH CHECK: DIAGNOSING ENVIRONMENT...")
+	} else if fails == 0 && warns == 0 {
+		healthBanner = m.styles.Success.Render("● HEALTH STATUS: ALL SYSTEMS NOMINAL [OPTIMAL]")
+	} else if fails > 0 {
+		healthBanner = m.styles.Error.Render(fmt.Sprintf("✖ HEALTH STATUS: %d CRITICAL ISSUE(S) DETECTED", fails))
+	} else {
+		healthBanner = m.styles.Warning.Render(fmt.Sprintf("▲ HEALTH STATUS: %d WARNING(S) FOUND", warns))
+	}
+
 	if m.isWideLayout() {
 		leftW, rightW := m.calculateDualPaneWidths()
 		p := m.deps.Platform
@@ -127,9 +150,11 @@ func (m Model) renderOverview(w, h int) string {
 		}
 
 		rightLines := []string{
+			healthBanner,
+			"",
 			m.styles.Highlight.Render("ENVIRONMENT METRICS & HEALTH"),
-			fmt.Sprintf("• Managed Packages: %d registered", len(m.packages)),
-			fmt.Sprintf("• Managed Configs:  %d assets in files/", len(m.configs)),
+			fmt.Sprintf("• Tools & Packages: %d registered (%d tools, %d deps)", len(m.packages), len(m.tools), len(m.depsList)),
+			fmt.Sprintf("• Managed Configs:  %d assets in files/ (%d integrated)", len(m.configs), len(m.integratedConfigs)),
 			fmt.Sprintf("• Detected Hacks:   %d system tweaks", len(m.detectedHacks)),
 			fmt.Sprintf("• Active Palette:   %s", m.styles.Palette.Name),
 			"",
@@ -145,28 +170,117 @@ func (m Model) renderOverview(w, h int) string {
 			rightLines = append(rightLines, fmt.Sprintf(" %s %s: %s", icon, c.Name, c.Message))
 		}
 
+		// 2. Background Update & Upgrade Check Findings
+		rightLines = append(rightLines, "", m.styles.Highlight.Render("UPDATES & SYNCHRONIZATION (BACKGROUND)"))
+		if m.updateCheck != nil {
+			if m.updateCheck.HasUpdates {
+				if m.updateCheck.RepoBehind > 0 {
+					rightLines = append(rightLines, m.styles.Warning.Render(fmt.Sprintf("• Git Repository:  %d commit(s) behind remote (run 'anx upgrade')", m.updateCheck.RepoBehind)))
+				}
+				if m.updateCheck.ConfigDrifts > 0 {
+					rightLines = append(rightLines, m.styles.Warning.Render(fmt.Sprintf("• Dotfile Drifts:  %d configuration drift(s) detected (run 'anx sync')", m.updateCheck.ConfigDrifts)))
+				}
+			} else {
+				cleanMsg := "clean"
+				if !m.updateCheck.RepoClean {
+					cleanMsg = "uncommitted local changes"
+				}
+				branch := m.updateCheck.RepoBranch
+				if branch == "" {
+					branch = "main"
+				}
+				rightLines = append(rightLines,
+					m.styles.Success.Render(fmt.Sprintf("✓ Repository:      [%s, %s] up to date", branch, cleanMsg)),
+					m.styles.Success.Render("✓ Dotfiles:        All configuration assets synchronized"),
+				)
+			}
+		} else {
+			rightLines = append(rightLines, m.styles.Muted.Render("⟳ Checking repository commits & dotfile drifts in background..."))
+		}
+
 		leftPanel := BuildPanel(m.styles, leftLines, leftW, h, m.focusedPanel == "left")
 		rightPanel := BuildPanel(m.styles, rightLines, rightW, h, m.focusedPanel == "right")
 		return JoinHorizontal(leftPanel, rightPanel, 2)
 	}
 
 	lines := []string{
+		healthBanner,
+		"",
 		m.styles.Highlight.Render("SYSTEM OVERVIEW"),
 		fmt.Sprintf("OS: %s | Arch: %s | Distro: %s", m.deps.Platform.OS(), m.deps.Platform.Arch(), m.deps.Platform.Distribution()),
-		fmt.Sprintf("Packages: %d | Configs: %d | Hacks: %d", len(m.packages), len(m.configs), len(m.detectedHacks)),
+		fmt.Sprintf("Packages: %d (%d tools, %d deps) | Configs: %d | Hacks: %d", len(m.packages), len(m.tools), len(m.depsList), len(m.configs), len(m.detectedHacks)),
 		"",
 		m.styles.Highlight.Render("HEALTH CHECKS"),
 	}
 	for _, c := range m.doctorChecks {
 		lines = append(lines, fmt.Sprintf("• %s: %s", c.Name, c.Message))
 	}
+	if m.updateCheck != nil {
+		lines = append(lines, "", m.styles.Highlight.Render("UPDATES & SYNCHRONIZATION"))
+		if m.updateCheck.HasUpdates {
+			if m.updateCheck.RepoBehind > 0 {
+				lines = append(lines, m.styles.Warning.Render(fmt.Sprintf("• Repo: %d commit(s) behind (run 'anx upgrade')", m.updateCheck.RepoBehind)))
+			}
+			if m.updateCheck.ConfigDrifts > 0 {
+				lines = append(lines, m.styles.Warning.Render(fmt.Sprintf("• Drifts: %d configuration drift(s) (run 'anx sync')", m.updateCheck.ConfigDrifts)))
+			}
+		} else {
+			lines = append(lines, m.styles.Success.Render("✓ Repository and dotfiles are fully up to date"))
+		}
+	}
+	return BuildPanel(m.styles, lines, w, h, true)
+}
+
+func (m Model) renderPackageDetail(pkg domain.ManagedResource, requiredBy map[string][]string, w, h int) string {
+	var lines []string
+	header := m.styles.Header.Render(fmt.Sprintf("PACKAGE DEPENDENCY INSPECTOR: %s (%s)", pkg.Name, pkg.ID))
+	lines = append(lines, header, "")
+
+	lines = append(lines, fmt.Sprintf("• Category:    %s", pkg.Category))
+	statusStr := m.styles.Success.Render("[Available]")
+	if pkg.Deprecated {
+		statusStr = m.styles.Warning.Render("[Deprecated]")
+	}
+	lines = append(lines, fmt.Sprintf("• Status:      %s", statusStr))
+	if pkg.BinaryName != "" {
+		lines = append(lines, fmt.Sprintf("• Binary:      %s", pkg.BinaryName))
+	}
+	if pkg.Ecosystem != "" {
+		lines = append(lines, fmt.Sprintf("• Ecosystem:   %s", pkg.Ecosystem))
+	}
+	lines = append(lines, fmt.Sprintf("• Description: %s", pkg.Description))
+	lines = append(lines, "")
+
+	// 1. Dependencies that this package requires
+	lines = append(lines, m.styles.Highlight.Render("DEPENDENCIES REQUIRED (DependsOn):"))
+	if len(pkg.DependsOn) > 0 {
+		for _, dep := range pkg.DependsOn {
+			lines = append(lines, fmt.Sprintf("  • %-16s (declared prerequisite)", dep))
+		}
+	} else {
+		lines = append(lines, m.styles.Muted.Render("  None (Standalone component without prerequisite packages)"))
+	}
+	lines = append(lines, "")
+
+	// 2. Tools or packages that depend on this package
+	lines = append(lines, m.styles.Highlight.Render("REQUIRED AS DEPENDENCY BY (Tools depending on this):"))
+	dependents := requiredBy[pkg.ID]
+	if len(dependents) > 0 {
+		for _, parent := range dependents {
+			lines = append(lines, fmt.Sprintf("  • %-16s (requires %s to function)", parent, pkg.ID))
+		}
+	} else {
+		lines = append(lines, m.styles.Muted.Render("  None (Direct tool / Root component, not required by others)"))
+	}
+	lines = append(lines, "")
+
+	lines = append(lines, m.styles.Highlight.Render("NAVIGATION:"))
+	lines = append(lines, "• Press [Enter] or [Esc] to return to packages list")
+
 	return BuildPanel(m.styles, lines, w, h, true)
 }
 
 func (m Model) renderPackages(w, h int) string {
-	header := m.styles.Highlight.Render(fmt.Sprintf("MANAGED PACKAGES & SYSTEM TOOLCHAINS (%d/%d)", m.selectedIdx+1, len(m.packages)))
-	items := make([]string, 0, len(m.packages))
-
 	requiredBy := make(map[string][]string)
 	for _, p := range m.packages {
 		for _, dep := range p.DependsOn {
@@ -174,77 +288,200 @@ func (m Model) renderPackages(w, h int) string {
 		}
 	}
 
-	for i, p := range m.packages {
+	if m.inspectingPackage != nil {
+		return m.renderPackageDetail(*m.inspectingPackage, requiredBy, w, h)
+	}
+
+	if m.isWideLayout() {
+		leftW, rightW := m.calculateDualPaneWidths()
+
+		// Left Panel: TOOLS
+		leftHeader := m.styles.Highlight.Render(fmt.Sprintf("TOOLS (%d/%d) — Press [Enter] to inspect", m.toolsSelectedIdx+1, len(m.tools)))
+		toolItems := make([]string, 0, len(m.tools))
+		for i, p := range m.tools {
+			prefix := "  "
+			if m.focusedPanel == "left" && i == m.toolsSelectedIdx {
+				prefix = "> "
+			}
+			statusTag := m.styles.Success.Render("[Available]")
+			if p.Deprecated {
+				statusTag = m.styles.Warning.Render("[Deprecated]")
+			}
+			kindBadge := m.styles.Highlight.Render("[Tool]")
+			// Clean description without inline (dep of: ...) or (requires: ...)
+			row := fmt.Sprintf("%s%s %-15s %-10s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+			if m.focusedPanel == "left" && i == m.toolsSelectedIdx {
+				toolItems = append(toolItems, m.styles.RenderSelectedRow(row))
+			} else {
+				toolItems = append(toolItems, row)
+			}
+		}
+
+		// Right Panel: DEPENDENCIES
+		rightHeader := m.styles.Highlight.Render(fmt.Sprintf("DEPENDENCIES (%d/%d) — Press [Enter] to inspect", m.depsSelectedIdx+1, len(m.depsList)))
+		depItems := make([]string, 0, len(m.depsList))
+		for i, p := range m.depsList {
+			prefix := "  "
+			if m.focusedPanel == "right" && i == m.depsSelectedIdx {
+				prefix = "> "
+			}
+			statusTag := m.styles.Success.Render("[Available]")
+			if p.Deprecated {
+				statusTag = m.styles.Warning.Render("[Deprecated]")
+			}
+			kindBadge := m.styles.Muted.Render("[Dep] ")
+			// Clean description without inline (dep of: ...) or (requires: ...)
+			row := fmt.Sprintf("%s%s %-15s %-12s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+			if m.focusedPanel == "right" && i == m.depsSelectedIdx {
+				depItems = append(depItems, m.styles.RenderSelectedRow(row))
+			} else {
+				depItems = append(depItems, row)
+			}
+		}
+
+		leftPanel := BuildScrollablePanel(m.styles, []string{leftHeader}, toolItems, m.toolsSelectedIdx, m.toolsScrollOffset, leftW, h, m.focusedPanel == "left")
+		rightPanel := BuildScrollablePanel(m.styles, []string{rightHeader}, depItems, m.depsSelectedIdx, m.depsScrollOffset, rightW, h, m.focusedPanel == "right")
+		return JoinHorizontal(leftPanel, rightPanel, 2)
+	}
+
+	// Narrow layout (single panel with active section)
+	activeItems := m.tools
+	activeIdx := m.toolsSelectedIdx
+	activeOffset := m.toolsScrollOffset
+	activeTitle := fmt.Sprintf("[ TOOLS (%d) ]   Dependencies (%d) — [h/l to switch, Enter to inspect]", len(m.tools), len(m.depsList))
+	if m.focusedPanel == "right" {
+		activeItems = m.depsList
+		activeIdx = m.depsSelectedIdx
+		activeOffset = m.depsScrollOffset
+		activeTitle = fmt.Sprintf("Tools (%d)   [ DEPENDENCIES (%d) ] — [h/l to switch, Enter to inspect]", len(m.tools), len(m.depsList))
+	}
+
+	header := m.styles.Highlight.Render(activeTitle)
+	items := make([]string, 0, len(activeItems))
+	for i, p := range activeItems {
 		prefix := "  "
-		if i == m.selectedIdx {
+		if i == activeIdx {
 			prefix = "> "
 		}
 		statusTag := m.styles.Success.Render("[Available]")
 		if p.Deprecated {
 			statusTag = m.styles.Warning.Render("[Deprecated]")
 		}
-
-		isDirect := p.IsDirectTool(requiredBy)
 		kindBadge := m.styles.Highlight.Render("[Tool]")
-		depInfo := ""
-		if !isDirect {
-			kindBadge = m.styles.Muted.Render("[Dep]")
-			if len(requiredBy[p.ID]) > 0 {
-				depInfo = fmt.Sprintf(" (dep of: %s)", strings.Join(requiredBy[p.ID], ", "))
-			} else if strings.Contains(p.Category, "build") || p.ID == "build-essential" || p.ID == "cmake" || p.ID == "pkg-config" {
-				depInfo = " (build dependency)"
-			} else if strings.Contains(p.Category, "lib") || strings.HasSuffix(p.ID, "-dev") {
-				depInfo = " (library dependency)"
-			} else {
-				depInfo = " (system prerequisite)"
-			}
-		} else if len(p.DependsOn) > 0 {
-			depInfo = fmt.Sprintf(" (requires: %s)", strings.Join(p.DependsOn, ", "))
+		if !p.IsDirectTool(requiredBy) {
+			kindBadge = m.styles.Muted.Render("[Dep] ")
 		}
-
-		row := fmt.Sprintf("%s%s %-14s %-10s %s : %s%s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description, depInfo)
-		if i == m.selectedIdx {
+		row := fmt.Sprintf("%s%s %-15s %-10s %s  %s", prefix, kindBadge, p.ID, p.Category, statusTag, p.Description)
+		if i == activeIdx {
 			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
 	}
-	return BuildScrollablePanel(m.styles, []string{header}, items, m.selectedIdx, m.scrollOffset, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, activeIdx, activeOffset, w, h, true)
 }
 
 func (m Model) renderConfigs(w, h int) string {
-	header := m.styles.Highlight.Render(fmt.Sprintf("MANAGED CONFIGURATION ASSETS (%d/%d)", m.selectedIdx+1, len(m.configs)))
-	items := make([]string, 0, len(m.configs))
-	for i, c := range m.configs {
-		prefix := "  "
-		if i == m.selectedIdx {
-			prefix = "> "
+	if m.isWideLayout() {
+		leftW, rightW := m.calculateDualPaneWidths()
+
+		// Left Panel: INTEGRATED
+		leftHeader := m.styles.Highlight.Render(fmt.Sprintf("INTEGRATED CONFIGURATIONS (%d/%d)", m.intConfigsSelectedIdx+1, len(m.integratedConfigs)))
+		intItems := make([]string, 0, len(m.integratedConfigs))
+		for i, c := range m.integratedConfigs {
+			prefix := "  "
+			if m.focusedPanel == "left" && i == m.intConfigsSelectedIdx {
+				prefix = "> "
+			}
+			statusTag := m.styles.Success.Render("[Integrated ✓]")
+			grp := c.Group
+			if grp == "" {
+				grp = "misc"
+			}
+			groupBadge := m.styles.Muted.Render(fmt.Sprintf("[%s]", grp))
+			row := fmt.Sprintf("%s%-18s %s %-12s %-20s -> %s", prefix, c.ID, statusTag, groupBadge, c.Source, c.Target)
+			if m.focusedPanel == "left" && i == m.intConfigsSelectedIdx {
+				intItems = append(intItems, m.styles.RenderSelectedRow(row))
+			} else {
+				intItems = append(intItems, row)
+			}
 		}
 
+		// Right Panel: NOT INTEGRATED
+		rightHeader := m.styles.Highlight.Render(fmt.Sprintf("NOT INTEGRATED CONFIGURATIONS (%d/%d)", m.notIntConfigsSelectedIdx+1, len(m.notIntegratedConfigs)))
+		notIntItems := make([]string, 0, len(m.notIntegratedConfigs))
+		for i, c := range m.notIntegratedConfigs {
+			prefix := "  "
+			if m.focusedPanel == "right" && i == m.notIntConfigsSelectedIdx {
+				prefix = "> "
+			}
+			statusTag := m.styles.Muted.Render("[Not Integrated ✗]")
+			if c.Deprecated {
+				statusTag += " " + m.styles.Warning.Render("[Deprecated]")
+			}
+			grp := c.Group
+			if grp == "" {
+				grp = "misc"
+			}
+			groupBadge := m.styles.Muted.Render(fmt.Sprintf("[%s]", grp))
+			row := fmt.Sprintf("%s%-18s %s %-12s %-20s -> %s", prefix, c.ID, statusTag, groupBadge, c.Source, c.Target)
+			if m.focusedPanel == "right" && i == m.notIntConfigsSelectedIdx {
+				notIntItems = append(notIntItems, m.styles.RenderSelectedRow(row))
+			} else {
+				notIntItems = append(notIntItems, row)
+			}
+		}
+
+		leftPanel := BuildScrollablePanel(m.styles, []string{leftHeader}, intItems, m.intConfigsSelectedIdx, m.intConfigsScrollOffset, leftW, h, m.focusedPanel == "left")
+		rightPanel := BuildScrollablePanel(m.styles, []string{rightHeader}, notIntItems, m.notIntConfigsSelectedIdx, m.notIntConfigsScrollOffset, rightW, h, m.focusedPanel == "right")
+		return JoinHorizontal(leftPanel, rightPanel, 2)
+	}
+
+	// Narrow layout
+	activeConfigs := m.integratedConfigs
+	activeIdx := m.intConfigsSelectedIdx
+	activeOffset := m.intConfigsScrollOffset
+	activeTitle := fmt.Sprintf("[ INTEGRATED (%d) ]   Not Integrated (%d) — [h/l to switch]", len(m.integratedConfigs), len(m.notIntegratedConfigs))
+	if m.focusedPanel == "right" {
+		activeConfigs = m.notIntegratedConfigs
+		activeIdx = m.notIntConfigsSelectedIdx
+		activeOffset = m.notIntConfigsScrollOffset
+		activeTitle = fmt.Sprintf("Integrated (%d)   [ NOT INTEGRATED (%d) ] — [h/l to switch]", len(m.integratedConfigs), len(m.notIntegratedConfigs))
+	}
+
+	header := m.styles.Highlight.Render(activeTitle)
+	items := make([]string, 0, len(activeConfigs))
+	for i, c := range activeConfigs {
+		prefix := "  "
+		if i == activeIdx {
+			prefix = "> "
+		}
+		var statusTag string
 		targetPath := c.Target
 		if m.deps.Platform != nil {
 			targetPath = m.deps.Platform.ExpandPath(c.TargetForOS(m.deps.Platform.OS()))
 		}
-
-		var statusTag string
 		if fi, err := os.Lstat(targetPath); err == nil && fi != nil {
 			statusTag = m.styles.Success.Render("[Integrated ✓]")
 		} else {
 			statusTag = m.styles.Muted.Render("[Not Integrated ✗]")
 		}
-
 		if c.Deprecated {
 			statusTag += " " + m.styles.Warning.Render("[Deprecated]")
 		}
-
-		row := fmt.Sprintf("%s%-18s %s  %-24s -> %s", prefix, c.ID, statusTag, c.Source, c.Target)
-		if i == m.selectedIdx {
+		grp := c.Group
+		if grp == "" {
+			grp = "misc"
+		}
+		groupBadge := m.styles.Muted.Render(fmt.Sprintf("[%s]", grp))
+		row := fmt.Sprintf("%s%-18s %s %-12s %-20s -> %s", prefix, c.ID, statusTag, groupBadge, c.Source, c.Target)
+		if i == activeIdx {
 			items = append(items, m.styles.RenderSelectedRow(row))
 		} else {
 			items = append(items, row)
 		}
 	}
-	return BuildScrollablePanel(m.styles, []string{header}, items, m.selectedIdx, m.scrollOffset, w, h, true)
+	return BuildScrollablePanel(m.styles, []string{header}, items, activeIdx, activeOffset, w, h, true)
 }
 
 func (m Model) renderAI(w, h int) string {

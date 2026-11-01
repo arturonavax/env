@@ -184,6 +184,9 @@ func TestIsDirectTool(t *testing.T) {
 		{ID: "eza", Category: "cli-tools"},
 		{ID: "git", Category: "core"},
 		{ID: "rtk", Category: "ai"},
+		{ID: "make", Category: "devtools"},
+		{ID: "fzf", Category: "cli-tools"},
+		{ID: "anx", Category: "core"},
 	}
 
 	for _, tool := range directTools {
@@ -198,11 +201,9 @@ func TestIsDirectTool(t *testing.T) {
 		{ID: "bz2-dev", Category: "core-libs"},
 		{ID: "ca-certificates", Category: "core"},
 		{ID: "libssl-dev", Category: "core-libs"},
-		{ID: "make", Category: "core-build"},
 		{ID: "gcc", Category: "core-build"},
 		{ID: "cmake", Category: "core-build"},
 		{ID: "fontconfig", Category: "desktop-libs"},
-		{ID: "fzf", Category: "cli-tools"}, // in requiredBy
 	}
 
 	for _, dep := range dependencies {

@@ -102,3 +102,13 @@ tools:
     version_args: ["--version"]
     repo_url: "https://github.com/arturonavax/env"
     update_strategy: "anx_self"
+
+  - id: kos
+    name: "KOS Agent Orchestrator"
+    category: "ai"
+    description: "Autonomous multi-agent orchestration runtime and workflow manager"
+    executable: "kos"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "go"
+    version_args: ["--version"]

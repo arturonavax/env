@@ -116,46 +116,65 @@ type ManagedResource struct {
 	Archived         bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
 }
 
-// IsDirectTool reports whether this resource is a direct interactive user tool (e.g. Ghostty, Herdr, Neovim, LazyGit, Zsh, Atuin, Bat, Fd),
-// as opposed to a dependency (libraries, headers, build essentials, system prerequisites, or required by other packages).
-func (r ManagedResource) IsDirectTool(requiredBy map[string][]string) bool {
-	if len(requiredBy[r.ID]) > 0 {
-		return false
-	}
+// DirectToolsSet contains the authoritative canonical list of direct tools managed by anx.
+// Any resource with an ID in this set is a Tool; everything else is classified as a Dependency.
+var DirectToolsSet = map[string]struct{}{
+	"anx":             {},
+	"atuin":           {},
+	"bat":             {},
+	"claude-code":     {},
+	"codex-cli":       {},
+	"curl":            {},
+	"delta":           {},
+	"delve":           {},
+	"direnv":          {},
+	"eza":             {},
+	"fd":              {},
+	"fnm":             {},
+	"fx":              {},
+	"fzf":             {},
+	"ghostty":         {},
+	"git":             {},
+	"gofumpt":         {},
+	"golang":          {},
+	"golangci-lint":   {},
+	"gopls":           {},
+	"govulncheck":     {},
+	"herdr":           {},
+	"htop":            {},
+	"jq":              {},
+	"just":            {},
+	"lazygit":         {},
+	"make":            {},
+	"neovim":          {},
+	"opencode":        {},
+	"pipx":            {},
+	"pnpm":            {},
+	"pyenv":           {},
+	"python3":         {},
+	"resync":          {},
+	"ripgrep":         {},
+	"rtk":             {},
+	"shellcheck":      {},
+	"shellharden":     {},
+	"shfmt":           {},
+	"starship":        {},
+	"stylua":          {},
+	"tealdeer":        {},
+	"tree":            {},
+	"tree-sitter-cli": {},
+	"usql":            {},
+	"wget":            {},
+	"xclip":           {},
+	"zip":             {},
+	"zoxide":          {},
+	"zsh":             {},
+}
 
-	switch r.Category {
-	case "core-build", "core-libs", "desktop-libs", "system-libs":
-		return false
-	}
-
-	id := strings.ToLower(r.ID)
-	if strings.HasSuffix(id, "-dev") || strings.HasSuffix(id, "-devel") ||
-		strings.HasSuffix(id, "-headers") || strings.HasSuffix(id, "-libs") ||
-		strings.HasPrefix(id, "lib") || strings.Contains(id, "certificate") ||
-		strings.Contains(id, "build-essential") || strings.Contains(id, "binutils") {
-		return false
-	}
-
-	switch id {
-	case "make", "gcc", "clang", "bison", "flex", "cmake", "pkg-config", "fontconfig", "ca-certificates", "gnupg":
-		return false
-	}
-
-	if r.Category == "core" {
-		switch id {
-		case "git", "curl", "jq", "anx":
-			return true
-		default:
-			return false
-		}
-	}
-
-	switch r.Category {
-	case "terminal", "editor", "shell", "cli-tools", "devtools", "ai", "toolchains":
-		return true
-	}
-
-	return false
+// IsDirectTool reports whether this resource is a direct interactive user tool as defined in DirectToolsSet.
+func (r ManagedResource) IsDirectTool(_ map[string][]string) bool {
+	_, ok := DirectToolsSet[strings.ToLower(r.ID)]
+	return ok
 }
 
 // ConfigurationResource represents a managed dotfile, directory tree, or shell marker block.

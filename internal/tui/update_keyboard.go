@@ -17,12 +17,61 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "q", "ctrl+c":
+		if m.inspectingPackage != nil {
+			m.inspectingPackage = nil
+			return m, nil
+		}
 		m.quitting = true
 		return m, tea.Quit
 
 	case "?":
 		m.showHelp = !m.showHelp
 		return m, nil
+
+	case "enter":
+		if m.inspectingPackage != nil {
+			m.inspectingPackage = nil
+			return m, nil
+		}
+		if m.activeTab == TabPackages {
+			if m.focusedPanel == "right" && len(m.depsList) > 0 && m.depsSelectedIdx < len(m.depsList) {
+				pkg := m.depsList[m.depsSelectedIdx]
+				m.inspectingPackage = &pkg
+				return m, nil
+			}
+			if len(m.tools) > 0 && m.toolsSelectedIdx < len(m.tools) {
+				pkg := m.tools[m.toolsSelectedIdx]
+				m.inspectingPackage = &pkg
+				return m, nil
+			}
+		}
+
+	case "esc":
+		if m.inspectingPackage != nil {
+			m.inspectingPackage = nil
+			return m, nil
+		}
+		if m.showHelp {
+			m.showHelp = false
+			return m, nil
+		}
+
+	case "ctrl+d":
+		halfPage := max(1, m.visibleItemLines()/2)
+		m.selectedIdx += halfPage
+		maxIdx := m.maxSelectedIndex()
+		if m.selectedIdx > maxIdx {
+			m.selectedIdx = maxIdx
+		}
+		m.adjustScroll()
+
+	case "ctrl+u":
+		halfPage := max(1, m.visibleItemLines()/2)
+		m.selectedIdx -= halfPage
+		if m.selectedIdx < 0 {
+			m.selectedIdx = 0
+		}
+		m.adjustScroll()
 
 	case "tab":
 		m.activeTab = (m.activeTab + 1) % 8
@@ -89,9 +138,23 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case "h", "left":
 		m.focusedPanel = "left"
+		if m.activeTab == TabPackages {
+			m.selectedIdx = m.toolsSelectedIdx
+			m.scrollOffset = m.toolsScrollOffset
+		} else if m.activeTab == TabConfigs {
+			m.selectedIdx = m.intConfigsSelectedIdx
+			m.scrollOffset = m.intConfigsScrollOffset
+		}
 
 	case "l", "right":
 		m.focusedPanel = "right"
+		if m.activeTab == TabPackages {
+			m.selectedIdx = m.depsSelectedIdx
+			m.scrollOffset = m.depsScrollOffset
+		} else if m.activeTab == TabConfigs {
+			m.selectedIdx = m.notIntConfigsSelectedIdx
+			m.scrollOffset = m.notIntConfigsScrollOffset
+		}
 
 	case "a":
 		m.accordionMode = !m.accordionMode
@@ -162,10 +225,28 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) maxSelectedIndex() int {
 	switch m.activeTab {
 	case TabPackages:
+		if m.focusedPanel == "right" {
+			if len(m.depsList) > 0 {
+				return len(m.depsList) - 1
+			}
+			return 0
+		}
+		if len(m.tools) > 0 {
+			return len(m.tools) - 1
+		}
 		if len(m.packages) > 0 {
 			return len(m.packages) - 1
 		}
 	case TabConfigs:
+		if m.focusedPanel == "right" {
+			if len(m.notIntegratedConfigs) > 0 {
+				return len(m.notIntegratedConfigs) - 1
+			}
+			return 0
+		}
+		if len(m.integratedConfigs) > 0 {
+			return len(m.integratedConfigs) - 1
+		}
 		if len(m.configs) > 0 {
 			return len(m.configs) - 1
 		}
@@ -192,6 +273,23 @@ func (m *Model) adjustScroll() {
 	visibleLines := m.visibleItemLines()
 	totalItems := m.maxSelectedIndex() + 1
 	m.scrollOffset = AdjustScrollOffset(m.selectedIdx, m.scrollOffset, visibleLines, totalItems)
+	if m.activeTab == TabPackages {
+		if m.focusedPanel == "right" {
+			m.depsSelectedIdx = m.selectedIdx
+			m.depsScrollOffset = m.scrollOffset
+		} else {
+			m.toolsSelectedIdx = m.selectedIdx
+			m.toolsScrollOffset = m.scrollOffset
+		}
+	} else if m.activeTab == TabConfigs {
+		if m.focusedPanel == "right" {
+			m.notIntConfigsSelectedIdx = m.selectedIdx
+			m.notIntConfigsScrollOffset = m.scrollOffset
+		} else {
+			m.intConfigsSelectedIdx = m.selectedIdx
+			m.intConfigsScrollOffset = m.scrollOffset
+		}
+	}
 }
 
 func (m Model) visibleItemLines() int {

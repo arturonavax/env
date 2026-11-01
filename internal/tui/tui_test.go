@@ -641,3 +641,140 @@ func TestRenderSelectedRowContrast(t *testing.T) {
 		t.Fatalf("expected inner ANSI color codes to be stripped in RenderSelectedRow, got: %q", rendered)
 	}
 }
+
+func TestDashboardPackagesPinCoreAnxAndSorting(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+
+	if len(m.tools) == 0 {
+		t.Fatalf("expected registered tools, got 0")
+	}
+	if m.tools[0].ID != "anx" {
+		t.Fatalf("expected anx to be pinned at index 0 of tools, got %s", m.tools[0].ID)
+	}
+	if len(m.packages) == 0 || m.packages[0].ID != "anx" {
+		t.Fatalf("expected anx to be pinned at index 0 of packages, got %s", m.packages[0].ID)
+	}
+
+	// Verify categories are sorted in tools
+	for i := 1; i < len(m.tools)-1; i++ {
+		curr := m.tools[i]
+		next := m.tools[i+1]
+		if curr.Category > next.Category {
+			t.Errorf("tools not sorted by category: %s (%s) > %s (%s)", curr.ID, curr.Category, next.ID, next.Category)
+		}
+	}
+}
+
+func TestDashboardMouseClickPreservesScrollOffset(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Switch to TabPackages
+	nm, _ := m.Update(tea.KeyPressMsg{Text: "2"})
+	m = nm.(Model)
+
+	// Simulate scrolling down
+	m.scrollOffset = 10
+	m.toolsScrollOffset = 10
+
+	// Click row 5 (relY = 5 - 3 = 2)
+	clickMsg := tea.MouseClickMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseLeft,
+	}
+	nm, _ = m.Update(clickMsg)
+	curr := nm.(Model)
+
+	expectedIdx := 10 + (5 - 3) // scrollOffset (10) + relY (2) = 12
+	if curr.selectedIdx != expectedIdx {
+		t.Fatalf("expected clicked row to select targetIdx %d with scrollOffset, got %d", expectedIdx, curr.selectedIdx)
+	}
+}
+
+func TestDashboardVimHalfPageNavigation(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Switch to TabPackages
+	nm, _ := m.Update(tea.KeyPressMsg{Text: "2"})
+	m = nm.(Model)
+
+	visible := m.visibleItemLines()
+	halfPage := max(1, visible/2)
+
+	// ctrl+d down
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+d"})
+	m = nm.(Model)
+	if m.selectedIdx != halfPage {
+		t.Fatalf("expected ctrl+d to advance cursor by %d, got %d", halfPage, m.selectedIdx)
+	}
+
+	// ctrl+u back up
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+u"})
+	m = nm.(Model)
+	if m.selectedIdx != 0 {
+		t.Fatalf("expected ctrl+u to return cursor to 0, got %d", m.selectedIdx)
+	}
+}
+
+func TestDashboardPackageInspector(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Switch to TabPackages
+	nm, _ := m.Update(tea.KeyPressMsg{Text: "2"})
+	m = nm.(Model)
+
+	// Press Enter to open inspector
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = nm.(Model)
+	if m.inspectingPackage == nil {
+		t.Fatalf("expected inspectingPackage to be set on enter")
+	}
+
+	view := m.View().Content
+	if !strings.Contains(view, "PACKAGE DEPENDENCY INSPECTOR") {
+		t.Fatalf("expected inspector modal title in view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "DEPENDENCIES REQUIRED") {
+		t.Fatalf("expected dependencies section in inspector modal")
+	}
+
+	// Press Esc to close
+	nm, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = nm.(Model)
+	if m.inspectingPackage != nil {
+		t.Fatalf("expected inspectingPackage to be nil after esc")
+	}
+}
+
+func TestDashboardOverviewUpdateCheck(t *testing.T) {
+	deps := newTestDeps(t)
+	m := NewModel(deps)
+	m.SetDimensions(120, 40)
+
+	// Inject background update check result with updates
+	updateMsg := updateCheckLoadedMsg{
+		result: UpdateCheckResult{
+			RepoBehind:   3,
+			ConfigDrifts: 2,
+			HasUpdates:   true,
+			RepoClean:    true,
+		},
+	}
+	nm, _ := m.Update(updateMsg)
+	m = nm.(Model)
+
+	view := m.View().Content
+	if !strings.Contains(view, "3 commit(s)") {
+		t.Fatalf("expected commits behind in overview view, got:\n%s", view)
+	}
+	if !strings.Contains(view, "2 configuratio") {
+		t.Fatalf("expected config drifts in overview view, got:\n%s", view)
+	}
+}

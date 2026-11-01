@@ -149,20 +149,6 @@ packages:
           manager: go
           package: "github.com/securego/gosec/v2/cmd/gosec@latest"
 
-  - id: air
-    name: Air
-    category: devtools
-    description: Live-reload utility for Go applications
-    binary_name: air
-    ecosystem: Go
-    osv_package: github.com/air-verse/air
-    depends_on: [golang]
-    strategies:
-      - type: language_pkg
-        language_pkg:
-          manager: go
-          package: "github.com/air-verse/air@latest"
-
   - id: just
     name: just
     category: devtools

@@ -115,7 +115,6 @@ profiles:
     description: Complete ecosystem including optional CLI harnesses and live-reload utilities
     extends: workstation
     packages:
-      - air
       - shellharden
       - claude-code
       - codex-cli

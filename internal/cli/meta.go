@@ -73,6 +73,7 @@ func runDashboard(cmd *cobra.Command, appCtx *AppContext) error {
 		Sync:     appCtx.SyncSvc,
 		Store:    appCtx.Store,
 		Theme:    &pal,
+		RepoRoot: appCtx.RepoRoot,
 	}), tea.WithContext(cmd.Context()))
 	_, err := p.Run()
 	return err

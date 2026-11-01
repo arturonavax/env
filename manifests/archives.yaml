@@ -30,3 +30,11 @@ archives:
     reason: "Replaced by usql (single static Go binary) eliminating Python virtualenv startup overhead."
     recommend_purge: true
     replacement: "usql"
+
+  - id: air
+    name: "Air Live Reload"
+    category: "devtools"
+    retired_at: "2026-11-01"
+    reason: "Decommissioned in favor of direct go run / test watching."
+    recommend_purge: true
+    cleanup_paths: []

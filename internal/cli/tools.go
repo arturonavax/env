@@ -9,6 +9,7 @@ import (
 
 	aicli "github.com/arturonavax/env/internal/ai/cli"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/theme"
 )
 
 func toolsCommands(appCtx *AppContext) []*cobra.Command {
@@ -203,38 +204,83 @@ func newToolsQuotaShortcut(appCtx *AppContext) *cobra.Command {
 	}
 }
 
+func isExternalApart(s domain.ToolStatus) bool {
+	id := strings.ToLower(s.ID)
+	if id == "ai" || id == "kos" {
+		return true
+	}
+	if s.UpdateStrategy == "external" || s.UpdateStrategy == "anx_self" {
+		return true
+	}
+	return false
+}
+
+func renderToolRow(w io.Writer, st *theme.Styles, s domain.ToolStatus) {
+	lang := s.Language
+	if lang == "" {
+		lang = "any"
+	}
+	target := s.ActiveTarget
+	if len(target) > 32 {
+		target = target[:29] + "..."
+	}
+	statusStr := st.Success.Render("[Available]")
+	if s.Version != "" && s.Version != "available" {
+		statusStr = st.Success.Render(s.Version)
+	}
+
+	paddedID := fmt.Sprintf("%-14s", s.ID)
+	renderedID := st.Highlight.Render(paddedID)
+
+	fmt.Fprintf(w, "  %s %-12s %-8s %-32s %s\n",
+		renderedID,
+		s.Category,
+		lang,
+		target,
+		statusStr,
+	)
+}
+
 func runToolsList(cmd *cobra.Command, appCtx *AppContext) error {
-	statuses := appCtx.ToolsSvc.List(cmd.Context())
+	statuses := appCtx.ToolsSvc.ListFast(cmd.Context())
+
+	var managedTools []domain.ToolStatus
+	var externalTools []domain.ToolStatus
+
+	for _, s := range statuses {
+		if !s.Available {
+			continue
+		}
+		if isExternalApart(s) {
+			externalTools = append(externalTools, s)
+		} else {
+			managedTools = append(managedTools, s)
+		}
+	}
+
 	return emit(cmd, appCtx, statuses, func(w io.Writer) {
 		st := styles(appCtx)
-		fmt.Fprintln(w, st.Header.Render("Decoupled Tools & Personal Extensions"))
-		fmt.Fprintln(w, st.Muted.Render(fmt.Sprintf("  %-12s %-10s %-8s %-12s %-28s %s", "TOOL ID", "CATEGORY", "LANG", "KIND", "ACTIVE TARGET", "VERSION")))
-		fmt.Fprintln(w, st.Muted.Render("  -----------------------------------------------------------------------------------------------"))
-		for _, s := range statuses {
-			kindTag := st.Muted.Render(string(s.Kind))
-			if s.IsExternal {
-				kindTag = st.Success.Render("external")
-			} else if s.HasBuiltin {
-				kindTag = st.Highlight.Render("builtin")
+		fmt.Fprintln(w, st.Header.Render("ANX MANAGED TOOLS (Herramientas gestionadas por anx)"))
+		if len(managedTools) == 0 {
+			fmt.Fprintln(w, st.Muted.Render("  No managed tools currently available."))
+		} else {
+			fmt.Fprintln(w, st.Muted.Render(fmt.Sprintf("  %-14s %-12s %-8s %-32s %s", "TOOL ID", "CATEGORY", "LANG", "ACTIVE TARGET", "STATUS")))
+			fmt.Fprintln(w, st.Muted.Render("  -----------------------------------------------------------------------------------------------"))
+			for _, s := range managedTools {
+				renderToolRow(w, st, s)
 			}
+		}
 
-			lang := s.Language
-			if lang == "" {
-				lang = "any"
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, st.Header.Render("EXTERNAL EXTENSIONS & SUITES (Herramientas externas aparte)"))
+		if len(externalTools) == 0 {
+			fmt.Fprintln(w, st.Muted.Render("  No external extensions currently available."))
+		} else {
+			fmt.Fprintln(w, st.Muted.Render(fmt.Sprintf("  %-14s %-12s %-8s %-32s %s", "TOOL ID", "CATEGORY", "LANG", "ACTIVE TARGET", "STATUS")))
+			fmt.Fprintln(w, st.Muted.Render("  -----------------------------------------------------------------------------------------------"))
+			for _, s := range externalTools {
+				renderToolRow(w, st, s)
 			}
-			target := s.ActiveTarget
-			if len(target) > 28 {
-				target = target[:25] + "..."
-			}
-
-			fmt.Fprintf(w, "  %-12s %-10s %-8s %-12s %-28s %s\n",
-				st.Highlight.Render(s.ID),
-				s.Category,
-				lang,
-				kindTag,
-				target,
-				s.Version,
-			)
 		}
 	})
 }

@@ -28,6 +28,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detectedHacks = msg
 		return m, nil
 
+	case updateCheckLoadedMsg:
+		if msg.err == nil {
+			m.updateCheck = &msg.result
+		}
+		return m, nil
+
 	case statusUpdateMsg:
 		m.statusMsg = string(msg)
 		return m, nil

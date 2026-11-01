@@ -31,18 +31,34 @@ func (m Model) handleMouse(msg tea.Msg) (tea.Model, tea.Cmd) {
 			leftWidth, _ := m.calculateDualPaneWidths()
 			if msg.X < leftWidth {
 				m.focusedPanel = "left"
+				if m.activeTab == TabPackages {
+					m.selectedIdx = m.toolsSelectedIdx
+					m.scrollOffset = m.toolsScrollOffset
+				} else if m.activeTab == TabConfigs {
+					m.selectedIdx = m.intConfigsSelectedIdx
+					m.scrollOffset = m.intConfigsScrollOffset
+				}
 			} else {
 				m.focusedPanel = "right"
+				if m.activeTab == TabPackages {
+					m.selectedIdx = m.depsSelectedIdx
+					m.scrollOffset = m.depsScrollOffset
+				} else if m.activeTab == TabConfigs {
+					m.selectedIdx = m.notIntConfigsSelectedIdx
+					m.scrollOffset = m.notIntConfigsScrollOffset
+				}
 			}
 		}
 
-		// Vertical list selection: use relative Y coordinate
+		// Vertical list selection: use relative Y coordinate + scrollOffset
 		contentStartY := 3 // Header + Tabs + Panel top border
 		relY := msg.Y - contentStartY
 		if relY >= 0 {
+			targetIdx := m.scrollOffset + relY
 			maxIdx := m.maxSelectedIndex()
-			if relY <= maxIdx {
-				m.selectedIdx = relY
+			if targetIdx <= maxIdx {
+				m.selectedIdx = targetIdx
+				m.adjustScroll()
 			}
 		}
 

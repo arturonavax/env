@@ -186,7 +186,7 @@ func TestCLIToolsList(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
 	}
 	out := outBuf.String()
-	if !strings.Contains(out, "Decoupled Tools") || !strings.Contains(out, "ai") {
+	if !strings.Contains(out, "ANX MANAGED TOOLS") || !strings.Contains(out, "ai") {
 		t.Fatalf("expected tools list output containing 'ai', got: %s", out)
 	}
 }

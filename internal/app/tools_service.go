@@ -46,6 +46,14 @@ func (s *ToolsService) List(ctx context.Context) []domain.ToolStatus {
 	return s.registry.ListStatuses(ctx)
 }
 
+// ListFast returns the statuses of all registered tools via filesystem checks without invoking them.
+func (s *ToolsService) ListFast(ctx context.Context) []domain.ToolStatus {
+	if s.registry == nil {
+		return nil
+	}
+	return s.registry.ListFastStatuses(ctx)
+}
+
 // Get returns the operational status for a single tool by ID.
 func (s *ToolsService) Get(ctx context.Context, id string) (domain.ToolStatus, error) {
 	if s.registry == nil {

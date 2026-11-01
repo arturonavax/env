@@ -483,6 +483,145 @@ func (r *Registry) detectVersion(ctx context.Context, execPath string, args []st
 	return line
 }
 
+// CheckStatusFast inspects the tool availability purely via filesystem and PATH checks
+// without spawning any subprocesses or executing version detection commands.
+func (r *Registry) CheckStatusFast(ctx context.Context, id string) (domain.ToolStatus, error) {
+	m, ok := r.Get(id)
+	if !ok {
+		return domain.ToolStatus{}, fmt.Errorf("unknown tool %q", id)
+	}
+
+	status := domain.ToolStatus{
+		ID:             m.ID,
+		Name:           m.Name,
+		Category:       m.Category,
+		Language:       m.Language,
+		HasBuiltin:     m.FallbackBuiltin,
+		RepoURL:        m.RepoURL,
+		UpdateStrategy: m.UpdateStrategy,
+	}
+
+	binName := m.Executable
+	if binName == "" {
+		binName = m.ID
+	}
+
+	var extPath string
+	home := r.homeDir
+	if home == "" && r.plat != nil {
+		home = r.plat.HomeDir()
+	}
+
+	if r.plat != nil {
+		toolsBin := r.plat.ToolsBinDir()
+		if toolsBin != "" {
+			cand := filepath.Join(toolsBin, binName)
+			if r.plat.OS() == "windows" && !strings.HasSuffix(cand, ".exe") {
+				cand += ".exe"
+			}
+			if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+				extPath = cand
+			}
+		}
+	}
+
+	if extPath == "" && r.plat != nil {
+		userConfigBin := filepath.Join(r.plat.ConfigDir(), "tools", "bin", binName)
+		if r.plat.OS() == "windows" && !strings.HasSuffix(userConfigBin, ".exe") {
+			userConfigBin += ".exe"
+		}
+		if info, err := os.Stat(userConfigBin); err == nil && !info.IsDir() {
+			extPath = userConfigBin
+		}
+	}
+
+	if extPath == "" && m.Path != "" {
+		expanded := m.Path
+		if strings.HasPrefix(expanded, "~/") {
+			expanded = filepath.Join(home, expanded[2:])
+		}
+		if info, err := os.Stat(expanded); err == nil && !info.IsDir() {
+			extPath = expanded
+		}
+	}
+
+	if extPath == "" && m.AllowGlobalPATH {
+		if p, err := r.lookPath(binName); err == nil {
+			extPath = p
+		}
+	}
+
+	if extPath != "" {
+		status.Available = true
+		status.IsExternal = true
+		status.ExternalPath = extPath
+		status.Path = extPath
+		status.Kind = domain.ToolKindExternal
+		if m.Language == "python" || m.Language == "bash" || m.Language == "node" {
+			status.Kind = domain.ToolTypeScript
+		}
+		status.ActiveTarget = fmt.Sprintf("external (%s)", extPath)
+		// Check cached version without spawning subprocess
+		if fi, err := os.Stat(extPath); err == nil {
+			r.vMu.RLock()
+			if r.versionCache != nil {
+				if entry, ok := r.versionCache[extPath]; ok && entry.ModTime == fi.ModTime().UnixNano() && entry.Size == fi.Size() && entry.Version != "" {
+					status.Version = entry.Version
+				}
+			}
+			r.vMu.RUnlock()
+		}
+		if status.Version == "" {
+			status.Version = "available"
+		}
+		return status, nil
+	}
+
+	if m.FallbackBuiltin {
+		status.Available = true
+		status.IsExternal = false
+		status.Kind = domain.ToolKindBuiltin
+		status.ActiveTarget = "builtin (anx engine)"
+		status.Version = "built-in"
+		return status, nil
+	}
+
+	status.Available = false
+	status.Kind = domain.ToolKindUnknown
+	status.ActiveTarget = "missing"
+	status.Version = "not installed"
+	return status, nil
+}
+
+// ListFastStatuses returns the live operational status for every registered tool without executing subprocesses.
+func (r *Registry) ListFastStatuses(ctx context.Context) []domain.ToolStatus {
+	all := r.List()
+	statuses := make([]domain.ToolStatus, len(all))
+	valid := make([]bool, len(all))
+
+	var wg sync.WaitGroup
+	wg.Add(len(all))
+	for i, m := range all {
+		go func(idx int, toolID string) {
+			defer wg.Done()
+			st, err := r.CheckStatusFast(ctx, toolID)
+			if err == nil {
+				statuses[idx] = st
+				valid[idx] = true
+			}
+		}(i, m.ID)
+	}
+	wg.Wait()
+
+	out := make([]domain.ToolStatus, 0, len(all))
+	for i := range statuses {
+		if valid[i] {
+			out = append(out, statuses[i])
+		}
+	}
+	return out
+}
+
 // ListStatuses returns the live operational status for every registered tool concurrently.
 func (r *Registry) ListStatuses(ctx context.Context) []domain.ToolStatus {
 	all := r.List()
