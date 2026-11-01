@@ -59,6 +59,11 @@ func (r *Registry) GetPackageSpec(id string) (manifest.PackageSpec, bool) {
 	return r.cat.GetPackageSpec(id)
 }
 
+// FindPackageIDByBinary finds a package whose binary name or alias matches name.
+func (r *Registry) FindPackageIDByBinary(name string) (string, bool) {
+	return r.cat.FindPackageIDByBinary(name)
+}
+
 // ListPackages returns all registered packages sorted deterministically by ID.
 func (r *Registry) ListPackages() []domain.ManagedResource {
 	specs := r.cat.ListPackageSpecs()

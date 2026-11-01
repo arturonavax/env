@@ -240,7 +240,15 @@ func NewContainer(opts ...Option) (*Container, error) {
 	}
 	toolRunner := tools.NewRunner(toolReg)
 	toolUpdater := tools.NewUpdater(toolReg, func(ctx context.Context, packageID string) error {
-		plan, err := installSvc.Plan(ctx, "all", []string{packageID})
+		resolvedID := packageID
+		if _, ok := cat.GetPackageSpec(resolvedID); !ok {
+			if byBin, found := cat.FindPackageIDByBinary(packageID); found {
+				resolvedID = byBin
+			} else {
+				return fmt.Errorf("unknown package dependency %q", packageID)
+			}
+		}
+		plan, err := installSvc.Plan(ctx, "all", []string{resolvedID})
 		if err != nil {
 			return err
 		}

@@ -39,6 +39,7 @@ packages:
     category: toolchains
     description: Rust compiler toolchain and Cargo package manager
     binary_name: cargo
+    depends_on: [curl, build-essential]
     strategies:
       - type: script
         when:
@@ -117,7 +118,7 @@ packages:
     description: Simple Python version management
     binary_name: pyenv
     os: [linux, darwin]
-    depends_on: [git, curl]
+    depends_on: [git, curl, build-essential, bz2-dev, ssl-dev, zlib-dev, readline-dev, sqlite-dev, ffi-dev, xz-dev, ncurses-dev]
     strategies:
       - type: native
         when:

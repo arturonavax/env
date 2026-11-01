@@ -44,6 +44,12 @@ func (u *Updater) Update(ctx context.Context, toolID string) (domain.ToolUpdateR
 		ToolID: toolID,
 	}
 
+	if !st.Available && !m.FallbackBuiltin {
+		res.Status = "skipped"
+		res.Message = "tool is not installed on this system"
+		return res, nil
+	}
+
 	switch m.UpdateStrategy {
 	case "self_update":
 		if len(m.UpdateCmd) == 0 {
@@ -64,7 +70,11 @@ func (u *Updater) Update(ctx context.Context, toolID string) (domain.ToolUpdateR
 
 	case "package":
 		if u.packageUpdater != nil {
-			if err := u.packageUpdater(ctx, toolID); err != nil {
+			pkgID := toolID
+			if m.PackageID != "" {
+				pkgID = m.PackageID
+			}
+			if err := u.packageUpdater(ctx, pkgID); err != nil {
 				res.Status = "failed"
 				res.Message = fmt.Sprintf("package upgrade failed: %v", err)
 				return res, err

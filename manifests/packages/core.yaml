@@ -23,6 +23,7 @@ packages:
     category: core-build
     description: C/C++ compiler suite, make, and standard system headers
     os: [linux]
+    depends_on: [make, gcc, binutils]
     strategies:
       - type: native
         packages:

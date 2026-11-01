@@ -184,13 +184,41 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 					fmt.Fprintf(out, "  [1/4] %s Dry-run: would fast-forward pull repository (%s)\n", st.Highlight.Render("ℹ"), repo)
 				} else if isGitClean(ctx, repo) {
 					fmt.Fprintf(out, "  [1/4] Pulling latest repository changes (%s)...\n", repo)
-					pullCmd := exec.CommandContext(ctx, "git", "-C", repo, "pull", "--ff-only")
-					if pOut, err := pullCmd.CombinedOutput(); err != nil {
-						errMsg := fmt.Errorf("git pull: %s", strings.TrimSpace(string(pOut)))
-						stepErrors = append(stepErrors, errMsg)
-						fmt.Fprintf(out, "    %s git pull warning: %s\n", st.Warning.Render("!"), strings.TrimSpace(string(pOut)))
+					curBranch, _ := gitCurrentBranch(ctx, repo)
+					hasUpstream := false
+					if curBranch != "" {
+						uCmd := exec.CommandContext(ctx, "git", "-C", repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+						if err := uCmd.Run(); err == nil {
+							hasUpstream = true
+						}
+					}
+
+					if !hasUpstream {
+						checkRemote := exec.CommandContext(ctx, "git", "-C", repo, "rev-parse", "--verify", "origin/"+curBranch)
+						if err := checkRemote.Run(); err == nil {
+							pullCmd := exec.CommandContext(ctx, "git", "-C", repo, "pull", "--ff-only", "origin", curBranch)
+							if pOut, err := pullCmd.CombinedOutput(); err != nil {
+								fmt.Fprintf(out, "    %s git pull note: %s\n", st.Warning.Render("!"), strings.TrimSpace(string(pOut)))
+							} else {
+								fmt.Fprintf(out, "    %s Repository updated: %s\n", st.Success.Render("✓"), strings.TrimSpace(string(pOut)))
+							}
+						} else {
+							fmt.Fprintf(out, "    %s Branch %q has no remote tracking upstream; skipping git pull.\n", st.Highlight.Render("ℹ"), curBranch)
+						}
 					} else {
-						fmt.Fprintf(out, "    %s Repository updated: %s\n", st.Success.Render("✓"), strings.TrimSpace(string(pOut)))
+						pullCmd := exec.CommandContext(ctx, "git", "-C", repo, "pull", "--ff-only")
+						if pOut, err := pullCmd.CombinedOutput(); err != nil {
+							outStr := strings.TrimSpace(string(pOut))
+							if strings.Contains(outStr, "no tracking information") {
+								fmt.Fprintf(out, "    %s Branch %q has no remote tracking upstream; skipping git pull.\n", st.Highlight.Render("ℹ"), curBranch)
+							} else {
+								errMsg := fmt.Errorf("git pull: %s", outStr)
+								stepErrors = append(stepErrors, errMsg)
+								fmt.Fprintf(out, "    %s git pull warning: %s\n", st.Warning.Render("!"), outStr)
+							}
+						} else {
+							fmt.Fprintf(out, "    %s Repository updated: %s\n", st.Success.Render("✓"), strings.TrimSpace(string(pOut)))
+						}
 					}
 				} else {
 					fmt.Fprintf(out, "  [1/4] %s Repository has uncommitted local changes; skipping git pull to prevent conflicts.\n", st.Warning.Render("!"))
@@ -219,6 +247,8 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 							if r.Status == "error" || r.Status == "failed" {
 								stepErrors = append(stepErrors, fmt.Errorf("tool %s update reported: %s", r.ToolID, r.Message))
 								status = st.Error.Render(r.Status)
+							} else if r.Status == "skipped" {
+								status = st.Muted.Render(r.Status)
 							}
 							fmt.Fprintf(out, "    • %-16s [%s] %s\n", r.ToolID, status, r.Message)
 						}

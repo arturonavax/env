@@ -1103,12 +1103,20 @@ func (w WizardModel) renderSelectPackages(width, height int) string {
 			depBadge = " " + w.styles.Warning.Render("[Deprecated]")
 		}
 
-		isDep := len(w.requiredBy[p.ID]) > 0
+		isDirect := p.IsDirectTool(w.requiredBy)
 		typeTag := w.styles.Highlight.Render("[Tool]")
 		depDetail := ""
-		if isDep {
+		if !isDirect {
 			typeTag = w.styles.Muted.Render("[Dep]")
-			depDetail = fmt.Sprintf(" (dep of: %s)", strings.Join(w.requiredBy[p.ID], ", "))
+			if len(w.requiredBy[p.ID]) > 0 {
+				depDetail = fmt.Sprintf(" (dep of: %s)", strings.Join(w.requiredBy[p.ID], ", "))
+			} else if strings.Contains(p.Category, "build") || p.ID == "build-essential" || p.ID == "cmake" || p.ID == "pkg-config" {
+				depDetail = " (build dependency)"
+			} else if strings.Contains(p.Category, "lib") || strings.HasSuffix(p.ID, "-dev") {
+				depDetail = " (library dependency)"
+			} else {
+				depDetail = " (system prerequisite)"
+			}
 		} else if len(p.DependsOn) > 0 {
 			depDetail = fmt.Sprintf(" (requires: %s)", strings.Join(p.DependsOn, ", "))
 		}

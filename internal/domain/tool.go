@@ -27,6 +27,7 @@ type ToolStatus struct {
 	HasBuiltin       bool     `json:"has_builtin" yaml:"has_builtin"`
 	ActiveTarget     string   `json:"active_target" yaml:"active_target"`
 	RepoURL          string   `json:"repo_url,omitempty" yaml:"repo_url,omitempty"`
+	PackageID        string   `json:"package_id,omitempty" yaml:"package_id,omitempty"`
 	UpdateStrategy   string   `json:"update_strategy,omitempty" yaml:"update_strategy,omitempty"`
 	Deprecated       bool     `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
 	DeprecatedReason string   `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
@@ -48,6 +49,7 @@ type ToolManifest struct {
 	Language         string   `json:"language,omitempty" yaml:"language,omitempty"`
 	VersionArgs      []string `json:"version_args,omitempty" yaml:"version_args,omitempty"`
 	RepoURL          string   `json:"repo_url,omitempty" yaml:"repo_url,omitempty"`
+	PackageID        string   `json:"package_id,omitempty" yaml:"package_id,omitempty"`
 	UpdateStrategy   string   `json:"update_strategy,omitempty" yaml:"update_strategy,omitempty"`
 	UpdateCmd        []string `json:"update_cmd,omitempty" yaml:"update_cmd,omitempty"`
 	Deprecated       bool     `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`

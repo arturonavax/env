@@ -116,6 +116,48 @@ type ManagedResource struct {
 	Archived         bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
 }
 
+// IsDirectTool reports whether this resource is a direct interactive user tool (e.g. Ghostty, Herdr, Neovim, LazyGit, Zsh, Atuin, Bat, Fd),
+// as opposed to a dependency (libraries, headers, build essentials, system prerequisites, or required by other packages).
+func (r ManagedResource) IsDirectTool(requiredBy map[string][]string) bool {
+	if len(requiredBy[r.ID]) > 0 {
+		return false
+	}
+
+	switch r.Category {
+	case "core-build", "core-libs", "desktop-libs", "system-libs":
+		return false
+	}
+
+	id := strings.ToLower(r.ID)
+	if strings.HasSuffix(id, "-dev") || strings.HasSuffix(id, "-devel") ||
+		strings.HasSuffix(id, "-headers") || strings.HasSuffix(id, "-libs") ||
+		strings.HasPrefix(id, "lib") || strings.Contains(id, "certificate") ||
+		strings.Contains(id, "build-essential") || strings.Contains(id, "binutils") {
+		return false
+	}
+
+	switch id {
+	case "make", "gcc", "clang", "bison", "flex", "cmake", "pkg-config", "fontconfig", "ca-certificates", "gnupg":
+		return false
+	}
+
+	if r.Category == "core" {
+		switch id {
+		case "git", "curl", "jq", "anx":
+			return true
+		default:
+			return false
+		}
+	}
+
+	switch r.Category {
+	case "terminal", "editor", "shell", "cli-tools", "devtools", "ai", "toolchains":
+		return true
+	}
+
+	return false
+}
+
 // ConfigurationResource represents a managed dotfile, directory tree, or shell marker block.
 type ConfigurationResource struct {
 	ID                 string                `json:"id" yaml:"id"`

@@ -164,3 +164,50 @@ func TestPlanSpecDeterministicDigest(t *testing.T) {
 		t.Fatalf("expected ErrPlanDigest for nil plan, got: %v", errNil)
 	}
 }
+
+func TestIsDirectTool(t *testing.T) {
+	requiredBy := map[string][]string{
+		"binutils": {"build-essential"},
+		"fzf":      {"neovim"},
+	}
+
+	directTools := []domain.ManagedResource{
+		{ID: "ghostty", Category: "terminal"},
+		{ID: "herdr", Category: "terminal"},
+		{ID: "neovim", Category: "editor"},
+		{ID: "lazygit", Category: "devtools"},
+		{ID: "zsh", Category: "shell"},
+		{ID: "atuin", Category: "shell"},
+		{ID: "bat", Category: "cli-tools"},
+		{ID: "fd", Category: "cli-tools"},
+		{ID: "ripgrep", Category: "cli-tools"},
+		{ID: "eza", Category: "cli-tools"},
+		{ID: "git", Category: "core"},
+		{ID: "rtk", Category: "ai"},
+	}
+
+	for _, tool := range directTools {
+		if !tool.IsDirectTool(requiredBy) {
+			t.Errorf("expected tool %s to be classified as direct tool", tool.ID)
+		}
+	}
+
+	dependencies := []domain.ManagedResource{
+		{ID: "binutils", Category: "core-build"},
+		{ID: "build-essential", Category: "core-build"},
+		{ID: "bz2-dev", Category: "core-libs"},
+		{ID: "ca-certificates", Category: "core"},
+		{ID: "libssl-dev", Category: "core-libs"},
+		{ID: "make", Category: "core-build"},
+		{ID: "gcc", Category: "core-build"},
+		{ID: "cmake", Category: "core-build"},
+		{ID: "fontconfig", Category: "desktop-libs"},
+		{ID: "fzf", Category: "cli-tools"}, // in requiredBy
+	}
+
+	for _, dep := range dependencies {
+		if dep.IsDirectTool(requiredBy) {
+			t.Errorf("expected dependency %s to be classified as dependency, got tool", dep.ID)
+		}
+	}
+}

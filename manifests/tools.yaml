@@ -19,11 +19,12 @@ tools:
     description: "High-speed LLM terminal output compressor proxy (saves 60-90% prompt tokens)"
     executable: "rtk"
     fallback_builtin: false
+    allow_global_path: true
     language: "rust"
+    package_id: "rtk"
     version_args: ["--version"]
     repo_url: "https://github.com/arturonavax/rtk"
-    update_strategy: "self_update"
-    update_cmd: ["rtk", "update"]
+    update_strategy: "package"
 
   - id: herdr
     name: "Herdr Multiplexer"
@@ -31,11 +32,12 @@ tools:
     description: "Terminal and agent multiplexer with workspace isolation and socket API"
     executable: "herdr"
     fallback_builtin: false
+    allow_global_path: true
     language: "rust"
+    package_id: "herdr"
     version_args: ["--version"]
     repo_url: "https://herdr.dev"
-    update_strategy: "self_update"
-    update_cmd: ["herdr", "upgrade"]
+    update_strategy: "package"
 
   - id: usql
     name: "Universal SQL Client"
@@ -45,6 +47,7 @@ tools:
     fallback_builtin: false
     allow_global_path: true
     language: "go"
+    package_id: "usql"
     version_args: ["--version"]
     repo_url: "https://github.com/xo/usql"
     update_strategy: "package"
@@ -57,6 +60,7 @@ tools:
     fallback_builtin: false
     allow_global_path: true
     language: "rust"
+    package_id: "difftastic"
     version_args: ["--version"]
     repo_url: "https://github.com/Wilfred/difftastic"
     update_strategy: "package"
@@ -69,6 +73,7 @@ tools:
     fallback_builtin: false
     allow_global_path: true
     language: "rust"
+    package_id: "delta"
     version_args: ["--version"]
     repo_url: "https://github.com/dandavison/delta"
     update_strategy: "package"
@@ -81,6 +86,7 @@ tools:
     fallback_builtin: false
     allow_global_path: true
     language: "rust"
+    package_id: "tealdeer"
     version_args: ["--version"]
     repo_url: "https://github.com/dbrgn/tealdeer"
     update_strategy: "package"
@@ -95,4 +101,4 @@ tools:
     language: "bash"
     version_args: ["--version"]
     repo_url: "https://github.com/arturonavax/env"
-    update_strategy: "package"
+    update_strategy: "anx_self"

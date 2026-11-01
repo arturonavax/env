@@ -275,6 +275,23 @@ func (c *Catalog) GetPackageSpec(id string) (PackageSpec, bool) {
 	return spec, ok
 }
 
+// FindPackageIDByBinary finds a package whose BinaryName or BinaryAliases matches name.
+func (c *Catalog) FindPackageIDByBinary(name string) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for id, spec := range c.packages {
+		if spec.BinaryName == name {
+			return id, true
+		}
+		for _, alias := range spec.BinaryAliases {
+			if alias == name {
+				return id, true
+			}
+		}
+	}
+	return "", false
+}
+
 // ListPackageSpecs returns all PackageSpecs sorted deterministically by ID.
 func (c *Catalog) ListPackageSpecs() []PackageSpec {
 	c.mu.RLock()

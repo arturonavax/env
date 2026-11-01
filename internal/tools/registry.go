@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -80,8 +81,9 @@ func WithPlatform(plat *platform.Info) Option {
 
 // Registry manages declarative tool definitions, dynamic discovery, and status resolution.
 type versionCacheEntry struct {
-	version string
-	modTime int64
+	Version string `json:"version"`
+	ModTime int64  `json:"mod_time"`
+	Size    int64  `json:"size"`
 }
 
 type Registry struct {
@@ -90,6 +92,7 @@ type Registry struct {
 	lookPath     LookPathFunc
 	plat         *platform.Info
 	homeDir      string
+	cacheFile    string
 	versionCache map[string]versionCacheEntry
 	vMu          sync.RWMutex
 }
@@ -110,12 +113,22 @@ func LoadRegistry(opts ...Option) (*Registry, error) {
 		home = cfg.plat.HomeDir()
 	}
 
-	r := &Registry{
-		tools:    make(map[string]domain.ToolManifest, 16),
-		lookPath: cfg.lookPath,
-		plat:     cfg.plat,
-		homeDir:  home,
+	cacheFile := ""
+	if cfg.plat != nil && cfg.plat.CacheDir() != "" {
+		cacheFile = filepath.Join(cfg.plat.CacheDir(), "tool_versions.json")
+	} else if home != "" {
+		cacheFile = filepath.Join(home, ".cache", "anx", "tool_versions.json")
 	}
+
+	r := &Registry{
+		tools:        make(map[string]domain.ToolManifest, 16),
+		lookPath:     cfg.lookPath,
+		plat:         cfg.plat,
+		homeDir:      home,
+		cacheFile:    cacheFile,
+		versionCache: make(map[string]versionCacheEntry, 16),
+	}
+	r.loadVersionCache()
 
 	// 1. Load embedded tools.yaml (a broken embedded manifest is a build defect: always fatal)
 	if data, err := fs.ReadFile(manifests.EmbeddedFS, "tools.yaml"); err == nil {
@@ -386,15 +399,46 @@ func (r *Registry) CheckStatus(ctx context.Context, id string) (domain.ToolStatu
 	return status, nil
 }
 
+func (r *Registry) loadVersionCache() {
+	if r.cacheFile == "" {
+		return
+	}
+	data, err := os.ReadFile(r.cacheFile)
+	if err != nil {
+		return
+	}
+	var cached map[string]versionCacheEntry
+	if err := json.Unmarshal(data, &cached); err == nil && cached != nil {
+		r.vMu.Lock()
+		r.versionCache = cached
+		r.vMu.Unlock()
+	}
+}
+
+func (r *Registry) saveVersionCache() {
+	if r.cacheFile == "" {
+		return
+	}
+	r.vMu.RLock()
+	data, err := json.Marshal(r.versionCache)
+	r.vMu.RUnlock()
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(r.cacheFile), 0o755)
+	_ = os.WriteFile(r.cacheFile, data, 0o644)
+}
+
 func (r *Registry) detectVersion(ctx context.Context, execPath string, args []string) string {
-	var modTime int64
+	var modTime, size int64
 	if fi, err := os.Stat(execPath); err == nil {
 		modTime = fi.ModTime().UnixNano()
+		size = fi.Size()
 		r.vMu.RLock()
 		if r.versionCache != nil {
-			if entry, ok := r.versionCache[execPath]; ok && entry.modTime == modTime && entry.version != "" {
+			if entry, ok := r.versionCache[execPath]; ok && entry.ModTime == modTime && entry.Size == size && entry.Version != "" {
 				r.vMu.RUnlock()
-				return entry.version
+				return entry.Version
 			}
 		}
 		r.vMu.RUnlock()
@@ -428,10 +472,12 @@ func (r *Registry) detectVersion(ctx context.Context, execPath string, args []st
 			r.versionCache = make(map[string]versionCacheEntry)
 		}
 		r.versionCache[execPath] = versionCacheEntry{
-			version: line,
-			modTime: modTime,
+			Version: line,
+			ModTime: modTime,
+			Size:    size,
 		}
 		r.vMu.Unlock()
+		r.saveVersionCache()
 	}
 
 	return line

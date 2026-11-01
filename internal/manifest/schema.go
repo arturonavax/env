@@ -1,6 +1,10 @@
 package manifest
 
-import "github.com/arturonavax/env/internal/domain"
+import (
+	"strings"
+
+	"github.com/arturonavax/env/internal/domain"
+)
 
 // CatalogDocument represents any declarative YAML file containing packages, configurations, and/or profiles.
 type CatalogDocument struct {
@@ -56,6 +60,48 @@ func (p PackageSpec) SupportsOS(goos string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// IsDirectTool reports whether this package is a direct interactive user tool (e.g. Ghostty, Herdr, Neovim, LazyGit, Zsh, Atuin, Bat, Fd),
+// as opposed to a dependency (libraries, headers, build essentials, system prerequisites, or required by other packages).
+func (p PackageSpec) IsDirectTool(requiredBy map[string][]string) bool {
+	if len(requiredBy[p.ID]) > 0 {
+		return false
+	}
+
+	switch p.Category {
+	case "core-build", "core-libs", "desktop-libs", "system-libs":
+		return false
+	}
+
+	id := strings.ToLower(p.ID)
+	if strings.HasSuffix(id, "-dev") || strings.HasSuffix(id, "-devel") ||
+		strings.HasSuffix(id, "-headers") || strings.HasSuffix(id, "-libs") ||
+		strings.HasPrefix(id, "lib") || strings.Contains(id, "certificate") ||
+		strings.Contains(id, "build-essential") || strings.Contains(id, "binutils") {
+		return false
+	}
+
+	switch id {
+	case "make", "gcc", "clang", "bison", "flex", "cmake", "pkg-config", "fontconfig", "ca-certificates", "gnupg":
+		return false
+	}
+
+	if p.Category == "core" {
+		switch id {
+		case "git", "curl", "jq", "anx":
+			return true
+		default:
+			return false
+		}
+	}
+
+	switch p.Category {
+	case "terminal", "editor", "shell", "cli-tools", "devtools", "ai", "toolchains":
+		return true
+	}
+
 	return false
 }
 

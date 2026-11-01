@@ -184,12 +184,20 @@ func (m Model) renderPackages(w, h int) string {
 			statusTag = m.styles.Warning.Render("[Deprecated]")
 		}
 
-		isDep := len(requiredBy[p.ID]) > 0
+		isDirect := p.IsDirectTool(requiredBy)
 		kindBadge := m.styles.Highlight.Render("[Tool]")
 		depInfo := ""
-		if isDep {
+		if !isDirect {
 			kindBadge = m.styles.Muted.Render("[Dep]")
-			depInfo = fmt.Sprintf(" (dep of: %s)", strings.Join(requiredBy[p.ID], ", "))
+			if len(requiredBy[p.ID]) > 0 {
+				depInfo = fmt.Sprintf(" (dep of: %s)", strings.Join(requiredBy[p.ID], ", "))
+			} else if strings.Contains(p.Category, "build") || p.ID == "build-essential" || p.ID == "cmake" || p.ID == "pkg-config" {
+				depInfo = " (build dependency)"
+			} else if strings.Contains(p.Category, "lib") || strings.HasSuffix(p.ID, "-dev") {
+				depInfo = " (library dependency)"
+			} else {
+				depInfo = " (system prerequisite)"
+			}
 		} else if len(p.DependsOn) > 0 {
 			depInfo = fmt.Sprintf(" (requires: %s)", strings.Join(p.DependsOn, ", "))
 		}
