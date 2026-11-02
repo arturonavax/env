@@ -123,6 +123,27 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 		defer stopKeepalive()
 	}
 
+	if !appCtx.Flags.Quiet {
+		st := styles(appCtx)
+		out := cmd.OutOrStdout()
+		appCtx.InstallSvc.SetOnProgress(func(ev app.ProgressEvent) {
+			switch ev.Status {
+			case domain.StepRunning:
+				fmt.Fprintf(out, "  %s [%d/%d] %s: %s...\n",
+					st.Highlight.Render("▶"), ev.StepID, ev.TotalSteps, ev.Action, ev.Description)
+			case domain.StepSuccess:
+				fmt.Fprintf(out, "  %s [%d/%d] Completed: %s\n",
+					st.Success.Render("✓"), ev.StepID, ev.TotalSteps, ev.ResourceID)
+			case domain.StepFailed:
+				fmt.Fprintf(out, "  %s [%d/%d] Failed: %s (%s)\n",
+					st.Warning.Render("✖"), ev.StepID, ev.TotalSteps, ev.ResourceID, ev.Error)
+			case domain.StepSkipped:
+				fmt.Fprintf(out, "  %s [%d/%d] Skipped: %s\n",
+					st.Highlight.Render("ℹ"), ev.StepID, ev.TotalSteps, ev.ResourceID)
+			}
+		})
+	}
+
 	if err := appCtx.InstallSvc.Apply(cmd.Context(), plan); err != nil {
 		return err
 	}
@@ -136,7 +157,7 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 			if !appCtx.Flags.Quiet {
 				fmt.Fprintf(cmd.OutOrStdout(), "Applying matched hardware workstation hack: %s (%s)...\n", hk.ID, hk.Name)
 			}
-			_, _ = appCtx.HacksSvc.Apply(cmd.Context(), hk.ID)
+			_, _ = appCtx.HacksSvc.Apply(cmd.Context(), hk.ID, app.WithHackOutput(cmd.OutOrStdout()))
 		}
 	}
 	return nil

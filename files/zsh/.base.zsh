@@ -323,11 +323,32 @@ function reloadenv() {
 }
 
 function update-go() {
-    curl -fsSL https://env.arturonavax.dev/install_golang.sh | bash -s -- "$@"
+    local script_path="${REPO_ROOT:-$HOME/repos/github.com/arturonavax/env}/scripts/install_golang.sh"
+    if [[ -f "$script_path" ]]; then
+        bash "$script_path" "$@"
+    elif command -v gvm >/dev/null 2>&1; then
+        gvm update
+    elif command -v anx >/dev/null 2>&1; then
+        anx rebuild go
+    else
+        echo "No Go update provider found (scripts/install_golang.sh, gvm, or anx)" >&2
+        return 1
+    fi
 }
 
 function update-python() {
-    curl -fsSL https://env.arturonavax.dev/install_python.sh | bash -s -- "$@"
+    if command -v pyenv >/dev/null 2>&1; then
+        if command -v pyenv-update >/dev/null 2>&1; then
+            pyenv update
+        elif [[ -d "$(pyenv root 2>/dev/null)/.git" ]]; then
+            git -C "$(pyenv root)" pull --quiet 2>/dev/null || true
+        fi
+    fi
+    if command -v pipx >/dev/null 2>&1; then
+        pipx upgrade-all
+    elif command -v anx >/dev/null 2>&1; then
+        anx rebuild python
+    fi
 }
 
 function rebuild-tools() {
@@ -361,33 +382,39 @@ alias sleep-safe='safe-suspend'
 
 # Update
 function update() {
-    fcwb='\033[1;37m'
-    fcr='\033[0m'
+    local c_cyan="\033[38;5;75m"
+    local c_green="\033[38;5;114m"
+    local c_yellow="\033[38;5;221m"
+    local c_magenta="\033[38;5;176m"
+    local c_bold="\033[1m"
+    local c_dim="\033[2m"
+    local c_reset="\033[0m"
 
     function usage_update(){
-        echo -e "$(cat <<EOF
-[Updater]: List of update options:
-  ${fcwb}system ${fcr}/ ${fcwb}s    ${fcr}- Upgrades operating system packages (apt/dnf/brew).
-  ${fcwb}tools ${fcr}/ ${fcwb}t     ${fcr}- Updates toolchain managers (rustup, pnpm, pyenv, gvm).
-  ${fcwb}rebuild ${fcr}/ ${fcwb}r   ${fcr}- Recompiles/reinstalls global tools with active language versions (Python/pipx, Node/pnpm, Go, Rust, Neovim).
-  ${fcwb}all ${fcr}/ ${fcwb}a       ${fcr}- Runs system + tools + rebuild.
-  ${fcwb}help ${fcr}/ ${fcwb}h      ${fcr}- This helpful explanation.${fcr}
-EOF
-        )"
+        echo -e "${c_bold}${c_cyan}[anx::updater]${c_reset} List of update options:"
+        echo -e "  ${c_bold}system${c_reset}  / ${c_yellow}s${c_reset}    - Upgrades operating system packages (apt/dnf/brew)."
+        echo -e "  ${c_bold}tools${c_reset}   / ${c_yellow}t${c_reset}    - Updates toolchains and CLI tools (rustup, pnpm, pipx, pyenv, anx)."
+        echo -e "  ${c_bold}rebuild${c_reset} / ${c_yellow}r${c_reset}    - Recompiles/reinstalls global tools with active language runtimes."
+        echo -e "  ${c_bold}prune${c_reset}   / ${c_yellow}p${c_reset}    - Safely reviews and cleans orphaned packages/caches."
+        echo -e "  ${c_bold}all${c_reset}     / ${c_yellow}a${c_reset}    - Runs end-to-end upgrade (anx upgrade + tools + system)."
+        echo -e "  ${c_bold}help${c_reset}    / ${c_yellow}h${c_reset}    - Displays this helpful explanation."
     }
 
     local update_tools=0
     local update_system=0
     local update_rebuild=0
     local update_all=0
+    local update_prune=0
 
     for arg in "$@"; do
         case "$arg" in
             tools | t) update_tools=1 ;;
             system | s) update_system=1 ;;
             rebuild | r) update_rebuild=1 ;;
+            prune | p) update_prune=1 ;;
             all | a) update_all=1 ;;
-            h | help)
+            --rebuild) update_rebuild=1 ;;
+            h | help | -h | --help)
                 usage_update
                 return 0
                 ;;
@@ -398,74 +425,105 @@ EOF
         esac
     done
 
-    [[ "$#" == 0 ]] && update_system=1
+    [[ "$#" -eq 0 ]] && update_system=1
 
-    if [[ "$update_all" == 1 ]]; then
+    if [[ "$update_all" -eq 1 ]]; then
         update_tools=1
         update_system=1
-        update_rebuild=1
     fi
 
-	sudo true
+    # 1. End-to-end environment & repository synchronization
+    if [[ "$update_all" -eq 1 ]] && command -v anx >/dev/null 2>&1; then
+        echo -e "\n${c_bold}${c_cyan}── [1/3] ANX Environment & Dotfiles Synchronization ──${c_reset}"
+        anx upgrade --include-hacks
+    fi
 
-    if [[ "$update_tools" == 1 ]]; then
-        if [[ "$(command -v rustup)" != "" ]]; then
+    # 2. Toolchain managers & decoupled tools
+    if [[ "$update_tools" -eq 1 ]]; then
+        echo -e "\n${c_bold}${c_magenta}── [2/3] Toolchain Managers & Personal Tools ──${c_reset}"
+
+        if command -v anx >/dev/null 2>&1; then
+            echo -e "  ${c_cyan}•${c_reset} Updating personal CLI tools..."
+            anx tools upgrade 2>/dev/null || true
+        fi
+
+        if command -v rustup >/dev/null 2>&1; then
+            echo -e "  ${c_cyan}•${c_reset} Updating Rust toolchain (rustup)..."
             rustup update stable
-            rustup check
         fi
 
-        if [[ "$(command -v pnpm)" != "" ]]; then
-            pnpm self-update
-            pnpm --global update
-            [[ -f "$HOME/package.json" ]] && pnpm --dir "$HOME" update
+        if command -v pnpm >/dev/null 2>&1; then
+            echo -e "  ${c_cyan}•${c_reset} Updating Node.js package manager (pnpm)..."
+            pnpm self-update 2>/dev/null || true
+            pnpm --global update 2>/dev/null || true
+            [[ -f "$HOME/package.json" ]] && pnpm --dir "$HOME" update 2>/dev/null || true
         fi
 
-        if [[ "$(command -v python3)" != "" ]]; then
-            python3 -m pip install --upgrade pip
-            python3 -m pip install --user --upgrade pipx
+        if command -v pipx >/dev/null 2>&1; then
+            echo -e "  ${c_cyan}•${c_reset} Updating Python CLI applications (pipx)..."
             pipx upgrade-all 2>/dev/null || true
         fi
 
-        update-go -i
-        update-python -i
+        update-go
+        update-python
     fi
 
-    if [[ "$update_rebuild" == 1 ]]; then
-        rebuild-tools
-    fi
+    # 3. Operating System packages
+    if [[ "$update_system" -eq 1 ]]; then
+        echo -e "\n${c_bold}${c_green}── [3/3] Operating System Package Manager ──${c_reset}"
 
-    if [[ "$update_system" == 1 ]]; then
         if [[ "$OSTYPE" == linux* ]]; then
             if (( $+commands[apt] )); then
-                sudo apt update -y
+                # Silence masked PackageKit D-Bus noise if unit is masked
+                if systemctl is-enabled packagekit.service 2>/dev/null | grep -q "masked"; then
+                    sudo systemctl unmask packagekit.service 2>/dev/null || true
+                fi
+
+                sudo apt update
                 sudo apt upgrade -y
-                sudo apt dist-upgrade -y
-                sudo apt full-upgrade -y
-                sudo apt autoremove
-                sudo apt autoclean
+                sudo apt autoclean -y 2>/dev/null || true
             fi
 
             if (( $+commands[snap] )); then
+                echo -e "  ${c_cyan}•${c_reset} Refreshing Snap packages..."
                 sudo snap refresh
             fi
 
             if (( $+commands[dnf] )); then
-                sudo dnf update -y
                 sudo dnf upgrade -y
-                sudo dnf distro-sync -y
-                sudo dnf autoremove
+            fi
+
+            if (( $+commands[pacman] )); then
+                sudo pacman -Syu --noconfirm
             fi
 
         elif [[ "$OSTYPE" == darwin* ]]; then
-            sudo softwareupdate -i -a
-
             if (( $+commands[brew] )); then
                 brew update
                 brew upgrade
                 brew cleanup
             fi
+            sudo softwareupdate -i -a
         fi
     fi
+
+    # 4. Optional Tool Recompilation (only when explicitly requested)
+    if [[ "$update_rebuild" -eq 1 ]]; then
+        echo -e "\n${c_bold}${c_yellow}── Rebuilding Developer Tools Across Active Runtimes ──${c_reset}"
+        rebuild-tools
+    fi
+
+    # 5. Optional Prune / Cleanup
+    if [[ "$update_prune" -eq 1 ]]; then
+        echo -e "\n${c_bold}${c_yellow}── Pruning Orphaned Packages & Caches ──${c_reset}"
+        if command -v anx >/dev/null 2>&1; then
+            anx prune
+        elif (( $+commands[apt] )); then
+            sudo apt autoremove
+        fi
+    fi
+
+    echo -e "\n${c_bold}${c_green}✓ Update completed successfully.${c_reset}\n"
 }
 
 # Load theme mode

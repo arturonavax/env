@@ -145,12 +145,14 @@ func newHacksCmd(appCtx *AppContext) *cobra.Command {
 				printHackPlan(c.OutOrStdout(), plan.Name, plan.BackupPaths, plan.Steps)
 				return nil
 			}
-			res, err := appCtx.HacksSvc.Apply(c.Context(), args[0])
+			out := c.OutOrStdout()
+			fmt.Fprintf(out, "==> Applying hardware hack: %s...\n", args[0])
+			res, err := appCtx.HacksSvc.Apply(c.Context(), args[0], app.WithHackOutput(out))
 			if err != nil {
 				return err
 			}
 			return emit(c, appCtx, res, func(w io.Writer) {
-				fmt.Fprintf(w, "Applied %s (snapshot %s): %s\n", res.HackID, res.SnapshotID, strings.Join(res.AppliedSteps, ", "))
+				fmt.Fprintf(w, "\n✓ Successfully applied %s (snapshot %s): %s\n", res.HackID, res.SnapshotID, strings.Join(res.AppliedSteps, ", "))
 			})
 		},
 	})

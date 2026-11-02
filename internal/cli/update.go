@@ -288,6 +288,22 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 							stopKeepalive := security.StartSudoKeepalive(ctx)
 							defer stopKeepalive()
 						}
+						appCtx.InstallSvc.SetOnProgress(func(ev app.ProgressEvent) {
+							switch ev.Status {
+							case domain.StepRunning:
+								fmt.Fprintf(out, "    %s [%d/%d] %s: %s...\n",
+									st.Highlight.Render("▶"), ev.StepID, ev.TotalSteps, ev.Action, ev.Description)
+							case domain.StepSuccess:
+								fmt.Fprintf(out, "    %s [%d/%d] Completed: %s\n",
+									st.Success.Render("✓"), ev.StepID, ev.TotalSteps, ev.ResourceID)
+							case domain.StepFailed:
+								fmt.Fprintf(out, "    %s [%d/%d] Failed: %s (%s)\n",
+									st.Warning.Render("✖"), ev.StepID, ev.TotalSteps, ev.ResourceID, ev.Error)
+							case domain.StepSkipped:
+								fmt.Fprintf(out, "    %s [%d/%d] Skipped: %s\n",
+									st.Highlight.Render("ℹ"), ev.StepID, ev.TotalSteps, ev.ResourceID)
+							}
+						})
 						if err := appCtx.InstallSvc.Apply(ctx, plan); err != nil {
 							return fmt.Errorf("package installation failed: %w", err)
 						}
@@ -303,7 +319,7 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 					for _, hk := range matches {
 						fmt.Fprintf(out, "    Applying matched hardware hack: %s...\n", hk.ID)
 						if !appCtx.Flags.DryRun {
-							if _, err := appCtx.HacksSvc.Apply(ctx, hk.ID); err != nil {
+							if _, err := appCtx.HacksSvc.Apply(ctx, hk.ID, app.WithHackOutput(out)); err != nil {
 								fmt.Fprintf(out, "      %s Failed to apply hack %s: %v\n", st.Warning.Render("!"), hk.ID, err)
 							} else {
 								fmt.Fprintf(out, "      %s Applied %s\n", st.Success.Render("✓"), hk.ID)

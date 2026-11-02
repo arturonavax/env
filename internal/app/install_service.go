@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -49,6 +50,13 @@ type InstallDeps struct {
 
 // NewInstallService constructs an InstallService from its dependencies.
 func NewInstallService(deps InstallDeps) *InstallService {
+	workers := runtime.NumCPU() * 2
+	if workers < 4 {
+		workers = 4
+	}
+	if workers > 32 {
+		workers = 32
+	}
 	return &InstallService{
 		platform:   deps.Platform,
 		catalog:    deps.Catalog,
@@ -57,7 +65,7 @@ func NewInstallService(deps InstallDeps) *InstallService {
 		provider:   deps.Provider,
 		store:      deps.Store,
 		sync:       deps.Sync,
-		engine:     execution.NewEngine(4),
+		engine:     execution.NewEngine(workers),
 		onProgress: deps.OnProgress,
 	}
 }

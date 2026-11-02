@@ -1,0 +1,23 @@
+id: dell-xps13-9343
+name: Dell XPS 13 9343 Broadcom BCM4352 Wi-Fi Driver Suite
+category: hardware-network
+description: >-
+  Ensures installation, DKMS module compilation, and kernel binding of the
+  proprietary Broadcom STA wireless driver (broadcom-sta-dkms / wl) for the
+  Dell Wireless 1560 (BCM4352 802.11ac [14e4:43b1]) adapter on Dell XPS 13 9343.
+safe_by_opt_in: true
+match:
+  os:
+    - linux
+  dmi_vendor: Dell
+  dmi_product: XPS 13 9343
+backup_paths: []
+steps:
+  - id: apply-xps13-wifi-driver
+    name: Ensure broadcom-sta-dkms and wl module are active
+    description: >-
+      Installs broadcom-sta-dkms and dkms if missing, unloads conflicting bcma,
+      loads the wl kernel module, and restarts NetworkManager to bind wireless interfaces.
+    script: apply_wifi_hack.sh
+    touches: []
+    privileged: true

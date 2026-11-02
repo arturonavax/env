@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -56,6 +57,8 @@ type ApplyOptions struct {
 	Store     *state.Store
 	Env       []string
 	WorkDir   string
+	Stdout    io.Writer
+	Stderr    io.Writer
 }
 
 // HackApplyResult summarizes a completed hack application.
@@ -194,10 +197,22 @@ func ApplyHack(
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
-		out, err := runner.RunWithOptions(ctx, workDir, execEnv, ps.binary, ps.args...)
+		if opts.Stdout != nil {
+			fmt.Fprintf(opts.Stdout, "  ▶ Running step: %s (%s)...\n", ps.step.Name, ps.step.ID)
+		}
+		runOpts := security.RunOptions{
+			Dir:    workDir,
+			Env:    execEnv,
+			Stdout: opts.Stdout,
+			Stderr: opts.Stderr,
+		}
+		out, err := runner.RunWithInput(ctx, runOpts, ps.binary, ps.args...)
 		result.Outputs = append(result.Outputs, out)
 		if err != nil {
 			return result, fmt.Errorf("executing hack %q step %q: %w", profile.ID, ps.step.ID, err)
+		}
+		if opts.Stdout != nil {
+			fmt.Fprintf(opts.Stdout, "  ✓ Step completed: %s\n", ps.step.ID)
 		}
 		result.AppliedSteps = append(result.AppliedSteps, ps.step.ID)
 	}

@@ -153,19 +153,19 @@ if [[ "$RUN_SYNTAX" -eq 1 ]]; then
 		*.md | *.json | *.toml | *.yaml | *.yml | *.txt | *.lock | *.zwc | *.lua | *.js | *.css | *.html | *.svg | *.png | *.desktop) continue ;;
 		esac
 
-		if [[ "$script_file" == *.sh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*(bash|sh)'; then
-			checked_count=$((checked_count + 1))
-			if ! bash -n "$script_file" 2>/dev/null; then
-				printf '    %s%s%s Syntax error in: %s\n' "$RED" "$SYM_CROSS" "$RESET" "$script_file"
-				syntax_errors=$((syntax_errors + 1))
-			fi
-		elif [[ "$script_file" == *.zsh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*zsh'; then
+		if [[ "$script_file" == *.zsh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*zsh'; then
 			if command -v zsh >/dev/null 2>&1; then
 				checked_count=$((checked_count + 1))
 				if ! zsh -n "$script_file" 2>/dev/null; then
 					printf '    %s%s%s Zsh syntax error in: %s\n' "$RED" "$SYM_CROSS" "$RESET" "$script_file"
 					syntax_errors=$((syntax_errors + 1))
 				fi
+			fi
+		elif [[ "$script_file" == *.sh ]] || head -n 1 "$script_file" 2>/dev/null | grep -qE '^#!.*(bash|/sh| env sh)'; then
+			checked_count=$((checked_count + 1))
+			if ! bash -n "$script_file" 2>/dev/null; then
+				printf '    %s%s%s Syntax error in: %s\n' "$RED" "$SYM_CROSS" "$RESET" "$script_file"
+				syntax_errors=$((syntax_errors + 1))
 			fi
 		fi
 	done < <(find "$REPO_ROOT" -type f ! -path "*/.git/*" ! -path "*/.agents/*" ! -path "*/.gemini/*" ! -path "*/.claude/*" ! -path "*/archives/*" | sort)

@@ -30,6 +30,8 @@ type RunOptions struct {
 	Dir     string
 	Env     []string
 	Stdin   io.Reader
+	Stdout  io.Writer
+	Stderr  io.Writer
 	Timeout time.Duration
 }
 
@@ -109,8 +111,16 @@ func (r *Runner) RunWithInput(
 	}
 
 	outBuf := newCappedBuffer(r.maxOutputBytes)
-	cmd.Stdout = outBuf
-	cmd.Stderr = outBuf
+	if opts.Stdout != nil {
+		cmd.Stdout = io.MultiWriter(outBuf, opts.Stdout)
+	} else {
+		cmd.Stdout = outBuf
+	}
+	if opts.Stderr != nil {
+		cmd.Stderr = io.MultiWriter(outBuf, opts.Stderr)
+	} else {
+		cmd.Stderr = outBuf
+	}
 
 	err := cmd.Run()
 	output := outBuf.String()

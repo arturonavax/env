@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/hacks"
@@ -55,8 +56,19 @@ func (h *HacksService) Plan(id string) (*hacks.HackPlan, error) {
 	return hacks.PlanHack(h.platform, p)
 }
 
+// HackApplyOption configures individual hack executions.
+type HackApplyOption func(*hacks.ApplyOptions)
+
+// WithHackOutput directs real-time step progress and command stdout/stderr to out.
+func WithHackOutput(out io.Writer) HackApplyOption {
+	return func(o *hacks.ApplyOptions) {
+		o.Stdout = out
+		o.Stderr = out
+	}
+}
+
 // Apply runs a hack after taking a pre-hack snapshot; it never runs implicitly.
-func (h *HacksService) Apply(ctx context.Context, id string) (*hacks.HackApplyResult, error) {
+func (h *HacksService) Apply(ctx context.Context, id string, opts ...HackApplyOption) (*hacks.HackApplyResult, error) {
 	p, ok := h.registry.Get(id)
 	if !ok {
 		return nil, fmt.Errorf("unknown hack %q", id)
@@ -67,11 +79,18 @@ func (h *HacksService) Apply(ctx context.Context, id string) (*hacks.HackApplyRe
 	}
 	defer func() { _ = lock.Release() }()
 
-	return hacks.ApplyHack(ctx, p, hacks.ApplyOptions{
+	applyOpts := hacks.ApplyOptions{
 		Platform:  h.platform,
 		Runner:    h.runner,
 		Snapshots: h.snapshots,
 		Store:     h.store,
 		WorkDir:   h.repoRoot,
-	})
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&applyOpts)
+		}
+	}
+
+	return hacks.ApplyHack(ctx, p, applyOpts)
 }
