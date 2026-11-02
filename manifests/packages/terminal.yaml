@@ -324,8 +324,18 @@ packages:
     strategies:
       - type: native
         packages:
+          apt: [ghostty]
           pacman: [ghostty]
+          dnf: [ghostty]
+          zypper: [ghostty]
           brew: ["--cask", "ghostty"]
+      - type: script
+        when:
+          os: [linux]
+        script:
+          local_script: scripts/install_ghostty.sh
+          interpreter: bash
+          creates: "/usr/bin/ghostty"
       - type: source
         when:
           os: [linux, darwin]

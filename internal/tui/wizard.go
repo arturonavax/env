@@ -120,9 +120,11 @@ type WizardModel struct {
 	selectedPkgs     map[string]bool
 	pkgMap           map[string]domain.ManagedResource
 	requiredBy       map[string][]string
-	pkgCursor        int
-	pkgScrollOffset  int
-	planScrollOffset int
+	pkgCursor             int
+	pkgScrollOffset       int
+	planScrollOffset      int
+	applyScrollOffset     int
+	completedScrollOffset int
 	spinnerFrame     int
 	plan             *domain.ExecutionPlan
 	progressStep     int
@@ -461,6 +463,14 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if w.planScrollOffset > 0 {
 					w.planScrollOffset--
 				}
+			case StageApplying:
+				if w.applyScrollOffset > 0 {
+					w.applyScrollOffset--
+				}
+			case StageCompleted:
+				if w.completedScrollOffset > 0 {
+					w.completedScrollOffset--
+				}
 			}
 
 		case "down", "j":
@@ -486,6 +496,10 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.adjustPkgScroll()
 			case StageReviewPlan:
 				w.planScrollOffset++
+			case StageApplying:
+				w.applyScrollOffset++
+			case StageCompleted:
+				w.completedScrollOffset++
 			}
 
 		case "pgup", "ctrl+u":
@@ -501,6 +515,16 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if w.planScrollOffset < 0 {
 					w.planScrollOffset = 0
 				}
+			case StageApplying:
+				w.applyScrollOffset -= 5
+				if w.applyScrollOffset < 0 {
+					w.applyScrollOffset = 0
+				}
+			case StageCompleted:
+				w.completedScrollOffset -= 5
+				if w.completedScrollOffset < 0 {
+					w.completedScrollOffset = 0
+				}
 			}
 
 		case "pgdown", "ctrl+d":
@@ -513,6 +537,10 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.adjustPkgScroll()
 			case StageReviewPlan:
 				w.planScrollOffset += 5
+			case StageApplying:
+				w.applyScrollOffset += 5
+			case StageCompleted:
+				w.completedScrollOffset += 5
 			}
 
 		case "tab", "left", "right":
@@ -622,6 +650,14 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if w.planScrollOffset > 0 {
 					w.planScrollOffset--
 				}
+			case StageApplying:
+				if w.applyScrollOffset > 0 {
+					w.applyScrollOffset--
+				}
+			case StageCompleted:
+				if w.completedScrollOffset > 0 {
+					w.completedScrollOffset--
+				}
 			}
 		case tea.MouseWheelDown:
 			switch w.stage {
@@ -642,6 +678,10 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.adjustPkgScroll()
 			case StageReviewPlan:
 				w.planScrollOffset++
+			case StageApplying:
+				w.applyScrollOffset++
+			case StageCompleted:
+				w.completedScrollOffset++
 			}
 		}
 
@@ -1151,9 +1191,9 @@ func (w WizardModel) View() tea.View {
 	case StageReviewPlan:
 		body = w.renderReviewPlan(availWidth, availHeight)
 	case StageApplying:
-		body = w.renderApplying(availWidth)
+		body = w.renderApplying(availWidth, availHeight)
 	case StageCompleted:
-		body = w.renderCompleted(availWidth)
+		body = w.renderCompleted(availWidth, availHeight)
 	}
 
 	content := fmt.Sprintf("%s\n\n%s", header, body)
@@ -1508,7 +1548,7 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	return strings.Join(append(visibleLines, "", footer), "\n")
 }
 
-func (w WizardModel) renderCompleted(width int) string {
+func (w WizardModel) renderCompleted(width int, height ...int) string {
 	var lines []string
 	if w.err != nil {
 		lines = append(lines,
@@ -1565,22 +1605,58 @@ func (w WizardModel) renderCompleted(width int) string {
 			"",
 			w.styles.Header.Render("Press [Enter] or [q] to exit."),
 		)
-		return strings.Join(lines, "\n")
+	} else {
+		logLine := ""
+		if w.installLogPath != "" {
+			logLine = fmt.Sprintf("\n  • Installation log saved to: %s", w.installLogPath)
+		}
+
+		lines = append(lines,
+			w.styles.Success.Render("✓ SETUP AND RECONCILIATION COMPLETED SUCCESSFULLY"),
+			"",
+			"All selected packages and configurations were reconciled safely.",
+			"",
+			w.styles.Highlight.Render("Next Steps:"),
+			"  • Restart your terminal or run 'zsh' to load new configs.",
+			"  • Run 'anx doctor' anytime to verify your environment health."+logLine,
+			"",
+			w.styles.Header.Render("Press [Enter] or [q] to exit."),
+		)
 	}
 
-	logLine := ""
-	if w.installLogPath != "" {
-		logLine = fmt.Sprintf("\n  • Installation log saved to: %s", w.installLogPath)
+	var allLines []string
+	for _, l := range lines {
+		allLines = append(allLines, AnsiWrap(l, width-4)...)
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n\n%s\n%s\n%s%s\n\n%s",
-		w.styles.Success.Render("✓ SETUP AND RECONCILIATION COMPLETED SUCCESSFULLY"),
-		"All selected packages and configurations were reconciled safely.",
-		w.styles.Highlight.Render("Next Steps:"),
-		"  • Restart your terminal or run 'zsh' to load new configs.",
-		"  • Run 'anx doctor' anytime to verify your environment health.",
-		logLine,
-		w.styles.Header.Render("Press [Enter] or [q] to exit."))
+	availHeight := 0
+	if len(height) > 0 {
+		availHeight = height[0] - 3
+	}
+	if availHeight <= 0 || len(allLines) <= availHeight {
+		return strings.Join(allLines, "\n")
+	}
+
+	totalLines := len(allLines)
+	maxOffset := totalLines - availHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	offset := w.completedScrollOffset
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + availHeight
+	if end > totalLines {
+		end = totalLines
+	}
+	visibleLines := allLines[offset:end]
+
+	scrollHint := w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down / Mouse Wheel] Scroll Results (%d-%d/%d)  [Enter/q] Exit", offset+1, end, totalLines))
+	return strings.Join(append(visibleLines, "", scrollHint), "\n")
 }
 
 func (w WizardModel) renderPlanning(width int) string {
@@ -1766,7 +1842,7 @@ func (w WizardModel) renderGlobalOutputBox(width int) []string {
 	return boxLines
 }
 
-func (w WizardModel) renderApplying(width int) string {
+func (w WizardModel) renderApplying(width int, height ...int) string {
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	frame := frames[w.spinnerFrame%len(frames)]
 	spinner := w.styles.Header.Render(frame)
@@ -1853,11 +1929,41 @@ func (w WizardModel) renderApplying(width int) string {
 	}
 
 	lines = append(lines, "",
-		w.styles.Muted.Render("  • Base tools prioritized first (ghostty, zsh, herdr, neovim)."),
+		w.styles.Muted.Render("  • Base tools prioritized first (curl, wget, build-essential, git, ghostty)."),
 		w.styles.Muted.Render("  • DAG scheduler executes independent downloads, builds, and syncs concurrently."),
 		w.styles.Muted.Render("  • Fault-tolerant: single package failures do not abort remaining installations."))
 
-	return strings.Join(lines, "\n")
+	var allLines []string
+	for _, l := range lines {
+		allLines = append(allLines, AnsiWrap(l, width-4)...)
+	}
 
-	return strings.Join(lines, "\n")
+	availHeight := 0
+	if len(height) > 0 {
+		availHeight = height[0] - 2
+	}
+	if availHeight <= 0 || len(allLines) <= availHeight {
+		return strings.Join(allLines, "\n")
+	}
+
+	totalLines := len(allLines)
+	maxOffset := totalLines - availHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	offset := w.applyScrollOffset
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := offset + availHeight
+	if end > totalLines {
+		end = totalLines
+	}
+	visibleLines := allLines[offset:end]
+
+	scrollHint := w.styles.Muted.Render(fmt.Sprintf("  Navigation: [j/k / Up/Down / Mouse Wheel] Scroll Output (%d-%d/%d)", offset+1, end, totalLines))
+	return strings.Join(append(visibleLines, scrollHint), "\n")
 }

@@ -1086,3 +1086,84 @@ func TestWizardProgressOutputWidgetsAndErrorSummary(t *testing.T) {
 		t.Errorf("expected lazygit in failed section, got:\n%s", completedView)
 	}
 }
+
+func TestWizardScrollingInApplyingAndCompletedStages(t *testing.T) {
+	deps := newTestDeps(t)
+	wiz := NewWizardModel(deps.Platform, deps.Catalog, nil)
+	wiz.width = 80
+	wiz.height = 20
+
+	// 1. Test StageApplying scrolling
+	wiz.stage = StageApplying
+	wiz.applyScrollOffset = 0
+
+	// Down key increases offset
+	nm, _ := wiz.Update(tea.KeyPressMsg{Text: "down"})
+	w := nm.(WizardModel)
+	if w.applyScrollOffset != 1 {
+		t.Errorf("expected applyScrollOffset=1 after down, got %d", w.applyScrollOffset)
+	}
+
+	// 'j' increases offset
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "j"})
+	w = nm.(WizardModel)
+	if w.applyScrollOffset != 2 {
+		t.Errorf("expected applyScrollOffset=2 after 'j', got %d", w.applyScrollOffset)
+	}
+
+	// MouseWheelDown increases offset
+	nm, _ = w.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	w = nm.(WizardModel)
+	if w.applyScrollOffset != 3 {
+		t.Errorf("expected applyScrollOffset=3 after MouseWheelDown, got %d", w.applyScrollOffset)
+	}
+
+	// 'k' decreases offset
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "k"})
+	w = nm.(WizardModel)
+	if w.applyScrollOffset != 2 {
+		t.Errorf("expected applyScrollOffset=2 after 'k', got %d", w.applyScrollOffset)
+	}
+
+	// Up decreases offset
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "up"})
+	w = nm.(WizardModel)
+	if w.applyScrollOffset != 1 {
+		t.Errorf("expected applyScrollOffset=1 after up, got %d", w.applyScrollOffset)
+	}
+
+	// MouseWheelUp decreases offset
+	nm, _ = w.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	w = nm.(WizardModel)
+	if w.applyScrollOffset != 0 {
+		t.Errorf("expected applyScrollOffset=0 after MouseWheelUp, got %d", w.applyScrollOffset)
+	}
+
+	// 2. Test StageCompleted scrolling
+	w.stage = StageCompleted
+	w.completedScrollOffset = 0
+
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "down"})
+	w = nm.(WizardModel)
+	if w.completedScrollOffset != 1 {
+		t.Errorf("expected completedScrollOffset=1 after down, got %d", w.completedScrollOffset)
+	}
+
+	nm, _ = w.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	w = nm.(WizardModel)
+	if w.completedScrollOffset != 2 {
+		t.Errorf("expected completedScrollOffset=2 after MouseWheelDown, got %d", w.completedScrollOffset)
+	}
+
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "up"})
+	w = nm.(WizardModel)
+	if w.completedScrollOffset != 1 {
+		t.Errorf("expected completedScrollOffset=1 after up, got %d", w.completedScrollOffset)
+	}
+
+	nm, _ = w.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	w = nm.(WizardModel)
+	if w.completedScrollOffset != 0 {
+		t.Errorf("expected completedScrollOffset=0 after MouseWheelUp, got %d", w.completedScrollOffset)
+	}
+}

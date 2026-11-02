@@ -139,7 +139,7 @@ packages:
           brew: [pyenv]
       - type: script
         script:
-          url: https://pyenv.run
+          local_script: scripts/install_pyenv.sh
           interpreter: bash
           creates: "~/.pyenv/bin/pyenv"
 
