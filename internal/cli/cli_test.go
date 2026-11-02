@@ -355,6 +355,13 @@ func TestCLIUpdate(t *testing.T) {
 	if summary.ConfigDrifts != len(summary.DriftedFiles) {
 		t.Errorf("expected ConfigDrifts (%d) to match DriftedFiles count (%d)", summary.ConfigDrifts, len(summary.DriftedFiles))
 	}
+
+	// Test --check flag
+	var chkOut, chkErr bytes.Buffer
+	code = cli.ExecuteCLI([]string{"update", "--fetch=false", "--check"}, &chkOut, &chkErr, "1.0.0-test", "", "")
+	if code != 0 && code != 1 {
+		t.Fatalf("expected exit code 0 or 1 for update --check, got %d (err: %s)", code, chkErr.String())
+	}
 }
 
 func TestCLIUpgradeDryRun(t *testing.T) {

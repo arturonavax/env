@@ -220,7 +220,14 @@ func (r *Rebuilder) rebuildRust(ctx context.Context) (RebuildResult, error) {
 		res.Commands = append(res.Commands, "rustup update stable")
 		if !r.DryRun {
 			if _, err := r.runCmd(ctx, rustupBin, "update", "stable"); err != nil {
-				errs = append(errs, fmt.Errorf("rustup update stable: %w", err))
+				errStr := err.Error()
+				if strings.Contains(errStr, "dns error") ||
+					strings.Contains(errStr, "Temporary failure in name resolution") ||
+					strings.Contains(errStr, "error sending request") {
+					res.Message = "rustup update skipped (network or DNS resolution unavailable)"
+				} else {
+					errs = append(errs, fmt.Errorf("rustup update stable: %w", err))
+				}
 			}
 		}
 	}
@@ -264,7 +271,7 @@ func (r *Rebuilder) rebuildNode(ctx context.Context) (RebuildResult, error) {
 		if r.DryRun {
 			return res, nil
 		}
-		if _, err := r.runCmd(ctx, pnpmBin, "update", "-g"); err != nil {
+		if _, err := r.runCmd(ctx, pnpmBin, "update", "-g", "--loglevel", "error"); err != nil {
 			return res, err
 		}
 		return res, nil

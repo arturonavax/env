@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,18 +21,75 @@ import (
 
 // UpdateCheckSummary holds the status of updates across repo, tools, and configs.
 type UpdateCheckSummary struct {
-	RepoBehind    int      `json:"repo_behind"`
-	RepoBranch    string   `json:"repo_branch"`
-	RepoClean     bool     `json:"repo_clean"`
-	ToolsTotal    int      `json:"tools_total"`
-	ConfigDrifts  int      `json:"config_drifts"`
-	DriftedFiles  []string `json:"drifted_files,omitempty"`
-	MatchedHacks  int      `json:"matched_hacks"`
-	CheckDuration string   `json:"check_duration"`
+	RepoBehind       int      `json:"repo_behind"`
+	RepoBranch       string   `json:"repo_branch"`
+	RepoClean        bool     `json:"repo_clean"`
+	ToolsTotal       int      `json:"tools_total"`
+	ConfigDrifts     int      `json:"config_drifts"`
+	DriftedFiles     []string `json:"drifted_files,omitempty"`
+	PackagesPending  int      `json:"packages_pending"`
+	OSUpdatesPending int      `json:"os_updates_pending"`
+	MatchedHacks     int      `json:"matched_hacks"`
+	CheckDuration    string   `json:"check_duration"`
+}
+
+// HasUpdates returns true if any update or synchronization is required.
+func (s UpdateCheckSummary) HasUpdates() bool {
+	return s.RepoBehind > 0 || s.ConfigDrifts > 0 || s.PackagesPending > 0 || s.OSUpdatesPending > 0
+}
+
+func checkOSUpdates(ctx context.Context) int {
+	checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	if _, err := exec.LookPath("apt-get"); err == nil {
+		out, err := exec.CommandContext(checkCtx, "apt-get", "-s", "upgrade").Output()
+		if err == nil {
+			re := regexp.MustCompile(`(?m)^(\d+)\s+upgraded`)
+			if m := re.FindSubmatch(out); len(m) > 1 {
+				var count int
+				if _, err := fmt.Sscanf(string(m[1]), "%d", &count); err == nil {
+					return count
+				}
+			}
+		}
+	} else if _, err := exec.LookPath("checkupdates"); err == nil {
+		out, _ := exec.CommandContext(checkCtx, "checkupdates").Output()
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		count := 0
+		for _, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				count++
+			}
+		}
+		return count
+	} else if _, err := exec.LookPath("dnf"); err == nil {
+		cmd := exec.CommandContext(checkCtx, "dnf", "check-update", "-q")
+		if err := cmd.Run(); err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() == 100 {
+				return 1
+			}
+		}
+	} else if _, err := exec.LookPath("brew"); err == nil {
+		out, _ := exec.CommandContext(checkCtx, "brew", "outdated", "-q").Output()
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		count := 0
+		for _, l := range lines {
+			if strings.TrimSpace(l) != "" {
+				count++
+			}
+		}
+		return count
+	}
+	return 0
 }
 
 func newUpdateCmd(appCtx *AppContext) *cobra.Command {
-	var fetchRemote bool
+	var (
+		fetchRemote bool
+		checkOnly   bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "update",
@@ -51,7 +109,9 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 				RepoClean: true,
 			}
 
-			renderSecuritySealBanner(cmd.OutOrStdout(), appCtx)
+			if !checkOnly {
+				renderSecuritySealBanner(cmd.OutOrStdout(), appCtx)
+			}
 
 			// 1. Check Git Repository
 			if isGitRepo(repo) {
@@ -61,7 +121,7 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 				summary.RepoClean = isGitClean(ctx, repo)
 
 				if fetchRemote && !appCtx.Flags.Offline {
-					fetchCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+					fetchCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 					_ = exec.CommandContext(fetchCtx, "git", "-C", repo, "fetch", "--quiet").Run()
 					cancel()
 				}
@@ -96,13 +156,51 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 				}
 			}
 
-			// 4. Check Matched Hacks
+			// 4. Check Package Installation Plan
+			if appCtx.InstallSvc != nil {
+				plan, err := appCtx.InstallSvc.Plan(ctx, appCtx.Flags.Profile, nil)
+				if err == nil {
+					summary.PackagesPending = len(plan.Steps)
+				}
+			}
+
+			// 5. Check Native OS Package Updates (simulation)
+			summary.OSUpdatesPending = checkOSUpdates(ctx)
+
+			// 6. Check Matched Hacks
 			if appCtx.HacksSvc != nil {
 				_, matches := appCtx.HacksSvc.Detect(ctx)
 				summary.MatchedHacks = len(matches)
 			}
 
 			summary.CheckDuration = time.Since(start).Round(time.Millisecond).String()
+
+			if checkOnly {
+				if !summary.HasUpdates() {
+					if !appCtx.Flags.Quiet {
+						fmt.Fprintln(cmd.OutOrStdout(), st.Success.Render("✓ Environment is fully up to date (0 pending updates)."))
+					}
+					return nil
+				}
+				if !appCtx.Flags.Quiet {
+					var reasons []string
+					if summary.RepoBehind > 0 {
+						reasons = append(reasons, fmt.Sprintf("%d repo commit(s)", summary.RepoBehind))
+					}
+					if summary.ConfigDrifts > 0 {
+						reasons = append(reasons, fmt.Sprintf("%d dotfile drift(s)", summary.ConfigDrifts))
+					}
+					if summary.PackagesPending > 0 {
+						reasons = append(reasons, fmt.Sprintf("%d package action(s)", summary.PackagesPending))
+					}
+					if summary.OSUpdatesPending > 0 {
+						reasons = append(reasons, fmt.Sprintf("%d OS update(s)", summary.OSUpdatesPending))
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "%s Updates available: %s. Run 'anx upgrade' to apply.\n",
+						st.Highlight.Render("ℹ"), strings.Join(reasons, ", "))
+				}
+				return domain.NewExitError(domain.ExitGeneralError, errors.New("updates available"))
+			}
 
 			return emit(cmd, appCtx, summary, func(w io.Writer) {
 				fmt.Fprintln(w, st.Header.Render("ANX Update Check"))
@@ -126,6 +224,16 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 						st.Warning.Render(fmt.Sprintf("%d configs have drifts", summary.ConfigDrifts)),
 						strings.Join(summary.DriftedFiles, ", "))
 				}
+				if summary.PackagesPending == 0 {
+					fmt.Fprintf(w, "  • Managed Packages:  %s\n", st.Success.Render("all up to date"))
+				} else {
+					fmt.Fprintf(w, "  • Managed Packages:  %s\n",
+						st.Warning.Render(fmt.Sprintf("%d pending action(s)", summary.PackagesPending)))
+				}
+				if summary.OSUpdatesPending > 0 {
+					fmt.Fprintf(w, "  • System OS Updates: %s\n",
+						st.Highlight.Render(fmt.Sprintf("%d package(s) upgradable", summary.OSUpdatesPending)))
+				}
 				if summary.MatchedHacks > 0 {
 					fmt.Fprintf(w, "  • Workstation Hacks: %s\n", st.Highlight.Render(fmt.Sprintf("%d hardware match(es) detected", summary.MatchedHacks)))
 				}
@@ -135,6 +243,7 @@ Works seamlessly from any working directory (CWD-independent) by resolving the c
 	}
 
 	cmd.Flags().BoolVar(&fetchRemote, "fetch", true, "Fetch remote git references before checking")
+	cmd.Flags().BoolVar(&checkOnly, "check", false, "Exit 0 if clean, or exit 1 if updates or actions are pending")
 	return cmd
 }
 

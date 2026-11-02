@@ -112,3 +112,4 @@ tools:
     allow_global_path: true
     language: "go"
     version_args: ["--version"]
+    update_strategy: "anx_self"

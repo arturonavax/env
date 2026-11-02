@@ -428,6 +428,13 @@ function update() {
     [[ "$#" -eq 0 ]] && update_system=1
 
     if [[ "$update_all" -eq 1 ]]; then
+        if command -v anx >/dev/null 2>&1; then
+            echo -e "${c_bold}${c_cyan}[anx::updater]${c_reset} Checking for available environment, tool, and package updates..."
+            if anx update --check; then
+                echo -e "\n${c_bold}${c_green}✓ Environment, tools, dotfiles, and packages are fully up to date. No operations needed.${c_reset}\n"
+                return 0
+            fi
+        fi
         update_tools=1
         update_system=1
     fi
@@ -435,7 +442,7 @@ function update() {
     # 1. End-to-end environment & repository synchronization
     if [[ "$update_all" -eq 1 ]] && command -v anx >/dev/null 2>&1; then
         echo -e "\n${c_bold}${c_cyan}── [1/3] ANX Environment & Dotfiles Synchronization ──${c_reset}"
-        anx upgrade --include-hacks
+        anx upgrade
     fi
 
     # 2. Toolchain managers & decoupled tools
@@ -449,14 +456,16 @@ function update() {
 
         if command -v rustup >/dev/null 2>&1; then
             echo -e "  ${c_cyan}•${c_reset} Updating Rust toolchain (rustup)..."
-            rustup update stable
+            if ! rustup update stable; then
+                echo -e "  ${c_yellow}!${c_reset} Rustup update skipped (network or DNS resolution unavailable)."
+            fi
         fi
 
         if command -v pnpm >/dev/null 2>&1; then
             echo -e "  ${c_cyan}•${c_reset} Updating Node.js package manager (pnpm)..."
             pnpm self-update 2>/dev/null || true
-            pnpm --global update 2>/dev/null || true
-            [[ -f "$HOME/package.json" ]] && pnpm --dir "$HOME" update 2>/dev/null || true
+            pnpm --global update --loglevel error 2>/dev/null || true
+            [[ -f "$HOME/package.json" ]] && pnpm --dir "$HOME" update --loglevel error 2>/dev/null || true
         fi
 
         if command -v pipx >/dev/null 2>&1; then
@@ -474,27 +483,50 @@ function update() {
 
         if [[ "$OSTYPE" == linux* ]]; then
             if (( $+commands[apt] )); then
-                # Silence masked PackageKit D-Bus noise if unit is masked
-                if systemctl is-enabled packagekit.service 2>/dev/null | grep -q "masked"; then
-                    sudo systemctl unmask packagekit.service 2>/dev/null || true
+                local upgradable=0
+                if command -v apt-get >/dev/null 2>&1; then
+                    upgradable=$(apt-get -s upgrade 2>/dev/null | grep -E -o '^[0-9]+ upgraded' | cut -d' ' -f1)
                 fi
 
-                sudo apt update
-                sudo apt upgrade -y
-                sudo apt autoclean -y 2>/dev/null || true
+                if [[ "${upgradable:-0}" -gt 0 || "$update_all" -ne 1 ]]; then
+                    # Silence masked PackageKit D-Bus noise if unit is masked
+                    if systemctl is-enabled packagekit.service 2>/dev/null | grep -q "masked"; then
+                        sudo systemctl unmask packagekit.service 2>/dev/null || true
+                    fi
+
+                    sudo apt update
+                    sudo apt upgrade -y
+                    sudo apt autoclean -y 2>/dev/null || true
+                else
+                    echo -e "  ${c_green}✓${c_reset} System packages are already up to date (0 upgradable)."
+                fi
             fi
 
             if (( $+commands[snap] )); then
-                echo -e "  ${c_cyan}•${c_reset} Refreshing Snap packages..."
-                sudo snap refresh
+                if [[ "$update_all" -ne 1 ]]; then
+                    echo -e "  ${c_cyan}•${c_reset} Refreshing Snap packages..."
+                    sudo snap refresh
+                fi
             fi
 
             if (( $+commands[dnf] )); then
-                sudo dnf upgrade -y
+                if [[ "$update_all" -ne 1 ]] || dnf check-update -q 2>/dev/null; then
+                    sudo dnf upgrade -y
+                else
+                    echo -e "  ${c_green}✓${c_reset} DNF packages are already up to date."
+                fi
             fi
 
             if (( $+commands[pacman] )); then
-                sudo pacman -Syu --noconfirm
+                local arch_updates=0
+                if command -v checkupdates >/dev/null 2>&1; then
+                    arch_updates=$(checkupdates 2>/dev/null | wc -l)
+                fi
+                if [[ "${arch_updates:-0}" -gt 0 || "$update_all" -ne 1 ]]; then
+                    sudo pacman -Syu --noconfirm
+                else
+                    echo -e "  ${c_green}✓${c_reset} Pacman packages are already up to date."
+                fi
             fi
 
         elif [[ "$OSTYPE" == darwin* ]]; then

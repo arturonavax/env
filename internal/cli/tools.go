@@ -360,7 +360,7 @@ func runToolsUpdate(cmd *cobra.Command, appCtx *AppContext, target string) error
 			tag := themeStyles.Success.Render("[" + strings.ToUpper(r.Status) + "]")
 			if r.Status == "error" || r.Status == "failed" {
 				tag = themeStyles.Error.Render("[" + strings.ToUpper(r.Status) + "]")
-			} else if r.Status == "skipped" || r.Status == "up-to-date" {
+			} else if r.Status == "skipped" || r.Status == "up-to-date" || r.Status == "external" {
 				tag = themeStyles.Muted.Render("[" + strings.ToUpper(r.Status) + "]")
 			}
 			fmt.Fprintf(w, "  %-14s %s %s\n", r.ToolID, tag, r.Message)
