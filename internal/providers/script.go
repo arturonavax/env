@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/arturonavax/env/internal/manifest"
 	"github.com/arturonavax/env/internal/security"
@@ -89,15 +90,57 @@ func (d *Dispatcher) installScript(ctx context.Context, spec manifest.ScriptSpec
 	}
 
 	env := d.buildSubprocessEnv(spec.Env)
-	if _, err := d.runner.RunWithOptions(ctx, "", env, interpreter, execArgs...); err != nil {
-		return err
+
+	scriptCtx, cancelScript := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancelScript()
+
+	var watcherDone chan struct{}
+	if spec.Creates != "" {
+		expectedPath := expandTemplateString(spec.Creates, d.platform, d.repoDir)
+		watcherDone = make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-watcherDone:
+					return
+				case <-scriptCtx.Done():
+					return
+				case <-ticker.C:
+					if info, err := os.Stat(expectedPath); err == nil && info.Size() > 0 {
+						select {
+						case <-watcherDone:
+							return
+						case <-scriptCtx.Done():
+							return
+						case <-time.After(2 * time.Second):
+							if handler := security.OutputHandlerFromContext(scriptCtx); handler != nil {
+								handler(fmt.Sprintf("Target artifact %s verified; completing installer script.", filepath.Base(expectedPath)))
+							}
+							cancelScript()
+							return
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	_, err = d.runner.RunWithOptions(scriptCtx, "", env, interpreter, execArgs...)
+	if watcherDone != nil {
+		close(watcherDone)
 	}
 
 	if spec.Creates != "" {
 		expected := expandTemplateString(spec.Creates, d.platform, d.repoDir)
-		if _, err := os.Stat(expected); err != nil {
-			return fmt.Errorf("script finished without creating expected path %q: %w", expected, err)
+		if _, statErr := os.Stat(expected); statErr == nil {
+			return nil
 		}
+	}
+
+	if err != nil {
+		return err
 	}
 
 	return nil

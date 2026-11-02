@@ -170,7 +170,10 @@ func (r *Runner) RunWithInput(
 	}
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
+	} else {
+		cmd.Stdin = strings.NewReader("")
 	}
+	setProcessAttributes(cmd, binary)
 
 	outBuf := newCappedBuffer(r.maxOutputBytes)
 	handler := OutputHandlerFromContext(ctx)

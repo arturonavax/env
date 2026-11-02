@@ -268,3 +268,73 @@ func TestDispatcherPreviewMultiDistroMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestScriptStrategyCompletesWhenTargetCreatedEvenIfScriptHangs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping bash-specific hang test on Windows")
+	}
+
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	_ = os.MkdirAll(binDir, 0o755)
+
+	targetFile := filepath.Join(binDir, "hanging-tool")
+
+	// Script creates targetFile, then sleeps
+	scriptBody := "#!/bin/sh\n" +
+		"echo 'hanging-tool 1.0.0' > \"" + targetFile + "\"\n" +
+		"chmod +x \"" + targetFile + "\"\n" +
+		"sleep 30\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(scriptBody))
+	}))
+	defer srv.Close()
+
+	dropIn := t.TempDir()
+	yamlSpec := `packages:
+  - id: hanging-tool
+    name: Hanging Tool
+    category: test
+    binary_name: hanging-tool
+    strategies:
+      - type: script
+        script:
+          url: "` + srv.URL + `/install.sh"
+          interpreter: sh
+          creates: "` + targetFile + `"
+`
+	if err := os.WriteFile(filepath.Join(dropIn, "hanging.yaml"), []byte(yamlSpec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cat, err := manifest.LoadCatalog(manifest.WithUserDropInDir(dropIn))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{},
+		HomeDir:         home,
+		LocalBinDir:     binDir,
+	})
+
+	disp := providers.NewDispatcher(plat, cat, security.NewRunner(30*time.Second), "")
+
+	start := time.Now()
+	err = disp.Install(context.Background(), domain.ManagedResource{ID: "hanging-tool", Name: "Hanging Tool"})
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("expected install to succeed via creates watchdog, got: %v", err)
+	}
+	if elapsed > 10*time.Second {
+		t.Fatalf("install took too long (%v), expected early completion after creates verified", elapsed)
+	}
+	if _, err := os.Stat(targetFile); err != nil {
+		t.Fatalf("expected target file %s to exist, stat error: %v", targetFile, err)
+	}
+}

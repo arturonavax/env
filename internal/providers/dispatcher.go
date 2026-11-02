@@ -482,6 +482,20 @@ func (d *Dispatcher) buildSubprocessEnv(extra map[string]string) []string {
 	if home != "" {
 		envMap["HOME"] = home
 	}
+
+	// Enforce non-interactive execution across all child processes and scripts
+	envMap["DEBIAN_FRONTEND"] = "noninteractive"
+	envMap["CI"] = "true"
+	envMap["NONINTERACTIVE"] = "1"
+	envMap["AUTOMATED"] = "1"
+	envMap["INTERACTIVE"] = "0"
+	envMap["GIT_TERMINAL_PROMPT"] = "0"
+	envMap["ATUIN_NON_INTERACTIVE"] = "yes"
+	envMap["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+	envMap["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
+	envMap["HOMEBREW_NO_INTERACTIVE"] = "1"
+	envMap["NEEDRESTART_MODE"] = "a"
+	envMap["UCF_FORCE_CONFFOLD"] = "1"
 	if len(prependPaths) > 0 {
 		joined := strings.Join(prependPaths, string(os.PathListSeparator))
 		if currentPath != "" {
