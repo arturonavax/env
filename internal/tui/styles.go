@@ -16,10 +16,29 @@ func AnsiTruncate(s string, maxLen int) string {
 	return ansi.Truncate(s, maxLen, "…")
 }
 
+// AnsiWrap wraps text at width respecting ANSI escapes without losing characters.
+func AnsiWrap(s string, width int) []string {
+	if width <= 0 {
+		return []string{s}
+	}
+	wrapped := ansi.Wordwrap(s, width, " ,._/-")
+	lines := strings.Split(wrapped, "\n")
+	var result []string
+	for _, l := range lines {
+		if ansi.StringWidth(l) > width {
+			hard := ansi.Hardwrap(l, width, false)
+			result = append(result, strings.Split(hard, "\n")...)
+		} else {
+			result = append(result, l)
+		}
+	}
+	return result
+}
+
 // BuildPanel constructs a bordered panel adhering strictly to Golden Rules #1 & #2:
 // - Never sets .Height() on a bordered Lipgloss style
 // - Fills lines to exact innerHeight so panel height is deterministic
-// - Truncates each line to maxWidth - 4 (2 border, 2 padding) to prevent wrapping
+// - Wraps each line cleanly to maxWidth - 4 (2 border, 2 padding)
 func BuildPanel(styles *theme.Styles, lines []string, width, height int, active bool) string {
 	if width < 10 {
 		width = 10
@@ -35,10 +54,16 @@ func BuildPanel(styles *theme.Styles, lines []string, width, height int, active 
 		maxTextWidth = 1
 	}
 
+	expandedLines := make([]string, 0, len(lines))
+	for _, l := range lines {
+		wrapped := AnsiWrap(l, maxTextWidth)
+		expandedLines = append(expandedLines, wrapped...)
+	}
+
 	paddedLines := make([]string, 0, innerHeight)
 	for i := 0; i < innerHeight; i++ {
-		if i < len(lines) {
-			paddedLines = append(paddedLines, AnsiTruncate(lines[i], maxTextWidth))
+		if i < len(expandedLines) {
+			paddedLines = append(paddedLines, expandedLines[i])
 		} else {
 			paddedLines = append(paddedLines, "")
 		}

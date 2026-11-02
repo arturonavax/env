@@ -44,6 +44,13 @@ func WithRollbackOnError(enabled bool) EngineOption {
 	}
 }
 
+// WithContinueOnError configures the engine to keep executing independent tasks when a step fails.
+func WithContinueOnError(enabled bool) EngineOption {
+	return func(e *Engine) {
+		e.continueOnError = enabled
+	}
+}
+
 // WithDefaultTaskTimeout sets the fallback per-task timeout when Task.Timeout is unset.
 func WithDefaultTaskTimeout(d time.Duration) EngineOption {
 	return func(e *Engine) {
@@ -58,6 +65,7 @@ func WithDefaultTaskTimeout(d time.Duration) EngineOption {
 type Engine struct {
 	maxWorkers      int
 	rollbackOnError bool
+	continueOnError bool
 	defaultTimeout  time.Duration
 }
 
@@ -69,6 +77,7 @@ func NewEngine(maxWorkers int, opts ...EngineOption) *Engine {
 	e := &Engine{
 		maxWorkers:      maxWorkers,
 		rollbackOnError: true,
+		continueOnError: false,
 		defaultTimeout:  300 * time.Second,
 	}
 	for _, opt := range opts {
@@ -125,6 +134,7 @@ func (e *Engine) ExecuteTasks(
 	defer cancel()
 
 	var execErr error
+	var stepErrors []error
 	completed := make([]int, 0, len(tasks))
 
 	for {
@@ -134,7 +144,7 @@ func (e *Engine) ExecuteTasks(
 				cancel()
 			}
 		}
-		if execErr == nil {
+		if execErr == nil || e.continueOnError {
 			r.dispatch(runCtx, e, notify)
 		}
 		if r.running == 0 {
@@ -150,21 +160,42 @@ func (e *Engine) ExecuteTasks(
 		notify(c.res)
 
 		if c.res.Error != nil {
-			if execErr == nil {
-				step := &tasks[c.idx].Step
-				execErr = fmt.Errorf("step %d (%s) failed: %w", step.ID, step.ResourceID, c.res.Error)
-				cancel()
+			step := &tasks[c.idx].Step
+			stepErr := fmt.Errorf("step %d (%s) failed: %w", step.ID, step.ResourceID, c.res.Error)
+			stepErrors = append(stepErrors, stepErr)
+			if !e.continueOnError {
+				if execErr == nil {
+					execErr = stepErr
+					cancel()
+				}
 			}
 			continue
 		}
 
 		completed = append(completed, c.idx)
-		if execErr == nil {
+		if execErr == nil || e.continueOnError {
 			r.unblock(c.idx)
 		}
 	}
 
-	if execErr != nil && e.rollbackOnError && len(completed) > 0 {
+	if e.continueOnError {
+		for i := range r.results {
+			if r.results[i].Status == domain.StepPending {
+				r.results[i].Status = domain.StepSkipped
+				notify(r.results[i])
+			}
+		}
+	}
+
+	if len(stepErrors) > 0 {
+		if execErr == nil {
+			execErr = errors.Join(stepErrors...)
+		} else {
+			execErr = errors.Join(execErr, errors.Join(stepErrors...))
+		}
+	}
+
+	if execErr != nil && e.rollbackOnError && !e.continueOnError && len(completed) > 0 {
 		execErr = errors.Join(execErr, e.compensate(g, tasks, completed, r.results, notify))
 	}
 

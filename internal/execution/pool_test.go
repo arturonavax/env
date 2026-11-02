@@ -220,3 +220,55 @@ func TestEngineFineGrainedLockSerialization(t *testing.T) {
 		t.Fatal("fine-grained lock conflict: steps sharing 'pkg:apt' executed concurrently")
 	}
 }
+
+func TestEngineWithContinueOnError(t *testing.T) {
+	eng := NewEngine(4, WithContinueOnError(true), WithRollbackOnError(false))
+
+	var ranTask3 atomic.Bool
+	var ranTask4 atomic.Bool
+
+	tasks := []Task{
+		{
+			Step: domain.PlanStep{ID: 1, ResourceID: "failing-task"},
+			Execute: func(ctx context.Context) error {
+				return errors.New("simulated network failure")
+			},
+		},
+		{
+			Step: domain.PlanStep{ID: 2, ResourceID: "dependent-on-failure", DependsOn: []int{1}},
+			Execute: func(ctx context.Context) error {
+				ranTask4.Store(true)
+				return nil
+			},
+		},
+		{
+			Step: domain.PlanStep{ID: 3, ResourceID: "independent-task"},
+			Execute: func(ctx context.Context) error {
+				ranTask3.Store(true)
+				return nil
+			},
+		},
+	}
+
+	results, err := eng.ExecuteTasks(context.Background(), tasks, nil)
+	if err == nil {
+		t.Fatal("expected error due to failing-task, got nil")
+	}
+	if !ranTask3.Load() {
+		t.Fatal("independent task should have completed even when step 1 failed")
+	}
+	if ranTask4.Load() {
+		t.Fatal("dependent task should have been skipped, but it executed")
+	}
+
+	// Verify status of results
+	if results[0].Status != domain.StepFailed {
+		t.Fatalf("expected step 1 to be StepFailed, got %v", results[0].Status)
+	}
+	if results[1].Status != domain.StepSkipped {
+		t.Fatalf("expected step 2 to be StepSkipped, got %v", results[1].Status)
+	}
+	if results[2].Status != domain.StepSuccess {
+		t.Fatalf("expected step 3 to be StepSuccess, got %v", results[2].Status)
+	}
+}

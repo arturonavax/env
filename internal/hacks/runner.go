@@ -200,6 +200,9 @@ func ApplyHack(
 		if opts.Stdout != nil {
 			fmt.Fprintf(opts.Stdout, "  ▶ Running step: %s (%s)...\n", ps.step.Name, ps.step.ID)
 		}
+		if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+			handler(fmt.Sprintf("▶ Running hack %s step: %s (%s)", profile.ID, ps.step.Name, ps.step.ID))
+		}
 		runOpts := security.RunOptions{
 			Dir:    workDir,
 			Env:    execEnv,
@@ -209,10 +212,16 @@ func ApplyHack(
 		out, err := runner.RunWithInput(ctx, runOpts, ps.binary, ps.args...)
 		result.Outputs = append(result.Outputs, out)
 		if err != nil {
+			if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+				handler(fmt.Sprintf("✖ Hack step failed: %s (%v)", ps.step.ID, err))
+			}
 			return result, fmt.Errorf("executing hack %q step %q: %w", profile.ID, ps.step.ID, err)
 		}
 		if opts.Stdout != nil {
 			fmt.Fprintf(opts.Stdout, "  ✓ Step completed: %s\n", ps.step.ID)
+		}
+		if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+			handler(fmt.Sprintf("✓ Hack step completed: %s", ps.step.ID))
 		}
 		result.AppliedSteps = append(result.AppliedSteps, ps.step.ID)
 	}

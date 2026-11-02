@@ -11,6 +11,7 @@ type ProgressEvent struct {
 	Description string            `json:"description"`
 	Status      domain.StepStatus `json:"status"`
 	Error       string            `json:"error,omitempty"`
+	OutputLine  string            `json:"output_line,omitempty"`
 }
 
 // EventHandler receives progress events.

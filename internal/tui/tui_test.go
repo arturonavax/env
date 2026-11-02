@@ -997,3 +997,92 @@ func TestWizardApplyingMultiProgressConcurrentWorkers(t *testing.T) {
 		t.Errorf("expected git with success badge in recently completed, got:\n%s", renderedAfter)
 	}
 }
+
+func TestWizardPackageOrderingToolsBeforeDeps(t *testing.T) {
+	deps := newTestDeps(t)
+	wiz := NewWizardModel(deps.Platform, deps.Catalog, nil)
+
+	seenDep := false
+	for _, p := range wiz.packages {
+		isDirect := p.IsDirectTool(wiz.requiredBy)
+		if !isDirect {
+			seenDep = true
+		} else if seenDep {
+			t.Fatalf("package %s is a direct tool but was ordered after dependencies!", p.ID)
+		}
+	}
+}
+
+func TestWizardProgressOutputWidgetsAndErrorSummary(t *testing.T) {
+	deps := newTestDeps(t)
+	wiz := NewWizardModel(deps.Platform, deps.Catalog, nil)
+	wiz.stage = StageApplying
+
+	// Send progress with output line
+	nm, _ := wiz.Update(wizardProgressMsg{
+		StepID:      1,
+		TotalSteps:  5,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "lazygit",
+		Description: "Simple terminal UI for Git",
+		Status:      domain.StepRunning,
+		Percent:     20,
+		OutputLine:  "Resolved lazygit release asset: lazygit_0.66.2_linux_x86_64.tar.gz",
+	})
+	w := nm.(WizardModel)
+
+	if len(w.workerLogs[1]) != 1 {
+		t.Fatalf("expected 1 log line for worker 1, got %d", len(w.workerLogs[1]))
+	}
+	if len(w.recentOutputLines) != 1 {
+		t.Fatalf("expected 1 recent output line, got %d", len(w.recentOutputLines))
+	}
+
+	rendered := w.renderApplying(100)
+	if !strings.Contains(rendered, "GLOBAL PROGRESS:") {
+		t.Errorf("expected GLOBAL PROGRESS in rendered output, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "LIVE PROGRESS OUTPUT STREAM") {
+		t.Errorf("expected LIVE PROGRESS OUTPUT STREAM box in rendered output, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "lazygit") {
+		t.Errorf("expected lazygit in rendered output, got:\n%s", rendered)
+	}
+
+	// Now fail step 1 and succeed step 2
+	nm, _ = w.Update(wizardProgressMsg{
+		StepID:      1,
+		TotalSteps:  5,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "lazygit",
+		Description: "Simple terminal UI for Git",
+		Status:      domain.StepFailed,
+		Percent:     30,
+	})
+	nm, _ = nm.Update(wizardProgressMsg{
+		StepID:      2,
+		TotalSteps:  5,
+		Phase:       "Installing",
+		Action:      "install",
+		ResourceID:  "fzf",
+		Description: "Command-line fuzzy finder",
+		Status:      domain.StepSuccess,
+		Percent:     50,
+	})
+	w = nm.(WizardModel)
+	w.err = errors.New("step 1 (lazygit) failed: tier 1 failed")
+	w.stage = StageCompleted
+
+	completedView := w.renderCompleted(100)
+	if !strings.Contains(completedView, "SETUP COMPLETED WITH COMPONENT WARNINGS / ERRORS") {
+		t.Errorf("expected warnings/errors header in completed view, got:\n%s", completedView)
+	}
+	if !strings.Contains(completedView, "Succeeded (1 components)") || !strings.Contains(completedView, "fzf") {
+		t.Errorf("expected fzf in succeeded section, got:\n%s", completedView)
+	}
+	if !strings.Contains(completedView, "Failed Components (1)") || !strings.Contains(completedView, "lazygit") {
+		t.Errorf("expected lazygit in failed section, got:\n%s", completedView)
+	}
+}

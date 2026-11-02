@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
@@ -46,6 +48,7 @@ type activeWorkerSlot struct {
 	Action      string
 	Description string
 	StartedAt   time.Time
+	Outputs     []string
 }
 
 type wizardProgressMsg struct {
@@ -57,6 +60,7 @@ type wizardProgressMsg struct {
 	Description string
 	Status      domain.StepStatus
 	Percent     int
+	OutputLine  string
 }
 
 type wizardPlanDoneMsg struct {
@@ -133,6 +137,10 @@ type WizardModel struct {
 	activeWorkerOrder []int
 	recentCompleted   []string
 	completedSteps    int
+	workerLogs        map[int][]string
+	recentOutputLines []string
+	failedItems       []string
+	succeededItems    []string
 	err              error
 	quitting         bool
 	matchedHacks     []domain.HackProfile
@@ -302,12 +310,18 @@ func NewWizardModel(
 	var directTools []domain.ManagedResource
 	var dependencies []domain.ManagedResource
 	for _, p := range pkgs {
-		if len(requiredBy[p.ID]) > 0 {
-			dependencies = append(dependencies, p)
-		} else {
+		if p.IsDirectTool(requiredBy) {
 			directTools = append(directTools, p)
+		} else {
+			dependencies = append(dependencies, p)
 		}
 	}
+	sort.Slice(directTools, func(i, j int) bool {
+		return directTools[i].ID < directTools[j].ID
+	})
+	sort.Slice(dependencies, func(i, j int) bool {
+		return dependencies[i].ID < dependencies[j].ID
+	})
 	orderedPkgs := append(directTools, dependencies...)
 
 	selected := make(map[string]bool)
@@ -367,6 +381,10 @@ func NewWizardModel(
 		activeWorkers:     make(map[int]activeWorkerSlot),
 		activeWorkerOrder: make([]int, 0),
 		recentCompleted:   make([]string, 0),
+		workerLogs:        make(map[int][]string),
+		recentOutputLines: make([]string, 0),
+		failedItems:       make([]string, 0),
+		succeededItems:    make([]string, 0),
 		width:             80,
 		height:            24,
 	}
@@ -652,19 +670,53 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if w.activeWorkers == nil {
 			w.activeWorkers = make(map[int]activeWorkerSlot)
 		}
+		if w.workerLogs == nil {
+			w.workerLogs = make(map[int][]string)
+		}
+
+		if msg.OutputLine != "" {
+			lines := w.workerLogs[msg.StepID]
+			lines = append(lines, msg.OutputLine)
+			if len(lines) > 20 {
+				lines = lines[len(lines)-20:]
+			}
+			w.workerLogs[msg.StepID] = lines
+
+			tag := msg.ResourceID
+			if tag == "" {
+				tag = msg.Phase
+			}
+			w.recentOutputLines = append(w.recentOutputLines, fmt.Sprintf("[%s] %s", tag, msg.OutputLine))
+			if len(w.recentOutputLines) > 40 {
+				w.recentOutputLines = w.recentOutputLines[len(w.recentOutputLines)-40:]
+			}
+		}
 
 		if msg.Status == domain.StepRunning {
-			if _, exists := w.activeWorkers[msg.StepID]; !exists {
+			slot, exists := w.activeWorkers[msg.StepID]
+			if !exists {
 				w.activeWorkerOrder = append(w.activeWorkerOrder, msg.StepID)
+				slot = activeWorkerSlot{
+					StepID:      msg.StepID,
+					ResourceID:  msg.ResourceID,
+					Action:      msg.Action,
+					Description: msg.Description,
+					StartedAt:   time.Now(),
+				}
 			}
-			w.activeWorkers[msg.StepID] = activeWorkerSlot{
-				StepID:      msg.StepID,
-				ResourceID:  msg.ResourceID,
-				Action:      msg.Action,
-				Description: msg.Description,
-				StartedAt:   time.Now(),
+			if msg.OutputLine != "" {
+				slot.Outputs = append(slot.Outputs, msg.OutputLine)
+				if len(slot.Outputs) > 5 {
+					slot.Outputs = slot.Outputs[len(slot.Outputs)-5:]
+				}
 			}
+			w.activeWorkers[msg.StepID] = slot
 		} else if msg.Status == domain.StepSuccess || msg.Status == domain.StepFailed {
+			if msg.Status == domain.StepSuccess {
+				w.succeededItems = append(w.succeededItems, msg.ResourceID)
+			} else {
+				w.failedItems = append(w.failedItems, fmt.Sprintf("%s (%s)", msg.ResourceID, msg.Description))
+			}
 			if _, exists := w.activeWorkers[msg.StepID]; exists {
 				delete(w.activeWorkers, msg.StepID)
 				for i, id := range w.activeWorkerOrder {
@@ -954,6 +1006,7 @@ func runWizardApplyWorker(
 		}
 	}
 
+	var installErr error
 	if installSvc != nil && activePlan != nil && len(activePlan.Steps) > 0 {
 		totalInstallSteps := len(activePlan.Steps)
 		var completedSteps atomic.Int32
@@ -975,15 +1028,16 @@ func runWizardApplyWorker(
 				Description: ev.Description,
 				Status:      ev.Status,
 				Percent:     pct,
+				OutputLine:  ev.OutputLine,
 			}
 		})
 		if err := installSvc.Apply(ctx, activePlan); err != nil {
-			progressChan <- wizardApplyDoneMsg{err: err}
-			return
+			installErr = err
 		}
 	}
 
 	// 4. Hacks Phase
+	var hacksErr error
 	if hacksSvc != nil && includeHacks && len(matchedHacks) > 0 {
 		totalHacks := len(matchedHacks)
 		for i, hk := range matchedHacks {
@@ -1000,11 +1054,27 @@ func runWizardApplyWorker(
 				Description: hk.Description,
 				Percent:     pct,
 			}
-			_, _ = hacksSvc.Apply(ctx, hk.ID)
+			hackCtx := security.ContextWithOutputHandler(ctx, func(line string) {
+				progressChan <- wizardProgressMsg{
+					StepID:      i + 1,
+					TotalSteps:  totalHacks,
+					Phase:       "Hardware Hacks",
+					Action:      "apply",
+					ResourceID:  hk.ID,
+					Description: hk.Description,
+					Status:      domain.StepRunning,
+					Percent:     pct,
+					OutputLine:  line,
+				}
+			})
+			if _, err := hacksSvc.Apply(hackCtx, hk.ID); err != nil {
+				hacksErr = errors.Join(hacksErr, err)
+			}
 		}
 	}
 
 	// 5. Sync Phase
+	var syncErr error
 	if syncSvc != nil {
 		progressChan <- wizardProgressMsg{
 			StepID:      1,
@@ -1020,8 +1090,7 @@ func runWizardApplyWorker(
 			Shell:    selectedShell,
 			Terminal: selectedTerminal,
 		}); err != nil {
-			progressChan <- wizardApplyDoneMsg{err: err}
-			return
+			syncErr = err
 		}
 	}
 
@@ -1039,7 +1108,7 @@ func runWizardApplyWorker(
 		_ = store.SetActiveProfile(profName)
 	}
 
-	progressChan <- wizardApplyDoneMsg{err: nil}
+	progressChan <- wizardApplyDoneMsg{err: errors.Join(installErr, hacksErr, syncErr)}
 }
 
 // View renders the current stage of the interactive wizard (Bubble Tea v2).
@@ -1385,9 +1454,11 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 		allLines = append(allLines, "", w.styles.Warning.Render("🔒 Administrator privileges (sudo) required. You will be prompted in the terminal upon confirmation."))
 	}
 
-	for i := range allLines {
-		allLines[i] = AnsiTruncate(allLines[i], width-4)
+	var wrappedLines []string
+	for _, l := range allLines {
+		wrappedLines = append(wrappedLines, AnsiWrap(l, width-4)...)
 	}
+	allLines = wrappedLines
 
 	availHeight := height - 3
 	if availHeight < 5 {
@@ -1427,17 +1498,61 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 }
 
 func (w WizardModel) renderCompleted(width int) string {
+	var lines []string
 	if w.err != nil {
-		return fmt.Sprintf("%s\n\nError: %v\n\nPress [Enter] to exit.",
-			w.styles.Error.Render("SETUP COMPLETED WITH ERRORS"), w.err)
+		lines = append(lines,
+			w.styles.Error.Render("⚠️  SETUP COMPLETED WITH COMPONENT WARNINGS / ERRORS"),
+			"",
+			w.styles.Muted.Render("The installer executed all independent tasks and reconciled components."),
+			w.styles.Muted.Render("The following summary outlines succeeded and failed items:"),
+			"",
+		)
+
+		if len(w.succeededItems) > 0 {
+			lines = append(lines, w.styles.Success.Render(fmt.Sprintf("✓ Succeeded (%d components):", len(w.succeededItems))))
+			succStr := strings.Join(w.succeededItems, ", ")
+			for _, wl := range AnsiWrap("   "+succStr, width-4) {
+				lines = append(lines, w.styles.Muted.Render(wl))
+			}
+			lines = append(lines, "")
+		}
+
+		if len(w.failedItems) > 0 {
+			lines = append(lines, w.styles.Error.Render(fmt.Sprintf("✖ Failed Components (%d):", len(w.failedItems))))
+			for _, item := range w.failedItems {
+				for _, wl := range AnsiWrap("   • "+item, width-4) {
+					lines = append(lines, w.styles.Error.Render(wl))
+				}
+			}
+			lines = append(lines, "")
+		}
+
+		lines = append(lines, w.styles.Highlight.Render("Detailed Error Report:"))
+		for _, el := range strings.Split(w.err.Error(), "\n") {
+			for _, wl := range AnsiWrap("   "+el, width-4) {
+				lines = append(lines, w.styles.Muted.Render(wl))
+			}
+		}
+
+		lines = append(lines,
+			"",
+			w.styles.Highlight.Render("Next Steps:"),
+			"  • Core tools are functional with all succeeded packages.",
+			"  • Run 'anx doctor' to inspect environment health.",
+			"  • Re-run 'anx apply' to retry failed items when ready.",
+			"",
+			w.styles.Header.Render("Press [Enter] or [q] to exit."),
+		)
+		return strings.Join(lines, "\n")
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n\n%s\n%s\n%s\n\nPress [Enter] or [q] to exit.",
+	return fmt.Sprintf("%s\n\n%s\n\n%s\n%s\n%s\n\n%s",
 		w.styles.Success.Render("✓ SETUP AND RECONCILIATION COMPLETED SUCCESSFULLY"),
 		"All selected packages and configurations were reconciled safely.",
-		"Next Steps:",
+		w.styles.Highlight.Render("Next Steps:"),
 		"  • Restart your terminal or run 'zsh' to load new configs.",
-		"  • Run 'anx doctor' anytime to verify your environment health.")
+		"  • Run 'anx doctor' anytime to verify your environment health.",
+		w.styles.Header.Render("Press [Enter] or [q] to exit."))
 }
 
 func (w WizardModel) renderPlanning(width int) string {
@@ -1503,6 +1618,126 @@ func (w WizardModel) renderWorkerPulseBar(frame, barWidth int) string {
 	return b.String()
 }
 
+func (w WizardModel) renderWorkerIndividualBar(slot activeWorkerSlot, frame, barWidth int) string {
+	if barWidth < 10 {
+		barWidth = 10
+	}
+	elapsed := time.Since(slot.StartedAt)
+	if elapsed < 0 || slot.StartedAt.IsZero() {
+		elapsed = 0
+	}
+	period := barWidth * 2
+	pos := frame % period
+	if pos >= barWidth {
+		pos = period - 1 - pos
+	}
+	var b strings.Builder
+	b.WriteString("[")
+	for i := 0; i < barWidth; i++ {
+		dist := i - pos
+		if dist < 0 {
+			dist = -dist
+		}
+		if dist <= 1 {
+			b.WriteString(w.styles.Header.Render("█"))
+		} else {
+			b.WriteString(w.styles.Muted.Render("░"))
+		}
+	}
+	b.WriteString("]")
+	return fmt.Sprintf("%s %s", b.String(), w.styles.Muted.Render(fmt.Sprintf("%4.1fs", elapsed.Seconds())))
+}
+
+func (w WizardModel) renderWorkerOutputBox(slot activeWorkerSlot, width int) []string {
+	boxWidth := width - 6
+	if boxWidth < 30 {
+		boxWidth = 30
+	}
+	innerBoxWidth := boxWidth - 4
+	if innerBoxWidth < 20 {
+		innerBoxWidth = 20
+	}
+
+	header := fmt.Sprintf("┌─ [%s] output ─", slot.ResourceID)
+	if len(header) < boxWidth {
+		header += strings.Repeat("─", boxWidth-len(header)-1) + "┐"
+	} else {
+		header = header[:boxWidth-1] + "┐"
+	}
+
+	var boxLines []string
+	boxLines = append(boxLines, "   "+w.styles.Muted.Render(header))
+
+	outputs := slot.Outputs
+	if len(outputs) == 0 {
+		outputs = []string{"Preparing operation..."}
+	}
+	start := 0
+	if len(outputs) > 3 {
+		start = len(outputs) - 3
+	}
+	for _, rawLine := range outputs[start:] {
+		wrapped := AnsiWrap(rawLine, innerBoxWidth-2)
+		for _, wl := range wrapped {
+			pad := innerBoxWidth - ansi.StringWidth(wl)
+			if pad < 0 {
+				pad = 0
+			}
+			lineContent := fmt.Sprintf("│ > %s%s │", wl, strings.Repeat(" ", pad))
+			boxLines = append(boxLines, "   "+w.styles.Muted.Render(lineContent))
+		}
+	}
+
+	footer := "└" + strings.Repeat("─", boxWidth-2) + "┘"
+	boxLines = append(boxLines, "   "+w.styles.Muted.Render(footer))
+	return boxLines
+}
+
+func (w WizardModel) renderGlobalOutputBox(width int) []string {
+	boxWidth := width - 4
+	if boxWidth < 30 {
+		boxWidth = 30
+	}
+	innerBoxWidth := boxWidth - 4
+	if innerBoxWidth < 20 {
+		innerBoxWidth = 20
+	}
+
+	header := "┌─ LIVE PROGRESS OUTPUT STREAM ─"
+	if len(header) < boxWidth {
+		header += strings.Repeat("─", boxWidth-len(header)-1) + "┐"
+	} else {
+		header = header[:boxWidth-1] + "┐"
+	}
+
+	var boxLines []string
+	boxLines = append(boxLines, "  "+w.styles.Header.Render(header))
+
+	recent := w.recentOutputLines
+	if len(recent) == 0 {
+		recent = []string{"Initializing deployment operations..."}
+	}
+	start := 0
+	if len(recent) > 6 {
+		start = len(recent) - 6
+	}
+	for _, rawLine := range recent[start:] {
+		wrapped := AnsiWrap(rawLine, innerBoxWidth-2)
+		for _, wl := range wrapped {
+			pad := innerBoxWidth - ansi.StringWidth(wl)
+			if pad < 0 {
+				pad = 0
+			}
+			lineContent := fmt.Sprintf("│ %s%s │", wl, strings.Repeat(" ", pad))
+			boxLines = append(boxLines, "  "+w.styles.Muted.Render(lineContent))
+		}
+	}
+
+	footer := "└" + strings.Repeat("─", boxWidth-2) + "┘"
+	boxLines = append(boxLines, "  "+w.styles.Header.Render(footer))
+	return boxLines
+}
+
 func (w WizardModel) renderApplying(width int) string {
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	frame := frames[w.spinnerFrame%len(frames)]
@@ -1510,7 +1745,7 @@ func (w WizardModel) renderApplying(width int) string {
 
 	phase := w.progressPhase
 	if phase == "" {
-		phase = "Initializing"
+		phase = "Installing"
 	}
 
 	title := fmt.Sprintf("  %s %s: %s", spinner, w.styles.Header.Render("STAGE 5/5"), w.styles.Highlight.Render(phase))
@@ -1537,12 +1772,12 @@ func (w WizardModel) renderApplying(width int) string {
 	lines := []string{
 		title,
 		"",
-		fmt.Sprintf("  %s", progressBar),
+		fmt.Sprintf("  %s %s", w.styles.Header.Render("GLOBAL PROGRESS:"), progressBar),
 	}
 
 	if len(w.activeWorkers) > 0 {
 		lines = append(lines, "", fmt.Sprintf("  %s", w.styles.Header.Render(fmt.Sprintf("CONCURRENT WORKERS (%d executing in parallel):", len(w.activeWorkers)))))
-		maxWorkersToShow := 4
+		maxWorkersToShow := 3
 		for i, id := range w.activeWorkerOrder {
 			if i >= maxWorkersToShow {
 				remaining := len(w.activeWorkerOrder) - maxWorkersToShow
@@ -1551,25 +1786,20 @@ func (w WizardModel) renderApplying(width int) string {
 			}
 			slot := w.activeWorkers[id]
 			wSpinner := frames[(w.spinnerFrame+id)%len(frames)]
-			elapsed := time.Since(slot.StartedAt).Round(100 * time.Millisecond)
-			if elapsed < 0 || slot.StartedAt.IsZero() {
-				elapsed = 0
-			}
 			act := strings.ToUpper(slot.Action)
 			if act == "" {
 				act = "INSTALL"
 			}
-			pulseBar := w.renderWorkerPulseBar(w.spinnerFrame+id, 12)
-			lines = append(lines, fmt.Sprintf("   %s %s %s %s %s",
+			indivBar := w.renderWorkerIndividualBar(slot, w.spinnerFrame+id, 12)
+			lines = append(lines, fmt.Sprintf("   %s %s %s %s",
 				w.styles.Header.Render(wSpinner),
 				w.styles.Success.Render("["+act+"]"),
 				w.styles.Highlight.Render(slot.ResourceID),
-				pulseBar,
-				w.styles.Muted.Render(fmt.Sprintf("(%s)", elapsed.String())),
+				indivBar,
 			))
-			if slot.Description != "" {
-				lines = append(lines, fmt.Sprintf("       %s", w.styles.Muted.Render(slot.Description)))
-			}
+			// Render individual worker output widget
+			wBox := w.renderWorkerOutputBox(slot, width)
+			lines = append(lines, wBox...)
 		}
 	} else {
 		desc := w.progressDesc
@@ -1583,6 +1813,10 @@ func (w WizardModel) renderApplying(width int) string {
 		lines = append(lines, "", fmt.Sprintf("  %s%s", w.styles.Success.Render(actionBadge), desc))
 	}
 
+	// Always render the consolidated live output box
+	lines = append(lines, "")
+	lines = append(lines, w.renderGlobalOutputBox(width)...)
+
 	if len(w.recentCompleted) > 0 {
 		lines = append(lines, "", w.styles.Muted.Render("  RECENTLY COMPLETED:"))
 		for _, item := range w.recentCompleted {
@@ -1593,7 +1827,9 @@ func (w WizardModel) renderApplying(width int) string {
 	lines = append(lines, "",
 		w.styles.Muted.Render("  • Base tools prioritized first (ghostty, zsh, herdr, neovim)."),
 		w.styles.Muted.Render("  • DAG scheduler executes independent downloads, builds, and syncs concurrently."),
-		w.styles.Muted.Render("  • Transactional journal active; operations are compensated on failure."))
+		w.styles.Muted.Render("  • Fault-tolerant: single package failures do not abort remaining installations."))
+
+	return strings.Join(lines, "\n")
 
 	return strings.Join(lines, "\n")
 }

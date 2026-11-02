@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/arturonavax/env/internal/security"
 )
 
 func (d *Dispatcher) selectNativePackages(matrix map[string][]string) (string, []string) {
@@ -30,6 +32,7 @@ func (d *Dispatcher) isNativeInstalled(ctx context.Context, matrix map[string][]
 
 	var bin string
 	var args []string
+
 	switch pm {
 	case "apt", "pkg":
 		bin = "dpkg-query"
@@ -97,6 +100,10 @@ func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]stri
 		}
 	}
 
+	if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+		handler(fmt.Sprintf("Running %s install for: %s", pm, strings.Join(pkgs, ", ")))
+	}
+
 	switch pm {
 	case "apt":
 		cmd, args := d.maybeSudo("apt-get", append([]string{"install", "-y", "--no-install-recommends"}, pkgs...)...)
@@ -156,6 +163,10 @@ func (d *Dispatcher) uninstallNative(ctx context.Context, matrix map[string][]st
 	env := d.buildSubprocessEnv(map[string]string{
 		"DEBIAN_FRONTEND": "noninteractive",
 	})
+
+	if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+		handler(fmt.Sprintf("Running %s remove for: %s", pm, strings.Join(pkgs, ", ")))
+	}
 
 	switch pm {
 	case "apt":

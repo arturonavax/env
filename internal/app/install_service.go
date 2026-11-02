@@ -65,7 +65,7 @@ func NewInstallService(deps InstallDeps) *InstallService {
 		provider:   deps.Provider,
 		store:      deps.Store,
 		sync:       deps.Sync,
-		engine:     execution.NewEngine(workers),
+		engine:     execution.NewEngine(workers, execution.WithContinueOnError(true), execution.WithRollbackOnError(false)),
 		onProgress: deps.OnProgress,
 	}
 }
@@ -399,18 +399,35 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 		}
 		task.Timeout = 30 * time.Minute
 		task.Execute = func(ctx context.Context) error {
+			outHandler := func(line string) {
+				if progressFn := s.getOnProgress(); progressFn != nil {
+					progressFn(ProgressEvent{
+						StepID:      step.ID,
+						ResourceID:  step.ResourceID,
+						Action:      step.Action,
+						Description: step.Description,
+						Status:      domain.StepRunning,
+						OutputLine:  line,
+					})
+				}
+			}
+			taskCtx := security.ContextWithOutputHandler(ctx, outHandler)
+			outHandler(fmt.Sprintf("Starting installation of %s...", pkg.Name))
+
 			if err := s.journalStep(txID, "step_start", step, ""); err != nil {
 				return fmt.Errorf("journal step_start: %w", err)
 			}
-			if err := s.provider.Install(ctx, pkg); err != nil {
+			if err := s.provider.Install(taskCtx, pkg); err != nil {
 				_ = s.journalStep(txID, "step_failed", step, err.Error())
+				outHandler(fmt.Sprintf("Failed to install %s: %v", pkg.Name, err))
 				return err
 			}
-			_, ver, _ := s.provider.IsInstalled(ctx, pkg)
+			_, ver, _ := s.provider.IsInstalled(taskCtx, pkg)
 			if err := s.recordInstalled(pkg, ver); err != nil {
 				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				return fmt.Errorf("recording installed %s: %w", pkg.ID, err)
 			}
+			outHandler(fmt.Sprintf("Successfully installed %s (%s)", pkg.Name, ver))
 			if err := s.journalStep(txID, "step_done", step, ""); err != nil {
 				return fmt.Errorf("journal step_done: %w", err)
 			}

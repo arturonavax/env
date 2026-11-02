@@ -275,11 +275,11 @@ packages:
         github_release:
           repo: jesseduffield/lazygit
           asset_patterns:
-            linux/amd64: "lazygit_{version}_Linux_x86_64.tar.gz"
-            linux/arm64: "lazygit_{version}_Linux_arm64.tar.gz"
-            darwin/arm64: "lazygit_{version}_Darwin_arm64.tar.gz"
-            darwin/amd64: "lazygit_{version}_Darwin_x86_64.tar.gz"
-            windows/amd64: "lazygit_{version}_Windows_x86_64.zip"
+            linux/amd64: "lazygit_{version}_linux_x86_64.tar.gz"
+            linux/arm64: "lazygit_{version}_linux_arm64.tar.gz"
+            darwin/arm64: "lazygit_{version}_darwin_arm64.tar.gz"
+            darwin/amd64: "lazygit_{version}_darwin_x86_64.tar.gz"
+            windows/amd64: "lazygit_{version}_windows_x86_64.zip"
           binary_in_archive: lazygit
           install_to: "~/.local/bin/lazygit"
       - type: native

@@ -42,6 +42,11 @@ func (d *Dispatcher) installGitHubRelease(
 		return err
 	}
 
+	if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+		handler(fmt.Sprintf("Resolved %s release asset: %s", rel.Repo, assetName))
+		handler(fmt.Sprintf("Downloading %s...", assetName))
+	}
+
 	expectedSHA := strings.TrimSpace(rel.SHA256)
 	if byTarget, ok := rel.SHA256ByTarget[targetKey]; ok && strings.TrimSpace(byTarget) != "" {
 		expectedSHA = strings.TrimSpace(byTarget)
@@ -61,6 +66,10 @@ func (d *Dispatcher) installGitHubRelease(
 	extractDir := filepath.Join(tmpDir, "extracted")
 	if err := os.MkdirAll(extractDir, 0o755); err != nil {
 		return err
+	}
+
+	if handler := security.OutputHandlerFromContext(ctx); handler != nil {
+		handler(fmt.Sprintf("Extracting %s...", assetName))
 	}
 
 	lowerName := strings.ToLower(assetName)
@@ -184,8 +193,30 @@ func (d *Dispatcher) resolveGitHubAssetURL(
 	expectedAsset := strings.ReplaceAll(pattern, "{version}", cleanVer)
 	expectedAsset = strings.ReplaceAll(expectedAsset, "{tag}", meta.TagName)
 
+	// 1. Exact match
 	for _, asset := range meta.Assets {
 		if asset.Name == expectedAsset {
+			return asset.BrowserDownloadURL, asset.Name, nil
+		}
+	}
+
+	// 2. Case-insensitive match
+	for _, asset := range meta.Assets {
+		if strings.EqualFold(asset.Name, expectedAsset) {
+			return asset.BrowserDownloadURL, asset.Name, nil
+		}
+	}
+
+	// 3. Normalized separators ('_', '-', ' ') and case-insensitive match
+	norm := func(s string) string {
+		s = strings.ToLower(s)
+		s = strings.ReplaceAll(s, "-", "_")
+		s = strings.ReplaceAll(s, " ", "_")
+		return s
+	}
+	targetNorm := norm(expectedAsset)
+	for _, asset := range meta.Assets {
+		if norm(asset.Name) == targetNorm {
 			return asset.BrowserDownloadURL, asset.Name, nil
 		}
 	}
