@@ -65,7 +65,19 @@ packages:
     binary_name: fnm
     ecosystem: crates.io
     osv_package: fnm
+    depends_on: [curl]
     strategies:
+      - type: github_release
+        github_release:
+          repo: Schniz/fnm
+          asset_patterns:
+            linux/amd64: "fnm-linux.zip"
+            linux/arm64: "fnm-arm64.zip"
+            darwin/amd64: "fnm-macos.zip"
+            darwin/arm64: "fnm-macos.zip"
+            windows/amd64: "fnm-windows.zip"
+          binary_in_archive: fnm
+          install_to: "~/.local/bin/fnm"
       - type: script
         when:
           os: [linux, darwin]
@@ -172,6 +184,7 @@ packages:
     category: toolchains
     description: General-purpose systems programming language and C/C++ cross-compiler (required for Ghostty source builds)
     binary_name: zig
+    depends_on: [curl]
     strategies:
       - type: native
         packages:
@@ -183,3 +196,10 @@ packages:
           pkg: [zig]
           winget: [zig.zig]
           scoop: [zig]
+      - type: script
+        when:
+          os: [linux, darwin]
+        script:
+          local_script: scripts/install_zig.sh
+          interpreter: bash
+          creates: "~/.local/bin/zig"

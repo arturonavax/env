@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -83,18 +85,29 @@ func (s *InstallService) getOnProgress() EventHandler {
 	return s.onProgress
 }
 
+// InstallLogPath returns the persistent installation log file path.
+func (s *InstallService) InstallLogPath() string {
+	if s.platform != nil && s.platform.StateDir() != "" {
+		return filepath.Join(s.platform.StateDir(), "logs", "install.log")
+	}
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "anx", "logs", "install.log")
+}
+
 // baseToolRank defines explicit priority order for core environment tools.
 // Base tools must always be installed before other direct tools and dependencies
 // so that a functional core environment is guaranteed even if later steps fail.
 var baseToolRank = map[string]int{
-	"git":     1,
-	"curl":    2,
-	"ghostty": 3,
-	"zsh":     4,
-	"herdr":   5,
-	"neovim":  6,
-	"nvim":    6,
-	"anx":     7,
+	"curl":            1,
+	"wget":            1,
+	"build-essential": 1,
+	"git":             2,
+	"htop":            3,
+	"ghostty":         4,
+	"zsh":             5,
+	"herdr":           6,
+	"neovim":          7,
+	"nvim":            7,
+	"anx":             8,
 }
 
 // PrioritizePackageIDs reorders package IDs into an optimal topological sequence:
@@ -343,9 +356,30 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		return domain.NewExitError(domain.ExitRollbackOrPartial, fmt.Errorf("journal begin failed: %w", err))
 	}
 
+	logPath := s.InstallLogPath()
+	_ = os.MkdirAll(filepath.Dir(logPath), 0o755)
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	var logMu sync.Mutex
+	writeLog := func(format string, args ...any) {
+		if logFile == nil {
+			return
+		}
+		ts := time.Now().Format("2006-01-02 15:04:05")
+		msg := fmt.Sprintf(format, args...)
+		logMu.Lock()
+		defer logMu.Unlock()
+		_, _ = fmt.Fprintf(logFile, "[%s] %s\n", ts, msg)
+	}
+	if logFile != nil {
+		defer logFile.Close()
+		writeLog("================================================================================")
+		writeLog("ANX INSTALLATION SESSION STARTED (Plan: %s, Profile: %s, Steps: %d)", plan.ID, plan.Profile, len(plan.Steps))
+		writeLog("================================================================================")
+	}
+
 	tasks := make([]execution.Task, len(plan.Steps))
 	for i := range plan.Steps {
-		tasks[i] = s.buildTask(txID, plan.Steps[i])
+		tasks[i] = s.buildTask(txID, plan.Steps[i], writeLog)
 	}
 
 	byID := make(map[int]*domain.PlanStep, len(plan.Steps))
@@ -371,6 +405,9 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 	})
 
 	if execErr != nil {
+		writeLog("================================================================================")
+		writeLog("INSTALLATION SESSION COMPLETED WITH FAILURES:\n%s", execErr.Error())
+		writeLog("================================================================================")
 		_ = s.journalAppend(domain.JournalEntry{
 			TxID: txID, Timestamp: time.Now(), Type: "rollback", Details: execErr.Error(),
 		})
@@ -380,6 +417,10 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		return domain.NewExitError(domain.ExitRollbackOrPartial, execErr)
 	}
 
+	writeLog("================================================================================")
+	writeLog("INSTALLATION SESSION COMPLETED SUCCESSFULLY: %d steps reconciled", len(plan.Steps))
+	writeLog("================================================================================")
+
 	if err := s.journalAppend(domain.JournalEntry{
 		TxID: txID, Timestamp: time.Now(), Type: "commit", Details: "all steps succeeded",
 	}); err != nil {
@@ -388,7 +429,7 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 	return nil
 }
 
-func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.Task {
+func (s *InstallService) buildTask(txID string, step domain.PlanStep, writeLog func(string, ...any)) execution.Task {
 	task := execution.Task{Step: step, Exclusive: step.IsExclusive, Locks: step.Locks}
 
 	switch step.Action {
@@ -400,6 +441,9 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 		task.Timeout = 30 * time.Minute
 		task.Execute = func(ctx context.Context) error {
 			outHandler := func(line string) {
+				if writeLog != nil {
+					writeLog("[STEP %d] [OUTPUT] [%s] %s", step.ID, step.ResourceID, line)
+				}
 				if progressFn := s.getOnProgress(); progressFn != nil {
 					progressFn(ProgressEvent{
 						StepID:      step.ID,
@@ -412,20 +456,32 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 				}
 			}
 			taskCtx := security.ContextWithOutputHandler(ctx, outHandler)
+			if writeLog != nil {
+				writeLog("[STEP %d] [START] Installing %s (%s)", step.ID, pkg.Name, pkg.Description)
+			}
 			outHandler(fmt.Sprintf("Starting installation of %s...", pkg.Name))
 
 			if err := s.journalStep(txID, "step_start", step, ""); err != nil {
 				return fmt.Errorf("journal step_start: %w", err)
 			}
 			if err := s.provider.Install(taskCtx, pkg); err != nil {
+				if writeLog != nil {
+					writeLog("[STEP %d] [FAILED] %s: %v", step.ID, pkg.Name, err)
+				}
 				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				outHandler(fmt.Sprintf("Failed to install %s: %v", pkg.Name, err))
 				return err
 			}
 			_, ver, _ := s.provider.IsInstalled(taskCtx, pkg)
 			if err := s.recordInstalled(pkg, ver); err != nil {
+				if writeLog != nil {
+					writeLog("[STEP %d] [FAILED] Recording %s: %v", step.ID, pkg.Name, err)
+				}
 				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				return fmt.Errorf("recording installed %s: %w", pkg.ID, err)
+			}
+			if writeLog != nil {
+				writeLog("[STEP %d] [SUCCESS] Installed %s (%s)", step.ID, pkg.Name, ver)
 			}
 			outHandler(fmt.Sprintf("Successfully installed %s (%s)", pkg.Name, ver))
 			if err := s.journalStep(txID, "step_done", step, ""); err != nil {
@@ -453,6 +509,9 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 	case domain.ActionSync:
 		var snapID string
 		task.Execute = func(ctx context.Context) error {
+			if writeLog != nil {
+				writeLog("[STEP %d] [SYNC-START] Synchronizing %s", step.ID, step.ResourceID)
+			}
 			if err := s.journalStep(txID, "step_start", step, ""); err != nil {
 				return fmt.Errorf("journal step_start: %w", err)
 			}
@@ -461,10 +520,16 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep) execution.
 			}
 			res, err := s.sync.SyncOne(ctx, step.ResourceID, SyncOptions{})
 			if err != nil {
+				if writeLog != nil {
+					writeLog("[STEP %d] [SYNC-FAILED] %s: %v", step.ID, step.ResourceID, err)
+				}
 				_ = s.journalStep(txID, "step_failed", step, err.Error())
 				return err
 			}
 			snapID = res.SnapshotID
+			if writeLog != nil {
+				writeLog("[STEP %d] [SYNC-SUCCESS] Synchronized %s (snapshot: %s)", step.ID, step.ResourceID, snapID)
+			}
 			if err := s.journalStep(txID, "step_done", step, ""); err != nil {
 				return fmt.Errorf("journal step_done: %w", err)
 			}

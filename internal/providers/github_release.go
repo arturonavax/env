@@ -221,6 +221,28 @@ func (d *Dispatcher) resolveGitHubAssetURL(
 		}
 	}
 
+	// 4. Glob pattern match
+	for _, asset := range meta.Assets {
+		if matched, _ := filepath.Match(expectedAsset, asset.Name); matched {
+			return asset.BrowserDownloadURL, asset.Name, nil
+		}
+	}
+
+	// 5. Version-tolerant match: if pattern lacked {version}, match prefix and suffix
+	// e.g. expected "difft-x86_64-unknown-linux-gnu.tar.gz" matches "difft-0.72.0-x86_64-unknown-linux-gnu.tar.gz"
+	for _, asset := range meta.Assets {
+		assetLower := strings.ToLower(asset.Name)
+		expLower := strings.ToLower(expectedAsset)
+		firstDash := strings.Index(expLower, "-")
+		if firstDash > 0 {
+			prefix := expLower[:firstDash+1]
+			suffix := expLower[firstDash:]
+			if strings.HasPrefix(assetLower, prefix) && strings.HasSuffix(assetLower, suffix) {
+				return asset.BrowserDownloadURL, asset.Name, nil
+			}
+		}
+	}
+
 	return "", "", fmt.Errorf("asset %q not found in %s release %s", expectedAsset, rel.Repo, meta.TagName)
 }
 
@@ -410,6 +432,11 @@ func findBinaryInTree(root, binaryName string, isWindows bool) (string, error) {
 		return "", err
 	}
 	if found == "" {
+		// Fallback: if root contains exactly 1 regular file, use it (handles standalone binary downloads).
+		entries, readErr := os.ReadDir(root)
+		if readErr == nil && len(entries) == 1 && !entries[0].IsDir() {
+			return filepath.Join(root, entries[0].Name()), nil
+		}
 		return "", fmt.Errorf("binary %q not found inside extracted archive", binaryName)
 	}
 	return found, nil

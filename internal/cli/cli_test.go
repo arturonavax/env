@@ -85,7 +85,8 @@ func TestCLIRepo(t *testing.T) {
 
 	outBuf.Reset()
 	errBuf.Reset()
-	code = cli.ExecuteCLI([]string{"repo", "clone", "--dry-run"}, &outBuf, &errBuf, "1.0.0-test", "", "")
+	tmpTarget := filepath.Join(t.TempDir(), "repo")
+	code = cli.ExecuteCLI([]string{"repo", "clone", "--dir", tmpTarget, "--dry-run"}, &outBuf, &errBuf, "1.0.0-test", "", "")
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d (err: %s)", code, errBuf.String())
 	}

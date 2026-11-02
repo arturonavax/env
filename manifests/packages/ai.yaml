@@ -7,7 +7,19 @@ packages:
     binary_name: rtk
     ecosystem: crates.io
     osv_package: rtk
+    depends_on: [curl]
     strategies:
+      - type: github_release
+        github_release:
+          repo: rtk-ai/rtk
+          asset_patterns:
+            linux/amd64: "rtk-x86_64-unknown-linux-musl.tar.gz"
+            linux/arm64: "rtk-aarch64-unknown-linux-gnu.tar.gz"
+            darwin/amd64: "rtk-x86_64-apple-darwin.tar.gz"
+            darwin/arm64: "rtk-aarch64-apple-darwin.tar.gz"
+            windows/amd64: "rtk-x86_64-pc-windows-msvc.zip"
+          binary_in_archive: rtk
+          install_to: "~/.local/bin/rtk"
       - type: script
         when:
           os: [linux, darwin]
@@ -49,7 +61,20 @@ packages:
     category: ai
     description: Open-source terminal AI coding assistant
     binary_name: opencode
+    depends_on: [curl]
     strategies:
+      - type: github_release
+        github_release:
+          repo: anomalyco/opencode
+          asset_patterns:
+            linux/amd64: "opencode-linux-x64.tar.gz"
+            linux/arm64: "opencode-linux-arm64.tar.gz"
+            darwin/amd64: "opencode-darwin-x64.zip"
+            darwin/arm64: "opencode-darwin-arm64.zip"
+            windows/amd64: "opencode-windows-x64.zip"
+            windows/arm64: "opencode-windows-arm64.zip"
+          binary_in_archive: opencode
+          install_to: "~/.local/bin/opencode"
       - type: script
         when:
           os: [linux, darwin]
@@ -60,3 +85,7 @@ packages:
         packages:
           brew: [opencode]
           scoop: [opencode]
+      - type: language_pkg
+        language_pkg:
+          manager: pnpm
+          package: "opencode-ai"

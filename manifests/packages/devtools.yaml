@@ -48,8 +48,10 @@ packages:
         github_release:
           repo: Wilfred/difftastic
           asset_patterns:
-            linux/amd64: "difft-x86_64-unknown-linux-gnu.tar.gz"
-            linux/arm64: "difft-aarch64-unknown-linux-gnu.tar.gz"
+            linux/amd64: "difft-{version}-x86_64-unknown-linux-gnu.tar.gz"
+            linux/arm64: "difft-{version}-aarch64-unknown-linux-gnu.tar.gz"
+            darwin/amd64: "difft-{version}-x86_64-apple-darwin.tar.gz"
+            darwin/arm64: "difft-{version}-aarch64-apple-darwin.tar.gz"
           binary_in_archive: difft
           install_to: "~/.local/bin/difft"
       - type: native

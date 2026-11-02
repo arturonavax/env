@@ -35,7 +35,8 @@ const (
 )
 
 type wizardApplyDoneMsg struct {
-	err error
+	err     error
+	logPath string
 }
 
 type wizardSudoAuthMsg struct {
@@ -141,7 +142,8 @@ type WizardModel struct {
 	recentOutputLines []string
 	failedItems       []string
 	succeededItems    []string
-	err              error
+	installLogPath    string
+	err               error
 	quitting         bool
 	matchedHacks     []domain.HackProfile
 	includeHacks     bool
@@ -754,6 +756,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case wizardApplyDoneMsg:
 		w.err = msg.err
+		w.installLogPath = msg.logPath
 		if msg.err == nil && w.store != nil {
 			prof := w.ChosenProfile()
 			if prof != "" {
@@ -931,6 +934,11 @@ func runWizardApplyWorker(
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	var logPath string
+	if installSvc != nil {
+		logPath = installSvc.InstallLogPath()
+	}
+
 	if security.IsSudoAuthenticated() {
 		stopKeepalive := security.StartSudoKeepalive(ctx)
 		defer stopKeepalive()
@@ -948,7 +956,7 @@ func runWizardApplyWorker(
 			Percent:     2,
 		}
 		if err := seal.Verify(ctx); err != nil {
-			progressChan <- wizardApplyDoneMsg{err: err}
+			progressChan <- wizardApplyDoneMsg{err: err, logPath: logPath}
 			return
 		}
 	}
@@ -1108,7 +1116,10 @@ func runWizardApplyWorker(
 		_ = store.SetActiveProfile(profName)
 	}
 
-	progressChan <- wizardApplyDoneMsg{err: errors.Join(installErr, hacksErr, syncErr)}
+	progressChan <- wizardApplyDoneMsg{
+		err:     errors.Join(installErr, hacksErr, syncErr),
+		logPath: logPath,
+	}
 }
 
 // View renders the current stage of the interactive wizard (Bubble Tea v2).
@@ -1540,18 +1551,35 @@ func (w WizardModel) renderCompleted(width int) string {
 			"  • Core tools are functional with all succeeded packages.",
 			"  • Run 'anx doctor' to inspect environment health.",
 			"  • Re-run 'anx apply' to retry failed items when ready.",
+		)
+
+		if w.installLogPath != "" {
+			lines = append(lines,
+				"",
+				w.styles.Highlight.Render("Persistent Installation Log:"),
+				fmt.Sprintf("  • Diagnostic log with complete command outputs: %s", w.installLogPath),
+			)
+		}
+
+		lines = append(lines,
 			"",
 			w.styles.Header.Render("Press [Enter] or [q] to exit."),
 		)
 		return strings.Join(lines, "\n")
 	}
 
-	return fmt.Sprintf("%s\n\n%s\n\n%s\n%s\n%s\n\n%s",
+	logLine := ""
+	if w.installLogPath != "" {
+		logLine = fmt.Sprintf("\n  • Installation log saved to: %s", w.installLogPath)
+	}
+
+	return fmt.Sprintf("%s\n\n%s\n\n%s\n%s\n%s%s\n\n%s",
 		w.styles.Success.Render("✓ SETUP AND RECONCILIATION COMPLETED SUCCESSFULLY"),
 		"All selected packages and configurations were reconciled safely.",
 		w.styles.Highlight.Render("Next Steps:"),
 		"  • Restart your terminal or run 'zsh' to load new configs.",
 		"  • Run 'anx doctor' anytime to verify your environment health.",
+		logLine,
 		w.styles.Header.Render("Press [Enter] or [q] to exit."))
 }
 

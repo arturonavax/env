@@ -241,7 +241,19 @@ packages:
     description: Statically-linked terminal and AI agent workspace multiplexer
     binary_name: herdr
     os: [linux, darwin]
+    depends_on: [curl]
     strategies:
+      - type: github_release
+        github_release:
+          repo: herdrdev/herdr
+          asset_patterns:
+            linux/amd64: "herdr-linux-x86_64"
+            linux/arm64: "herdr-linux-aarch64"
+            darwin/amd64: "herdr-macos-x86_64"
+            darwin/arm64: "herdr-macos-aarch64"
+            windows/amd64: "herdr-windows-x86_64.zip"
+          binary_in_archive: herdr
+          install_to: "~/.local/bin/herdr"
       - type: script
         script:
           url: https://herdr.dev/install.sh
