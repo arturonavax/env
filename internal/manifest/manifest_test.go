@@ -90,6 +90,16 @@ func TestEmbeddedManifestsLoadAndValidate(t *testing.T) {
 		if len(pkgIDs) == 0 {
 			t.Fatalf("expected profile %q to resolve non-empty packages", prof.Name)
 		}
+		hasTree := false
+		for _, p := range pkgIDs {
+			if p == "tree" {
+				hasTree = true
+				break
+			}
+		}
+		if !hasTree {
+			t.Fatalf("expected profile %q to include 'tree' package", prof.Name)
+		}
 		if _, err := cat.ResolveInstallOrder(pkgIDs); err != nil {
 			t.Fatalf("profile %q failed DAG resolution: %v", prof.Name, err)
 		}

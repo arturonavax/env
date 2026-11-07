@@ -29,6 +29,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - zsh
       - atuin
       - herdr
@@ -48,6 +49,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - neovim
       - stylua
       - shfmt
@@ -64,6 +66,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - build-essential
       - cmake
       - pkg-config
@@ -103,6 +106,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - rtk
       - opencode
     config_groups:
@@ -119,6 +123,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - wmctrl
       - xdotool
       - xclip
@@ -136,6 +141,7 @@ profiles:
       - curl
       - wget
       - htop
+      - tree
       - shellharden
       - claude-code
       - codex-cli
