@@ -56,6 +56,9 @@ func CaptureToRepoDetailed(
 	if !cfg.SupportsOS(goos) {
 		return nil, nil
 	}
+	if cfg.IsHostSpecific() {
+		return nil, nil
+	}
 
 	rawTarget := strings.TrimSpace(cfg.TargetForOS(goos))
 	if rawTarget == "" || strings.TrimSpace(cfg.Source) == "" {

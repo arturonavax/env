@@ -210,3 +210,47 @@ func TestHS11_PreservesPermissions(t *testing.T) {
 		t.Errorf("expected executable bit preserved on run.sh, got mode: %v", info.Mode())
 	}
 }
+
+// HS09: Host-specific and SkipCapture configurations are never captured back into repository.
+func TestHS09_HostSpecificAndSkipCaptureConfigsIgnoredInCapture(t *testing.T) {
+	home := t.TempDir()
+	repo := t.TempDir()
+
+	userFile := filepath.Join(home, ".config", "rcmd", "rcmd.conf")
+	repoFile := filepath.Join(repo, "files", "rcmd", "rcmd.conf")
+	_ = os.MkdirAll(filepath.Dir(userFile), 0o755)
+	_ = os.MkdirAll(filepath.Dir(repoFile), 0o755)
+	_ = os.WriteFile(userFile, []byte("local_shortcut=CustomApp\n"), 0o644)
+	_ = os.WriteFile(repoFile, []byte("default_shortcut=Standard\n"), 0o644)
+
+	// Case 1: StrategyPreserve
+	cfgPreserve := domain.ConfigurationResource{
+		ID:       "xfce-rcmd-shortcuts",
+		Source:   "files/rcmd/rcmd.conf",
+		Strategy: domain.StrategyPreserve,
+		Target:   "~/.config/rcmd/rcmd.conf",
+	}
+	captured, err := configsync.CaptureToRepoDetailed(home, repo, cfgPreserve, "linux", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(captured) != 0 {
+		t.Fatalf("expected 0 files captured for StrategyPreserve, got %d: %v", len(captured), captured)
+	}
+
+	// Case 2: SkipCapture = true
+	cfgSkip := domain.ConfigurationResource{
+		ID:          "custom-personal-config",
+		Source:      "files/rcmd/rcmd.conf",
+		Strategy:    domain.StrategyThreeWay,
+		Target:      "~/.config/rcmd/rcmd.conf",
+		SkipCapture: true,
+	}
+	capturedSkip, err := configsync.CaptureToRepoDetailed(home, repo, cfgSkip, "linux", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(capturedSkip) != 0 {
+		t.Fatalf("expected 0 files captured for SkipCapture=true, got %d: %v", len(capturedSkip), capturedSkip)
+	}
+}

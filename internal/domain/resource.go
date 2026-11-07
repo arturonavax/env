@@ -198,11 +198,17 @@ type ConfigurationResource struct {
 	PostSyncCmds       [][]string            `json:"post_sync_cmds,omitempty" yaml:"post_sync_cmds,omitempty"`
 	PostSyncByDesktop  map[string][][]string `json:"post_sync_by_desktop,omitempty" yaml:"post_sync_by_desktop,omitempty"`
 	Backup             bool                  `json:"backup" yaml:"backup"`
+	SkipCapture        bool                  `json:"skip_capture,omitempty" yaml:"skip_capture,omitempty"`
 	Deprecated         bool                  `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
 	DeprecatedReason   string                `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
 	RecommendPurge     bool                  `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
 	Replacement        string                `json:"replacement,omitempty" yaml:"replacement,omitempty"`
 	Archived           bool                  `json:"archived,omitempty" yaml:"archived,omitempty"`
+}
+
+// IsHostSpecific reports whether the configuration is host-specific or explicitly marked to skip repository capture.
+func (c ConfigurationResource) IsHostSpecific() bool {
+	return c.Strategy == StrategyPreserve || c.SkipCapture
 }
 
 // TargetForOS resolves the OS-specific target path, falling back to Target.

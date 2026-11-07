@@ -29,7 +29,7 @@ Runners: `go test -race ./...` | `go vet ./...` | `bash tests/run_tests.sh --lin
   Verbatim: `"un buen lugar mas concreto para @[hacks] (scripts o configuraciones de sistema especificos para ciertas maquinas personales en las cuales se necesitan operaciones especificas para optimizar)"`
   Scope & Acceptance:
   - Consolidate machine- and hardware-specific hacks under top-level `hacks/<hack-id>/` with declarative `hack.yaml` metadata (hardware/DMI/GPU/DE matchers, modular steps, dry-run checks, backup targets, and documentation), `hacks/embed.go`, and `hacks/README.md`.
-  - Migrate `src/hacks/activate_scroll_lock.sh` to `hacks/x11-scroll-lock-led/` (preserving a compatibility shim at `src/hacks/activate_scroll_lock.sh`) and fix hardcoded `/home/arthurnavah` paths in `hacks/dell-precision-m6800/apply_hacks.sh` to use `$HOME` portably.
+  - Migrate `src/hacks/activate_scroll_lock.sh` to `hacks/x11-scroll-lock-led/` (preserving a compatibility shim at `src/hacks/activate_scroll_lock.sh`) and fix hardcoded `/home/<user>` paths in `hacks/dell-precision-m6800/apply_hacks.sh` to use `$HOME` portably.
   - Expose `anx hacks list|detect|info|plan|apply` in CLI and a dedicated `Hacks` view in the TUI.
   - Checks: `go test -race ./internal/hacks/...` && `shellcheck hacks/*/*.sh`.
 

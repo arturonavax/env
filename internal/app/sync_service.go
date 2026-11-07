@@ -223,6 +223,12 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 			diffs = append(diffs, d)
 			continue
 		}
+		if cfg.IsHostSpecific() {
+			d.State = "clean"
+			d.Summary = "host-specific configuration preserved"
+			diffs = append(diffs, d)
+			continue
+		}
 		incoming = s.ApplyConfigDiffs(cfg.ID, incoming)
 		local, err := os.ReadFile(target)
 		if err != nil {
@@ -293,6 +299,16 @@ func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult,
 
 	if opts.Push {
 		for _, cfg := range cfgs {
+			if cfg.IsHostSpecific() {
+				results = append(results, SyncResult{
+					ConfigID:      cfg.ID,
+					Action:        "preserved",
+					Files:         0,
+					CapturedPaths: nil,
+					Detail:        "host-specific configuration preserved; skipped from repo capture",
+				})
+				continue
+			}
 			capturedPaths, err := configsync.CaptureToRepoDetailed(s.platform.HomeDir(), s.repoRoot, cfg, s.platform.OS(), opts.DryRun)
 			if err != nil {
 				return results, fmt.Errorf("capturing %s: %w", cfg.ID, err)

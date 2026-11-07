@@ -13,7 +13,7 @@ func TestSudoCleanEnv(t *testing.T) {
 		"SUDO_ASKPASS=/usr/lib/ssh/gnome-ssh-askpass",
 		"SSH_ASKPASS=/usr/bin/ksshaskpass",
 		"SSH_ASKPASS_REQUIRE=force",
-		"USER=arthurnavah",
+		"USER=testuser",
 	}
 
 	cleaned := SudoCleanEnv(env)

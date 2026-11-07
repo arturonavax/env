@@ -294,6 +294,7 @@ configurations:
     target: "~/.config/rcmd/rcmd.conf"
     os: [linux]
     strategy: preserve
+    skip_capture: true
     post_sync_by_desktop:
       xfce:
         - ["rcmd", "--sync-xfce"]

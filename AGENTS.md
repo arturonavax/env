@@ -414,7 +414,7 @@ CodeGraph maintains a SQLite knowledge graph of AST symbols, edges, and call pat
 
 Engram is the long-term memory engine (`.engram/config.json`, project: `env`):
 
-- **CLI Access**: `/home/arthurnavah/.local/bin/engram`
+- **CLI Access**: `~/.local/bin/engram`
   - Save: `engram save <title> <content> --project env --topic <topic_key> --type <type>`
   - Context: `engram context env`
   - Stats: `engram stats --project env`
@@ -515,7 +515,7 @@ To maximize token economy, speed, and accuracy, AI agents MUST follow these seve
 6. **Skill Delegation via Exact Paths**:
 
    - Read `.atl/skill-registry.md` as an index.
-   - When delegating to sub-agents, pass the exact file path under `## Skills to load before work` (e.g. `/home/arthurnavah/.gemini/skills/work-unit-commits/SKILL.md`). Do not generate verbose summaries of the skills.
+   - When delegating to sub-agents, pass the exact file path under `## Skills to load before work` (e.g. `~/.gemini/skills/work-unit-commits/SKILL.md`). Do not generate verbose summaries of the skills.
 
 7. **Transparent RTK CLI Execution**:
    - Prefer running verbose CLI inspections and commands through `rtk` (e.g. `rtk git status`, `rtk cargo check`, `rtk npm test`).
