@@ -10,7 +10,7 @@ font-size = 13
 # --- Apariencia ---
 theme = "light:TokyoNight Day,dark:TokyoNight Night"
 
-background-opacity = 0.92
+background-opacity = 0.97
 background-blur-radius = 0
 
 window-decoration = true
