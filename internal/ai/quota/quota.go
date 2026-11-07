@@ -258,7 +258,26 @@ func (s *Service) applyAgyUsageTelemetry(
 	var primaryFound bool
 	eval.SubQuotas = make([]SubQuota, 0, 8)
 
+	// Identify target group if bucket_id is specified
+	targetGroup := ""
+	if target.BucketID != "" {
+		for _, g := range env.Command.Data.Groups {
+			for _, b := range g.Buckets {
+				if b.ID == target.BucketID {
+					targetGroup = g.Name
+					break
+				}
+			}
+			if targetGroup != "" {
+				break
+			}
+		}
+	}
+
 	for _, g := range env.Command.Data.Groups {
+		if targetGroup != "" && g.Name != targetGroup {
+			continue
+		}
 		for _, b := range g.Buckets {
 			remPct := math.Round(b.RemainingFraction*1000) / 10
 			sq := SubQuota{
@@ -306,9 +325,15 @@ func (s *Service) applyAgyUsageTelemetry(
 						eval.IsActive = true
 						eval.NeedsWake = false
 						eval.RemainingSeconds = int(rem.Seconds())
-						h := int(rem.Hours())
-						m := int(rem.Minutes()) % 60
-						eval.StatusLabel = fmt.Sprintf("ACTIVE (%dh %02dm left, resets at %s)", h, m, resetAt.Local().Format("15:04"))
+						if rem.Hours() > 24 {
+							d := int(rem.Hours()) / 24
+							h := int(rem.Hours()) % 24
+							eval.StatusLabel = fmt.Sprintf("ACTIVE (~%dd %dh left, resets at %s)", d, h, resetAt.Local().Format("Jan 02 15:04"))
+						} else {
+							h := int(rem.Hours())
+							m := int(rem.Minutes()) % 60
+							eval.StatusLabel = fmt.Sprintf("ACTIVE (%dh %02dm left, resets at %s)", h, m, resetAt.Local().Format("15:04"))
+						}
 					} else {
 						eval.State = StateExpired
 						eval.IsActive = false
@@ -492,9 +517,24 @@ func (s *Service) WakeWithOptions(ctx context.Context, opts WakeOptions) (*WakeR
 				tool = "agy"
 			}
 			if tool == "agy" {
-				wakeCmd = []string{tool, "-p", "Reply with: 1", "--model", "gemini-3.8-flash-low", "--effort", "low", "--disable-slash-commands"}
+				model := "gemini-3.8-flash-low"
+				if strings.Contains(strings.ToLower(target.ID), "argon") || strings.Contains(strings.ToLower(target.BucketID), "argon") {
+					model = "gemini-4-argon-low"
+				}
+				wakeCmd = []string{tool, "-p", "Reply with: 1", "--model", model, "--effort", "low", "--disable-slash-commands"}
 			} else {
 				wakeCmd = []string{tool, "-p", "Reply with: 1"}
+			}
+		} else if wakeCmd[0] == "agy" {
+			hasDisableSlash := false
+			for _, arg := range wakeCmd {
+				if arg == "--disable-slash-commands" {
+					hasDisableSlash = true
+					break
+				}
+			}
+			if !hasDisableSlash {
+				wakeCmd = append(wakeCmd, "--disable-slash-commands")
 			}
 		}
 
