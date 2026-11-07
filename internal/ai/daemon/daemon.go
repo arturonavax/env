@@ -614,13 +614,23 @@ func FormatStatus(rep *StatusReport) string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-// RunWakeCycle executes the scheduled wake cycle:
-//  1. Verifies network reconnect
-//  2. Executes target wakeup probes
-//  3. Validates 100% probe success (aborts suspend on any failure guardrail!)
-//  4. Re-arms next day's RTC alarm
-//  5. Sends desktop & Telegram notifications and triggers cross-platform safe suspend.
+// WakeCycleOptions customizes wake cycle execution.
+type WakeCycleOptions struct {
+	DisableResuspend bool
+}
+
+// RunWakeCycle executes the scheduled wake cycle with default options.
 func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleResult, error) {
+	return m.RunWakeCycleWithOptions(ctx, out, WakeCycleOptions{})
+}
+
+// RunWakeCycleWithOptions executes the scheduled wake cycle:
+//  1. Verifies network reconnect
+//  2. Executes target wakeup probes (only probing targets that need priming to conserve quota)
+//  3. Validates probe success (aborts suspend on any failure guardrail!)
+//  4. Re-arms next day's RTC alarm
+//  5. Sends desktop & Telegram notifications and triggers cross-platform safe suspend (unless DisableResuspend is set).
+func (m *Manager) RunWakeCycleWithOptions(ctx context.Context, out io.Writer, opts WakeCycleOptions) (*WakeCycleResult, error) {
 	if out == nil {
 		out = io.Discard
 	}
@@ -658,7 +668,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		if aw.Enabled {
 			_, _, _ = m.ScheduleNextRTC(ctx, aw.Time)
 		}
-		if aw.AutoResuspend {
+		if aw.AutoResuspend && !opts.DisableResuspend {
 			delay := time.Duration(aw.ResuspendDelaySec) * time.Second
 			if delay < 0 {
 				delay = 0
@@ -684,9 +694,9 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 	res.NetworkVerified = true
 	_ = m.store.AppendLog("INFO", "NETWORK_OK", "Internet connectivity and DNS verified", nil)
 
-	// 2. Execute wakeup probes and validate probe success
+	// 2. Execute wakeup probes (only probing targets that need wake to conserve quota)
 	wakeRep, wakeErr := m.quotaSvc.WakeWithOptions(ctx, quota.WakeOptions{
-		Force:  true,
+		Force:  false,
 		Reason: "scheduled_wake_cycle",
 		Out:    out,
 	})
@@ -704,7 +714,7 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		if wakeErr == nil {
 			wakeErr = errors.New("wakeup probe reported target failures")
 		}
-		if aw.AutoResuspend {
+		if aw.AutoResuspend && !opts.DisableResuspend {
 			delay := time.Duration(aw.ResuspendDelaySec) * time.Second
 			if delay < 0 {
 				delay = 0
@@ -732,8 +742,8 @@ func (m *Manager) RunWakeCycle(ctx context.Context, out io.Writer) (*WakeCycleRe
 		_, _, _ = m.ScheduleNextRTC(ctx, aw.Time)
 	}
 
-	// 4. Trigger cross-platform safe suspend ONLY after full verified probe success
-	if aw.AutoResuspend {
+	// 4. Trigger cross-platform safe suspend ONLY if permitted and AutoResuspend is active
+	if aw.AutoResuspend && !opts.DisableResuspend {
 		delay := time.Duration(aw.ResuspendDelaySec) * time.Second
 		if delay < 0 {
 			delay = 0
@@ -955,11 +965,12 @@ func (m *Manager) HandleDBusLine(ctx context.Context, out io.Writer, line string
 
 		if st.ExpectingAutoWake && st.ScheduledWakeEpoch > 0 && now >= st.ScheduledWakeEpoch {
 			if now-st.ScheduledWakeEpoch > maxWindowSec {
-				_ = m.store.AppendLog("WARN", "MISSED_WAKE_CATCHUP", fmt.Sprintf("Scheduled wake passed %ds ago during sleep; running catchup wake cycle now", now-st.ScheduledWakeEpoch), nil)
-				fmt.Fprintf(out, "[D-Bus] Missed scheduled wake during sleep (%ds late); executing catchup wake cycle...\n", now-st.ScheduledWakeEpoch)
-			} else {
-				fmt.Fprintln(out, "[D-Bus] On-schedule resume detected; executing wake cycle...")
+				_ = m.store.AppendLog("WARN", "MISSED_WAKE_CATCHUP", fmt.Sprintf("Scheduled wake passed %ds ago during sleep; running catchup wake cycle now (no resuspend)", now-st.ScheduledWakeEpoch), nil)
+				fmt.Fprintf(out, "[D-Bus] Missed scheduled wake during sleep (%ds late); executing catchup wake cycle (no resuspend)...\n", now-st.ScheduledWakeEpoch)
+				_, err := m.RunWakeCycleWithOptions(ctx, out, WakeCycleOptions{DisableResuspend: true})
+				return err
 			}
+			fmt.Fprintln(out, "[D-Bus] On-schedule resume detected; executing wake cycle...")
 			_, err := m.RunWakeCycle(ctx, out)
 			return err
 		}

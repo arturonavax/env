@@ -965,7 +965,15 @@ X-XFCE-Category=FileManager
 X-XFCE-Commands=%B;
 X-XFCE-CommandsWithParameter=%B "%s";
 EOF
-echo "FileManager=nemo" > "$HOME/.config/xfce4/helpers.rc"
+if [ -f "$HOME/.config/xfce4/helpers.rc" ]; then
+    if grep -q "^FileManager=" "$HOME/.config/xfce4/helpers.rc"; then
+        sed -i 's/^FileManager=.*/FileManager=nemo/' "$HOME/.config/xfce4/helpers.rc"
+    else
+        echo "FileManager=nemo" >> "$HOME/.config/xfce4/helpers.rc"
+    fi
+else
+    echo "FileManager=nemo" > "$HOME/.config/xfce4/helpers.rc"
+fi
 gsettings set org.nemo.desktop show-desktop-icons false 2>/dev/null || true
 
 echo "==> 12. Configurando Panel Xfce y Notificaciones..."

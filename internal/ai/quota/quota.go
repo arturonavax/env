@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -21,22 +22,36 @@ const (
 	StateDisabled = "disabled"
 )
 
-// TargetEvaluation represents the evaluated rolling quota window state of a target.
-type TargetEvaluation struct {
+// SubQuota represents a granular model group or window limit (5h, weekly).
+type SubQuota struct {
 	ID               string    `json:"id"`
+	Group            string    `json:"group"`
 	Name             string    `json:"name"`
-	Tool             string    `json:"tool"`
-	Account          string    `json:"account"`
-	Enabled          bool      `json:"enabled"`
-	TelemetryType    string    `json:"telemetry_type"`
-	State            string    `json:"state"`
+	Window           string    `json:"window"`
 	RemainingPercent float64   `json:"remaining_percent"`
-	RemainingSeconds int       `json:"remaining_seconds"`
 	ResetTimeLocal   string    `json:"reset_time_local"`
 	ResetAt          time.Time `json:"reset_at,omitempty"`
-	IsActive         bool      `json:"is_active"`
-	StatusLabel      string    `json:"status_label"`
-	NeedsWake        bool      `json:"needs_wake"`
+	Disabled         bool      `json:"disabled,omitempty"`
+	Description      string    `json:"description,omitempty"`
+}
+
+// TargetEvaluation represents the evaluated rolling quota window state of a target.
+type TargetEvaluation struct {
+	ID               string     `json:"id"`
+	Name             string     `json:"name"`
+	Tool             string     `json:"tool"`
+	Account          string     `json:"account"`
+	Enabled          bool       `json:"enabled"`
+	TelemetryType    string     `json:"telemetry_type"`
+	State            string     `json:"state"`
+	RemainingPercent float64    `json:"remaining_percent"`
+	RemainingSeconds int        `json:"remaining_seconds"`
+	ResetTimeLocal   string     `json:"reset_time_local"`
+	ResetAt          time.Time  `json:"reset_at,omitempty"`
+	IsActive         bool       `json:"is_active"`
+	StatusLabel      string     `json:"status_label"`
+	NeedsWake        bool       `json:"needs_wake"`
+	SubQuotas        []SubQuota `json:"sub_quotas,omitempty"`
 }
 
 // WakeOptions configures a wakeup priming run.
@@ -199,10 +214,14 @@ type agyUsageEnvelope struct {
 	Command struct {
 		Data struct {
 			Groups []struct {
-				Name    string `json:"name"`
-				Buckets []struct {
+				Name        string `json:"name"`
+				Description string `json:"description"`
+				Buckets     []struct {
 					ID                string  `json:"id"`
 					Name              string  `json:"name"`
+					Window            string  `json:"window"`
+					Description       string  `json:"description"`
+					Disabled          bool    `json:"disabled"`
 					RemainingFraction float64 `json:"remaining_fraction"`
 					ResetTime         string  `json:"reset_time"`
 				} `json:"buckets"`
@@ -236,45 +255,82 @@ func (s *Service) applyAgyUsageTelemetry(
 		return false
 	}
 
+	var primaryFound bool
+	eval.SubQuotas = make([]SubQuota, 0, 8)
+
 	for _, g := range env.Command.Data.Groups {
 		for _, b := range g.Buckets {
-			if target.BucketID != "" && b.ID != target.BucketID {
-				continue
-			}
-			eval.RemainingPercent = math.Round(b.RemainingFraction*1000) / 10
-			if strings.TrimSpace(b.ResetTime) == "" {
-				eval.State = StateIdle
-				eval.IsActive = false
-				eval.NeedsWake = true
-				eval.StatusLabel = "IDLE (no rolling timer active)"
-				return true
+			remPct := math.Round(b.RemainingFraction*1000) / 10
+			sq := SubQuota{
+				ID:               b.ID,
+				Group:            g.Name,
+				Name:             b.Name,
+				Window:           b.Window,
+				RemainingPercent: remPct,
+				Disabled:         b.Disabled,
+				Description:      b.Description,
 			}
 
-			resetAt, parseErr := parseResetTimestamp(b.ResetTime)
-			if parseErr != nil {
-				return false
+			var resetAt time.Time
+			var hasReset bool
+			if strings.TrimSpace(b.ResetTime) != "" {
+				if t, parseErr := parseResetTimestamp(b.ResetTime); parseErr == nil {
+					resetAt = t
+					hasReset = true
+					sq.ResetAt = t
+					sq.ResetTimeLocal = t.Local().Format("15:04:05")
+				}
 			}
-			eval.ResetAt = resetAt
-			eval.ResetTimeLocal = resetAt.Local().Format("15:04:05")
+			eval.SubQuotas = append(eval.SubQuotas, sq)
 
-			if resetAt.After(now) {
-				rem := resetAt.Sub(now)
-				eval.State = StateActive
-				eval.IsActive = true
-				eval.NeedsWake = false
-				eval.RemainingSeconds = int(rem.Seconds())
-				h := int(rem.Hours())
-				m := int(rem.Minutes()) % 60
-				eval.StatusLabel = fmt.Sprintf("ACTIVE (%dh %02dm left, resets at %s)", h, m, resetAt.Local().Format("15:04"))
-			} else {
-				eval.State = StateExpired
-				eval.IsActive = false
-				eval.NeedsWake = true
-				eval.RemainingSeconds = 0
-				eval.StatusLabel = fmt.Sprintf("EXPIRED (refreshed at %s)", resetAt.Local().Format("15:04"))
+			isTargetBucket := (target.BucketID != "" && b.ID == target.BucketID)
+			isFallback5h := (target.BucketID == "" && !primaryFound && (b.Window == "5h" || b.ID == "gemini-5h"))
+
+			if isTargetBucket || isFallback5h {
+				primaryFound = true
+				eval.RemainingPercent = remPct
+
+				if !hasReset || strings.TrimSpace(b.ResetTime) == "" {
+					eval.State = StateIdle
+					eval.IsActive = false
+					eval.NeedsWake = true
+					eval.RemainingSeconds = 0
+					eval.StatusLabel = "IDLE (no rolling timer active)"
+				} else {
+					eval.ResetAt = resetAt
+					eval.ResetTimeLocal = resetAt.Local().Format("15:04:05")
+
+					if resetAt.After(now) {
+						rem := resetAt.Sub(now)
+						eval.State = StateActive
+						eval.IsActive = true
+						eval.NeedsWake = false
+						eval.RemainingSeconds = int(rem.Seconds())
+						h := int(rem.Hours())
+						m := int(rem.Minutes()) % 60
+						eval.StatusLabel = fmt.Sprintf("ACTIVE (%dh %02dm left, resets at %s)", h, m, resetAt.Local().Format("15:04"))
+					} else {
+						eval.State = StateExpired
+						eval.IsActive = false
+						eval.NeedsWake = true
+						eval.RemainingSeconds = 0
+						eval.StatusLabel = fmt.Sprintf("EXPIRED (refreshed at %s)", resetAt.Local().Format("15:04"))
+					}
+				}
 			}
-			return true
 		}
+	}
+
+	if len(eval.SubQuotas) > 0 {
+		if !primaryFound {
+			eval.RemainingPercent = eval.SubQuotas[0].RemainingPercent
+			eval.ResetAt = eval.SubQuotas[0].ResetAt
+			eval.ResetTimeLocal = eval.SubQuotas[0].ResetTimeLocal
+			eval.State = StateActive
+			eval.IsActive = true
+			eval.StatusLabel = "ACTIVE"
+		}
+		return true
 	}
 	return false
 }
@@ -435,7 +491,11 @@ func (s *Service) WakeWithOptions(ctx context.Context, opts WakeOptions) (*WakeR
 			if tool == "" {
 				tool = "agy"
 			}
-			wakeCmd = []string{tool, "-p", "Reply with: 1"}
+			if tool == "agy" {
+				wakeCmd = []string{tool, "-p", "Reply with: 1", "--model", "gemini-3.8-flash-low", "--effort", "low", "--disable-slash-commands"}
+			} else {
+				wakeCmd = []string{tool, "-p", "Reply with: 1"}
+			}
 		}
 
 		timeout := time.Duration(target.TimeoutSec) * time.Second
@@ -444,7 +504,11 @@ func (s *Service) WakeWithOptions(ctx context.Context, opts WakeOptions) (*WakeR
 		}
 
 		_ = s.store.AppendLog("INFO", "PROBE_DISPATCH", fmt.Sprintf("Sending wakeup probe to %q", target.ID), nil)
-		probeOut, probeErr := s.exec.RunWithInput(ctx, security.RunOptions{Timeout: timeout}, wakeCmd[0], wakeCmd[1:]...)
+		runOpts := security.RunOptions{
+			Dir:     os.TempDir(),
+			Timeout: timeout,
+		}
+		probeOut, probeErr := s.exec.RunWithInput(ctx, runOpts, wakeCmd[0], wakeCmd[1:]...)
 		if probeErr != nil {
 			errMsg := probeErr.Error()
 			report.Failed[target.ID] = errMsg
@@ -490,36 +554,131 @@ func FormatJSON(evals []TargetEvaluation) (string, error) {
 	return string(b), nil
 }
 
-// FormatTable renders evaluations as an aligned terminal table with ASCII/Unicode progress bars.
+// FormatTable renders evaluations as an aligned terminal table with Tokyo Night styling,
+// showing both target-level and detailed sub-quota breakdowns (5-hour and weekly limits).
 func FormatTable(evals []TargetEvaluation) string {
 	var sb strings.Builder
-	sb.WriteString("ANX AI · Models Rolling Quota & Reset Timers\n")
-	sb.WriteString(strings.Repeat("─", 86) + "\n")
-	fmt.Fprintf(&sb, "%-14s %-8s %-10s %-19s %-10s %s\n", "ID", "TOOL", "ACCOUNT", "QUOTA", "RESETS AT", "STATUS")
-	sb.WriteString(strings.Repeat("─", 86) + "\n")
+	const (
+		cReset   = "\033[0m"
+		cBold    = "\033[1m"
+		cDim     = "\033[2m"
+		cRed     = "\033[38;2;247;118;142m" // Tokyo Night Red (#f7768e)
+		cBlue    = "\033[38;2;122;162;247m" // Tokyo Night Blue (#7aa2f7)
+		cCyan    = "\033[38;2;125;207;255m" // Tokyo Night Cyan (#7dcfff)
+		cGreen   = "\033[38;2;158;206;106m" // Tokyo Night Green (#9ece6a)
+		cYellow  = "\033[38;2;224;175;104m" // Tokyo Night Yellow (#e0af68)
+		cMuted   = "\033[38;2;86;95;137m"   // Tokyo Night Gray (#565f89)
+		cWhite   = "\033[38;2;192;202;245m" // Tokyo Night Foreground (#c0caf5)
+	)
+
+	sb.WriteString(fmt.Sprintf("%s%sANX AI%s %s·%s %sModels Rolling Quota & Reset Timers%s\n", cBold, cRed, cReset, cMuted, cReset, cBold, cReset))
+	sb.WriteString(fmt.Sprintf("%s%s%s\n", cMuted, strings.Repeat("━", 88), cReset))
 
 	if len(evals) == 0 {
-		sb.WriteString("(no targets configured)\n")
+		sb.WriteString(fmt.Sprintf("%s(no targets configured)%s\n", cMuted, cReset))
 		return sb.String()
 	}
 
 	for _, e := range evals {
-		bar := FormatProgressBar(e.RemainingPercent, 10)
-		if !e.Enabled {
-			bar = "──────────   -  "
+		statusColor := cGreen
+		if e.State == StateExpired {
+			statusColor = cRed
+		} else if e.State == StateIdle {
+			statusColor = cYellow
+		} else if !e.Enabled {
+			statusColor = cMuted
 		}
+
 		fmt.Fprintf(
 			&sb,
-			"%-14s %-8s %-10s %-19s %-10s %s\n",
+			"%s%s● %s%s %s[%s / %s / %s]%s %s(%s)%s\n",
+			cBold,
+			statusColor,
+			e.Name,
+			cReset,
+			cMuted,
 			e.ID,
 			e.Tool,
 			e.Account,
-			bar,
-			e.ResetTimeLocal,
-			strings.ToUpper(e.State)+" · "+e.StatusLabel,
+			cReset,
+			cDim,
+			strings.ToUpper(e.State),
+			cReset,
 		)
+
+		if len(e.SubQuotas) > 0 {
+			currentGroup := ""
+			for _, sq := range e.SubQuotas {
+				if sq.Group != currentGroup {
+					currentGroup = sq.Group
+					fmt.Fprintf(&sb, "  %s%s%s%s\n", cBold, cCyan, currentGroup, cReset)
+				}
+				bar := FormatProgressBar(sq.RemainingPercent, 10)
+				resetInfo := sq.ResetTimeLocal
+				if sq.Disabled {
+					resetInfo = fmt.Sprintf("%s(disabled)%s", cMuted, cReset)
+					bar = "──────────   -  "
+				} else if !sq.ResetAt.IsZero() {
+					now := time.Now()
+					if sq.ResetAt.After(now) {
+						delta := sq.ResetAt.Sub(now)
+						if delta.Hours() > 24 {
+							d := int(delta.Hours()) / 24
+							h := int(delta.Hours()) % 24
+							resetInfo = fmt.Sprintf("%s (~%dd %dh left)", sq.ResetAt.Local().Format("Jan 02 15:04"), d, h)
+						} else {
+							h := int(delta.Hours())
+							m := int(delta.Minutes()) % 60
+							resetInfo = fmt.Sprintf("%s (~%dh %02dm left)", sq.ResetTimeLocal, h, m)
+						}
+					} else {
+						resetInfo = fmt.Sprintf("%s (window ended)", sq.ResetTimeLocal)
+					}
+				}
+
+				nameLabel := sq.Name
+				if sq.Window == "5h" {
+					nameLabel = "5-Hour Window"
+				} else if sq.Window == "weekly" {
+					nameLabel = "Weekly Window"
+				}
+
+				fmt.Fprintf(
+					&sb,
+					"    %s%-16s%s %s%s%s  %sResets:%s %-28s\n",
+					cMuted,
+					nameLabel,
+					cReset,
+					cWhite,
+					bar,
+					cReset,
+					cMuted,
+					cReset,
+					resetInfo,
+				)
+			}
+		} else {
+			bar := FormatProgressBar(e.RemainingPercent, 10)
+			if !e.Enabled {
+				bar = "──────────   -  "
+			}
+			fmt.Fprintf(
+				&sb,
+				"    %s%-16s%s %s%s%s  %sResets:%s %-28s %s\n",
+				cMuted,
+				"Rolling Window",
+				cReset,
+				cWhite,
+				bar,
+				cReset,
+				cMuted,
+				cReset,
+				e.ResetTimeLocal,
+				e.StatusLabel,
+			)
+		}
+		sb.WriteString(fmt.Sprintf("%s%s%s\n", cMuted, strings.Repeat("─", 88), cReset))
 	}
-	sb.WriteString(strings.Repeat("─", 86))
 	return sb.String()
 }
 

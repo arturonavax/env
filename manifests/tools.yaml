@@ -113,3 +113,15 @@ tools:
     language: "go"
     version_args: ["--version"]
     update_strategy: "anx_self"
+
+  - id: rcmd
+    name: "rcmd Window Switcher"
+    category: "osconfig"
+    description: "Instant macOS-style Right-Alt window switcher & app launcher daemon (GNOME, Hyprland, Sway, KDE, X11)"
+    executable: "rcmd"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "bash"
+    version_args: ["--help"]
+    repo_url: "https://github.com/arturonavax/env"
+    update_strategy: "anx_self"

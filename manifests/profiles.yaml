@@ -1,7 +1,7 @@
 # Declarative Environment Profiles
 profiles:
   - name: minimal
-    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, wget, htop)
+    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, wget, htop, tree)
     packages:
       - git
       - curl
@@ -13,6 +13,7 @@ profiles:
       - fd
       - bat
       - eza
+      - tree
       - starship
     configurations:
       - starship-config
@@ -162,6 +163,7 @@ profiles:
       - neovim
       - ripgrep
       - fd
+      - tree
       - lazygit
       - rsync
     configurations:

@@ -287,16 +287,16 @@ configurations:
     backup: false
 
   - id: xfce-rcmd-shortcuts
-    name: XFCE rcmd Shortcuts & Extension
+    name: rcmd Shortcuts Configuration
     group: osconfig
-    description: XFCE4 keyboard shortcuts configuration for rcmd switcher
+    description: Host-specific application shortcuts for rcmd switcher (preserved across syncs)
     source: files/rcmd/rcmd.conf
     target: "~/.config/rcmd/rcmd.conf"
     os: [linux]
-    desktops: [xfce]
-    strategy: three_way
-    post_sync_cmds:
-      - ["rcmd", "--sync-xfce"]
+    strategy: preserve
+    post_sync_by_desktop:
+      xfce:
+        - ["rcmd", "--sync-xfce"]
     backup: true
 
   - id: amethyst-config

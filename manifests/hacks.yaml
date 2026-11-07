@@ -25,6 +25,11 @@ hacks:
       - "~/.config/BraveSoftware"
       - "~/.config/brave-flags.conf"
       - "~/.config/night-shift.conf"
+    config_diffs:
+      - config_id: ghostty-config
+        set_keys:
+          background-opacity: "1.0"
+          window-vsync: "false"
     steps:
       - id: apply-m6800-workstation-hacks
         name: Apply Dell Precision M6800 Nouveau & Xfce Optimizations
@@ -83,7 +88,8 @@ hacks:
     backup_paths: []
     steps:
       - id: toggle-scroll-lock-led
-        name: Toggle X11 Scroll Lock LED
-        description: Queries the X11 keyboard LED state via xset and toggles Scroll Lock.
+        name: Enable X11 Scroll Lock LED
+        description: Queries the X11 keyboard LED state via xset and ensures Scroll Lock is active.
         script: manifests/hacks/x11-scroll-lock-led/activate_scroll_lock.sh
+        args: ["--on"]
         privileged: false

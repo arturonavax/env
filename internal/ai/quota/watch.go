@@ -236,11 +236,11 @@ func (m WatchModel) View() tea.View {
 		statusLines = 1
 	)
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7aa2f7"))
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f7768e"))
 	subStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b1d6"))
 	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a"))
 
-	header1 := ansi.Truncate(titleStyle.Render("aitools watch · Live Rolling Quota Dashboard"), totalWidth, "…")
+	header1 := ansi.Truncate(titleStyle.Render("anx ai quota · Live Rolling Quota Dashboard"), totalWidth, "…")
 	header2 := ansi.Truncate(subStyle.Render(m.statusNote), totalWidth, "…")
 	footer := ansi.Truncate(
 		statusStyle.Render("Keys: [j/k] Select  [tab] Focus Pane  [r] Refresh  [w] Wake Target  [q] Quit"),
@@ -317,16 +317,51 @@ func (m WatchModel) buildDetailLines() []string {
 	e := m.evals[m.cursor]
 	remH := e.RemainingSeconds / 3600
 	remM := (e.RemainingSeconds % 3600) / 60
-	return []string{
+
+	lines := []string{
 		fmt.Sprintf("Name:      %s", e.Name),
 		fmt.Sprintf("ID:        %s", e.ID),
 		fmt.Sprintf("Harness:   %s (%s)", e.Tool, e.Account),
-		fmt.Sprintf("Telemetry: %s", e.TelemetryType),
 		fmt.Sprintf("State:     %s", strings.ToUpper(e.State)),
-		fmt.Sprintf("Remaining: %.1f%% (%dh %02dm)", e.RemainingPercent, remH, remM),
+		fmt.Sprintf("Primary:   %.1f%% (%dh %02dm left)", e.RemainingPercent, remH, remM),
 		fmt.Sprintf("Resets At: %s", e.ResetTimeLocal),
 		fmt.Sprintf("Summary:   %s", e.StatusLabel),
 	}
+
+	if len(e.SubQuotas) > 0 {
+		lines = append(lines, "", "── Sub-Quotas & Limit Windows ──")
+		currentGroup := ""
+		for _, sq := range e.SubQuotas {
+			if sq.Group != currentGroup {
+				currentGroup = sq.Group
+				lines = append(lines, fmt.Sprintf("▸ %s:", currentGroup))
+			}
+			bar := FormatProgressBar(sq.RemainingPercent, 8)
+			resetInfo := sq.ResetTimeLocal
+			if sq.Disabled {
+				resetInfo = "(disabled)"
+				bar = "────────   -  "
+			} else if !sq.ResetAt.IsZero() {
+				now := time.Now()
+				if sq.ResetAt.After(now) {
+					delta := sq.ResetAt.Sub(now)
+					if delta.Hours() > 24 {
+						d := int(delta.Hours()) / 24
+						h := int(delta.Hours()) % 24
+						resetInfo = fmt.Sprintf("%s (~%dd %dh)", sq.ResetAt.Local().Format("Jan 02 15:04"), d, h)
+					} else {
+						h := int(delta.Hours())
+						m := int(delta.Minutes()) % 60
+						resetInfo = fmt.Sprintf("%s (~%dh %02dm)", sq.ResetTimeLocal, h, m)
+					}
+				} else {
+					resetInfo = fmt.Sprintf("%s (ended)", sq.ResetTimeLocal)
+				}
+			}
+			lines = append(lines, fmt.Sprintf("  • %-13s %s %s", sq.Name, bar, resetInfo))
+		}
+	}
+	return lines
 }
 
 // Golden Rules #1 & #2: Fill lines to exact innerHeight (no .Height() on bordered style)
@@ -348,7 +383,7 @@ func renderBorderedPanel(title string, rawLines []string, panelWidth, innerHeigh
 
 	borderColor := lipgloss.Color("#565f89")
 	if focused {
-		borderColor = lipgloss.Color("#7dcfff")
+		borderColor = lipgloss.Color("#f7768e")
 	}
 
 	style := lipgloss.NewStyle().

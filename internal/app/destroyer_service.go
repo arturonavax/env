@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
@@ -64,11 +66,17 @@ type DestroyerService struct {
 	syncSvc    *SyncService
 	store      *state.Store
 	onProgress func(step, total int, item string)
+	onLog      func(item, line string)
 }
 
 // SetOnProgress sets the callback to report individual purge step completions.
 func (d *DestroyerService) SetOnProgress(h func(step, total int, item string)) {
 	d.onProgress = h
+}
+
+// SetOnLog sets the callback to report detailed real-time log lines during purge.
+func (d *DestroyerService) SetOnLog(h func(item, line string)) {
+	d.onLog = h
 }
 
 // NewDestroyerService constructs a DestroyerService.
@@ -291,79 +299,109 @@ func (d *DestroyerService) ExecutePurge(
 	if purgeState {
 		totalPurgeItems += len(plan.StateDirectories)
 	}
-	purgeStep := 0
-	report := func(item string) {
-		purgeStep++
+	var stepCounter atomic.Int32
+	report := func(item, logLine string) {
+		s := int(stepCounter.Add(1))
 		if d.onProgress != nil {
-			d.onProgress(purgeStep, totalPurgeItems, item)
+			d.onProgress(s, totalPurgeItems, item)
+		}
+		if d.onLog != nil && logLine != "" {
+			d.onLog(item, logLine)
 		}
 	}
 
+	var mu sync.Mutex
+
+	// 1. Uninstall managed packages sequentially to prevent package manager and state lock collisions
 	if len(plan.PackagesToUninstall) > 0 && d.installSvc != nil {
 		for _, pkgID := range plan.PackagesToUninstall {
-			report("package: " + pkgID)
+			report("package: "+pkgID, fmt.Sprintf("Uninstalling package %s", pkgID))
 			_ = d.installSvc.Uninstall(ctx, []string{pkgID})
-		}
-		res.UninstalledPackages = len(plan.PackagesToUninstall)
-	}
-
-	// 2. Purge configuration targets with declared markers
-	for _, target := range plan.ConfigTargets {
-		report("config: " + filepath.Base(target))
-		markerStart, markerEnd := "", ""
-		if markers, ok := plan.ConfigMarkers[target]; ok {
-			markerStart = markers[0]
-			markerEnd = markers[1]
-		}
-		if err := PurgeConfigTargetWithMarker(target, markerStart, markerEnd); err == nil {
-			res.PurgedConfigs++
-			res.PurgedPaths = append(res.PurgedPaths, target)
+			res.UninstalledPackages++
 		}
 	}
 
-	// 3. Purge archive cleanup paths declared in manifests/archives.yaml
-	for _, target := range plan.ArchiveCleanupPaths {
-		report("archive: " + filepath.Base(target))
-		if err := os.RemoveAll(target); err == nil {
-			res.PurgedConfigs++
-			res.PurgedPaths = append(res.PurgedPaths, target)
+	// 2. Purge configuration targets with declared markers concurrently
+	if len(plan.ConfigTargets) > 0 {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 4)
+		for _, target := range plan.ConfigTargets {
+			wg.Add(1)
+			go func(t string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				report("config: "+filepath.Base(t), fmt.Sprintf("Purging config %s", t))
+				markerStart, markerEnd := "", ""
+				if markers, ok := plan.ConfigMarkers[t]; ok {
+					markerStart = markers[0]
+					markerEnd = markers[1]
+				}
+				if err := PurgeConfigTargetWithMarker(t, markerStart, markerEnd); err == nil {
+					mu.Lock()
+					res.PurgedConfigs++
+					res.PurgedPaths = append(res.PurgedPaths, t)
+					mu.Unlock()
+				}
+			}(target)
 		}
+		wg.Wait()
 	}
+
+	// Helper to purge directories/files concurrently
+	purgePathsConcurrently := func(paths []string, category string, removeFn func(string) error, onSuccess func(string)) {
+		if len(paths) == 0 {
+			return
+		}
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 4)
+		for _, p := range paths {
+			wg.Add(1)
+			go func(target string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				report(category+": "+filepath.Base(target), fmt.Sprintf("Purging %s %s", category, target))
+				if err := removeFn(target); err == nil {
+					mu.Lock()
+					onSuccess(target)
+					mu.Unlock()
+				}
+			}(p)
+		}
+		wg.Wait()
+	}
+
+	// 3. Purge archive cleanup paths
+	purgePathsConcurrently(plan.ArchiveCleanupPaths, "archive", os.RemoveAll, func(target string) {
+		res.PurgedConfigs++
+		res.PurgedPaths = append(res.PurgedPaths, target)
+	})
 
 	// 4. Purge personal tools directories
-	for _, dir := range plan.ToolsDirectories {
-		report("tool: " + filepath.Base(dir))
-		if err := os.RemoveAll(dir); err == nil {
-			res.PurgedPaths = append(res.PurgedPaths, dir)
-		}
-	}
+	purgePathsConcurrently(plan.ToolsDirectories, "tool", os.RemoveAll, func(target string) {
+		res.PurgedPaths = append(res.PurgedPaths, target)
+	})
 
 	// 5. Purge platform binaries if discovered
-	for _, binPath := range plan.Binaries {
-		report("binary: " + filepath.Base(binPath))
-		if err := os.Remove(binPath); err == nil {
-			res.PurgedPaths = append(res.PurgedPaths, binPath)
-		}
-	}
+	purgePathsConcurrently(plan.Binaries, "binary", os.Remove, func(target string) {
+		res.PurgedPaths = append(res.PurgedPaths, target)
+	})
 
 	// 6. Purge caches
-	for _, dir := range plan.CacheDirectories {
-		report("cache: " + filepath.Base(dir))
-		if err := os.RemoveAll(dir); err == nil {
-			res.PurgedPaths = append(res.PurgedPaths, dir)
-		}
-	}
+	purgePathsConcurrently(plan.CacheDirectories, "cache", os.RemoveAll, func(target string) {
+		res.PurgedPaths = append(res.PurgedPaths, target)
+	})
 
 	// 7. Purge state directories if requested
 	if purgeState {
-		for _, dir := range plan.StateDirectories {
-			report("state: " + filepath.Base(dir))
-			if err := os.RemoveAll(dir); err == nil {
-				res.PurgedPaths = append(res.PurgedPaths, dir)
-			}
-		}
+		purgePathsConcurrently(plan.StateDirectories, "state", os.RemoveAll, func(target string) {
+			res.PurgedPaths = append(res.PurgedPaths, target)
+		})
 	} else if d.store != nil {
-		report("state store reset")
+		report("state", "Resetting state database records")
 		_ = d.store.Reset()
 	}
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,12 +23,13 @@ import (
 
 // SyncOptions tunes a synchronization run.
 type SyncOptions struct {
-	Group    string
-	DryRun   bool
-	Force    bool   // incoming (repo) wins on conflicts
-	Push     bool   // capture from $HOME back into the repository instead
-	Shell    string // override shell for filtering configs (defaults to platform shell)
-	Terminal string // override terminal for filtering configs (defaults to platform terminal)
+	Group         string
+	ExcludeGroups []string
+	DryRun        bool
+	Force         bool   // incoming (repo) wins on conflicts
+	Push          bool   // capture from $HOME back into the repository instead
+	Shell         string // override shell for filtering configs (defaults to platform shell)
+	Terminal      string // override terminal for filtering configs (defaults to platform terminal)
 }
 
 // SyncResult reports what happened for one configuration.
@@ -57,6 +59,7 @@ type SyncService struct {
 	snapshots *snapshot.Manager
 	store     *state.Store
 	repoRoot  string
+	diffRules []domain.ConfigDiffRule
 }
 
 // NewSyncService creates a SyncService; store may be nil (no persisted merge ancestors).
@@ -70,6 +73,41 @@ func NewSyncService(
 	return &SyncService{platform: plat, catalog: cat, snapshots: snap, store: store, repoRoot: repoRoot}
 }
 
+// SetConfigDiffRules registers machine-specific configuration delta rules.
+func (s *SyncService) SetConfigDiffRules(rules []domain.ConfigDiffRule) {
+	s.diffRules = rules
+}
+
+// ConfigDiffRules returns currently active configuration diff rules.
+func (s *SyncService) ConfigDiffRules() []domain.ConfigDiffRule {
+	return s.diffRules
+}
+
+// ApplyConfigDiffs transforms raw incoming configuration content according to active machine-specific diff rules.
+func (s *SyncService) ApplyConfigDiffs(configID string, content []byte) []byte {
+	if len(s.diffRules) == 0 {
+		return content
+	}
+	res := string(content)
+	for _, rule := range s.diffRules {
+		if rule.ConfigID != configID {
+			continue
+		}
+		for k, v := range rule.SetKeys {
+			pattern := regexp.MustCompile(`(?m)^(\s*` + regexp.QuoteMeta(k) + `\s*=).*$`)
+			if pattern.MatchString(res) {
+				res = pattern.ReplaceAllString(res, fmt.Sprintf("%s = %s", k, v))
+			} else {
+				if !strings.HasSuffix(res, "\n") && len(res) > 0 {
+					res += "\n"
+				}
+				res += fmt.Sprintf("%s = %s\n", k, v)
+			}
+		}
+	}
+	return []byte(res)
+}
+
 // SetRepoRoot updates the repository root used for resolving configuration files.
 func (s *SyncService) SetRepoRoot(repoRoot string) {
 	s.repoRoot = repoRoot
@@ -80,7 +118,7 @@ func (s *SyncService) RepoRoot() string {
 	return s.repoRoot
 }
 
-func (s *SyncService) selectConfigs(group string, overrideShell, overrideTerminal string) []domain.ConfigurationResource {
+func (s *SyncService) selectConfigs(group string, overrideShell, overrideTerminal string, excludeGroups ...string) []domain.ConfigurationResource {
 	all := s.catalog.ListConfigurationsByGroup(group)
 	out := make([]domain.ConfigurationResource, 0, len(all))
 	sh := s.platform.CurrentShell()
@@ -98,6 +136,18 @@ func (s *SyncService) selectConfigs(group string, overrideShell, overrideTermina
 		term = "ghostty"
 	}
 	for _, c := range all {
+		if len(excludeGroups) > 0 {
+			excluded := false
+			for _, eg := range excludeGroups {
+				if eg != "" && c.Group == eg {
+					excluded = true
+					break
+				}
+			}
+			if excluded {
+				continue
+			}
+		}
 		if !c.SupportsOS(s.platform.OS()) {
 			continue
 		}
@@ -173,6 +223,7 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 			diffs = append(diffs, d)
 			continue
 		}
+		incoming = s.ApplyConfigDiffs(cfg.ID, incoming)
 		local, err := os.ReadFile(target)
 		if err != nil {
 			d.State = "missing"
@@ -237,7 +288,7 @@ func summarizeDiffLines(unified string) string {
 
 // Sync deploys (or with Push captures) every selected configuration.
 func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult, error) {
-	cfgs := s.selectConfigs(opts.Group, opts.Shell, opts.Terminal)
+	cfgs := s.selectConfigs(opts.Group, opts.Shell, opts.Terminal, opts.ExcludeGroups...)
 	results := make([]SyncResult, 0, len(cfgs))
 
 	if opts.Push {
@@ -456,6 +507,7 @@ func (s *SyncService) syncFile(
 	if err != nil {
 		return res, err
 	}
+	incoming = s.ApplyConfigDiffs(cfg.ID, incoming)
 	local, readErr := os.ReadFile(target)
 	if errors.Is(readErr, os.ErrNotExist) {
 		res.Action = "created"
@@ -474,6 +526,12 @@ func (s *SyncService) syncFile(
 	if bytes.Equal(local, incoming) {
 		res.Action = "unchanged"
 		s.recordBase(cfg.ID, incoming)
+		return res, nil
+	}
+
+	if cfg.Strategy == domain.StrategyPreserve && !opts.Force {
+		res.Action = "preserved"
+		res.Detail = "host-specific configuration preserved; use --force or --destroyer to overwrite"
 		return res, nil
 	}
 

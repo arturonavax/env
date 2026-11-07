@@ -65,7 +65,7 @@ func TestDestroyerService_PlanPurge_ProfileScoped(t *testing.T) {
 	// Verify that packages resolved match the minimal profile packages
 	expectedMinimalPkgs := map[string]bool{
 		"git": true, "curl": true, "wget": true, "htop": true, "jq": true, "fzf": true,
-		"ripgrep": true, "fd": true, "bat": true, "eza": true, "starship": true,
+		"ripgrep": true, "fd": true, "bat": true, "eza": true, "starship": true, "tree": true,
 	}
 
 	for _, pkg := range plan.PackagesToUninstall {

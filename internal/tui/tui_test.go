@@ -1167,3 +1167,54 @@ func TestWizardScrollingInApplyingAndCompletedStages(t *testing.T) {
 		t.Errorf("expected completedScrollOffset=0 after MouseWheelUp, got %d", w.completedScrollOffset)
 	}
 }
+
+func TestWizardReviewPlanStickyToggles(t *testing.T) {
+	plat := platform.Detect()
+	cat := catalog.NewDefaultRegistry()
+	w := NewWizardModel(plat, cat, nil,
+		WithWizardIncludeHacks(true),
+		WithWizardIncludeOSConfig(true),
+		WithWizardDestroyerMode(false),
+	)
+	w.stage = StageReviewPlan
+	w.width = 100
+	w.height = 24
+
+	// Render view at scroll offset 0
+	view0 := w.View().Content
+	if !strings.Contains(view0, "TOGGLES (STICKY)") {
+		t.Fatalf("expected view to contain sticky toggles header, got:\n%s", view0)
+	}
+	if !strings.Contains(view0, "[o] OS Config:") || !strings.Contains(view0, "[Included ✓]") {
+		t.Fatalf("expected OS config included badge in sticky toggles, got:\n%s", view0)
+	}
+
+	// Scroll down deep into the plan
+	w.planScrollOffset = 30
+	viewScrolled := w.View().Content
+	if !strings.Contains(viewScrolled, "TOGGLES (STICKY)") {
+		t.Fatalf("expected sticky toggles to remain visible when scrolled to offset 30, got:\n%s", viewScrolled)
+	}
+
+	// Toggle Destroyer mode with 'd'
+	nm, _ := w.Update(tea.KeyPressMsg{Text: "d"})
+	w = nm.(WizardModel)
+	if !w.destroyerMode {
+		t.Fatalf("expected destroyerMode to become true after pressing 'd'")
+	}
+	viewDestroyer := w.View().Content
+	if !strings.Contains(viewDestroyer, "[d] Destroyer:") || !strings.Contains(viewDestroyer, "ACTIVE ⚠️") {
+		t.Fatalf("expected sticky bar to update with active destroyer badge, got:\n%s", viewDestroyer)
+	}
+
+	// Toggle OS Config with 'o'
+	nm, _ = w.Update(tea.KeyPressMsg{Text: "o"})
+	w = nm.(WizardModel)
+	if w.includeOSConfig {
+		t.Fatalf("expected includeOSConfig to become false after pressing 'o'")
+	}
+	viewNoOS := w.View().Content
+	if !strings.Contains(viewNoOS, "[o] OS Config:") || !strings.Contains(viewNoOS, "[Excluded]") {
+		t.Fatalf("expected sticky bar to update with excluded osconfig badge, got:\n%s", viewNoOS)
+	}
+}

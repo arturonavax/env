@@ -149,6 +149,7 @@ type WizardModel struct {
 	quitting         bool
 	matchedHacks     []domain.HackProfile
 	includeHacks     bool
+	includeOSConfig  bool
 	configDiffs      []app.ConfigDiff
 	syncSvc          *app.SyncService
 	hacksSvc         *app.HacksService
@@ -202,6 +203,13 @@ func WithWizardMatchedHacks(hacks []domain.HackProfile) WizardOption {
 func WithWizardIncludeHacks(include bool) WizardOption {
 	return func(w *WizardModel) {
 		w.includeHacks = include
+	}
+}
+
+// WithWizardIncludeOSConfig sets initial desktop & OS config inclusion state.
+func WithWizardIncludeOSConfig(include bool) WizardOption {
+	return func(w *WizardModel) {
+		w.includeOSConfig = include
 	}
 }
 
@@ -380,6 +388,7 @@ func NewWizardModel(
 		shellCursor:      shellIdx,
 		terminalCursor:   termIdx,
 		envFocus:         "shell",
+		includeOSConfig:  true,
 		sudoCheckFn:       security.IsSudoAuthenticated,
 		sudoAuthCmdFn:     security.NewSudoAuthCmd,
 		activeWorkers:     make(map[int]activeWorkerSlot),
@@ -568,6 +577,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(w.matchedHacks) > 0 {
 				w.includeHacks = !w.includeHacks
 			}
+
+		case "o", "O":
+			w.includeOSConfig = !w.includeOSConfig
 
 		case "d", "D":
 			w.destroyerMode = !w.destroyerMode
@@ -924,6 +936,7 @@ func (w WizardModel) startApplying() (tea.Model, tea.Cmd) {
 		selectedList,
 		w.hacksSvc,
 		w.includeHacks,
+		w.includeOSConfig,
 		w.matchedHacks,
 		w.syncSvc,
 		w.selectedShell,
@@ -964,6 +977,7 @@ func runWizardApplyWorker(
 	selectedList []string,
 	hacksSvc *app.HacksService,
 	includeHacks bool,
+	includeOSConfig bool,
 	matchedHacks []domain.HackProfile,
 	syncSvc *app.SyncService,
 	selectedShell string,
@@ -1033,7 +1047,22 @@ func runWizardApplyWorker(
 					Percent:     pct,
 				}
 			})
-			_, _ = destroyerSvc.ExecutePurge(ctx, purgePlan, false, false)
+			destroyerSvc.SetOnLog(func(item, line string) {
+				progressChan <- wizardProgressMsg{
+					Phase:       "Purging (Destroyer)",
+					Action:      "purge",
+					ResourceID:  item,
+					OutputLine:  line,
+				}
+			})
+			pctx := security.ContextWithOutputHandler(ctx, func(line string) {
+				progressChan <- wizardProgressMsg{
+					Phase:       "Purging (Destroyer)",
+					Action:      "purge",
+					OutputLine:  line,
+				}
+			})
+			_, _ = destroyerSvc.ExecutePurge(pctx, purgePlan, false, false)
 		}
 	}
 
@@ -1133,11 +1162,15 @@ func runWizardApplyWorker(
 			Description: "Reconciling dotfiles with 3-way merge...",
 			Percent:     95,
 		}
-		if _, err := syncSvc.Sync(ctx, app.SyncOptions{
+		syncOpts := app.SyncOptions{
 			Force:    destroyerMode,
 			Shell:    selectedShell,
 			Terminal: selectedTerminal,
-		}); err != nil {
+		}
+		if !includeOSConfig {
+			syncOpts.ExcludeGroups = []string{"osconfig"}
+		}
+		if _, err := syncSvc.Sync(ctx, syncOpts); err != nil {
 			syncErr = err
 		}
 	}
@@ -1395,15 +1428,16 @@ func (w WizardModel) renderSelectPackages(width, height int) string {
 		lines = append(lines, w.styles.Muted.Render(fmt.Sprintf("  ▼ ... (%d more packages below)", len(w.packages)-end)))
 	}
 
+	// Sticky toggle line above navigation footer
 	if len(w.matchedHacks) > 0 {
-		status := w.styles.Muted.Render("NO (press 'h' to include)")
+		status := w.styles.Muted.Render("[Excluded] (press [h] to include)")
 		if w.includeHacks {
-			status = w.styles.Success.Render("YES ✓ (press 'h' to exclude)")
+			status = w.styles.Success.Render(fmt.Sprintf("[Included ✓ (%d hacks)] (press [h] to exclude)", len(w.matchedHacks)))
 		}
-		lines = append(lines, "", fmt.Sprintf("⚡ Include hardware workstation hacks: %s", status))
+		lines = append(lines, fmt.Sprintf("⚡ Hardware Hacks (Sticky): %s", status))
 	}
 
-	lines = append(lines, "", w.styles.Muted.Render("Navigation: [Up/Down / j/k] Navigate  [Space] Toggle  [h] Toggle Hacks  [Enter] Review Plan  [Esc] Back  [q] Quit"))
+	lines = append(lines, w.styles.Muted.Render("Navigation: [Up/Down / j/k] Navigate  [Space] Toggle  [h] Toggle Hacks  [Enter] Review Plan  [Esc] Back  [q] Quit"))
 	return strings.Join(lines, "\n")
 }
 
@@ -1414,15 +1448,47 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 		planID = w.plan.ID
 		stepCount = len(w.plan.Steps)
 	}
-	allLines := []string{
-		w.styles.Highlight.Render("STAGE 4/5: REVIEW EXECUTION PLAN"),
-		fmt.Sprintf("Plan ID: %s | Total Actions: %d", planID, stepCount),
-		w.styles.Muted.Render("• Automatic pre-mutation backups will be created before touching any file."),
-		w.styles.Muted.Render("• Transaction journal will record each step for rollback safety."),
+
+	hacksBadge := w.styles.Muted.Render("[No Hacks Detected]")
+	if len(w.matchedHacks) > 0 {
+		if w.includeHacks {
+			hacksBadge = w.styles.Success.Render(fmt.Sprintf("[Included ✓ (%d)]", len(w.matchedHacks)))
+		} else {
+			hacksBadge = w.styles.Muted.Render("[Excluded]")
+		}
 	}
 
-	allLines = append(allLines, "", w.styles.Highlight.Render("TARGET ENVIRONMENT:"))
-	allLines = append(allLines, fmt.Sprintf("  • Primary Shell : %s (Zsh source of truth)", w.selectedShell))
+	osconfigBadge := w.styles.Muted.Render("[Excluded]")
+	if w.includeOSConfig {
+		osconfigBadge = w.styles.Success.Render("[Included ✓]")
+	}
+
+	destroyerBadge := w.styles.Muted.Render("[OFF]")
+	if w.destroyerMode {
+		destroyerBadge = w.styles.Error.Render("[ACTIVE ⚠️]")
+	}
+
+	headerLine := w.styles.Highlight.Render("STAGE 4/5: REVIEW EXECUTION PLAN") +
+		w.styles.Muted.Render(fmt.Sprintf(" | Plan ID: %s | Total Actions: %d", planID, stepCount))
+
+	stickyBarText := fmt.Sprintf(" ⚙️  TOGGLES (STICKY): [h] Hacks: %s  |  [o] OS Config: %s  |  [d] Destroyer: %s",
+		hacksBadge, osconfigBadge, destroyerBadge)
+	stickyBarBox := w.styles.BorderActive.Render(stickyBarText)
+
+	stickyTopLines := []string{
+		headerLine,
+		stickyBarBox,
+	}
+
+	var scrollableLines []string
+	scrollableLines = append(scrollableLines,
+		w.styles.Muted.Render("• Automatic pre-mutation backups will be created before touching any file."),
+		w.styles.Muted.Render("• Transaction journal will record each step for rollback safety."),
+		"",
+		w.styles.Highlight.Render("TARGET ENVIRONMENT:"),
+		fmt.Sprintf("  • Primary Shell : %s (Zsh source of truth)", w.selectedShell),
+	)
+
 	termWarning := ""
 	for _, t := range w.terminals {
 		if t.ID == w.selectedTerminal && t.Warning != "" {
@@ -1430,9 +1496,9 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 			break
 		}
 	}
-	allLines = append(allLines, fmt.Sprintf("  • Terminal      : %s%s", w.selectedTerminal, termWarning))
+	scrollableLines = append(scrollableLines, fmt.Sprintf("  • Terminal      : %s%s", w.selectedTerminal, termWarning))
 
-	allLines = append(allLines, "", w.styles.Highlight.Render("CRYPTOGRAPHIC ORIGIN & PROVENANCE SEAL:"))
+	scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render("CRYPTOGRAPHIC ORIGIN & PROVENANCE SEAL:"))
 	origin := "Embedded Catalog (Immutable Binary)"
 	shortDigest := "N/A"
 	manifestFP := "N/A"
@@ -1447,23 +1513,25 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 			statusBadge = w.styles.Warning.Render(fmt.Sprintf("[INSECURE ORIGIN: %s]", w.seal.InsecureReason))
 		}
 	}
-	allLines = append(allLines, fmt.Sprintf("  • Source Origin   : %s", origin))
-	allLines = append(allLines, fmt.Sprintf("  • Manifests SHA256: %s", manifestFP))
+	scrollableLines = append(scrollableLines, fmt.Sprintf("  • Source Origin   : %s", origin))
+	scrollableLines = append(scrollableLines, fmt.Sprintf("  • Manifests SHA256: %s", manifestFP))
 	if w.platform != nil {
-		allLines = append(allLines, fmt.Sprintf("  • Destination Home: %s", w.platform.HomeDir()))
+		scrollableLines = append(scrollableLines, fmt.Sprintf("  • Destination Home: %s", w.platform.HomeDir()))
 	}
-	allLines = append(allLines, fmt.Sprintf("  • Dotfiles SHA256 : %s", dotfilesFP))
-	allLines = append(allLines, fmt.Sprintf("  • Security Seal   : %s %s", shortDigest, statusBadge))
+	scrollableLines = append(scrollableLines, fmt.Sprintf("  • Dotfiles SHA256 : %s", dotfilesFP))
+	scrollableLines = append(scrollableLines, fmt.Sprintf("  • Security Seal   : %s %s", shortDigest, statusBadge))
+
 	if len(w.matchedHacks) > 0 {
-		status := w.styles.Muted.Render("[Excluded]")
-		if w.includeHacks {
-			status = w.styles.Success.Render("[Included ✓]")
-		}
-		allLines = append(allLines, "", w.styles.Highlight.Render(fmt.Sprintf("⚡ HARDWARE WORKSTATION HACKS %s (Press [h] to toggle)", status)))
+		scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render(fmt.Sprintf("⚡ HARDWARE WORKSTATION HACKS %s (Press [h] to toggle):", hacksBadge)))
 		for _, hk := range w.matchedHacks {
-			allLines = append(allLines, fmt.Sprintf("  • %-20s : %s", hk.ID, hk.Description))
+			scrollableLines = append(scrollableLines, fmt.Sprintf("  • %-20s : %s", hk.ID, hk.Description))
 		}
 	}
+
+	scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render(fmt.Sprintf("🖥️  DESKTOP & OS INTEGRATION (osconfig) %s (Press [o] to toggle):", osconfigBadge)))
+	scrollableLines = append(scrollableLines, "  • rcmd switcher     : Right-Alt fast window focus & daemon integration")
+	scrollableLines = append(scrollableLines, "  • GNOME Extension   : rcmd-shell@arturonavax.dev IPC bridge for Wayland")
+	scrollableLines = append(scrollableLines, "  • Desktop Shortcuts : Preserved host-specific window switcher keybindings")
 
 	var drifted []app.ConfigDiff
 	for _, d := range w.configDiffs {
@@ -1472,52 +1540,54 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 		}
 	}
 	if len(drifted) > 0 {
-		allLines = append(allLines, "", w.styles.Warning.Render(fmt.Sprintf("⚠️  DOTFILE DRIFTS DETECTED (%d configs with differences):", len(drifted))))
+		scrollableLines = append(scrollableLines, "", w.styles.Warning.Render(fmt.Sprintf("⚠️  DOTFILE DRIFTS DETECTED (%d configs with differences):", len(drifted))))
 		for _, d := range drifted {
 			sum := d.Summary
 			if sum == "" {
 				sum = d.State
 			}
-			allLines = append(allLines, fmt.Sprintf("  • %-22s [%s] (%s)", d.ConfigID, d.State, sum))
+			scrollableLines = append(scrollableLines, fmt.Sprintf("  • %-22s [%s] (%s)", d.ConfigID, d.State, sum))
 		}
-		allLines = append(allLines, w.styles.Muted.Render("  Dotfiles will be automatically synchronized via safe 3-way merge."))
+		scrollableLines = append(scrollableLines, w.styles.Muted.Render("  Dotfiles will be automatically synchronized via safe 3-way merge."))
 	}
 
-	allLines = append(allLines, "", w.styles.Highlight.Render("PLANNED ACTIONS:"))
-
+	scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render("PLANNED ACTIONS:"))
 	if w.plan != nil {
 		for _, s := range w.plan.Steps {
-			allLines = append(allLines, fmt.Sprintf("  • [%s] %s", s.Action, AnsiTruncate(s.Description, width-15)))
+			scrollableLines = append(scrollableLines, fmt.Sprintf("  • [%s] %s", s.Action, AnsiTruncate(s.Description, width-15)))
 		}
 	} else {
-		allLines = append(allLines, "  • [noop] Ready to apply selected configuration")
+		scrollableLines = append(scrollableLines, "  • [noop] Ready to apply selected configuration")
 	}
 
-	destroyerBadge := w.styles.Muted.Render("OFF (Press [d] to activate)")
+	destroyerNotice := "OFF — safe non-destructive update"
 	if w.destroyerMode {
-		destroyerBadge = w.styles.Error.Render("ACTIVE ⚠️  Purges packages, tools & configs before installing (Press [d] to disable)")
+		destroyerNotice = w.styles.Error.Render("ACTIVE ⚠️  Purges packages, tools & configs before installing")
 	}
-	allLines = append(allLines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s", destroyerBadge))
+	scrollableLines = append(scrollableLines, "", fmt.Sprintf("💣 DESTROYER REINSTALL: %s (Press [d] to toggle)", destroyerNotice))
 
 	if w.sudoErr != nil {
-		allLines = append(allLines, "", w.styles.Error.Render(fmt.Sprintf("❌ SUDO AUTHENTICATION FAILED: %v (Press [Enter] to retry authentication)", w.sudoErr)))
+		scrollableLines = append(scrollableLines, "", w.styles.Error.Render(fmt.Sprintf("❌ SUDO AUTHENTICATION FAILED: %v (Press [Enter] to retry authentication)", w.sudoErr)))
 	} else if w.needsSudo() {
-		allLines = append(allLines, "", w.styles.Warning.Render("🔒 Administrator privileges (sudo) required. You will be prompted in the terminal upon confirmation."))
+		scrollableLines = append(scrollableLines, "", w.styles.Warning.Render("🔒 Administrator privileges (sudo) required. You will be prompted in the terminal upon confirmation."))
 	}
 
 	var wrappedLines []string
-	for _, l := range allLines {
+	for _, l := range scrollableLines {
 		wrappedLines = append(wrappedLines, AnsiWrap(l, width-4)...)
 	}
-	allLines = wrappedLines
+	scrollableLines = wrappedLines
 
-	availHeight := height - 3
-	if availHeight < 5 {
-		availHeight = 5
+	stickyTopCount := len(stickyTopLines)
+	stickyBottomCount := 1
+
+	availViewportHeight := height - stickyTopCount - stickyBottomCount - 1
+	if availViewportHeight < 4 {
+		availViewportHeight = 4
 	}
 
-	totalLines := len(allLines)
-	maxOffset := totalLines - availHeight
+	totalLines := len(scrollableLines)
+	maxOffset := totalLines - availViewportHeight
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
@@ -1529,23 +1599,28 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 		offset = 0
 	}
 
-	end := offset + availHeight
+	end := offset + availViewportHeight
 	if end > totalLines {
 		end = totalLines
 	}
 
-	visibleLines := allLines[offset:end]
+	visibleViewport := scrollableLines[offset:end]
 
 	var footer string
 	if w.sudoErr != nil {
 		footer = w.styles.Error.Render("Sudo authentication failed. Press [Enter] to retry password entry, [Esc] Back, or [q] Cancel.")
-	} else if totalLines > availHeight {
-		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Up/Down] Scroll Plan (%d-%d/%d)  [Enter] Execute  [d] Destroyer  [Esc] Back  [q] Cancel", offset+1, end, totalLines))
+	} else if totalLines > availViewportHeight {
+		footer = w.styles.Muted.Render(fmt.Sprintf("Navigation: [j/k / Scroll] Details (%d-%d/%d)  [h] Hacks  [o] OS Config  [d] Destroyer  [Enter] Execute  [Esc] Back", offset+1, end, totalLines))
 	} else {
-		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [d] Toggle Destroyer Mode, [Esc] Back, or [q] to Cancel.")
+		footer = w.styles.Success.Render("Press [Enter] to Execute Plan, [h] Hacks, [o] OS Config, [d] Destroyer, [Esc] Back, or [q] to Cancel.")
 	}
 
-	return strings.Join(append(visibleLines, "", footer), "\n")
+	resultLines := make([]string, 0, stickyTopCount+len(visibleViewport)+2)
+	resultLines = append(resultLines, stickyTopLines...)
+	resultLines = append(resultLines, visibleViewport...)
+	resultLines = append(resultLines, footer)
+
+	return strings.Join(resultLines, "\n")
 }
 
 func (w WizardModel) renderCompleted(width int, height ...int) string {

@@ -81,6 +81,7 @@ const (
 	StrategyCopy          StrategyType = "copy"
 	StrategyReplace       StrategyType = "replace"
 	StrategyThreeWay      StrategyType = "three_way"
+	StrategyPreserve      StrategyType = "preserve"
 	StrategySmartAppend   StrategyType = "smart-append"
 	StrategyMarkerBlock   StrategyType = "marker_block"
 	StrategyDirectorySync StrategyType = "directory_sync"

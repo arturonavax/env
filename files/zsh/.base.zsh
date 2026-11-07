@@ -94,7 +94,7 @@ zstyle ':completion:*' menu no
 zstyle ':completion:*' insert-tab false
 zstyle ':completion:*:descriptions' format '[%d]'
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 
 # Permitir navegación relativa hacia atrás con '..'
 zstyle ':completion:*' special-dirs ..
@@ -166,6 +166,7 @@ if [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh ]] && (( $+commands[fzf] )); then
         '--min-height=12' \
         '--layout=reverse' \
         '--border=rounded' \
+        '--ignore-case' \
         '--prompt=❯ ' \
         '--info=inline-right' \
         '--cycle' \

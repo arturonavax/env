@@ -34,14 +34,18 @@ if lsmod | grep -q "^bcma "; then
 fi
 
 # 4. Load the proprietary 'wl' module if not currently loaded
+MODULE_LOADED_FRESH=0
 if ! lsmod | grep -q "^wl "; then
     echo "    --> Loading Broadcom 'wl' kernel module..."
     sudo modprobe wl
+    MODULE_LOADED_FRESH=1
 fi
 
-# 5. Restart NetworkManager to discover the new wireless interface
-echo "    --> Refreshing NetworkManager service..."
-sudo systemctl restart NetworkManager
+# 5. Restart NetworkManager only if newly loaded or wireless interface is missing
+if [ "$MODULE_LOADED_FRESH" = "1" ] || ! (command -v nmcli >/dev/null 2>&1 && nmcli dev 2>/dev/null | grep -qE "wifi|wlan"); then
+    echo "    --> Refreshing NetworkManager service to bind wireless interface..."
+    sudo systemctl restart NetworkManager
+fi
 
 # 6. Verify wireless device detection
 if command -v nmcli >/dev/null 2>&1; then

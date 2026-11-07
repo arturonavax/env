@@ -35,6 +35,11 @@ func main() {
 		os.Exit(exitCode)
 	}
 
+	if base == "rcmd" {
+		exitCode := cli.ExecuteCLI(append([]string{"rcmd"}, os.Args[1:]...), os.Stdout, os.Stderr, info.Version, info.Commit, info.Date)
+		os.Exit(exitCode)
+	}
+
 	exitCode := cli.ExecuteCLI(os.Args[1:], os.Stdout, os.Stderr, info.Version, info.Commit, info.Date)
 	os.Exit(exitCode)
 }

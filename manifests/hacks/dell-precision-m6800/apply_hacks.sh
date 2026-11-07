@@ -36,15 +36,14 @@ echo "==> Applying hardware hacks for Dell Precision M6800 (Nouveau Kepler / Xfc
 # ------------------------------------------------------------------------------
 # 1. Ghostty Terminal Latency, Memory & Opacity Optimization
 # ------------------------------------------------------------------------------
-echo "--> [1/6] Configuring Ghostty (opaque visual, zero-latency vsync & bounded scrollback)..."
-for cfg in "$HOME/.config/ghostty/config" "./files/ghostty/config"; do
-    if [ -f "$cfg" ]; then
-        sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$cfg"
-        sed -i 's/^window-vsync = .*/window-vsync = false/' "$cfg"
-        grep -q "^scrollback-limit" "$cfg" && sed -i 's/^scrollback-limit = .*/scrollback-limit = 10000/' "$cfg" || echo "scrollback-limit = 10000" >> "$cfg"
-        grep -q "^image-storage-limit" "$cfg" && sed -i 's/^image-storage-limit = .*/image-storage-limit = 50000000/' "$cfg" || echo "image-storage-limit = 50000000" >> "$cfg"
-    fi
-done
+echo "--> [1/6] Configuring Ghostty on target host (opaque visual, zero-latency vsync & bounded scrollback)..."
+cfg="$HOME/.config/ghostty/config"
+if [ -f "$cfg" ]; then
+    sed -i 's/^background-opacity = .*/background-opacity = 1.0/' "$cfg"
+    sed -i 's/^window-vsync = .*/window-vsync = false/' "$cfg"
+    grep -q "^scrollback-limit" "$cfg" && sed -i 's/^scrollback-limit = .*/scrollback-limit = 10000/' "$cfg" || echo "scrollback-limit = 10000" >> "$cfg"
+    grep -q "^image-storage-limit" "$cfg" && sed -i 's/^image-storage-limit = .*/image-storage-limit = 50000000/' "$cfg" || echo "image-storage-limit = 50000000" >> "$cfg"
+fi
 
 # Wrapper de alto rendimiento: neutraliza la fuga del 90% de CPU por AT-SPI / ATK-Bridge
 cat <<'EOF' > "$HOME/.local/bin/ghostty"

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/x/term"
@@ -24,7 +26,33 @@ func toolsCommands(appCtx *AppContext) []*cobra.Command {
 	llmAlias.Use = "llm [flags] [prompt]"
 	llmAlias.GroupID = "tools"
 
-	return []*cobra.Command{toolsCmd, aiAlias, llmAlias}
+	rcmdAlias := newRCMDCmd(appCtx)
+
+	return []*cobra.Command{toolsCmd, aiAlias, llmAlias, rcmdAlias}
+}
+
+func newRCMDCmd(appCtx *AppContext) *cobra.Command {
+	return &cobra.Command{
+		Use:                "rcmd [key|flags]",
+		Short:              "Instant Right-Alt application switcher and window daemon",
+		GroupID:            "tools",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rcmdPath := filepath.Join(os.Getenv("HOME"), ".local/bin/rcmd")
+			if _, err := os.Stat(rcmdPath); err != nil {
+				p, lookErr := exec.LookPath("rcmd")
+				if lookErr != nil {
+					return fmt.Errorf("rcmd executable not found at %s or in PATH; deploy via 'anx apply' or 'anx sync'", rcmdPath)
+				}
+				rcmdPath = p
+			}
+			c := exec.CommandContext(cmd.Context(), rcmdPath, args...)
+			c.Stdin = os.Stdin
+			c.Stdout = cmd.OutOrStdout()
+			c.Stderr = cmd.ErrOrStderr()
+			return c.Run()
+		},
+	}
 }
 
 func toolCompletion(appCtx *AppContext) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {

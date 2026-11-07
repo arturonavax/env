@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/arturonavax/env/internal/ai/daemon"
@@ -120,12 +121,51 @@ func newWakeCmd(rt *runtimeEnv) *cobra.Command {
 }
 
 func newDaemonCmd(rt *runtimeEnv) *cobra.Command {
-	actions := []string{"status", "install", "uninstall", "run-wake-cycle", "auto-wake", "run-monitor", "log", "logs"}
+	actions := []string{"status", "install", "uninstall", "stop", "run-wake-cycle", "auto-wake", "run-monitor", "log", "logs"}
 	cmd := &cobra.Command{
-		Use:       "daemon <action> [arg]",
-		Short:     "Manage background wakeup daemon, RTC alarms, and safe suspension",
-		GroupID:   "quota",
-		Args:      cobra.MatchAll(cobra.RangeArgs(1, 2), cobra.OnlyValidArgs),
+		Use:   "daemon <action> [arg]",
+		Short: "Manage background wakeup daemon, RTC alarms, and safe suspension",
+		Long: `Manage the background AI quota wakeup daemon, RTC alarms, and safe suspension.
+
+Available Actions:
+  status           Show current daemon, systemd timers, RTC alarm status, and recent wakeups
+  install          Install and enable systemd user services/timers or launchd daemon
+  uninstall        Stop, disable, and remove systemd user services/timers and disarm RTC alarm
+  stop             Alias for uninstall
+  auto-wake on     Enable automatic daily 04:00 AM RTC wakeup alarms
+  auto-wake off    Disable automatic RTC wakeup alarms
+  run-wake-cycle   Trigger an immediate wake cycle pass (verify network, probe, resuspend)
+  run-monitor      Run foreground D-Bus monitor for system sleep/wake transitions
+  logs [N]         Show the last N lines of the daemon log (default 50)
+
+Examples:
+  anx tools ai daemon status
+  anx tools ai daemon auto-wake off
+  anx tools ai daemon stop
+  anx tools ai daemon logs 30`,
+		GroupID: "quota",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 || len(args) > 2 {
+				return fmt.Errorf("accepts between 1 and 2 arg(s), received %d", len(args))
+			}
+			action := args[0]
+			validAction := false
+			for _, a := range actions {
+				if a == action {
+					validAction = true
+					break
+				}
+			}
+			if !validAction {
+				return fmt.Errorf("invalid action %q, expected one of: %s", action, strings.Join(actions, ", "))
+			}
+			if action == "auto-wake" {
+				if len(args) < 2 || (args[1] != "on" && args[1] != "off") {
+					return fmt.Errorf("auto-wake requires 'on' or 'off'")
+				}
+			}
+			return nil
+		},
 		ValidArgs: actions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDaemonAction(rt, cmd, args)
@@ -157,7 +197,7 @@ func runDaemonAction(rt *runtimeEnv, cmd *cobra.Command, args []string) error {
 		for _, f := range res.Files {
 			fmt.Fprintln(out, "installed:", f)
 		}
-	case "uninstall":
+	case "uninstall", "stop":
 		return rt.daemonMgr.Uninstall(ctx)
 	case "auto-wake":
 		switch extra {

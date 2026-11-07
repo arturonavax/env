@@ -13,6 +13,7 @@ import (
 
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
+	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/hacks"
 	"github.com/arturonavax/env/internal/journal"
 	"github.com/arturonavax/env/internal/platform"
@@ -258,6 +259,12 @@ func NewContainer(opts ...Option) (*Container, error) {
 	doctorSvc := app.NewDoctorService(plat, cat, app.WithDoctorStore(store), app.WithDoctorRepoRoot(repoRoot))
 	auditSvc := app.NewAuditService(cat, prov, osvClient)
 	hacksSvc := app.NewHacksService(plat, hackReg, installRunner, snap, store, repoRoot)
+	_, matched := hacksSvc.Detect(context.Background())
+	var activeDiffRules []domain.ConfigDiffRule
+	for _, hk := range matched {
+		activeDiffRules = append(activeDiffRules, hk.ConfigDiffs...)
+	}
+	syncSvc.SetConfigDiffRules(activeDiffRules)
 	opsSvc := app.NewOpsService(plat, installRunner)
 	controlPlane := app.NewControlPlaneService(plat, cat, installSvc, syncSvc, hacksSvc, toolsSvc, store)
 	destroyerSvc := app.NewDestroyerService(plat, cat, installSvc, syncSvc, store, app.WithDestroyerToolsRegistry(toolReg))

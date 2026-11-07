@@ -25,17 +25,24 @@ type HackStep struct {
 	Privileged  bool     `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 }
 
+// ConfigDiffRule describes a machine-specific configuration delta (e.g. background-opacity = 1.0).
+type ConfigDiffRule struct {
+	ConfigID string            `json:"config_id" yaml:"config_id"`
+	SetKeys  map[string]string `json:"set_keys,omitempty" yaml:"set_keys,omitempty"`
+}
+
 // HackProfile represents a declarative machine- or hardware-specific optimization bundle under hacks/<id>/.
 type HackProfile struct {
-	ID          string          `json:"id" yaml:"id"`
-	Name        string          `json:"name" yaml:"name"`
-	Category    string          `json:"category" yaml:"category"`
-	Description string          `json:"description" yaml:"description"`
-	SafeByOptIn bool            `json:"safe_by_opt_in" yaml:"safe_by_opt_in"`
-	Match       HardwareMatcher `json:"match" yaml:"match"`
-	BackupPaths []string        `json:"backup_paths,omitempty" yaml:"backup_paths,omitempty"`
-	Steps       []HackStep      `json:"steps" yaml:"steps"`
-	Dir         string          `json:"dir,omitempty" yaml:"-"`
+	ID          string           `json:"id" yaml:"id"`
+	Name        string           `json:"name" yaml:"name"`
+	Category    string           `json:"category" yaml:"category"`
+	Description string           `json:"description" yaml:"description"`
+	SafeByOptIn bool             `json:"safe_by_opt_in" yaml:"safe_by_opt_in"`
+	Match       HardwareMatcher  `json:"match" yaml:"match"`
+	BackupPaths []string         `json:"backup_paths,omitempty" yaml:"backup_paths,omitempty"`
+	ConfigDiffs []ConfigDiffRule `json:"config_diffs,omitempty" yaml:"config_diffs,omitempty"`
+	Steps       []HackStep       `json:"steps" yaml:"steps"`
+	Dir         string           `json:"dir,omitempty" yaml:"-"`
 }
 
 // HardwareProfile captures probed host hardware and display metadata used to match hacks and run diagnostics.
