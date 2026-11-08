@@ -232,21 +232,55 @@ func TestAgyTargetGroupSubQuotaIsolationAndArgonWake(t *testing.T) {
 		t.Errorf("unexpected group in argon target: %q", evals[1].SubQuotas[0].Group)
 	}
 
-	// 2. Wake gemini-argon target with force
+	// 2. A running window is NEVER probed, not even with force.
+	spy.lastArgs = nil
 	rep, err := svc.Wake(ctx, true, "gemini-argon")
 	if err != nil {
 		t.Fatalf("Wake gemini-argon: %v", err)
 	}
-	if len(rep.Woken) != 1 || rep.Woken[0] != "gemini-argon" {
-		t.Fatalf("expected gemini-argon woken, got: %+v", rep)
+	if len(rep.Woken) != 0 || len(rep.Skipped) != 1 || rep.Skipped[0] != "gemini-argon" {
+		t.Fatalf("expected active gemini-argon skipped, got: %+v", rep)
 	}
+	for _, a := range spy.lastArgs {
+		if a == "Reply with: 1" {
+			t.Fatalf("wake probe must not be sent to an active window, args: %v", spy.lastArgs)
+		}
+	}
+}
 
-	// Verify command had gemini-4-argon-low and --disable-slash-commands
-	joined := strings.Join(spy.lastArgs, " ")
-	if !strings.Contains(joined, "gemini-4-argon-low") {
-		t.Errorf("expected default wake model gemini-4-argon-low, got args: %s", joined)
+type spyExpired3p struct{ probes [][]string }
+
+func (s *spyExpired3p) RunWithInput(_ context.Context, _ security.RunOptions, _ string, args ...string) (string, error) {
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "/usage") {
+		return `{"command":{"data":{"groups":[
+{"name":"Gemini Models","buckets":[{"id":"gemini-5h","window":"5h","remaining_fraction":0.9,"reset_time":"2026-11-07T16:00:00Z"}]},
+{"name":"Claude and GPT models","buckets":[{"id":"3p-5h","window":"5h","remaining_fraction":1,"reset_time":"2026-11-07T09:00:00Z"}]}
+]}}}`, nil
 	}
-	if !strings.Contains(joined, "--disable-slash-commands") {
-		t.Errorf("expected --disable-slash-commands in wake command, got: %s", joined)
+	s.probes = append(s.probes, args)
+	return "1", nil
+}
+
+func TestWakeClaudeGPTWhenExpiredAndSkipGeminiWhenActive(t *testing.T) {
+	t.Parallel()
+
+	spy := &spyExpired3p{}
+	cfg := &config.Config{Targets: []config.TargetConfig{
+		{ID: "gemini", Tool: "agy", Enabled: true, TelemetryType: "agy_usage", BucketID: "gemini-5h"},
+		{ID: "claude-gpt", Tool: "agy", Enabled: true, TelemetryType: "agy_usage", BucketID: "3p-5h"},
+	}}
+	svc := quota.NewService(cfg, config.NewStateStore(t.TempDir()), quota.WithExecutor(spy),
+		quota.WithClock(func() time.Time { return time.Date(2026, 11, 7, 11, 0, 0, 0, time.UTC) }))
+
+	rep, err := svc.Wake(context.Background(), false, "")
+	if err != nil {
+		t.Fatalf("Wake: %v", err)
+	}
+	if len(rep.Woken) != 1 || rep.Woken[0] != "claude-gpt" {
+		t.Fatalf("expected only claude-gpt woken, got %+v", rep)
+	}
+	if len(spy.probes) != 1 || !strings.Contains(strings.Join(spy.probes[0], " "), "Claude Sonnet 5.5 (Low)") {
+		t.Fatalf("expected one Claude probe, got %v", spy.probes)
 	}
 }

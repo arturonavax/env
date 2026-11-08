@@ -351,9 +351,12 @@ func (s *Service) applyAgyUsageTelemetry(
 			eval.RemainingPercent = eval.SubQuotas[0].RemainingPercent
 			eval.ResetAt = eval.SubQuotas[0].ResetAt
 			eval.ResetTimeLocal = eval.SubQuotas[0].ResetTimeLocal
+			// Telemetry succeeded but the configured bucket was not reported:
+			// never spend tokens on a target whose window state is unknown.
 			eval.State = StateActive
 			eval.IsActive = true
-			eval.StatusLabel = "ACTIVE"
+			eval.NeedsWake = false
+			eval.StatusLabel = "ACTIVE (bucket not reported)"
 		}
 		return true
 	}
@@ -504,9 +507,17 @@ func (s *Service) WakeWithOptions(ctx context.Context, opts WakeOptions) (*WakeR
 		eval := s.EvaluateTargetAt(ctx, target, st, now)
 		fmt.Fprintf(out, "Target %s [%s/%s]: %s (%.1f%%)\n", eval.Name, eval.Tool, eval.Account, eval.StatusLabel, eval.RemainingPercent)
 
-		if !opts.Force && !eval.NeedsWake {
+		// Hard guard: a window that is already running is NEVER probed, not even
+		// with --force, because a probe on an awake model only burns tokens.
+		if eval.State == StateActive || eval.IsActive || !eval.NeedsWake {
 			report.Skipped = append(report.Skipped, target.ID)
 			_ = s.store.AppendLog("INFO", "PROBE_SKIPPED", fmt.Sprintf("Target %q window active", target.ID), nil)
+			continue
+		}
+		// Debounce: telemetry can lag right after a probe; never re-probe within 10 minutes.
+		if last := st.LastWakeTime(target.ID); !last.IsZero() && now.Sub(last) < 10*time.Minute {
+			report.Skipped = append(report.Skipped, target.ID)
+			_ = s.store.AppendLog("INFO", "PROBE_SKIPPED", fmt.Sprintf("Target %q probed %s ago", target.ID, now.Sub(last).Round(time.Second)), nil)
 			continue
 		}
 
@@ -518,8 +529,12 @@ func (s *Service) WakeWithOptions(ctx context.Context, opts WakeOptions) (*WakeR
 			}
 			if tool == "agy" {
 				model := "gemini-3.8-flash-low"
-				if strings.Contains(strings.ToLower(target.ID), "argon") || strings.Contains(strings.ToLower(target.BucketID), "argon") {
+				idHint := strings.ToLower(target.ID + " " + target.BucketID)
+				switch {
+				case strings.Contains(idHint, "argon"):
 					model = "gemini-4-argon-low"
+				case strings.Contains(idHint, "3p") || strings.Contains(idHint, "claude") || strings.Contains(idHint, "gpt"):
+					model = "Claude Sonnet 5.5 (Low)"
 				}
 				wakeCmd = []string{tool, "-p", "Reply with: 1", "--model", model, "--effort", "low", "--disable-slash-commands"}
 			} else {
@@ -599,16 +614,16 @@ func FormatJSON(evals []TargetEvaluation) (string, error) {
 func FormatTable(evals []TargetEvaluation) string {
 	var sb strings.Builder
 	const (
-		cReset   = "\033[0m"
-		cBold    = "\033[1m"
-		cDim     = "\033[2m"
-		cRed     = "\033[38;2;247;118;142m" // Tokyo Night Red (#f7768e)
-		cBlue    = "\033[38;2;122;162;247m" // Tokyo Night Blue (#7aa2f7)
-		cCyan    = "\033[38;2;125;207;255m" // Tokyo Night Cyan (#7dcfff)
-		cGreen   = "\033[38;2;158;206;106m" // Tokyo Night Green (#9ece6a)
-		cYellow  = "\033[38;2;224;175;104m" // Tokyo Night Yellow (#e0af68)
-		cMuted   = "\033[38;2;86;95;137m"   // Tokyo Night Gray (#565f89)
-		cWhite   = "\033[38;2;192;202;245m" // Tokyo Night Foreground (#c0caf5)
+		cReset  = "\033[0m"
+		cBold   = "\033[1m"
+		cDim    = "\033[2m"
+		cRed    = "\033[38;2;247;118;142m" // Tokyo Night Red (#f7768e)
+		cBlue   = "\033[38;2;122;162;247m" // Tokyo Night Blue (#7aa2f7)
+		cCyan   = "\033[38;2;125;207;255m" // Tokyo Night Cyan (#7dcfff)
+		cGreen  = "\033[38;2;158;206;106m" // Tokyo Night Green (#9ece6a)
+		cYellow = "\033[38;2;224;175;104m" // Tokyo Night Yellow (#e0af68)
+		cMuted  = "\033[38;2;86;95;137m"   // Tokyo Night Gray (#565f89)
+		cWhite  = "\033[38;2;192;202;245m" // Tokyo Night Foreground (#c0caf5)
 	)
 
 	sb.WriteString(fmt.Sprintf("%s%sANX AI%s %s·%s %sModels Rolling Quota & Reset Timers%s\n", cBold, cRed, cReset, cMuted, cReset, cBold, cReset))

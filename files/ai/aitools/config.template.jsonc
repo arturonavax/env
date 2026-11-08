@@ -87,6 +87,34 @@
       ],
       "fallback_interval_hours": 168,
       "timeout_sec": 25
+    },
+    {
+      "id": "claude-gpt",
+      "name": "Claude & GPT Models (Antigravity)",
+      "tool": "agy",
+      "account": "default",
+      "enabled": true,
+      "telemetry_type": "agy_usage",
+      "bucket_id": "3p-5h",
+      "wake_command": [
+        "agy",
+        "-p",
+        "Reply with: 1",
+        "--model",
+        "Claude Sonnet 5.5 (Low)",
+        "--effort",
+        "low",
+        "--disable-slash-commands"
+      ],
+      "status_command": [
+        "agy",
+        "-p",
+        "/usage",
+        "--output-format",
+        "json"
+      ],
+      "fallback_interval_hours": 5,
+      "timeout_sec": 30
     }
   ],
   "commands": {
