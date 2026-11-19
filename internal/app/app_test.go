@@ -266,6 +266,42 @@ func TestSyncPostSyncErrorSurfacesAsPartial(t *testing.T) {
 	}
 }
 
+func TestSyncPostSyncUsesPlatformHomeDir(t *testing.T) {
+	fx := newFixture(t)
+	testCfg := domain.ConfigurationResource{
+		ID:       "test-post-sync-home",
+		Source:   "files/test/run.sh",
+		Target:   "~/.local/bin/test-run",
+		Strategy: domain.StrategyReplace,
+		FileMode: "0755",
+		PostSyncCmds: [][]string{
+			{"sh", "-c", `printf '%s' "$HOME" > "${HOME}/post_sync_home.txt"`},
+		},
+	}
+	fx.cat.AddConfiguration(testCfg)
+
+	svc := app.NewSyncService(fx.plat, fx.cat, fx.snap, fx.store, fx.repo)
+	write(t, filepath.Join(fx.repo, "files/test/run.sh"), "#!/bin/sh\necho ok\n")
+
+	if _, err := svc.SyncOne(context.Background(), "test-post-sync-home", app.SyncOptions{}); err != nil {
+		t.Fatalf("SyncOne failed: %v", err)
+	}
+	targetInfo, err := os.Stat(filepath.Join(fx.plat.HomeDir(), ".local/bin/test-run"))
+	if err != nil {
+		t.Fatalf("expected synced target to exist: %v", err)
+	}
+	if targetInfo.Mode().Perm()&0o111 == 0 {
+		t.Errorf("expected FileMode 0755 executable bits on target, got %v", targetInfo.Mode().Perm())
+	}
+	raw, err := os.ReadFile(filepath.Join(fx.plat.HomeDir(), "post_sync_home.txt"))
+	if err != nil {
+		t.Fatalf("expected post-sync hook to write inside platform HomeDir: %v", err)
+	}
+	if string(raw) != fx.plat.HomeDir() {
+		t.Errorf("post-sync HOME = %q, want %q", string(raw), fx.plat.HomeDir())
+	}
+}
+
 func TestInstallServicePlanRequiresSudo(t *testing.T) {
 	home := t.TempDir()
 	platLinuxSudo := platform.NewTestInfo(platform.TestInfoParams{

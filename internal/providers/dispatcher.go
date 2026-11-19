@@ -212,8 +212,15 @@ func (d *Dispatcher) IsInstalled(ctx context.Context, pkg domain.ManagedResource
 		}
 	}
 
+	pkgID := spec.ID
+	if pkgID == "" {
+		pkgID = pkg.ID
+	}
 	for _, bin := range candidates {
 		if binPath := d.locateBinary(bin); binPath != "" {
+			if d.isBrokenManagedBinary(ctx, pkgID, binPath) {
+				continue
+			}
 			ver := probeBinaryVersion(ctx, d.runner, binPath, spec.VersionArgs)
 			return true, ver, nil
 		}
@@ -243,6 +250,57 @@ func (d *Dispatcher) IsInstalled(ctx context.Context, pkg domain.ManagedResource
 	}
 
 	return false, "", nil
+}
+
+// isBrokenManagedBinary catches shim or incomplete single-file installs that exist on PATH
+// but cannot execute cleanly without toolchain configuration or package metadata.
+func (d *Dispatcher) isBrokenManagedBinary(ctx context.Context, pkgID, binPath string) bool {
+	switch pkgID {
+	case "rust":
+		if d.runner == nil {
+			return false
+		}
+		opts := security.RunOptions{
+			Timeout: 4 * time.Second,
+			Env:     d.buildSubprocessEnv(nil),
+		}
+		if d.platform != nil {
+			if home := d.platform.HomeDir(); home != "" {
+				if info, err := os.Stat(home); err == nil && info.IsDir() {
+					opts.Dir = home
+				}
+			}
+		}
+		_, err := d.runner.RunWithInput(ctx, opts, binPath, "--version")
+		return err != nil
+	case "codex-cli":
+		if d.platform == nil || d.platform.LocalBinDir() == "" || d.platform.HomeDir() == "" {
+			return false
+		}
+		if filepath.Clean(filepath.Dir(binPath)) != filepath.Clean(d.platform.LocalBinDir()) {
+			return false
+		}
+		marker := filepath.Join(
+			d.platform.HomeDir(),
+			".codex",
+			"packages",
+			"standalone",
+			"current",
+			"codex-package.json",
+		)
+		if info, err := os.Stat(marker); err == nil && !info.IsDir() {
+			return false
+		}
+		if linfo, err := os.Lstat(binPath); err == nil && linfo.Mode()&os.ModeSymlink != 0 {
+			if target, rerr := filepath.EvalSymlinks(binPath); rerr == nil &&
+				filepath.Clean(filepath.Dir(target)) != filepath.Clean(d.platform.LocalBinDir()) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 // Install executes the ordered declarative strategies for pkg, automatically falling back across tiers on error.

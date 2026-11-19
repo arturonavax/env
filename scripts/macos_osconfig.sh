@@ -40,6 +40,7 @@ TMP_FILES=()
 cleanup() {
 	if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
 		kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+		wait "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
 	fi
 	if [[ ${#TMP_FILES[@]} -gt 0 ]]; then
 		rm -f "${TMP_FILES[@]}" >/dev/null 2>&1 || true
@@ -207,8 +208,29 @@ defaults_write_tcc() {
 	fi
 }
 
+OPTIONAL_WARNED_DOMAINS="|"
+defaults_write_optional() {
+	if [[ "$DRY_RUN" -eq 1 ]]; then
+		run_cmd defaults write "$@"
+		return 0
+	fi
+	if ! defaults write "$@" >/dev/null 2>&1; then
+		case "$OPTIONAL_WARNED_DOMAINS" in
+			*"|$1|"*) ;;
+			*)
+				OPTIONAL_WARNED_DOMAINS="${OPTIONAL_WARNED_DOMAINS}$1|"
+				log_warn "Skipped sandboxed/unavailable defaults domain ($1)."
+				;;
+		esac
+	fi
+}
+
 quit_app_if_running() {
 	local app_name="$1"
+	if [[ "$app_name" == "Terminal" && "${TERM_PROGRAM:-}" == "Apple_Terminal" ]]; then
+		log_warn "Skipping quit for Terminal while running inside active Apple Terminal session."
+		return 0
+	fi
 	if [[ "$DRY_RUN" -eq 1 ]]; then
 		run_cmd osascript -e "if application \"${app_name}\" is running then tell application \"${app_name}\" to quit"
 		return 0
@@ -312,11 +334,18 @@ init_sudo_keepalive() {
 		USE_SUDO=0
 		return 0
 	fi
-	while true; do
-		sudo -n true >/dev/null 2>&1 || exit 0
-		sleep 60
-		kill -0 "$$" >/dev/null 2>&1 || exit 0
-	done &
+	(
+		sleep_pid=""
+		trap '[[ -n "${sleep_pid:-}" ]] && kill "${sleep_pid}" >/dev/null 2>&1 || true; exit 0' EXIT INT TERM
+		while true; do
+			sudo -n true >/dev/null 2>&1 || exit 0
+			sleep 60 &
+			sleep_pid="$!"
+			wait "${sleep_pid}" >/dev/null 2>&1 || exit 0
+			sleep_pid=""
+			kill -0 "$$" >/dev/null 2>&1 || exit 0
+		done
+	) </dev/null >/dev/null 2>&1 &
 	SUDO_KEEPALIVE_PID="$!"
 }
 
@@ -418,8 +447,8 @@ configure_defaults() {
 	defaults_write NSGlobalDomain com.apple.keyboard.fnState -bool false
 
 	# Keep Gatekeeper quarantine enabled for downloaded apps; only skip Cocoa persistence & printer queue linger.
-	defaults_write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
-	defaults_write com.apple.helpviewer DevMode -bool true
+	defaults_write_optional com.apple.print.PrintingPrefs "Quit When Finished" -bool true
+	defaults_write_optional com.apple.helpviewer DevMode -bool true
 
 	# Disable typing autocorrections globally (better for terminal/code editing).
 	defaults_write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
@@ -546,40 +575,42 @@ configure_defaults() {
 	# Keep Ghostty/Herdr/Neovim background builds on performance cores; leave App Nap enabled globally for battery life.
 	defaults_write com.mitchellh.ghostty NSQuitAlwaysKeepsWindows -bool false
 	defaults_write com.mitchellh.ghostty NSAppSleepDisabled -bool true
-	defaults_write com.apple.terminal StringEncodings -array 4
-	defaults_write com.apple.terminal SecureKeyboardEntry -bool true
-	defaults_write com.apple.terminal FocusFollowsMouse -bool false
-	quit_app_if_running "Terminal"
-	plist_set "${HOME}/Library/Preferences/com.apple.Terminal.plist" ':"Window Settings":Basic:shellExitAction' integer 0
+	defaults_write_optional com.apple.terminal StringEncodings -array 4
+	defaults_write_optional com.apple.terminal SecureKeyboardEntry -bool true
+	defaults_write_optional com.apple.terminal FocusFollowsMouse -bool false
+	if [[ "${TERM_PROGRAM:-}" != "Apple_Terminal" ]]; then
+		quit_app_if_running "Terminal"
+		plist_set "${HOME}/Library/Preferences/com.apple.Terminal.plist" ':"Window Settings":Basic:shellExitAction' integer 0
+	fi
 
-	defaults_write com.apple.ActivityMonitor OpenMainWindow -bool true
-	defaults_write com.apple.ActivityMonitor IconType -int 5
-	defaults_write com.apple.ActivityMonitor ShowCategory -int 0
-	defaults_write com.apple.ActivityMonitor SortColumn -string "CPUUsage"
-	defaults_write com.apple.ActivityMonitor SortDirection -int 0
-	defaults_write com.apple.ActivityMonitor UpdatePeriod -int 5
+	defaults_write_optional com.apple.ActivityMonitor OpenMainWindow -bool true
+	defaults_write_optional com.apple.ActivityMonitor IconType -int 5
+	defaults_write_optional com.apple.ActivityMonitor ShowCategory -int 0
+	defaults_write_optional com.apple.ActivityMonitor SortColumn -string "CPUUsage"
+	defaults_write_optional com.apple.ActivityMonitor SortDirection -int 0
+	defaults_write_optional com.apple.ActivityMonitor UpdatePeriod -int 5
 
-	defaults_write com.apple.TextEdit RichText -int 0
-	defaults_write com.apple.TextEdit PlainTextEncoding -int 4
-	defaults_write com.apple.TextEdit PlainTextEncodingForWrite -int 4
-	defaults_write com.apple.TextEdit SmartQuotes -bool false
+	defaults_write_optional com.apple.TextEdit RichText -int 0
+	defaults_write_optional com.apple.TextEdit PlainTextEncoding -int 4
+	defaults_write_optional com.apple.TextEdit PlainTextEncodingForWrite -int 4
+	defaults_write_optional com.apple.TextEdit SmartQuotes -bool false
 
-	defaults_write com.apple.DiskUtility DUDebugMenuEnabled -bool true
-	defaults_write com.apple.DiskUtility advanced-image-options -bool true
-	defaults_write com.apple.QuickTimePlayerX MGPlayMovieOnOpen -bool true
+	defaults_write_optional com.apple.DiskUtility DUDebugMenuEnabled -bool true
+	defaults_write_optional com.apple.DiskUtility advanced-image-options -bool true
+	defaults_write_optional com.apple.QuickTimePlayerX MGPlayMovieOnOpen -bool true
 	defaults_curhost_write com.apple.ImageCapture disableHotPlug -bool true
-	defaults_write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool false
-	defaults_write com.apple.Music userWantsPlaybackNotifications -bool true
-	defaults_write com.apple.SoftwareUpdate AutomaticCheckEnabled -bool true
-	defaults_write com.apple.SoftwareUpdate AutomaticDownload -bool true
-	defaults_write com.apple.SoftwareUpdate CriticalUpdateInstall -bool true
+	defaults_write_optional com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool false
+	defaults_write_optional com.apple.Music userWantsPlaybackNotifications -bool true
+	defaults_write_optional com.apple.SoftwareUpdate AutomaticCheckEnabled -bool true
+	defaults_write_optional com.apple.SoftwareUpdate AutomaticDownload -bool true
+	defaults_write_optional com.apple.SoftwareUpdate CriticalUpdateInstall -bool true
 
 	# Browser & Xcode tweaks
-	defaults_write com.google.Chrome AppleEnableSwipeNavigateWithScrolls -bool false
-	defaults_write com.google.Chrome AppleEnableMouseSwipeNavigateWithScrolls -bool false
-	defaults_write com.google.Chrome DisablePrintPreview -bool true
-	defaults_write com.google.Chrome PMPrintingExpandedStateForPrint2 -bool true
-	defaults_write com.apple.dt.Xcode ShowBuildOperationDuration -bool true
+	defaults_write_optional com.google.Chrome AppleEnableSwipeNavigateWithScrolls -bool false
+	defaults_write_optional com.google.Chrome AppleEnableMouseSwipeNavigateWithScrolls -bool false
+	defaults_write_optional com.google.Chrome DisablePrintPreview -bool true
+	defaults_write_optional com.google.Chrome PMPrintingExpandedStateForPrint2 -bool true
+	defaults_write_optional com.apple.dt.Xcode ShowBuildOperationDuration -bool true
 
 	# System-wide login window & volumes (privileged)
 	run_sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName || true

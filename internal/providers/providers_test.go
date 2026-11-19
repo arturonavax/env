@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -425,14 +427,15 @@ func TestDispatcherEffectiveDependenciesByHost(t *testing.T) {
 			want:  []string{},
 		},
 		{
-			name: "codex-cli on linux uses github release with zero pnpm or curl deps",
+			name: "codex-cli on linux uses standalone installer script with curl dep",
 			params: platform.TestInfoParams{
 				OS:              "linux",
 				Arch:            "amd64",
 				PackageManagers: []string{"apt"},
 			},
-			pkgID: "codex-cli",
-			want:  []string{},
+			isolate: true,
+			pkgID:   "codex-cli",
+			want:    []string{"curl"},
 		},
 		{
 			name: "tree-sitter-cli on alpine uses native apk with zero rust dep",
@@ -722,4 +725,251 @@ func TestDispatcherFallbackInstallsStrategyDependsOn(t *testing.T) {
 	if _, err := os.Stat(targetPath); err != nil {
 		t.Errorf("expected tier-target to be installed at %s: %v", targetPath, err)
 	}
+}
+
+func TestDispatcherIsInstalledDetectsBrokenManagedBinaries(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX script test skipped on Windows")
+	}
+	t.Setenv("PATH", t.TempDir())
+
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	cargoBinDir := filepath.Join(home, ".cargo", "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(cargoBinDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:          "darwin",
+		Arch:        "arm64",
+		HomeDir:     home,
+		LocalBinDir: binDir,
+	})
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	disp := providers.NewDispatcher(plat, cat, security.NewRunner(5*time.Second), "")
+
+	// 1. Broken rustup cargo proxy without a configured default toolchain must report installed=false.
+	cargoPath := filepath.Join(cargoBinDir, "cargo")
+	if err := os.WriteFile(cargoPath, []byte("#!/bin/sh\necho 'error: rustup could not choose a version of cargo to run' >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rustRes := domain.ManagedResource{ID: "rust", Name: "Rust", BinaryName: "cargo"}
+	if ok, _, err := disp.IsInstalled(context.Background(), rustRes); err != nil || ok {
+		t.Fatalf("expected broken cargo proxy to report installed=false, got ok=%v err=%v", ok, err)
+	}
+	if err := os.WriteFile(cargoPath, []byte("#!/bin/sh\necho 'cargo 1.85.0'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if ok, ver, err := disp.IsInstalled(context.Background(), rustRes); err != nil || !ok || ver != "1.85.0" {
+		t.Fatalf("expected working cargo to report installed=true ver=1.85.0, got ok=%v ver=%q err=%v", ok, ver, err)
+	}
+
+	// 2. Unpackaged bare ~/.local/bin/codex without standalone package metadata must report installed=false.
+	codexPath := filepath.Join(binDir, "codex")
+	if err := os.WriteFile(codexPath, []byte("#!/bin/sh\necho 'codex-cli 0.170.0'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	codexRes := domain.ManagedResource{ID: "codex-cli", Name: "Codex", BinaryName: "codex"}
+	if ok, _, err := disp.IsInstalled(context.Background(), codexRes); err != nil || ok {
+		t.Fatalf("expected bare unpackaged codex in ~/.local/bin to report installed=false, got ok=%v err=%v", ok, err)
+	}
+	pkgMarker := filepath.Join(home, ".codex", "packages", "standalone", "current", "codex-package.json")
+	if err := os.MkdirAll(filepath.Dir(pkgMarker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pkgMarker, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if ok, ver, err := disp.IsInstalled(context.Background(), codexRes); err != nil || !ok || ver != "0.170.0" {
+		t.Fatalf("expected packaged codex to report installed=true ver=0.170.0, got ok=%v ver=%q err=%v", ok, ver, err)
+	}
+}
+
+func TestInstallerScriptsGuardrailsAndStubBehavior(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX script test skipped on Windows")
+	}
+
+	repoRoot := filepath.Join("..", "..")
+	for _, script := range []string{
+		filepath.Join(repoRoot, "scripts", "install_rust.sh"),
+		filepath.Join(repoRoot, "scripts", "install_node.sh"),
+		filepath.Join(repoRoot, "scripts", "install_codex.sh"),
+	} {
+		raw, err := os.ReadFile(script)
+		if err != nil {
+			t.Fatalf("reading %s: %v", script, err)
+		}
+		if violations := security.ValidateScriptGuardrails(string(raw)); len(violations) > 0 {
+			t.Errorf("%s failed security guardrails: %+v", script, violations)
+		}
+	}
+
+	t.Run("install_rust.sh repairs rustup shim lacking default toolchain", func(t *testing.T) {
+		home := t.TempDir()
+		cargoBin := filepath.Join(home, ".cargo", "bin")
+		stateFile := filepath.Join(home, "default_set")
+		if err := os.MkdirAll(cargoBin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		rustupStub := `#!/bin/sh
+case "$1 $2" in
+  "show active-toolchain") [ -f "` + stateFile + `" ] || exit 1 ;;
+  "toolchain install") touch "` + stateFile + `" ;;
+  "default stable") touch "` + stateFile + `" ;;
+  "component add") exit 0 ;;
+esac
+exit 0
+`
+		cargoStub := "#!/bin/sh\n[ -f \"" + stateFile + "\" ] && { echo 'cargo 1.86.0'; exit 0; }\necho 'no default configured' >&2; exit 1\n"
+		rustcStub := "#!/bin/sh\n[ -f \"" + stateFile + "\" ] && { echo 'rustc 1.86.0'; exit 0; }\nexit 1\n"
+		for name, body := range map[string]string{
+			"rustup": rustupStub,
+			"cargo":  cargoStub,
+			"rustc":  rustcStub,
+		} {
+			if err := os.WriteFile(filepath.Join(cargoBin, name), []byte(body), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		cmd := exec.Command("bash", filepath.Join(repoRoot, "scripts", "install_rust.sh"))
+		cmd.Env = []string{
+			"HOME=" + home,
+			"PATH=/usr/bin:/bin",
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("install_rust.sh failed: %v\n%s", err, out)
+		}
+		if _, err := os.Stat(stateFile); err != nil {
+			t.Fatalf("expected install_rust.sh to configure stable default toolchain: %v", err)
+		}
+	})
+
+	t.Run("install_node.sh installs LTS via fnm and symlinks into ~/.local/bin", func(t *testing.T) {
+		home := t.TempDir()
+		fnmBinDir := filepath.Join(home, ".local", "share", "fnm")
+		fakeNodeBinDir := filepath.Join(home, "fake-node", "bin")
+		if err := os.MkdirAll(fnmBinDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(fakeNodeBinDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fakeNodeBinDir, "node"), []byte("#!/bin/sh\nif [ \"$1\" = \"-p\" ]; then echo \""+filepath.Join(fakeNodeBinDir, "node")+"\"; exit 0; fi\necho v22.14.0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fakeNodeBinDir, "npm"), []byte("#!/bin/sh\necho 10.9.2\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		fnmStub := `#!/bin/sh
+if [ "$1" = "install" ] && [ "$2" = "--lts" ]; then
+  exit 0
+fi
+if [ "$1" = "default" ]; then
+  exit 0
+fi
+if [ "$1" = "exec" ]; then
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --using=*) shift ;;
+      --using) shift 2 ;;
+      --) shift; break ;;
+      *) break ;;
+    esac
+  done
+  PATH="` + fakeNodeBinDir + `:$PATH" exec "$@"
+fi
+exit 0
+`
+		if err := os.WriteFile(filepath.Join(fnmBinDir, "fnm"), []byte(fnmStub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		cmd := exec.Command("bash", filepath.Join(repoRoot, "scripts", "install_node.sh"))
+		cmd.Env = []string{
+			"HOME=" + home,
+			"PATH=/usr/bin:/bin",
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("install_node.sh failed: %v\n%s", err, out)
+		}
+		for _, tool := range []string{"node", "npm"} {
+			dst := filepath.Join(home, ".local", "bin", tool)
+			target, err := os.Readlink(dst)
+			if err != nil || !strings.Contains(target, tool) {
+				t.Fatalf("expected symlink %s -> .../%s, got target=%q err=%v", dst, tool, target, err)
+			}
+		}
+	})
+
+	t.Run("install_codex.sh replaces unpackaged local binary with standalone package", func(t *testing.T) {
+		home := t.TempDir()
+		stubBin := t.TempDir()
+		localBin := filepath.Join(home, ".local", "bin")
+		if err := os.MkdirAll(localBin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		// Seed broken single-file binary.
+		if err := os.WriteFile(filepath.Join(localBin, "codex"), []byte("#!/bin/sh\necho 'no complete local package' >&2; exit 1\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		installerSrc := filepath.Join(t.TempDir(), "codex-installer.sh")
+		installerBody := `#!/bin/sh
+set -e
+pkg_dir="${HOME}/.codex/packages/standalone/current"
+mkdir -p "${pkg_dir}/bin"
+cat <<'EOF' > "${pkg_dir}/codex-package.json"
+{"version":"0.170.0"}
+EOF
+cat <<'EOF' > "${pkg_dir}/bin/codex"
+#!/bin/sh
+echo "codex-cli 0.170.0"
+EOF
+chmod +x "${pkg_dir}/bin/codex"
+ln -sfn "${pkg_dir}/bin/codex" "${CODEX_INSTALL_DIR}/codex"
+`
+		if err := os.WriteFile(installerSrc, []byte(installerBody), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		curlStub := `#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+cat "` + installerSrc + `" > "$out"
+`
+		if err := os.WriteFile(filepath.Join(stubBin, "curl"), []byte(curlStub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		cmd := exec.Command("bash", filepath.Join(repoRoot, "scripts", "install_codex.sh"))
+		cmd.Env = []string{
+			"HOME=" + home,
+			"TMPDIR=" + t.TempDir(),
+			"PATH=" + stubBin + ":/usr/bin:/bin",
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("install_codex.sh failed: %v\n%s", err, out)
+		}
+		marker := filepath.Join(home, ".codex", "packages", "standalone", "current", "codex-package.json")
+		if _, err := os.Stat(marker); err != nil {
+			t.Fatalf("expected standalone package marker at %s: %v", marker, err)
+		}
+	})
 }

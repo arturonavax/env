@@ -909,6 +909,40 @@ func TestWizardSudoAuthenticationFlow(t *testing.T) {
 	if cmdDirect == nil {
 		t.Fatalf("expected non-nil tea.Cmd for direct apply")
 	}
+
+	// 5. Darwin with includeOSConfig=true requires sudo (macos-osconfig), toggling [o] off drops that requirement.
+	platDarwin := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		HasSudo:         true,
+		IsRoot:          false,
+		PackageManagers: []string{"brew"},
+	})
+	installSvcDarwin := app.NewInstallService(app.InstallDeps{Platform: platDarwin, Catalog: cat})
+	wizDarwin := NewWizardModel(
+		platDarwin,
+		cat,
+		installSvcDarwin,
+		WithWizardSudoChecker(func() bool { return false }),
+	)
+	nm, _ = wizDarwin.Update(tea.KeyPressMsg{Text: "enter"})
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})
+	nm, _ = nm.Update(tea.KeyPressMsg{Text: "enter"})
+	nm, _ = nm.Update(wizardPlanDoneMsg{plan: &domain.ExecutionPlan{}, diffs: nil, err: nil})
+	wDarwin := nm.(WizardModel)
+	if !wDarwin.needsSudo() {
+		t.Fatalf("expected darwin wizard with includeOSConfig=true to require sudo")
+	}
+	nm, cmdSudoDarwin := wDarwin.Update(tea.KeyPressMsg{Text: "enter"})
+	wDarwin = nm.(WizardModel)
+	if wDarwin.stage != StageReviewPlan || cmdSudoDarwin == nil {
+		t.Fatalf("expected darwin wizard to prompt sudo before applying osconfig, got stage=%v cmd=%v", wDarwin.stage, cmdSudoDarwin)
+	}
+	nm, _ = wDarwin.Update(tea.KeyPressMsg{Text: "o"})
+	wDarwinNoOS := nm.(WizardModel)
+	if wDarwinNoOS.needsSudo() {
+		t.Fatalf("expected darwin wizard with includeOSConfig=false and empty plan not to require sudo")
+	}
 }
 
 func TestWizardApplyingMultiProgressConcurrentWorkers(t *testing.T) {

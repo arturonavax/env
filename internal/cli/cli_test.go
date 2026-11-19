@@ -584,8 +584,22 @@ func TestCLIInfoAndExplainEffectiveDeps(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("info codex-cli failed (code %d): %s", code, codexErr.String())
 	}
-	if !strings.Contains(codexOut.String(), "depends_on: []") {
-		t.Errorf("expected codex-cli effective depends_on: [], got:\n%s", codexOut.String())
+	if runtime.GOOS == "windows" {
+		if !strings.Contains(codexOut.String(), "depends_on: []") {
+			t.Errorf("expected windows codex-cli effective depends_on: [], got:\n%s", codexOut.String())
+		}
+	} else {
+		if !strings.Contains(codexOut.String(), "depends_on: [curl]") || strings.Contains(codexOut.String(), "github_release") {
+			t.Errorf("expected unix codex-cli to use script (depends_on: [curl]) rather than single-binary github_release, got:\n%s", codexOut.String())
+		}
+	}
+
+	var nodeOut, nodeErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"info", "nodejs"}, &nodeOut, &nodeErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("info nodejs failed (code %d): %s", code, nodeErr.String())
+	}
+	if !strings.Contains(nodeOut.String(), "depends_on: [fnm]") {
+		t.Errorf("expected nodejs effective depends_on: [fnm], got:\n%s", nodeOut.String())
 	}
 
 	if runtime.GOOS == "linux" {

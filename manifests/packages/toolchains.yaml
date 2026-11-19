@@ -15,7 +15,6 @@ packages:
           local_script: scripts/bootstrap_anx.sh
           interpreter: bash
           args: ["--ensure-go-only"]
-          creates: "~/.gvm/scripts/gvm"
       - type: script
         when:
           os: [linux, darwin]
@@ -47,19 +46,15 @@ packages:
           os: [linux]
         depends_on: [curl, build-essential]
         script:
-          url: https://sh.rustup.rs
-          interpreter: sh
-          args: ["-y", "--no-modify-path", "--default-toolchain", "stable"]
-          creates: "~/.cargo/bin/cargo"
+          local_script: scripts/install_rust.sh
+          interpreter: bash
       - type: script
         when:
           os: [darwin]
         depends_on: [curl]
         script:
-          url: https://sh.rustup.rs
-          interpreter: sh
-          args: ["-y", "--no-modify-path", "--default-toolchain", "stable"]
-          creates: "~/.cargo/bin/cargo"
+          local_script: scripts/install_rust.sh
+          interpreter: bash
       - type: native
         depends_on: [build-essential]
         packages:
@@ -69,6 +64,30 @@ packages:
           pkg: [rust]
           winget: [Rustlang.Rustup]
           scoop: [rustup]
+
+  - id: nodejs
+    name: Node.js (LTS via fnm)
+    category: toolchains
+    description: Node.js LTS runtime and npm managed via fnm and linked into ~/.local/bin
+    binary_name: node
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [fnm]
+        script:
+          local_script: scripts/install_node.sh
+          interpreter: bash
+      - type: native
+        packages:
+          brew: [node]
+          apt: [nodejs, npm]
+          dnf: [nodejs, npm]
+          pacman: [nodejs, npm]
+          apk: [nodejs, npm]
+          pkg: [node, npm]
+          winget: [OpenJS.NodeJS.LTS]
+          scoop: [nodejs-lts]
 
   - id: fnm
     name: Fast Node Manager (fnm)

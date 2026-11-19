@@ -1,6 +1,7 @@
 package manifest_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/arturonavax/env/internal/manifest"
 	"github.com/arturonavax/env/internal/security"
@@ -311,15 +313,38 @@ func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
 		if !ok {
 			t.Fatal("missing codex-cli")
 		}
-		if codex.Strategies[0].GitHubRelease == nil || codex.Strategies[0].GitHubRelease.AssetPatterns["windows/amd64"] != "codex-x86_64-pc-windows-msvc.exe.zip" {
-			t.Errorf("codex-cli windows/amd64 asset pattern mismatch: %+v", codex.Strategies[0].GitHubRelease)
+		if len(codex.Strategies) == 0 || codex.Strategies[0].Script == nil || codex.Strategies[0].Script.LocalScript != "scripts/install_codex.sh" {
+			t.Errorf("codex-cli should use scripts/install_codex.sh on Unix instead of bare single-binary download, got %+v", codex.Strategies)
 		}
 		if len(codex.Strategies) < 2 || len(codex.Strategies[1].Packages["winget"]) == 0 || codex.Strategies[1].Packages["winget"][0] != "OpenAI.Codex" {
 			t.Errorf("codex-cli should declare winget OpenAI.Codex fallback, got %+v", codex.Strategies)
 		}
+
+		for _, id := range []string{"golang", "rust"} {
+			spec, ok := cat.GetPackageSpec(id)
+			if !ok {
+				t.Fatalf("missing %q", id)
+			}
+			for _, st := range spec.Strategies {
+				if st.Script != nil && st.Script.Creates != "" {
+					t.Errorf("%q script strategy should not set creates (%q), which risks premature 2s watchdog termination", id, st.Script.Creates)
+				}
+			}
+		}
+
+		nodejs, ok := cat.GetPackageSpec("nodejs")
+		if !ok {
+			t.Fatal("missing nodejs")
+		}
+		if len(nodejs.Strategies) == 0 || nodejs.Strategies[0].Script == nil || nodejs.Strategies[0].Script.LocalScript != "scripts/install_node.sh" {
+			t.Errorf("nodejs should declare scripts/install_node.sh strategy, got %+v", nodejs.Strategies)
+		}
+		if !slices.Contains(nodejs.Strategies[0].DependsOn, "fnm") {
+			t.Errorf("nodejs script strategy should depend on fnm, got %v", nodejs.Strategies[0].DependsOn)
+		}
 	})
 
-	t.Run("profiles omit unnecessary wget and cmake", func(t *testing.T) {
+	t.Run("profiles omit unnecessary wget and cmake and include nodejs for editor and developer", func(t *testing.T) {
 		minPkgs, err := cat.ResolveProfilePackages("minimal")
 		if err != nil {
 			t.Fatal(err)
@@ -330,9 +355,20 @@ func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
 			}
 		}
 
+		editorPkgs, err := cat.ResolveProfilePackages("editor")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(editorPkgs, "nodejs") {
+			t.Errorf("editor profile should include nodejs for Mason/LSPs, got %v", editorPkgs)
+		}
+
 		devPkgs, err := cat.ResolveProfilePackages("developer")
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !slices.Contains(devPkgs, "nodejs") {
+			t.Errorf("developer profile should include nodejs, got %v", devPkgs)
 		}
 		for _, id := range devPkgs {
 			if id == "cmake" || id == "pkg-config" {
@@ -504,6 +540,14 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 			if strings.HasPrefix(cfg.ID, "macos-") || cfg.ID == "amethyst-config" || cfg.ID == "karabiner-config" {
 				if !slices.Equal(cfg.SupportedOS, []string{"darwin"}) {
 					t.Errorf("config %q SupportedOS = %v, want [darwin]", cfg.ID, cfg.SupportedOS)
+				}
+			}
+			if cfg.ID == "macos-osconfig-script" {
+				if cfg.FileMode != "0755" {
+					t.Errorf("macos-osconfig-script FileMode = %q, want 0755", cfg.FileMode)
+				}
+				if len(cfg.PostSyncCmds) == 0 {
+					t.Errorf("macos-osconfig-script should declare post_sync_cmds so anx applies macOS defaults automatically")
 				}
 			}
 		}
@@ -871,6 +915,9 @@ exit 0
 echo "defaults $*" >> "`+logFile+`"
 case "$*" in
   *com.apple.universalaccess*) exit 1 ;;
+  *com.apple.helpviewer*|*com.apple.print.PrintingPrefs*|*com.apple.TextEdit*|*com.apple.DiskUtility*|*com.apple.QuickTimePlayerX*|*com.apple.ActivityMonitor*|*com.apple.Music*|*com.apple.SoftwareUpdate*|*com.apple.TimeMachine*|*com.apple.terminal*|*com.google.Chrome*|*com.apple.dt.Xcode*)
+    exit 1
+    ;;
   *com.apple.Safari*)
     if [ "${ALLOW_SAFARI:-0}" = "1" ]; then exit 0; fi
     exit 1
@@ -945,6 +992,26 @@ exit 0
 			if cfpIdx == -1 || idx == -1 || cfpIdx > idx {
 				t.Errorf("expected killall cfprefsd before %s, calls:\n%s", daemon, calls)
 			}
+		}
+		if !strings.Contains(string(defsOut), "com.apple.helpviewer") {
+			t.Errorf("expected warning when sandboxed domain com.apple.helpviewer fails, got:\n%s", defsOut)
+		}
+
+		// Verify running inside Apple Terminal never kills the caller Terminal session.
+		if err := os.WriteFile(logFile, []byte(""), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cmdAppleTerm := exec.Command("bash", scriptPath, "--defaults", "--no-sudo", "--no-restart")
+		cmdAppleTerm.Env = append(append([]string{}, env...), "TERM_PROGRAM=Apple_Terminal")
+		if termOut, err := cmdAppleTerm.CombinedOutput(); err != nil {
+			t.Fatalf("expected Apple_Terminal run to succeed cleanly, err=%v out:\n%s", err, termOut)
+		}
+		termCalls, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(termCalls), `tell application "Terminal" to quit`) {
+			t.Errorf("should not quit Terminal while running inside TERM_PROGRAM=Apple_Terminal, calls:\n%s", string(termCalls))
 		}
 
 		// 2. --reduce-ui-fx survives TCC denial cleanly.
@@ -1071,6 +1138,16 @@ exit 0
 		sudoLocal := string(sudoLocalBytes)
 		if !strings.Contains(sudoLocal, "pam_reattach.so") || !strings.Contains(sudoLocal, "pam_tid.so") {
 			t.Errorf("unexpected sudo_local content:\n%s", sudoLocal)
+		}
+
+		// 7. Sudo keepalive background sleep does not hold stdout/stderr pipes open after exit.
+		_ = os.Remove(filepath.Join(binDir, "sleep"))
+		ctxPipe, cancelPipe := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancelPipe()
+		cmdPipe := exec.CommandContext(ctxPipe, "bash", scriptPath, "--power")
+		cmdPipe.Env = env
+		if pipeOut, pipeErr := cmdPipe.CombinedOutput(); pipeErr != nil {
+			t.Fatalf("expected sudo keepalive not to hold stderr/stdout pipe open after exit, err=%v out:\n%s", pipeErr, pipeOut)
 		}
 	})
 }

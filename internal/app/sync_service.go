@@ -459,7 +459,7 @@ func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationRe
 	}
 
 	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated" || r.Action == "merged") {
-		if err := s.runPostSync(cfg); err != nil {
+		if err := s.runPostSync(ctx, cfg); err != nil {
 			r.Action = "partial"
 			appendSyncDetail(&r, fmt.Sprintf("post-sync error: %v", err))
 			syncErr = fmt.Errorf("post-sync failed for config %q: %w", cfg.ID, err)
@@ -475,16 +475,27 @@ func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationRe
 	return r, syncErr
 }
 
-func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) error {
+func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.ConfigurationResource) error {
 	var errs []error
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, 3*time.Minute)
 	defer cancel()
+
+	var cmdEnv []string
+	if s.platform != nil && s.platform.HomeDir() != "" {
+		cmdEnv = replaceOrAppendEnv(os.Environ(), "HOME", s.platform.HomeDir())
+	}
 
 	runCmd := func(cmdArgs []string, prefix string) {
 		if len(cmdArgs) == 0 {
 			return
 		}
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+		if len(cmdEnv) > 0 {
+			cmd.Env = cmdEnv
+		}
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
@@ -509,6 +520,26 @@ func (s *SyncService) runPostSync(cfg domain.ConfigurationResource) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func replaceOrAppendEnv(env []string, key, value string) []string {
+	prefix := key + "="
+	out := make([]string, 0, len(env)+1)
+	replaced := false
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			if !replaced {
+				out = append(out, prefix+value)
+				replaced = true
+			}
+			continue
+		}
+		out = append(out, entry)
+	}
+	if !replaced {
+		out = append(out, prefix+value)
+	}
+	return out
 }
 
 func (s *SyncService) syncDirectory(

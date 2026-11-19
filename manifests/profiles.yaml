@@ -47,6 +47,7 @@ profiles:
     extends: minimal
     packages:
       - neovim
+      - nodejs
       - stylua
       - shfmt
       - actionlint
@@ -63,6 +64,7 @@ profiles:
       - golang
       - rust
       - fnm
+      - nodejs
       - pnpm
       - pyenv
       - python3

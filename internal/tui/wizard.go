@@ -914,6 +914,9 @@ func (w WizardModel) needsSudo() bool {
 	if w.destroyerMode {
 		return true
 	}
+	if w.includeOSConfig && w.platform.OS() == "darwin" {
+		return true
+	}
 	if w.includeHacks {
 		for _, hk := range w.matchedHacks {
 			for _, st := range hk.Steps {
