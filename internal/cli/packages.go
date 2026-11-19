@@ -134,6 +134,9 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 			case domain.StepSuccess:
 				fmt.Fprintf(out, "  %s [%d/%d] Completed: %s\n",
 					st.Success.Render("✓"), ev.StepID, ev.TotalSteps, ev.ResourceID)
+				if ev.OutputLine != "" {
+					fmt.Fprintf(out, "      %s\n", st.Highlight.Render(ev.OutputLine))
+				}
 			case domain.StepFailed:
 				fmt.Fprintf(out, "  %s [%d/%d] Failed: %s (%s)\n",
 					st.Warning.Render("✖"), ev.StepID, ev.TotalSteps, ev.ResourceID, ev.Error)

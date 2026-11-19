@@ -20,6 +20,11 @@ profiles:
       - zsh-base
       - zsh-tools
       - zshrc-loader
+      - ssh-config
+      - ssh-agent-service
+      - ssh-agent-env
+      - ssh-agent-zshenv
+      - ssh-agent-profile
 
   - name: terminal
     description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)

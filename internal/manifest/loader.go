@@ -193,6 +193,16 @@ func (c *Catalog) mergeYAML(source string, data []byte) error {
 		if strings.TrimSpace(cfg.Source) == "" || strings.TrimSpace(cfg.Target) == "" {
 			return fmt.Errorf("configuration %q in %q requires source and target", cfg.ID, source)
 		}
+		if strings.TrimSpace(cfg.DirMode) != "" {
+			if _, err := domain.ParseOctalMode(cfg.DirMode); err != nil {
+				return fmt.Errorf("configuration %q in %q: invalid dir_mode: %w", cfg.ID, source, err)
+			}
+		}
+		if strings.TrimSpace(cfg.FileMode) != "" {
+			if _, err := domain.ParseOctalMode(cfg.FileMode); err != nil {
+				return fmt.Errorf("configuration %q in %q: invalid file_mode: %w", cfg.ID, source, err)
+			}
+		}
 		if cfg.Excludes == nil {
 			cfg.Excludes = []string{}
 		}

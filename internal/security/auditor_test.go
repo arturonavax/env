@@ -145,3 +145,166 @@ func TestSecurityAuditorGuardrailBlocksMaliciousScript(t *testing.T) {
 		t.Fatal("expected guardrail error on destructive script, got nil")
 	}
 }
+
+func TestSecurityAuditorSSHAgentChecks(t *testing.T) {
+	findIDs := func(rep *security.SecurityAuditReport) map[string]security.SecurityFinding {
+		m := map[string]security.SecurityFinding{}
+		for _, f := range rep.Findings {
+			m[f.ID] = f
+		}
+		return m
+	}
+
+	t.Run("healthy linux ssh-agent passes all SSH checks", func(t *testing.T) {
+		procDir := t.TempDir()
+		etcDir := t.TempDir()
+		homeDir := t.TempDir()
+		sshDir := filepath.Join(homeDir, ".ssh")
+		_ = os.MkdirAll(sshDir, 0o700)
+		_ = os.WriteFile(filepath.Join(sshDir, "config"), []byte("Host *\n    AddKeysToAgent yes\n    IdentitiesOnly yes\n    IgnoreUnknown UseKeychain\n    UseKeychain yes\n"), 0o600)
+		_ = os.WriteFile(filepath.Join(homeDir, ".zshrc"), []byte("# clean zshrc\n"), 0o644)
+
+		aud := security.NewSecurityAuditor(
+			security.WithAuditorRoots(procDir, "", etcDir),
+			security.WithAuditorHome(homeDir),
+			security.WithAuditorOS("linux"),
+			security.WithAuditorGetenv(func(k string) string {
+				switch k {
+				case "XDG_RUNTIME_DIR":
+					return "/run/user/1000"
+				case "SSH_AUTH_SOCK":
+					return "/run/user/1000/ssh-agent.socket"
+				}
+				return ""
+			}),
+			security.WithAuditorLookPath(func(bin string) (string, error) {
+				if bin == "ssh-add" {
+					return "/usr/bin/ssh-add", nil
+				}
+				return "", os.ErrNotExist
+			}),
+			security.WithAuditorCommandRunner(func(_ context.Context, name string, args ...string) (int, string, string, error) {
+				if name == "ssh-add" && len(args) == 1 && args[0] == "-l" {
+					return 0, "256 SHA256:abc key (ED25519)", "", nil
+				}
+				return 127, "", "", os.ErrNotExist
+			}),
+		)
+
+		rep, err := aud.Audit(context.Background())
+		if err != nil {
+			t.Fatalf("Audit failed: %v", err)
+		}
+		for _, f := range rep.Findings {
+			if strings.HasPrefix(f.ID, "SEC-SSH-") {
+				t.Errorf("unexpected SSH finding on healthy Linux host: %+v", f)
+			}
+		}
+	})
+
+	t.Run("detects loose perms, ForwardAgent *, gcr hijack, broken agent, and RC spawn", func(t *testing.T) {
+		procDir := t.TempDir()
+		etcDir := t.TempDir()
+		homeDir := t.TempDir()
+		sshDir := filepath.Join(homeDir, ".ssh")
+		_ = os.MkdirAll(sshDir, 0o755)
+		_ = os.WriteFile(filepath.Join(sshDir, "config"), []byte("Host *\n    ForwardAgent yes\n"), 0o644)
+		_ = os.WriteFile(filepath.Join(homeDir, ".bashrc"), []byte("# ok comment eval \"$(ssh-agent -s)\"\neval \"$(ssh-agent -s)\"\n"), 0o644)
+
+		aud := security.NewSecurityAuditor(
+			security.WithAuditorRoots(procDir, "", etcDir),
+			security.WithAuditorHome(homeDir),
+			security.WithAuditorOS("linux"),
+			security.WithAuditorGetenv(func(k string) string {
+				switch k {
+				case "XDG_RUNTIME_DIR":
+					return "/run/user/1000"
+				case "SSH_AUTH_SOCK":
+					return "/run/user/1000/gcr/ssh"
+				}
+				return ""
+			}),
+			security.WithAuditorLookPath(func(bin string) (string, error) {
+				if bin == "ssh-add" {
+					return "/usr/bin/ssh-add", nil
+				}
+				return "", os.ErrNotExist
+			}),
+			security.WithAuditorCommandRunner(func(_ context.Context, _ string, _ ...string) (int, string, string, error) {
+				return 2, "", "Could not open a connection to your authentication agent.", nil
+			}),
+		)
+
+		rep, err := aud.Audit(context.Background())
+		if err != nil {
+			t.Fatalf("Audit failed: %v", err)
+		}
+		byID := findIDs(rep)
+		for _, id := range []string{
+			"SEC-SSH-DIR-PERM",
+			"SEC-SSH-CFG-PERM",
+			"SEC-SSH-FORWARDAGENT",
+			"SEC-SSH-AGENT-HIJACK",
+			"SEC-SSH-AGENT-UNREACHABLE",
+			"SEC-SSH-RC-SPAWN",
+		} {
+			if _, ok := byID[id]; !ok {
+				t.Errorf("expected finding %q, got findings: %+v", id, rep.Findings)
+			}
+		}
+		script, err := aud.SynthesizeScript(context.Background(), rep)
+		if err != nil {
+			t.Fatalf("SynthesizeScript failed: %v", err)
+		}
+		if violations := aud.ValidateScript(script); len(violations) > 0 {
+			t.Fatalf("remediation script failed guardrails: %+v", violations)
+		}
+	})
+
+	t.Run("macOS exit 1 emits non-blocking keychain hint and specific Host ForwardAgent is allowed", func(t *testing.T) {
+		procDir := t.TempDir()
+		etcDir := t.TempDir()
+		homeDir := t.TempDir()
+		sshDir := filepath.Join(homeDir, ".ssh")
+		_ = os.MkdirAll(sshDir, 0o700)
+		_ = os.WriteFile(filepath.Join(sshDir, "id_ed25519"), []byte("private"), 0o600)
+		_ = os.WriteFile(filepath.Join(sshDir, "config"), []byte("Host bastion\n    ForwardAgent yes\n\nHost *\n    AddKeysToAgent yes\n    UseKeychain yes\n"), 0o600)
+
+		aud := security.NewSecurityAuditor(
+			security.WithAuditorRoots(procDir, "", etcDir),
+			security.WithAuditorHome(homeDir),
+			security.WithAuditorOS("darwin"),
+			security.WithAuditorGetenv(func(k string) string {
+				if k == "SSH_AUTH_SOCK" {
+					return "/private/tmp/com.apple.launchd.XYZ/Listeners"
+				}
+				return ""
+			}),
+			security.WithAuditorLookPath(func(bin string) (string, error) {
+				if bin == "ssh-add" {
+					return "/usr/bin/ssh-add", nil
+				}
+				return "", os.ErrNotExist
+			}),
+			security.WithAuditorCommandRunner(func(_ context.Context, _ string, _ ...string) (int, string, string, error) {
+				return 1, "", "The agent has no identities.", nil
+			}),
+		)
+
+		rep, err := aud.Audit(context.Background())
+		if err != nil {
+			t.Fatalf("Audit failed: %v", err)
+		}
+		byID := findIDs(rep)
+		if _, hasFA := byID["SEC-SSH-FORWARDAGENT"]; hasFA {
+			t.Errorf("ForwardAgent under named host should not trigger Host * warning")
+		}
+		noKeys, ok := byID["SEC-SSH-NO-KEYS"]
+		if !ok {
+			t.Fatalf("expected SEC-SSH-NO-KEYS finding on exit code 1, got %+v", rep.Findings)
+		}
+		if !strings.Contains(noKeys.Remediation, "ssh-add --apple-use-keychain") {
+			t.Errorf("expected Keychain hint in SEC-SSH-NO-KEYS, got %+v", noKeys)
+		}
+	})
+}

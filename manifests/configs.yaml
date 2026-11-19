@@ -178,6 +178,66 @@ configurations:
     marker_end: "# <<< arturonavax/env <<<"
     backup: true
 
+  - id: ssh-config
+    name: OpenSSH Client Configuration (~/.ssh/config)
+    group: terminal
+    description: Shared non-destructive Host * block for Keychain/systemd agent persistence without ForwardAgent yes
+    source: files/ssh/config
+    target: "~/.ssh/config"
+    os: [linux, darwin]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    dir_mode: "0700"
+    file_mode: "0600"
+    skip_capture: true
+    backup: true
+
+  - id: ssh-agent-service
+    name: OpenSSH User Agent systemd Service
+    group: terminal
+    description: Persistent user ssh-agent listening on deterministic %t/ssh-agent.socket on Linux
+    source: files/ssh/systemd/ssh-agent.service
+    target: "~/.config/systemd/user/ssh-agent.service"
+    os: [linux]
+    strategy: three_way
+    backup: true
+
+  - id: ssh-agent-env
+    name: OpenSSH Agent systemd environment.d Config
+    group: terminal
+    description: Export deterministic SSH_AUTH_SOCK to Linux graphical and systemd user sessions
+    source: files/ssh/environment.d/ssh-agent.conf
+    target: "~/.config/environment.d/ssh-agent.conf"
+    os: [linux]
+    strategy: three_way
+    backup: true
+
+  - id: ssh-agent-zshenv
+    name: Zsh Non-Interactive Environment (.zshenv)
+    group: terminal
+    description: Linux-guarded SSH_AUTH_SOCK propagation for non-interactive and agent Zsh shells
+    source: files/zsh/.zshenv
+    target: "~/.zshenv"
+    os: [linux, darwin]
+    shells: [zsh]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
+  - id: ssh-agent-profile
+    name: POSIX Login Shell Profile (.profile)
+    group: terminal
+    description: Linux-guarded SSH_AUTH_SOCK propagation for POSIX login shells without touching macOS launchd
+    source: files/ssh/.profile
+    target: "~/.profile"
+    os: [linux, darwin]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    backup: true
+
   - id: nvim-config
     name: Neovim (LazyVim) Modular Configuration
     group: editor

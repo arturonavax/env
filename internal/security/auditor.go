@@ -114,6 +114,9 @@ type SecurityAuditorOption func(*SecurityAuditor)
 // SecurityPromptFunc synthesizes a remediation script from an audit prompt using LLM harness.
 type SecurityPromptFunc func(ctx context.Context, prompt string) (string, error)
 
+// SecurityCommandRunner executes external audit probe commands returning their exit code.
+type SecurityCommandRunner func(ctx context.Context, name string, args ...string) (exitCode int, stdout, stderr string, err error)
+
 // SecurityAuditor performs multi-level, profile-aware system security audits.
 type SecurityAuditor struct {
 	profile    string
@@ -121,9 +124,12 @@ type SecurityAuditor struct {
 	sysRoot    string
 	etcRoot    string
 	homeDir    string
+	goos       string
 	runner     *Runner
 	promptFunc SecurityPromptFunc
 	lookupBin  func(string) (string, error)
+	getenv     func(string) string
+	runCmd     SecurityCommandRunner
 }
 
 // NewSecurityAuditor constructs a configured SecurityAuditor.
@@ -134,8 +140,11 @@ func NewSecurityAuditor(opts ...SecurityAuditorOption) *SecurityAuditor {
 		sysRoot:   "/sys",
 		etcRoot:   "/etc",
 		homeDir:   os.Getenv("HOME"),
+		goos:      runtime.GOOS,
 		lookupBin: exec.LookPath,
+		getenv:    os.Getenv,
 	}
+	sa.runCmd = sa.defaultCommandRunner
 	for _, opt := range opts {
 		if opt != nil {
 			opt(sa)
@@ -195,6 +204,30 @@ func WithAuditorRunner(r *Runner) SecurityAuditorOption {
 func WithAuditorLookPath(fn func(string) (string, error)) SecurityAuditorOption {
 	return func(sa *SecurityAuditor) {
 		sa.lookupBin = fn
+	}
+}
+
+func WithAuditorOS(goos string) SecurityAuditorOption {
+	return func(sa *SecurityAuditor) {
+		if goos != "" {
+			sa.goos = strings.ToLower(strings.TrimSpace(goos))
+		}
+	}
+}
+
+func WithAuditorGetenv(fn func(string) string) SecurityAuditorOption {
+	return func(sa *SecurityAuditor) {
+		if fn != nil {
+			sa.getenv = fn
+		}
+	}
+}
+
+func WithAuditorCommandRunner(fn SecurityCommandRunner) SecurityAuditorOption {
+	return func(sa *SecurityAuditor) {
+		if fn != nil {
+			sa.runCmd = fn
+		}
 	}
 }
 
@@ -470,7 +503,11 @@ func (sa *SecurityAuditor) Audit(ctx context.Context) (*SecurityAuditReport, err
 		}
 	}
 
-	// 11. Permissions: World-writable files in /etc
+	// 11. SSH agent socket, ssh-add connectivity, ~/.ssh/config policy, and shell RC hygiene
+	recordCheck()
+	sa.auditSSHAgent(ctx, report)
+
+	// 12. Permissions: World-writable files in /etc
 	recordCheck()
 	if sa.etcRoot != "" {
 		_ = filepath.WalkDir(sa.etcRoot, func(p string, d fs.DirEntry, walkErr error) error {

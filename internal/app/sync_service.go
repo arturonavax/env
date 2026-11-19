@@ -60,6 +60,7 @@ type SyncService struct {
 	store     *state.Store
 	repoRoot  string
 	diffRules []domain.ConfigDiffRule
+	sshRunner SSHCommandRunner
 }
 
 // NewSyncService creates a SyncService; store may be nil (no persisted merge ancestors).
@@ -69,8 +70,22 @@ func NewSyncService(
 	snap *snapshot.Manager,
 	store *state.Store,
 	repoRoot string,
+	opts ...SyncServiceOption,
 ) *SyncService {
-	return &SyncService{platform: plat, catalog: cat, snapshots: snap, store: store, repoRoot: repoRoot}
+	svc := &SyncService{
+		platform:  plat,
+		catalog:   cat,
+		snapshots: snap,
+		store:     store,
+		repoRoot:  repoRoot,
+		sshRunner: defaultSSHCommandRunner{},
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(svc)
+		}
+	}
+	return svc
 }
 
 // SetConfigDiffRules registers machine-specific configuration delta rules.
@@ -223,9 +238,14 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 			diffs = append(diffs, d)
 			continue
 		}
-		if cfg.IsHostSpecific() {
-			d.State = "clean"
-			d.Summary = "host-specific configuration preserved"
+		if cfg.Strategy == domain.StrategyPreserve {
+			if hasPermissionDrift(cfg, target) {
+				d.State = "drift"
+				d.Summary = "permissions mismatch"
+			} else {
+				d.State = "clean"
+				d.Summary = "host-specific configuration preserved"
+			}
 			diffs = append(diffs, d)
 			continue
 		}
@@ -240,7 +260,12 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 		if cfg.Strategy == domain.StrategyMarkerBlock || cfg.Strategy == domain.StrategySmartAppend {
 			block, ok := configsync.ExtractMarkerBlock(string(local), markerStart(cfg), markerEnd(cfg))
 			if ok && bytes.Equal(bytes.TrimSpace([]byte(block)), bytes.TrimSpace(incoming)) {
-				d.Summary = "up to date"
+				if hasPermissionDrift(cfg, target) {
+					d.State = "drift"
+					d.Summary = "permissions mismatch"
+				} else {
+					d.Summary = "up to date"
+				}
 				diffs = append(diffs, d)
 				continue
 			}
@@ -252,7 +277,12 @@ func (s *SyncService) Diff(_ context.Context, group string) ([]ConfigDiff, error
 		}
 
 		if bytes.Equal(local, incoming) {
-			d.Summary = "up to date"
+			if hasPermissionDrift(cfg, target) {
+				d.State = "drift"
+				d.Summary = "permissions mismatch"
+			} else {
+				d.Summary = "up to date"
+			}
 			diffs = append(diffs, d)
 			continue
 		}
@@ -358,7 +388,7 @@ func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult,
 		if err := ctx.Err(); err != nil {
 			return results, err
 		}
-		res, err := s.syncConfig(cfg, opts)
+		res, err := s.syncConfig(ctx, cfg, opts)
 		if err != nil {
 			return results, fmt.Errorf("syncing %s: %w", cfg.ID, err)
 		}
@@ -389,12 +419,12 @@ func (s *SyncService) SyncOne(ctx context.Context, id string, opts SyncOptions) 
 	if err := ctx.Err(); err != nil {
 		return SyncResult{}, err
 	}
-	res, err := s.syncConfig(cfg, opts)
+	res, err := s.syncConfig(ctx, cfg, opts)
 	res.SnapshotID = snapID
 	return res, err
 }
 
-func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOptions) (SyncResult, error) {
+func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationResource, opts SyncOptions) (SyncResult, error) {
 	source, target, err := s.paths(cfg)
 	if err != nil {
 		return SyncResult{}, err
@@ -431,11 +461,15 @@ func (s *SyncService) syncConfig(cfg domain.ConfigurationResource, opts SyncOpti
 	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated" || r.Action == "merged") {
 		if err := s.runPostSync(cfg); err != nil {
 			r.Action = "partial"
-			if r.Detail != "" {
-				r.Detail += "; "
-			}
-			r.Detail += fmt.Sprintf("post-sync error: %v", err)
+			appendSyncDetail(&r, fmt.Sprintf("post-sync error: %v", err))
 			syncErr = fmt.Errorf("post-sync failed for config %q: %w", cfg.ID, err)
+		}
+	}
+	if syncErr == nil && r.Action != "skipped" && r.Action != "conflict" {
+		if err := s.reconcileSSHAgent(ctx, cfg, opts, &r); err != nil {
+			r.Action = "partial"
+			appendSyncDetail(&r, fmt.Sprintf("ssh-agent setup error: %v", err))
+			syncErr = fmt.Errorf("ssh-agent setup failed for config %q: %w", cfg.ID, err)
 		}
 	}
 	return r, syncErr
@@ -507,13 +541,17 @@ func (s *SyncService) syncMarker(
 	updated := configsync.SmartAppend(string(current), string(block), markerStart(cfg), markerEnd(cfg))
 	if updated == string(current) {
 		res.Action = "unchanged"
-		return res, nil
+		return res, reconcileTargetPermissions(cfg, target, opts, &res)
 	}
 	res.Action = "updated"
 	if opts.DryRun {
-		return res, nil
+		return res, reconcileTargetPermissions(cfg, target, opts, &res)
 	}
-	return res, writeFileAtomic(target, []byte(updated), 0o644)
+	dirMode, enforceDir, fMode := resolveConfigModes(cfg, source, 0o644)
+	if err := writeFileAtomicWithDirMode(target, []byte(updated), dirMode, fMode, enforceDir); err != nil {
+		return res, err
+	}
+	return res, reconcileTargetPermissions(cfg, target, opts, &res)
 }
 
 func (s *SyncService) syncFile(
@@ -524,13 +562,14 @@ func (s *SyncService) syncFile(
 		return res, err
 	}
 	incoming = s.ApplyConfigDiffs(cfg.ID, incoming)
+	dirMode, enforceDir, fMode := resolveConfigModes(cfg, source, fileMode(source))
 	local, readErr := os.ReadFile(target)
 	if errors.Is(readErr, os.ErrNotExist) {
 		res.Action = "created"
 		if opts.DryRun {
 			return res, nil
 		}
-		if err := writeFileAtomic(target, incoming, fileMode(source)); err != nil {
+		if err := writeFileAtomicWithDirMode(target, incoming, dirMode, fMode, enforceDir); err != nil {
 			return res, err
 		}
 		s.recordBase(cfg.ID, incoming)
@@ -542,7 +581,7 @@ func (s *SyncService) syncFile(
 	if bytes.Equal(local, incoming) {
 		res.Action = "unchanged"
 		s.recordBase(cfg.ID, incoming)
-		return res, nil
+		return res, reconcileTargetPermissions(cfg, target, opts, &res)
 	}
 
 	if cfg.Strategy == domain.StrategyPreserve && !opts.Force {
@@ -571,13 +610,76 @@ func (s *SyncService) syncFile(
 	}
 
 	if opts.DryRun {
-		return res, nil
+		return res, reconcileTargetPermissions(cfg, target, opts, &res)
 	}
-	if err := writeFileAtomic(target, final, fileMode(source)); err != nil {
+	if err := writeFileAtomicWithDirMode(target, final, dirMode, fMode, enforceDir); err != nil {
 		return res, err
 	}
 	s.recordBase(cfg.ID, incoming)
-	return res, nil
+	return res, reconcileTargetPermissions(cfg, target, opts, &res)
+}
+
+func resolveConfigModes(cfg domain.ConfigurationResource, _ string, defaultFile os.FileMode) (os.FileMode, bool, os.FileMode) {
+	dirMode := os.FileMode(0o755)
+	enforceDir := false
+	if dm, ok := cfg.ParsedDirMode(); ok {
+		dirMode = dm
+		enforceDir = true
+	}
+	fMode := defaultFile
+	if fm, ok := cfg.ParsedFileMode(); ok {
+		fMode = fm
+	}
+	return dirMode, enforceDir, fMode
+}
+
+func hasPermissionDrift(cfg domain.ConfigurationResource, target string) bool {
+	if dm, ok := cfg.ParsedDirMode(); ok {
+		if info, err := os.Stat(filepath.Dir(target)); err == nil && info.Mode().Perm() != dm {
+			return true
+		}
+	}
+	if fm, ok := cfg.ParsedFileMode(); ok {
+		if info, err := os.Stat(target); err == nil && info.Mode().Perm() != fm {
+			return true
+		}
+	}
+	return false
+}
+
+func reconcileTargetPermissions(cfg domain.ConfigurationResource, target string, opts SyncOptions, res *SyncResult) error {
+	if dm, ok := cfg.ParsedDirMode(); ok {
+		parent := filepath.Dir(target)
+		if info, err := os.Stat(parent); err == nil && info.Mode().Perm() != dm {
+			if res.Action == "unchanged" {
+				res.Action = "updated"
+			}
+			if opts.DryRun {
+				appendSyncDetail(res, fmt.Sprintf("would chmod dir %04o", dm))
+			} else {
+				if err := os.Chmod(parent, dm); err != nil {
+					return fmt.Errorf("chmod directory %s: %w", parent, err)
+				}
+				appendSyncDetail(res, fmt.Sprintf("enforced dir %04o", dm))
+			}
+		}
+	}
+	if fm, ok := cfg.ParsedFileMode(); ok {
+		if info, err := os.Stat(target); err == nil && info.Mode().Perm() != fm {
+			if res.Action == "unchanged" {
+				res.Action = "updated"
+			}
+			if opts.DryRun {
+				appendSyncDetail(res, fmt.Sprintf("would chmod file %04o", fm))
+			} else {
+				if err := os.Chmod(target, fm); err != nil {
+					return fmt.Errorf("chmod file %s: %w", target, err)
+				}
+				appendSyncDetail(res, fmt.Sprintf("enforced file %04o", fm))
+			}
+		}
+	}
+	return nil
 }
 
 func (s *SyncService) getBase(id string) (string, bool) {
@@ -616,10 +718,20 @@ func fileMode(path string) os.FileMode {
 }
 
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	return writeFileAtomicWithDirMode(path, data, 0o755, mode, false)
+}
+
+func writeFileAtomicWithDirMode(path string, data []byte, dirMode, fileMode os.FileMode, enforceDirMode bool) error {
+	parent := filepath.Dir(path)
+	if err := os.MkdirAll(parent, dirMode); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".anx-sync-*")
+	if enforceDirMode {
+		if err := os.Chmod(parent, dirMode); err != nil {
+			return err
+		}
+	}
+	tmp, err := os.CreateTemp(parent, ".anx-sync-*")
 	if err != nil {
 		return err
 	}
@@ -629,7 +741,7 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 		_ = os.Remove(tmpName)
 		return err
 	}
-	if err := tmp.Chmod(mode); err != nil {
+	if err := tmp.Chmod(fileMode); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
 		return err

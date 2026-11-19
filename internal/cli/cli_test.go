@@ -648,4 +648,24 @@ func TestCLIPlanProfileShowListAndUnknownErrors(t *testing.T) {
 		}
 	}
 
+	// Verify `sync terminal --script` & `--script --push` enforce SSH perms and skip_capture parity.
+	var syncScriptOut, syncScriptErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"sync", "terminal", "--script"}, &syncScriptOut, &syncScriptErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("sync terminal --script failed (code %d): %s", code, syncScriptErr.String())
+	}
+	scriptStr := syncScriptOut.String()
+	if !strings.Contains(scriptStr, "chmod 0700") || !strings.Contains(scriptStr, "chmod 0600") {
+		t.Errorf("expected sync terminal --script to enforce 0700/0600 for ssh-config, got:\n%s", scriptStr)
+	}
+	if strings.Contains(scriptStr, `cp -a "files/ssh/config"`) || strings.Contains(scriptStr, `cp -f "files/ssh/config"`) {
+		t.Errorf("sync terminal --script must not overwrite custom SSH hosts, got:\n%s", scriptStr)
+	}
+
+	var pushScriptOut, pushScriptErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"sync", "terminal", "--script", "--push"}, &pushScriptOut, &pushScriptErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("sync terminal --script --push failed (code %d): %s", code, pushScriptErr.String())
+	}
+	if strings.Contains(pushScriptOut.String(), "Capture ssh-config") {
+		t.Errorf("sync --script --push must skip host-specific ssh-config, got:\n%s", pushScriptOut.String())
+	}
 }

@@ -170,8 +170,7 @@ func TranslatePlan(plan *domain.ExecutionPlan, plat *platform.Info) string {
 
 		comment := fmt.Sprintf("Execute action %s on %s via provider %s (%s)", actionStr, step.ResourceID, step.Provider, step.Strategy)
 		if step.TargetPath != "" && step.SourcePath != "" {
-			cmd := fmt.Sprintf("mkdir -p $(dirname %q) && cp -f %q %q", step.TargetPath, step.SourcePath, step.TargetPath)
-			b.AddCommand(cmd, comment)
+			b.AddCommand(FormatSyncDeployCommand(step.ResourceID, step.SourcePath, step.TargetPath, plat), comment)
 		} else if step.Action == domain.ActionInstall {
 			pkgCmd := translatePackageInstall(step.ResourceID, step.Provider, plat)
 			b.AddCommand(pkgCmd, fmt.Sprintf("Installing package %s (%s)", step.ResourceID, step.Provider))
@@ -182,6 +181,24 @@ func TranslatePlan(plan *domain.ExecutionPlan, plat *platform.Info) string {
 	}
 
 	return b.Render()
+}
+
+// FormatSyncDeployCommand renders the auditable shell command for deploying a single configuration asset.
+func FormatSyncDeployCommand(resourceID, sourcePath, targetPath string, plat *platform.Info) string {
+	switch {
+	case resourceID == "ssh-config":
+		return fmt.Sprintf(
+			"mkdir -p -m 0700 $(dirname %q) && chmod 0700 $(dirname %q) && (umask 077 && touch %q) && chmod 0600 %q && (grep -qF '# >>> arturonavax/env >>>' %q || { printf '\\n# >>> arturonavax/env >>>\\n'; cat %q; printf '# <<< arturonavax/env <<<\\n'; } >> %q)",
+			targetPath, targetPath, targetPath, targetPath, targetPath, sourcePath, targetPath,
+		)
+	case resourceID == "ssh-agent-service" && plat != nil && plat.OS() == "linux":
+		return fmt.Sprintf(
+			"mkdir -p $(dirname %q) && cp -f %q %q && (systemctl --user daemon-reload && systemctl --user enable --now ssh-agent.service || true)",
+			targetPath, sourcePath, targetPath,
+		)
+	default:
+		return fmt.Sprintf("mkdir -p $(dirname %q) && cp -f %q %q", targetPath, sourcePath, targetPath)
+	}
 }
 
 func translatePackageInstall(resourceID, provider string, plat *platform.Info) string {

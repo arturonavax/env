@@ -325,12 +325,18 @@ func renderSyncScript(w io.Writer, appCtx *AppContext, args []string, push bool)
 	b.AddSection(actionTitle, "Synchronize managed configuration assets")
 
 	for _, c := range cfgs {
-		target := c.TargetForOS(appCtx.Platform.OS())
+		if !c.SupportsOS(appCtx.Platform.OS()) {
+			continue
+		}
+		target := appCtx.Platform.ExpandPath(c.TargetForOS(appCtx.Platform.OS()))
 		source := c.Source
 		if push {
+			if c.IsHostSpecific() {
+				continue
+			}
 			b.AddCommand(fmt.Sprintf("mkdir -p $(dirname %q) && cp -a %q %q", source, target, source), fmt.Sprintf("Capture %s", c.ID))
 		} else {
-			b.AddCommand(fmt.Sprintf("mkdir -p $(dirname %q) && cp -a %q %q", target, source, target), fmt.Sprintf("Deploy %s", c.ID))
+			b.AddCommand(scriptgen.FormatSyncDeployCommand(c.ID, source, target, appCtx.Platform), fmt.Sprintf("Deploy %s", c.ID))
 		}
 	}
 	fmt.Fprint(w, b.Render())

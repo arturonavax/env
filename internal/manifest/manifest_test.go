@@ -1075,3 +1075,140 @@ exit 0
 	})
 }
 
+func TestSSHAgentAssetsAndAllProfilesCoverage(t *testing.T) {
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog() failed: %v", err)
+	}
+
+	sshCfg, ok := cat.GetConfiguration("ssh-config")
+	if !ok {
+		t.Fatal("expected 'ssh-config' configuration in manifests/configs.yaml")
+	}
+	if sshCfg.DirMode != "0700" || sshCfg.FileMode != "0600" {
+		t.Errorf("expected ssh-config dir_mode=0700 file_mode=0600, got %q / %q", sshCfg.DirMode, sshCfg.FileMode)
+	}
+	if !sshCfg.SkipCapture {
+		t.Errorf("expected ssh-config to set skip_capture: true so user SSH hosts never leak")
+	}
+
+	requiredIDs := []string{
+		"ssh-config",
+		"ssh-agent-service",
+		"ssh-agent-env",
+		"ssh-agent-zshenv",
+		"ssh-agent-profile",
+	}
+	for _, prof := range cat.ListProfiles() {
+		cfgs, err := cat.ResolveProfileConfigurations(prof.Name)
+		if err != nil {
+			t.Fatalf("ResolveProfileConfigurations(%q): %v", prof.Name, err)
+		}
+		present := map[string]bool{}
+		for _, c := range cfgs {
+			present[c.ID] = true
+		}
+		for _, req := range requiredIDs {
+			if !present[req] {
+				t.Errorf("profile %q missing required SSH configuration %q", prof.Name, req)
+			}
+		}
+	}
+
+	sshConfigRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "ssh", "config"))
+	if err != nil {
+		t.Fatalf("reading files/ssh/config: %v", err)
+	}
+	sshConfig := string(sshConfigRaw)
+	for _, want := range []string{"Host *", "AddKeysToAgent yes", "IdentitiesOnly yes", "IgnoreUnknown UseKeychain", "UseKeychain yes"} {
+		if !strings.Contains(sshConfig, want) {
+			t.Errorf("files/ssh/config missing %q", want)
+		}
+	}
+	if strings.Contains(sshConfig, "ForwardAgent yes") {
+		t.Errorf("files/ssh/config must NEVER configure ForwardAgent yes")
+	}
+
+	unitRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "ssh", "systemd", "ssh-agent.service"))
+	if err != nil {
+		t.Fatalf("reading files/ssh/systemd/ssh-agent.service: %v", err)
+	}
+	for _, want := range []string{"ExecStartPre=-/bin/rm -f %t/ssh-agent.socket", "ExecStart=/usr/bin/ssh-agent -D -a %t/ssh-agent.socket", "WantedBy=default.target"} {
+		if !strings.Contains(string(unitRaw), want) {
+			t.Errorf("ssh-agent.service missing %q", want)
+		}
+	}
+
+	envRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "ssh", "environment.d", "ssh-agent.conf"))
+	if err != nil {
+		t.Fatalf("reading files/ssh/environment.d/ssh-agent.conf: %v", err)
+	}
+	if !strings.Contains(string(envRaw), "SSH_AUTH_SOCK=${XDG_RUNTIME_DIR}/ssh-agent.socket") {
+		t.Errorf("unexpected ssh-agent.conf content:\n%s", envRaw)
+	}
+
+	// Managed shell files must not manually spawn ssh-agent or run ssh-add at startup.
+	shellFiles := []string{
+		filepath.Join("..", "..", "files", "zsh", ".zshrc"),
+		filepath.Join("..", "..", "files", "zsh", ".base.zsh"),
+		filepath.Join("..", "..", "files", "zsh", ".tools.sh"),
+		filepath.Join("..", "..", "files", "zsh", ".zshenv"),
+		filepath.Join("..", "..", "files", "bash", ".bashrc"),
+		filepath.Join("..", "..", "files", "bash", ".base.bash"),
+		filepath.Join("..", "..", "files", "ssh", ".profile"),
+	}
+	for _, sf := range shellFiles {
+		raw, err := os.ReadFile(sf)
+		if err != nil {
+			t.Fatalf("reading %s: %v", sf, err)
+		}
+		txt := string(raw)
+		for _, banned := range []string{"ssh-agent -s", "ssh-agent -c", "eval \"$(ssh-agent", "eval '$(ssh-agent", "ssh-add "} {
+			if strings.Contains(txt, banned) {
+				t.Errorf("%s contains manual ssh-agent/ssh-add invocation %q", sf, banned)
+			}
+		}
+	}
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	// Execute guarded ~/.zshenv and ~/.profile under stubbed Linux vs Darwin uname.
+	for _, tc := range []struct {
+		osName   string
+		xdgDir   string
+		wantSock string
+	}{
+		{osName: "Linux", xdgDir: "/run/user/1000", wantSock: "/run/user/1000/ssh-agent.socket"},
+		{osName: "Linux", xdgDir: "", wantSock: "launchd-original"},
+		{osName: "Darwin", xdgDir: "/tmp/should-ignore", wantSock: "launchd-original"},
+	} {
+		for _, relPath := range []string{filepath.Join("..", "..", "files", "zsh", ".zshenv"), filepath.Join("..", "..", "files", "ssh", ".profile")} {
+			binDir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(binDir, "uname"), []byte("#!/bin/sh\necho "+tc.osName+"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(relPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("sh", "-c", string(raw)+"\nprintf '%s' \"$SSH_AUTH_SOCK\"")
+			env := []string{
+				"PATH=" + binDir + ":/usr/bin:/bin",
+				"SSH_AUTH_SOCK=launchd-original",
+			}
+			if tc.xdgDir != "" {
+				env = append(env, "XDG_RUNTIME_DIR="+tc.xdgDir)
+			}
+			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("executing %s (%s): %v out=%s", relPath, tc.osName, err, out)
+			}
+			if string(out) != tc.wantSock {
+				t.Errorf("%s (OS=%s XDG=%q): SSH_AUTH_SOCK = %q, want %q", relPath, tc.osName, tc.xdgDir, string(out), tc.wantSock)
+			}
+		}
+	}
+}

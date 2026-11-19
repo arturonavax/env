@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/arturonavax/env/internal/app"
@@ -731,6 +732,297 @@ func TestInstallServicePlanHeadlessAndStepEdges(t *testing.T) {
 		for _, id := range []string{"amethyst", "karabiner-elements", "pam-reattach"} {
 			if _, ok := findStep(planLinux, id); ok {
 				t.Errorf("linux workstation plan unexpectedly scheduled darwin-only %q", id)
+			}
+		}
+	})
+}
+
+type stubSSHRunner struct {
+	calls     [][]string
+	lookPaths map[string]string
+	env       map[string]string
+	handler   func(name string, args ...string) (int, string, string, error)
+}
+
+func (r *stubSSHRunner) Run(_ context.Context, name string, args ...string) (int, string, string, error) {
+	call := append([]string{name}, args...)
+	r.calls = append(r.calls, call)
+	if r.handler != nil {
+		return r.handler(name, args...)
+	}
+	return 0, "", "", nil
+}
+
+func (r *stubSSHRunner) LookPath(name string) (string, error) {
+	if p, ok := r.lookPaths[name]; ok {
+		return p, nil
+	}
+	return "", os.ErrNotExist
+}
+
+func (r *stubSSHRunner) Getenv(k string) string {
+	return r.env[k]
+}
+
+func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
+	repoRoot := filepath.Join("..", "..")
+
+	t.Run("enforces 0700/0600 on ssh-config, preserves user hosts, respects dry-run and capture guard, and enables systemd user agent", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:           "linux",
+			Arch:         "amd64",
+			CurrentShell: "zsh",
+			HomeDir:  home,
+			StateDir: filepath.Join(home, "state"),
+		})
+		snap, err := snapshot.NewManager(plat.StateDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		store, err := state.OpenStore(plat.StateDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = store.Close() })
+
+		sshDir := filepath.Join(home, ".ssh")
+		if err := os.MkdirAll(sshDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		sshCfgPath := filepath.Join(sshDir, "config")
+		existingUserHost := "Host prod-bastion\n    HostName 10.0.0.10\n    User deploy\n"
+		if err := os.WriteFile(sshCfgPath, []byte(existingUserHost), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		runner := &stubSSHRunner{
+			lookPaths: map[string]string{"systemctl": "/usr/bin/systemctl"},
+			env:       map[string]string{"XDG_RUNTIME_DIR": "/run/user/1000"},
+		}
+		cat := catalog.NewDefaultRegistry()
+		svc := app.NewSyncService(plat, cat, snap, store, repoRoot, app.WithSyncSSHRunner(runner))
+
+		// 1. Dry-run leaves permissions and contents untouched.
+		dryRes, err := svc.SyncOne(context.Background(), "ssh-config", app.SyncOptions{DryRun: true})
+		if err != nil {
+			t.Fatalf("dry-run SyncOne(ssh-config) failed: %v", err)
+		}
+		if dryRes.Action == "unchanged" {
+			t.Errorf("expected dry-run over missing marker block not to report unchanged")
+		}
+		info, _ := os.Stat(sshCfgPath)
+		if info.Mode().Perm() != 0o644 {
+			t.Errorf("dry-run mutated file permissions to %04o", info.Mode().Perm())
+		}
+
+		// 2. Live sync creates backup, merges Host *, preserves user host, tightens 0700 & 0600.
+		res, err := svc.SyncOne(context.Background(), "ssh-config", app.SyncOptions{})
+		if err != nil {
+			t.Fatalf("SyncOne(ssh-config) failed: %v", err)
+		}
+		if res.SnapshotID == "" {
+			t.Errorf("expected backup snapshot before updating ~/.ssh/config")
+		}
+		dirInfo, _ := os.Stat(sshDir)
+		cfgInfo, _ := os.Stat(sshCfgPath)
+		if dirInfo.Mode().Perm() != 0o700 {
+			t.Errorf("expected ~/.ssh mode 0700, got %04o", dirInfo.Mode().Perm())
+		}
+		if cfgInfo.Mode().Perm() != 0o600 {
+			t.Errorf("expected ~/.ssh/config mode 0600, got %04o", cfgInfo.Mode().Perm())
+		}
+		mergedBytes, _ := os.ReadFile(sshCfgPath)
+		merged := string(mergedBytes)
+		if !strings.Contains(merged, "Host prod-bastion") || !strings.Contains(merged, "AddKeysToAgent yes") || !strings.Contains(merged, "UseKeychain yes") {
+			t.Errorf("unexpected merged ~/.ssh/config:\n%s", merged)
+		}
+
+		// Capture skips ssh-config because skip_capture: true.
+		cfgObj, _ := cat.GetConfiguration("ssh-config")
+		if !cfgObj.IsHostSpecific() {
+			t.Errorf("expected ssh-config.IsHostSpecific() == true to block capture leakage")
+		}
+
+		// 3. Diff detects permission drift and re-syncing tightens modes back to 0700/0600 even when file text matches.
+		_ = os.Chmod(sshDir, 0o755)
+		_ = os.Chmod(sshCfgPath, 0o644)
+		diffs, err := svc.Diff(context.Background(), "ssh-config")
+		if err != nil {
+			t.Fatalf("Diff(ssh-config) failed: %v", err)
+		}
+		foundPermDrift := false
+		for _, d := range diffs {
+			if d.ConfigID == "ssh-config" && d.State == "drift" && strings.Contains(d.Summary, "permissions") {
+				foundPermDrift = true
+			}
+		}
+		if !foundPermDrift {
+			t.Errorf("expected Diff to detect permission drift on ssh-config, got %+v", diffs)
+		}
+		res2, err := svc.SyncOne(context.Background(), "ssh-config", app.SyncOptions{})
+		if err != nil {
+			t.Fatalf("re-sync ssh-config failed: %v", err)
+		}
+		if res2.Action != "updated" {
+			t.Errorf("expected Action=updated when fixing drifted perms, got %q", res2.Action)
+		}
+		dirInfo, _ = os.Stat(sshDir)
+		cfgInfo, _ = os.Stat(sshCfgPath)
+		if dirInfo.Mode().Perm() != 0o700 || cfgInfo.Mode().Perm() != 0o600 {
+			t.Errorf("expected re-tightened modes 0700/0600, got %04o/%04o", dirInfo.Mode().Perm(), cfgInfo.Mode().Perm())
+		}
+
+		// 4. ssh-agent-service invokes daemon-reload & enable --now when systemd --user session is active.
+		runner.calls = nil
+		svcRes, err := svc.SyncOne(context.Background(), "ssh-agent-service", app.SyncOptions{})
+		if err != nil {
+			t.Fatalf("SyncOne(ssh-agent-service) failed: %v", err)
+		}
+		var sawReload, sawEnable bool
+		for _, c := range runner.calls {
+			joined := strings.Join(c, " ")
+			if strings.Contains(joined, "systemctl --user daemon-reload") {
+				sawReload = true
+			}
+			if strings.Contains(joined, "systemctl --user enable --now ssh-agent.service") {
+				sawEnable = true
+			}
+		}
+		if !sawReload || !sawEnable {
+			t.Errorf("expected daemon-reload & enable --now calls (detail=%q), got calls: %v", svcRes.Detail, runner.calls)
+		}
+	})
+
+	t.Run("linux degrades safely without systemd user session", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:           "linux",
+			CurrentShell: "zsh",
+			HomeDir:  home,
+			StateDir: filepath.Join(home, "state"),
+		})
+		runner := &stubSSHRunner{
+			lookPaths: map[string]string{"systemctl": "/usr/bin/systemctl"},
+			handler: func(name string, args ...string) (int, string, string, error) {
+				if name == "systemctl" && slices.Contains(args, "show-environment") {
+					return 1, "", "Failed to connect to bus: No medium found", nil
+				}
+				return 0, "", "", nil
+			},
+		}
+		svc := app.NewSyncService(plat, catalog.NewDefaultRegistry(), nil, nil, repoRoot, app.WithSyncSSHRunner(runner))
+		res, err := svc.SyncOne(context.Background(), "ssh-agent-service", app.SyncOptions{})
+		if err != nil {
+			t.Fatalf("expected safe degradation without systemd --user bus, got err=%v", err)
+		}
+		if !strings.Contains(strings.ToLower(res.Detail), "systemd --user") {
+			t.Errorf("expected informative degradation detail, got %q", res.Detail)
+		}
+	})
+
+	t.Run("darwin respects launchd and emits non-blocking keychain hint on exit code 1", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:           "darwin",
+			Arch:         "arm64",
+			CurrentShell: "zsh",
+			HomeDir:  home,
+			StateDir: filepath.Join(home, "state"),
+		})
+		_ = os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
+		_ = os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("private"), 0o600)
+
+		runner := &stubSSHRunner{
+			lookPaths: map[string]string{"ssh-add": "/usr/bin/ssh-add"},
+			env:       map[string]string{"SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.123/Listeners"},
+			handler: func(name string, args ...string) (int, string, string, error) {
+				if name == "ssh-add" && len(args) == 1 && args[0] == "-l" {
+					return 1, "The agent has no identities.", "", nil
+				}
+				return 0, "", "", nil
+			},
+		}
+		svc := app.NewSyncService(plat, catalog.NewDefaultRegistry(), nil, nil, repoRoot, app.WithSyncSSHRunner(runner))
+		res, err := svc.SyncOne(context.Background(), "ssh-config", app.SyncOptions{})
+		if err != nil {
+			t.Fatalf("SyncOne(ssh-config) on darwin failed: %v", err)
+		}
+		if !strings.Contains(res.Detail, "ssh-add --apple-use-keychain") {
+			t.Errorf("expected non-blocking keychain hint in Detail, got %q", res.Detail)
+		}
+		for _, c := range runner.calls {
+			if c[0] == "systemctl" {
+				t.Errorf("darwin must never invoke systemctl: %v", c)
+			}
+		}
+
+		// InstallService.Apply forwards the keychain hint through StepSuccess ProgressEvent.OutputLine.
+		instSvc := app.NewInstallService(app.InstallDeps{
+			Platform: plat,
+			Catalog:  catalog.NewDefaultRegistry(),
+			Sync:     svc,
+		})
+		var sawHint bool
+		instSvc.SetOnProgress(func(ev app.ProgressEvent) {
+			if ev.ResourceID == "ssh-config" && ev.Status == domain.StepSuccess && strings.Contains(ev.OutputLine, "ssh-add --apple-use-keychain") {
+				sawHint = true
+			}
+		})
+		if err := instSvc.Apply(context.Background(), &domain.ExecutionPlan{
+			ID:      "plan-darwin-ssh",
+			Profile: "minimal",
+			Steps: []domain.PlanStep{
+				{ID: 1, ResourceID: "ssh-config", Action: domain.ActionSync, Description: "Synchronize OpenSSH client config", Locks: []string{"file:" + filepath.Join(home, ".ssh", "config")}},
+			},
+		}); err != nil {
+			t.Fatalf("InstallService.Apply(ssh-config) failed: %v", err)
+		}
+		if !sawHint {
+			t.Errorf("expected InstallService.Apply to emit ProgressEvent.OutputLine with keychain hint")
+		}
+	})
+
+	t.Run("all profiles schedule OS-appropriate SSH agent configs cleanly", func(t *testing.T) {
+		cat := catalog.NewDefaultRegistry()
+		runner := security.NewRunner(0)
+		for _, goos := range []string{"linux", "darwin"} {
+			for _, prof := range cat.ListProfiles() {
+				home := t.TempDir()
+				plat := platform.NewTestInfo(platform.TestInfoParams{
+					OS:       goos,
+					Arch:     "amd64",
+					HomeDir:  home,
+					StateDir: filepath.Join(home, "state"),
+				})
+				syncSvc := app.NewSyncService(plat, cat, nil, nil, repoRoot)
+				instSvc := app.NewInstallService(app.InstallDeps{
+					Platform: plat,
+					Catalog:  cat,
+					Provider: providers.NewDispatcher(plat, cat.Catalog(), runner, ""),
+					Sync:     syncSvc,
+				})
+				plan, err := instSvc.PlanWithReinstall(context.Background(), prof.Name, nil, true)
+				if err != nil {
+					t.Fatalf("Plan(%s/%s): %v", goos, prof.Name, err)
+				}
+				hasStep := func(id string) bool {
+					for _, st := range plan.Steps {
+						if st.ResourceID == id {
+							return true
+						}
+					}
+					return false
+				}
+				if !hasStep("ssh-config") || !hasStep("ssh-agent-zshenv") || !hasStep("ssh-agent-profile") {
+					t.Errorf("%s profile %q missing shared ssh configs", goos, prof.Name)
+				}
+				if goos == "linux" && (!hasStep("ssh-agent-service") || !hasStep("ssh-agent-env")) {
+					t.Errorf("%s profile %q missing systemd/environment.d configs", goos, prof.Name)
+				}
+				if goos == "darwin" && (hasStep("ssh-agent-service") || hasStep("ssh-agent-env")) {
+					t.Errorf("%s profile %q should not schedule linux systemd/environment.d configs", goos, prof.Name)
+				}
 			}
 		}
 	})

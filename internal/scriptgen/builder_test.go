@@ -40,6 +40,7 @@ func TestTranslators(t *testing.T) {
 	plat := platform.Detect()
 
 	t.Run("TranslatePlan", func(t *testing.T) {
+		linuxPlat := platform.NewTestInfo(platform.TestInfoParams{OS: "linux", Distribution: "ubuntu"})
 		plan := &domain.ExecutionPlan{
 			Steps: []domain.PlanStep{
 				{
@@ -48,11 +49,40 @@ func TestTranslators(t *testing.T) {
 					Provider:    "native",
 					Description: "Fast search tool",
 				},
+				{
+					Action:      domain.ActionSync,
+					ResourceID:  "ssh-config",
+					SourcePath:  "files/ssh/config",
+					TargetPath:  "/home/u/.ssh/config",
+					Description: "Synchronize OpenSSH client config",
+				},
+				{
+					Action:      domain.ActionSync,
+					ResourceID:  "ssh-agent-service",
+					SourcePath:  "files/ssh/systemd/ssh-agent.service",
+					TargetPath:  "/home/u/.config/systemd/user/ssh-agent.service",
+					Description: "Synchronize systemd user ssh-agent unit",
+				},
 			},
 		}
-		script := scriptgen.TranslatePlan(plan, plat)
-		if !strings.Contains(script, "Installing package ripgrep") {
-			t.Errorf("expected plan command in script, got:\n%s", script)
+		script := scriptgen.TranslatePlan(plan, linuxPlat)
+		for _, want := range []string{
+			"Installing package ripgrep",
+			"chmod 0700 $(dirname",
+			"chmod 0600",
+			"umask 077 && touch",
+			"grep -qF '# >>> arturonavax/env >>>'",
+			"systemctl --user enable --now ssh-agent.service",
+		} {
+			if !strings.Contains(script, want) {
+				t.Errorf("expected plan script to contain %q, got:\n%s", want, script)
+			}
+		}
+		if strings.Contains(script, `cp -f "files/ssh/config"`) {
+			t.Errorf("ssh-config script must not overwrite custom hosts via cp -f, got:\n%s", script)
+		}
+		if violations := security.ValidateScriptGuardrails(script); len(violations) > 0 {
+			t.Errorf("plan script failed security guardrails: %+v", violations)
 		}
 	})
 

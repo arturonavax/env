@@ -1,6 +1,11 @@
 package domain
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
 
 // ResourceStatus represents the operational state of a managed resource.
 type ResourceStatus int
@@ -218,6 +223,8 @@ type ConfigurationResource struct {
 	Strategy           StrategyType          `json:"strategy" yaml:"strategy"`
 	MarkerStart        string                `json:"marker_start,omitempty" yaml:"marker_start,omitempty"`
 	MarkerEnd          string                `json:"marker_end,omitempty" yaml:"marker_end,omitempty"`
+	DirMode            string                `json:"dir_mode,omitempty" yaml:"dir_mode,omitempty"`
+	FileMode           string                `json:"file_mode,omitempty" yaml:"file_mode,omitempty"`
 	Excludes           []string              `json:"excludes,omitempty" yaml:"excludes,omitempty"`
 	SupportedOS        []string              `json:"supported_os,omitempty" yaml:"os,omitempty"`
 	SupportedDesktops  []string              `json:"supported_desktops,omitempty" yaml:"desktops,omitempty"`
@@ -239,6 +246,42 @@ func (c ConfigurationResource) IsHostSpecific() bool {
 	return c.Strategy == StrategyPreserve || c.SkipCapture
 }
 
+// ParseOctalMode parses an octal permission string such as "0700" or "0600".
+func ParseOctalMode(raw string) (os.FileMode, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, fmt.Errorf("empty permission mode")
+	}
+	v, err := strconv.ParseUint(trimmed, 8, 32)
+	if err != nil || v > 0o777 {
+		return 0, fmt.Errorf("invalid octal permission mode %q", raw)
+	}
+	return os.FileMode(v), nil
+}
+
+// ParsedDirMode returns the configured directory permission mode when valid and set.
+func (c ConfigurationResource) ParsedDirMode() (os.FileMode, bool) {
+	if strings.TrimSpace(c.DirMode) == "" {
+		return 0, false
+	}
+	m, err := ParseOctalMode(c.DirMode)
+	if err != nil {
+		return 0, false
+	}
+	return m, true
+}
+
+// ParsedFileMode returns the configured file permission mode when valid and set.
+func (c ConfigurationResource) ParsedFileMode() (os.FileMode, bool) {
+	if strings.TrimSpace(c.FileMode) == "" {
+		return 0, false
+	}
+	m, err := ParseOctalMode(c.FileMode)
+	if err != nil {
+		return 0, false
+	}
+	return m, true
+}
 
 // TargetForOS resolves the OS-specific target path, falling back to Target.
 func (c ConfigurationResource) TargetForOS(goos string) string {

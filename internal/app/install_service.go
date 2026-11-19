@@ -427,9 +427,22 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		writeLog("================================================================================")
 	}
 
+	var (
+		detailsMu   sync.Mutex
+		stepDetails = map[int]string{}
+	)
+	recordDetail := func(stepID int, detail string) {
+		if detail == "" {
+			return
+		}
+		detailsMu.Lock()
+		stepDetails[stepID] = detail
+		detailsMu.Unlock()
+	}
+
 	tasks := make([]execution.Task, len(plan.Steps))
 	for i := range plan.Steps {
-		tasks[i] = s.buildTask(txID, plan.Steps[i], writeLog)
+		tasks[i] = s.buildTaskWithDetail(txID, plan.Steps[i], writeLog, recordDetail)
 	}
 
 	byID := make(map[int]*domain.PlanStep, len(plan.Steps))
@@ -446,10 +459,13 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		if res.Error != nil {
 			step.Error = res.Error.Error()
 		}
+		detailsMu.Lock()
+		outLine := stepDetails[res.StepID]
+		detailsMu.Unlock()
 		if progressFn := s.getOnProgress(); progressFn != nil {
 			progressFn(ProgressEvent{
 				StepID: step.ID, TotalSteps: len(plan.Steps), ResourceID: step.ResourceID,
-				Action: step.Action, Description: step.Description, Status: res.Status, Error: step.Error,
+				Action: step.Action, Description: step.Description, Status: res.Status, Error: step.Error, OutputLine: outLine,
 			})
 		}
 	})
@@ -480,6 +496,10 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 }
 
 func (s *InstallService) buildTask(txID string, step domain.PlanStep, writeLog func(string, ...any)) execution.Task {
+	return s.buildTaskWithDetail(txID, step, writeLog, nil)
+}
+
+func (s *InstallService) buildTaskWithDetail(txID string, step domain.PlanStep, writeLog func(string, ...any), recordDetail func(int, string)) execution.Task {
 	task := execution.Task{Step: step, Exclusive: step.IsExclusive, Locks: step.Locks}
 
 	switch step.Action {
@@ -577,6 +597,9 @@ func (s *InstallService) buildTask(txID string, step domain.PlanStep, writeLog f
 				return err
 			}
 			snapID = res.SnapshotID
+			if res.Detail != "" && recordDetail != nil {
+				recordDetail(step.ID, res.Detail)
+			}
 			if writeLog != nil {
 				writeLog("[STEP %d] [SYNC-SUCCESS] Synchronized %s (snapshot: %s)", step.ID, step.ResourceID, snapID)
 			}
