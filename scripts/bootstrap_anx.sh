@@ -49,11 +49,173 @@ if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
 	source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
 fi
 
+ensure_macos_homebrew_env() {
+	if command -v brew >/dev/null 2>&1; then
+		return 0
+	fi
+	if [[ -x "/opt/homebrew/bin/brew" ]]; then
+		eval "$(/opt/homebrew/bin/brew shellenv)"
+	elif [[ -x "/usr/local/bin/brew" ]]; then
+		eval "$(/usr/local/bin/brew shellenv)"
+	fi
+}
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+	ensure_macos_homebrew_env
+fi
+if ! command -v go >/dev/null 2>&1 && [[ -d "/usr/local/go/bin" && ":${PATH}:" != *":/usr/local/go/bin:"* ]]; then
+	export PATH="/usr/local/go/bin:${PATH}"
+fi
+
 # Ensure target binary directory exists
 mkdir -p "${DEST_BIN}"
 if [[ ":${PATH}:" != *":${DEST_BIN}:"* ]]; then
 	export PATH="${DEST_BIN}:${PATH}"
 fi
+
+CLT_PLACEHOLDER="${ANX_CLT_PLACEHOLDER:-/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress}"
+CLT_PLACEHOLDER_CREATED=0
+
+cleanup_bootstrap() {
+	if [[ "${CLT_PLACEHOLDER_CREATED:-0}" -eq 1 ]]; then
+		rm -f "${CLT_PLACEHOLDER}" >/dev/null 2>&1 || sudo -n rm -f "${CLT_PLACEHOLDER}" >/dev/null 2>&1 || true
+	fi
+}
+trap cleanup_bootstrap EXIT INT TERM
+
+has_macos_clt() {
+	local dev_dir
+	dev_dir="$(xcode-select -p 2>/dev/null || true)"
+	if [[ -n "${dev_dir}" && -x "${dev_dir}/usr/bin/git" ]]; then
+		return 0
+	fi
+	[[ -x "/Library/Developer/CommandLineTools/usr/bin/git" ]]
+}
+
+has_usable_git() {
+	if ! command -v git >/dev/null 2>&1; then
+		return 1
+	fi
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		local git_bin
+		git_bin="$(command -v git 2>/dev/null || true)"
+		if [[ "${git_bin}" == "/usr/bin/git" || "${git_bin}" == "${ANX_SYSTEM_GIT_PATH:-/usr/bin/git}" ]] && ! has_macos_clt; then
+			return 1
+		fi
+	fi
+	return 0
+}
+
+pick_latest_clt_label() {
+	awk '
+		/^[[:space:]]*\* Label:[[:space:]]*.*Command Line Tools/ {
+			label = $0
+			sub(/^[[:space:]]*\* Label:[[:space:]]*/, "", label)
+			ver = label
+			sub(/^.*-/, "", ver)
+			n = split(ver, p, ".")
+			key = sprintf("%05d.%05d.%05d", (n >= 1 ? p[1] + 0 : 0), (n >= 2 ? p[2] + 0 : 0), (n >= 3 ? p[3] + 0 : 0))
+			if (best_key == "" || key >= best_key) {
+				best_key = key
+				best_label = label
+			}
+		}
+		END {
+			if (best_label != "") {
+				print best_label
+			}
+		}
+	'
+}
+
+ensure_macos_clt() {
+	if [[ "$(uname -s)" != "Darwin" ]] || [[ "${ANX_SKIP_CLT:-0}" -eq 1 ]]; then
+		return 0
+	fi
+	if has_macos_clt; then
+		return 0
+	fi
+
+	log_step "Xcode Command Line Tools not found; installing headlessly (no GUI dialog required)..."
+	if ! sudo -n true >/dev/null 2>&1; then
+		if [[ -c /dev/tty ]] && ( : </dev/tty ) 2>/dev/null; then
+			if ! { sudo -v; } </dev/tty; then
+				log_warn "Administrator privileges declined; skipping headless CLT setup and falling back to CGO_ENABLED=0 Go build."
+				return 0
+			fi
+		elif [[ -t 0 ]]; then
+			if ! sudo -v; then
+				log_warn "Administrator privileges unavailable; continuing with CGO_ENABLED=0 Go build."
+				return 0
+			fi
+		else
+			log_warn "Non-interactive session without passwordless sudo; skipping headless CLT setup and continuing with CGO_ENABLED=0."
+			return 0
+		fi
+	fi
+
+	if ! sudo touch "${CLT_PLACEHOLDER}"; then
+		log_warn "Could not create softwareupdate sentinel; continuing with CGO_ENABLED=0 fallback."
+		return 0
+	fi
+	CLT_PLACEHOLDER_CREATED=1
+
+	local label_clt
+	label_clt="$(softwareupdate -l 2>/dev/null | pick_latest_clt_label || true)"
+	if [[ -z "${label_clt}" ]]; then
+		log_warn "Command Line Tools label not found via softwareupdate (run 'xcode-select --install' or retry online later). Continuing with CGO_ENABLED=0."
+		cleanup_bootstrap
+		CLT_PLACEHOLDER_CREATED=0
+		return 0
+	fi
+
+	log_info "Installing macOS package: ${label_clt}..."
+	if ! sudo softwareupdate -i "${label_clt}" </dev/null; then
+		log_warn "softwareupdate install did not succeed for '${label_clt}'. Continuing with CGO_ENABLED=0."
+	fi
+
+	sudo rm -f "${CLT_PLACEHOLDER}" >/dev/null 2>&1 || rm -f "${CLT_PLACEHOLDER}" >/dev/null 2>&1 || true
+	CLT_PLACEHOLDER_CREATED=0
+
+	if [[ -d "/Library/Developer/CommandLineTools" ]]; then
+		sudo xcode-select --switch /Library/Developer/CommandLineTools >/dev/null 2>&1 || true
+	fi
+
+	if has_macos_clt; then
+		log_success "Xcode Command Line Tools verified."
+	else
+		log_warn "Command Line Tools still unavailable; continuing with pure-Go CGO_ENABLED=0 build."
+	fi
+}
+
+ensure_macos_homebrew() {
+	if [[ "$(uname -s)" != "Darwin" ]] || [[ "${ANX_SKIP_HOMEBREW:-0}" -eq 1 ]]; then
+		return 0
+	fi
+	ensure_macos_homebrew_env
+	if command -v brew >/dev/null 2>&1; then
+		return 0
+	fi
+	if ! has_macos_clt || ! command -v curl >/dev/null 2>&1; then
+		log_warn "Skipping automatic Homebrew setup (requires Xcode CLT and curl)."
+		return 0
+	fi
+
+	log_step "Homebrew not detected on macOS; installing Homebrew..."
+	local tmp_brew
+	tmp_brew="$(mktemp "${TMPDIR:-/tmp}/anx-brew-install.XXXXXX")"
+	if curl -fsSL "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh" -o "${tmp_brew}"; then
+		if [[ -c /dev/tty ]] && ( : </dev/tty ) 2>/dev/null; then
+			{ NONINTERACTIVE=1 /bin/bash "${tmp_brew}"; } </dev/tty || log_warn "Homebrew installation failed; native macOS package installs will wait until 'brew' is installed."
+		else
+			NONINTERACTIVE=1 /bin/bash "${tmp_brew}" || log_warn "Homebrew installation failed; native macOS package installs will wait until 'brew' is installed."
+		fi
+	else
+		log_warn "Could not download Homebrew installer script."
+	fi
+	rm -f "${tmp_brew}"
+	ensure_macos_homebrew_env
+}
 
 # ------------------------------------------------------------------------------
 # Pre-Compiled GitHub Release Binary
@@ -213,6 +375,11 @@ check_go_version() {
 install_go_tier1_gvm() {
 	log_step "Tier 1: Attempting Go installation via GVM (Go Version Manager)..."
 
+	if ! has_usable_git; then
+		log_info "Usable git not detected; skipping Tier 1 (GVM) in favor of standalone Go binary installer."
+		return 1
+	fi
+
 	if ! command -v gvm >/dev/null 2>&1; then
 		if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
 			set +u
@@ -320,14 +487,23 @@ ensure_go_runtime() {
 build_anx() {
 	log_step "Compiling ANX platform binary..."
 	local version commit date
-	version=$(git -C "${REPO_ROOT}" describe --tags --always 2>/dev/null || echo "1.0.0")
-	commit=$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "dev")
+	version="1.0.0"
+	commit="dev"
+	if [[ -d "${REPO_ROOT}/.git" ]] && has_usable_git; then
+		version=$(git -C "${REPO_ROOT}" describe --tags --always 2>/dev/null || echo "1.0.0")
+		commit=$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "dev")
+	fi
 	date=$(date -u "+%Y-%m-%d")
 
 	(
 		cd "${REPO_ROOT}"
-		go build -ldflags "-s -w -X main.Version=${version} -X main.Commit=${commit} -X main.Date=${date}" \
-			-o "${DEST_BIN}/anx" ./cmd/anx
+		if [[ "$(uname -s)" == "Darwin" ]] && ! has_macos_clt; then
+			CGO_ENABLED=0 go build -ldflags "-s -w -X main.Version=${version} -X main.Commit=${commit} -X main.Date=${date}" \
+				-o "${DEST_BIN}/anx" ./cmd/anx
+		else
+			go build -ldflags "-s -w -X main.Version=${version} -X main.Commit=${commit} -X main.Date=${date}" \
+				-o "${DEST_BIN}/anx" ./cmd/anx
+		fi
 	)
 
 	# Multicall compatibility symlinks
@@ -377,6 +553,23 @@ main() {
 				;;
 		esac
 	done
+
+	local readonly_action=0
+	if [[ ${#forward_args[@]} -gt 0 ]]; then
+		local arg
+		for arg in "${forward_args[@]}"; do
+			case "${arg}" in
+				plan|--plan|-p|doctor|--check|--dry-run)
+					readonly_action=1
+					;;
+			esac
+		done
+	fi
+
+	if [[ "$(uname -s)" == "Darwin" && "${readonly_action}" -eq 0 ]]; then
+		ensure_macos_clt
+		ensure_macos_homebrew
+	fi
 
 	if [[ "${force_go_install}" -eq 1 ]]; then
 		if try_go_install; then

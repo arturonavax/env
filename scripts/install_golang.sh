@@ -89,9 +89,15 @@ if [[ -n "$json_response" ]]; then
 	latest_version="$(echo "$json_response" | grep -o '"version": "go[^"]*"' | head -n 1 | cut -d '"' -f 4 || true)"
 fi
 
-# Fallback to HTML scraping if JSON API fails
+# Fallback to HTML scraping if JSON API fails (BSD/POSIX-safe numeric sort)
 if [[ -z "$latest_version" ]]; then
-	latest_version="$(fetch_url "$DL_URL" 2>/dev/null | grep -E "/go1(\.[0-9]+){0,2}" | grep -v "[0-9]rc" | grep -E -o "/go1(\.[0-9]+){0,2}" | sort --version-sort | tail -n 1 | cut -d "/" -f 2 || true)"
+	latest_version="$(fetch_url "$DL_URL" 2>/dev/null | grep -E "/go1(\.[0-9]+){0,2}" | grep -v "[0-9]rc" | grep -E -o "/go1(\.[0-9]+){0,2}" | cut -d "/" -f 2 | awk '
+		/^go[0-9]/ {
+			v = substr($0, 3)
+			n = split(v, p, ".")
+			printf "%05d%05d%05d %s\n", (n>=1?p[1]+0:0), (n>=2?p[2]+0:0), (n>=3?p[3]+0:0), $0
+		}
+	' | sort | tail -n 1 | awk '{print $2}' || true)"
 fi
 
 if [[ -z "$latest_version" ]]; then
@@ -150,10 +156,17 @@ install_binary_release() {
 	fi
 
 	echo -e "${fcwb}[Golang Installer]: Extracting into ${INSTALLATION_DIR}/go...${fcr}"
-	sudo rm -rf "${INSTALLATION_DIR}/go"
-	sudo mkdir -p "${INSTALLATION_DIR}"
-	sudo tar -C "${INSTALLATION_DIR}" -xzf "$tmp_archive"
-	sudo chmod -R a+rX "${INSTALLATION_DIR}/go"
+	if [[ -w "${INSTALLATION_DIR}" || "${EUID:-$(id -u)}" -eq 0 ]]; then
+		rm -rf "${INSTALLATION_DIR}/go"
+		mkdir -p "${INSTALLATION_DIR}"
+		tar -C "${INSTALLATION_DIR}" -xzf "$tmp_archive"
+		chmod -R a+rX "${INSTALLATION_DIR}/go"
+	else
+		sudo rm -rf "${INSTALLATION_DIR}/go"
+		sudo mkdir -p "${INSTALLATION_DIR}"
+		sudo tar -C "${INSTALLATION_DIR}" -xzf "$tmp_archive"
+		sudo chmod -R a+rX "${INSTALLATION_DIR}/go"
+	fi
 	rm -rf "$tmp_dir"
 }
 

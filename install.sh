@@ -25,6 +25,16 @@ dispatch_exec() {
 
 DEST_BIN="${HOME}/.local/bin"
 
+for _brew_bin in /opt/homebrew/bin /usr/local/bin; do
+	if [ -d "${_brew_bin}" ]; then
+		case ":${PATH}:" in
+		*":${_brew_bin}:"*) ;;
+		*) PATH="${_brew_bin}:${PATH}" ;;
+		esac
+	fi
+done
+export PATH
+
 # Locate repository root if running inside an existing checkout
 REPO_ROOT=""
 cur="${PWD:-.}"
@@ -250,6 +260,64 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 	fi
 fi
 
+if [ "$FORCE_SOURCE" -eq 1 ]; then
+	export ANX_FORCE_SOURCE=1
+fi
+
+has_usable_git() {
+	if ! command -v git >/dev/null 2>&1; then
+		return 1
+	fi
+	if [ "$(uname -s)" = "Darwin" ]; then
+		_git_bin="$(command -v git 2>/dev/null || true)"
+		if [ "$_git_bin" = "/usr/bin/git" ] || [ "$_git_bin" = "${ANX_SYSTEM_GIT_PATH:-/usr/bin/git}" ]; then
+			_dev_dir="$(xcode-select -p 2>/dev/null || true)"
+			if [ -z "$_dev_dir" ] || [ ! -x "${_dev_dir}/usr/bin/git" ]; then
+				return 1
+			fi
+		fi
+	fi
+	return 0
+}
+
+fetch_repo_tarball() {
+	_url="$1"
+	_dest="$2"
+	_tmp_tar="$(mktemp -d 2>/dev/null || mktemp -d -t anx-repo)"
+	_archive="${_tmp_tar}/repo.tar.gz"
+	_extract="${_tmp_tar}/src"
+	mkdir -p "$_extract"
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsSL "$_url" -o "$_archive" || {
+			rm -rf "$_tmp_tar"
+			return 1
+		}
+	elif command -v wget >/dev/null 2>&1; then
+		wget -qO "$_archive" "$_url" || {
+			rm -rf "$_tmp_tar"
+			return 1
+		}
+	else
+		rm -rf "$_tmp_tar"
+		return 1
+	fi
+
+	if ! command -v tar >/dev/null 2>&1 || ! tar -xzf "$_archive" -C "$_extract" --strip-components=1 2>/dev/null; then
+		rm -rf "$_tmp_tar"
+		return 1
+	fi
+	if [ ! -f "${_extract}/scripts/bootstrap_anx.sh" ]; then
+		rm -rf "$_tmp_tar"
+		return 1
+	fi
+
+	mkdir -p "$_dest"
+	cp -R "${_extract}/." "${_dest}/"
+	rm -rf "$_tmp_tar"
+	return 0
+}
+
 try_download_release_direct() {
 	if [ "$FORCE_SOURCE" -eq 1 ] || [ "$FORCE_GO_INSTALL" -eq 1 ]; then
 		return 1
@@ -383,27 +451,26 @@ if [ -z "${REPO_ROOT}" ]; then
 		fi
 	fi
 
-	# Fallback to source clone
+	# Fallback to source checkout/tarball (avoiding Apple /usr/bin/git stub on fresh macOS without CLT)
 	TARGET_REPO="${ANX_REPO_DIR:-${HOME}/.local/share/anx/repo}"
 	echo "  [INFO] Bootstrapping repository into ${TARGET_REPO}..."
 	mkdir -p "$(dirname "${TARGET_REPO}")"
-	if [ -d "${TARGET_REPO}/.git" ]; then
+	TARBALL_URL="${ANX_TARBALL_URL:-https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz}"
+	if [ -d "${TARGET_REPO}/.git" ] && has_usable_git; then
 		git -C "${TARGET_REPO}" pull --rebase origin main 2>/dev/null || true
+	elif [ -f "${TARGET_REPO}/scripts/bootstrap_anx.sh" ]; then
+		fetch_repo_tarball "${TARBALL_URL}" "${TARGET_REPO}" || true
 	else
 		GIT_REMOTE_URL="${ANX_GIT_URL:-https://github.com/arturonavax/env.git}"
 		if [ -d "${GIT_REMOTE_URL}" ]; then
 			mkdir -p "${TARGET_REPO}"
 			cp -r "${GIT_REMOTE_URL}/." "${TARGET_REPO}/"
-		elif command -v git >/dev/null 2>&1; then
-			git clone --depth 1 "${GIT_REMOTE_URL}" "${TARGET_REPO}"
-		elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-			mkdir -p "${TARGET_REPO}"
-			curl -fsSL "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
-		elif command -v wget >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
-			mkdir -p "${TARGET_REPO}"
-			wget -qO- "https://github.com/arturonavax/env/archive/refs/heads/main.tar.gz" | tar -xz -C "${TARGET_REPO}" --strip-components=1
+		elif has_usable_git && git clone --depth 1 "${GIT_REMOTE_URL}" "${TARGET_REPO}"; then
+			:
+		elif fetch_repo_tarball "${TARBALL_URL}" "${TARGET_REPO}"; then
+			:
 		else
-			echo "[Installer Error]: 'git' or 'curl'+'tar' is required to fetch repository for installation." >&2
+			echo "[Installer Error]: Could not fetch repository (requires usable 'git' or 'curl'/'wget' + 'tar')." >&2
 			exit 1
 		fi
 	fi
