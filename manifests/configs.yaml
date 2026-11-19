@@ -320,6 +320,26 @@ configurations:
     strategy: three_way
     backup: true
 
+  - id: macos-osconfig-script
+    name: macOS System Configuration Script
+    group: osconfig
+    description: Modern idempotent macOS 14-27 preferences, Safari, Spaces hotkeys, and Ghostty+Herdr Touch ID sudo setup
+    source: scripts/macos_osconfig.sh
+    target: "~/.local/bin/macos-osconfig"
+    os: [darwin]
+    strategy: replace
+    backup: false
+
+  - id: macos-shortcuts
+    name: macOS Apple Shortcuts Suite
+    group: osconfig
+    description: Signed Apple .shortcut workflows (timers, stopwatch, Focus, Night Shift, theme, Wi-Fi)
+    source: files/macos-shortcuts
+    target: "~/.local/share/anx/macos-shortcuts"
+    os: [darwin]
+    strategy: directory_sync
+    backup: false
+
   # ----------------------------------------------------------------------------
   # Unmaintained IDE Assets (Preserved for existing users without offering purge)
   # ----------------------------------------------------------------------------

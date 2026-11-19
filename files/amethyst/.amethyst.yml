@@ -219,7 +219,7 @@ display-current-layout:
 
 # Turn on or off tiling entirely.
 toggle-tiling:
-  mod: mod1
+  mod: mod2
   key: t
 
 # Rerun the current layout's algorithm.
@@ -262,11 +262,14 @@ window-minimum-height: 0
 # The smallest width that a window can be sized to regardless of its layout frame (in px, default 0)
 window-minimum-width: 0
 
-# List of bundle identifiers for applications to either be automatically floating or automatically tiled based on floating-is-blacklist (default []).
-floating: [
-    # "com.mitchellh.ghostty", # I don't integrate the terminal into Amethyst because using herdr I don't need to manage many terminal windows, so it is not part of the necessary flow of managed windows.
-    "com.microsoft.VSCode",
-  ]
+# List of applications to either float or tile based on floating-is-blacklist.
+# In whitelist mode (floating-is-blacklist: false), only listed apps are tiled;
+# Ghostty stays floating intentionally because Herdr handles terminal panes internally.
+floating:
+  - id: com.microsoft.VSCode
+    window-titles: []
+  # - id: com.mitchellh.ghostty
+  #   window-titles: []
 
 # Boolean flag determining behavior of the floating list. true if the applications should be floating and all others tiled. false if the applications should be tiled and all others floating (default true).
 floating-is-blacklist: false

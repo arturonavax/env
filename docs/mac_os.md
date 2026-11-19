@@ -230,7 +230,7 @@
 
 - Delete file: `Command-Delete`
 
-### [System configs (Requiring reboot)](../src/remotes/macos_config.sh)
+### [System configs (Requiring reboot)](../scripts/macos_osconfig.sh)
 
 ## Devs
 

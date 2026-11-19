@@ -549,6 +549,57 @@ func TestDispatcherPreviewStrategyDisplayServer(t *testing.T) {
 	}
 }
 
+func TestDispatcherNativeBrewCaskInstalledCheck(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell stub for brew requires non-Windows host")
+	}
+
+	home := t.TempDir()
+	fakeBin := t.TempDir()
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	brewScript := `#!/bin/sh
+if [ "$1" = "list" ] && [ "$2" = "--cask" ] && [ "$3" = "--versions" ] && [ "$4" = "amethyst" ]; then
+  echo "amethyst 0.24.0"
+  exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(filepath.Join(fakeBin, "brew"), []byte(brewScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		PackageManagers: []string{"brew"},
+		HomeDir:         home,
+		LocalBinDir:     filepath.Join(home, ".local", "bin"),
+	})
+	disp := providers.NewDispatcher(plat, cat, security.NewRunner(5*time.Second), "")
+
+	installed, ver, err := disp.IsInstalled(context.Background(), domain.ManagedResource{ID: "amethyst", Name: "Amethyst"})
+	if err != nil {
+		t.Fatalf("IsInstalled(amethyst) error: %v", err)
+	}
+	if !installed {
+		t.Fatalf("expected brew cask amethyst to be detected as installed, got installed=false ver=%q", ver)
+	}
+
+	notInstalled, _, err := disp.IsInstalled(context.Background(), domain.ManagedResource{ID: "karabiner-elements", Name: "Karabiner-Elements"})
+	if err != nil {
+		t.Fatalf("IsInstalled(karabiner-elements) error: %v", err)
+	}
+	if notInstalled {
+		t.Errorf("expected missing brew cask karabiner-elements not to report installed")
+	}
+}
+
 func TestDispatcherFallbackInstallsStrategyDependsOn(t *testing.T) {
 	home := t.TempDir()
 	binDir := filepath.Join(home, ".local", "bin")

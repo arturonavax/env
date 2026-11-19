@@ -685,4 +685,53 @@ func TestInstallServicePlanHeadlessAndStepEdges(t *testing.T) {
 		}
 	})
 
+	t.Run("darwin workstation schedules amethyst karabiner and pam-reattach while linux skips them", func(t *testing.T) {
+		homeDarwin := t.TempDir()
+		platDarwin := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "darwin",
+			Arch:            "arm64",
+			PackageManagers: []string{"brew"},
+			DisplayServer:   "quartz",
+			HomeDir:         homeDarwin,
+			StateDir:        filepath.Join(homeDarwin, "state"),
+		})
+		svcDarwin := app.NewInstallService(app.InstallDeps{
+			Platform: platDarwin,
+			Catalog:  cat,
+			Provider: providers.NewDispatcher(platDarwin, cat.Catalog(), runner, ""),
+		})
+		planDarwin, err := svcDarwin.PlanWithReinstall(context.Background(), "workstation", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(darwin workstation) failed: %v", err)
+		}
+		for _, id := range []string{"amethyst", "karabiner-elements", "pam-reattach"} {
+			if _, ok := findStep(planDarwin, id); !ok {
+				t.Errorf("darwin workstation plan missing %q", id)
+			}
+		}
+
+		homeLinux := t.TempDir()
+		platLinux := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			PackageManagers: []string{"apt"},
+			DisplayServer:   "x11",
+			HomeDir:         homeLinux,
+			StateDir:        filepath.Join(homeLinux, "state"),
+		})
+		svcLinux := app.NewInstallService(app.InstallDeps{
+			Platform: platLinux,
+			Catalog:  cat,
+			Provider: providers.NewDispatcher(platLinux, cat.Catalog(), runner, ""),
+		})
+		planLinux, err := svcLinux.PlanWithReinstall(context.Background(), "workstation", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(linux workstation) failed: %v", err)
+		}
+		for _, id := range []string{"amethyst", "karabiner-elements", "pam-reattach"} {
+			if _, ok := findStep(planLinux, id); ok {
+				t.Errorf("linux workstation plan unexpectedly scheduled darwin-only %q", id)
+			}
+		}
+	})
 }

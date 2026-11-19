@@ -543,3 +543,32 @@ packages:
           pacman: [xdotool]
           zypper: [xdotool]
 
+  - id: amethyst
+    name: Amethyst
+    category: desktop
+    description: Tiling window manager for macOS along the lines of xmonad
+    os: [darwin]
+    strategies:
+      - type: native
+        packages:
+          brew: ["--cask", "amethyst"]
+
+  - id: karabiner-elements
+    name: Karabiner-Elements
+    category: desktop
+    description: Powerful and stable keyboard customizer for macOS
+    os: [darwin]
+    strategies:
+      - type: native
+        packages:
+          brew: ["--cask", "karabiner-elements"]
+
+  - id: pam-reattach
+    name: pam-reattach
+    category: osconfig
+    description: Reattach PAM sessions (Touch ID sudo) to the macOS Aqua GUI namespace inside detached multiplexers like Herdr/tmux
+    os: [darwin]
+    strategies:
+      - type: native
+        packages:
+          brew: [pam-reattach]

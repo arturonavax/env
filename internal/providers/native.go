@@ -26,7 +26,14 @@ func (d *Dispatcher) isNativeInstalled(ctx context.Context, matrix map[string][]
 		return false, ""
 	}
 	first := pkgs[0]
-	if strings.HasPrefix(first, "--") || strings.HasPrefix(first, "@") {
+	brewCask := false
+	if pm == "brew" && first == "--cask" {
+		if len(pkgs) < 2 {
+			return false, ""
+		}
+		brewCask = true
+		first = pkgs[1]
+	} else if strings.HasPrefix(first, "--") || strings.HasPrefix(first, "@") {
 		return false, ""
 	}
 
@@ -48,7 +55,11 @@ func (d *Dispatcher) isNativeInstalled(ctx context.Context, matrix map[string][]
 		args = []string{"info", "-e", first}
 	case "brew":
 		bin = "brew"
-		args = []string{"list", "--versions", first}
+		if brewCask {
+			args = []string{"list", "--cask", "--versions", first}
+		} else {
+			args = []string{"list", "--versions", first}
+		}
 	default:
 		return false, ""
 	}

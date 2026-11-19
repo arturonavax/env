@@ -104,6 +104,9 @@ profiles:
       - wmctrl
       - xdotool
       - xclip
+      - amethyst
+      - karabiner-elements
+      - pam-reattach
     config_groups:
       - terminal
       - editor
