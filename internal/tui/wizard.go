@@ -11,7 +11,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
@@ -19,6 +18,7 @@ import (
 	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/theme"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // WizardStage tracks which screen of the wizard is active.
@@ -107,66 +107,66 @@ type TerminalOption struct {
 
 // WizardModel represents the interactive setup interview wizard.
 type WizardModel struct {
-	width            int
-	height           int
-	stage            WizardStage
-	styles           *theme.Styles
-	platform         *platform.Info
-	catalog          *catalog.Registry
-	installSvc       *app.InstallService
-	profiles         []domain.Profile
-	selectedProf     int
-	packages         []domain.ManagedResource
-	selectedPkgs     map[string]bool
-	pkgMap           map[string]domain.ManagedResource
-	requiredBy       map[string][]string
+	width                 int
+	height                int
+	stage                 WizardStage
+	styles                *theme.Styles
+	platform              *platform.Info
+	catalog               *catalog.Registry
+	installSvc            *app.InstallService
+	profiles              []domain.Profile
+	selectedProf          int
+	packages              []domain.ManagedResource
+	selectedPkgs          map[string]bool
+	pkgMap                map[string]domain.ManagedResource
+	requiredBy            map[string][]string
 	pkgCursor             int
 	pkgScrollOffset       int
 	planScrollOffset      int
 	applyScrollOffset     int
 	completedScrollOffset int
-	spinnerFrame     int
-	plan             *domain.ExecutionPlan
-	progressStep     int
-	progressTotal    int
-	progressPhase    string
-	progressAction   string
-	progressResource string
-	progressDesc     string
-	progressPercent   int
-	progressChan      chan tea.Msg
-	progressMsg       string
-	activeWorkers     map[int]activeWorkerSlot
-	activeWorkerOrder []int
-	recentCompleted   []string
-	completedSteps    int
-	workerLogs        map[int][]string
-	recentOutputLines []string
-	failedItems       []string
-	succeededItems    []string
-	installLogPath    string
-	err               error
-	quitting         bool
-	matchedHacks     []domain.HackProfile
-	includeHacks     bool
-	includeOSConfig  bool
-	configDiffs      []app.ConfigDiff
-	syncSvc          *app.SyncService
-	hacksSvc         *app.HacksService
-	shells           []ShellOption
-	terminals        []TerminalOption
-	selectedShell    string
-	selectedTerminal string
-	shellCursor      int
-	terminalCursor   int
-	envFocus         string // "shell" or "terminal"
-	destroyerMode    bool
-	destroyerSvc     *app.DestroyerService
-	seal             *security.OriginSeal
-	store            *state.Store
-	sudoErr          error
-	sudoCheckFn      func() bool
-	sudoAuthCmdFn    func() *exec.Cmd
+	spinnerFrame          int
+	plan                  *domain.ExecutionPlan
+	progressStep          int
+	progressTotal         int
+	progressPhase         string
+	progressAction        string
+	progressResource      string
+	progressDesc          string
+	progressPercent       int
+	progressChan          chan tea.Msg
+	progressMsg           string
+	activeWorkers         map[int]activeWorkerSlot
+	activeWorkerOrder     []int
+	recentCompleted       []string
+	completedSteps        int
+	workerLogs            map[int][]string
+	recentOutputLines     []string
+	failedItems           []string
+	succeededItems        []string
+	installLogPath        string
+	err                   error
+	quitting              bool
+	matchedHacks          []domain.HackProfile
+	includeHacks          bool
+	includeOSConfig       bool
+	configDiffs           []app.ConfigDiff
+	syncSvc               *app.SyncService
+	hacksSvc              *app.HacksService
+	shells                []ShellOption
+	terminals             []TerminalOption
+	selectedShell         string
+	selectedTerminal      string
+	shellCursor           int
+	terminalCursor        int
+	envFocus              string // "shell" or "terminal"
+	destroyerMode         bool
+	destroyerSvc          *app.DestroyerService
+	seal                  *security.OriginSeal
+	store                 *state.Store
+	sudoErr               error
+	sudoCheckFn           func() bool
+	sudoAuthCmdFn         func() *exec.Cmd
 }
 
 func defaultShellOptions() []ShellOption {
@@ -309,7 +309,11 @@ func NewWizardModel(
 
 	pkgMap := make(map[string]domain.ManagedResource, len(pkgs))
 	requiredBy := make(map[string][]string)
-	for _, p := range pkgs {
+	for i := range pkgs {
+		if svc != nil {
+			pkgs[i].DependsOn = svc.EffectiveDependencies(pkgs[i].ID)
+		}
+		p := pkgs[i]
 		pkgMap[p.ID] = p
 		for _, dep := range p.DependsOn {
 			requiredBy[dep] = append(requiredBy[dep], p.ID)
@@ -369,26 +373,26 @@ func NewWizardModel(
 	}
 
 	m := WizardModel{
-		stage:            StageSelectProfile,
-		styles:           theme.DefaultStyles(),
-		platform:         plat,
-		catalog:          cat,
-		installSvc:       svc,
-		profiles:         profs,
-		selectedProf:     0,
-		packages:         orderedPkgs,
-		selectedPkgs:     selected,
-		pkgMap:           pkgMap,
-		requiredBy:       requiredBy,
-		pkgCursor:        0,
-		shells:           shells,
-		terminals:        terminals,
-		selectedShell:    selectedShell,
-		selectedTerminal: selectedTerminal,
-		shellCursor:      shellIdx,
-		terminalCursor:   termIdx,
-		envFocus:         "shell",
-		includeOSConfig:  true,
+		stage:             StageSelectProfile,
+		styles:            theme.DefaultStyles(),
+		platform:          plat,
+		catalog:           cat,
+		installSvc:        svc,
+		profiles:          profs,
+		selectedProf:      0,
+		packages:          orderedPkgs,
+		selectedPkgs:      selected,
+		pkgMap:            pkgMap,
+		requiredBy:        requiredBy,
+		pkgCursor:         0,
+		shells:            shells,
+		terminals:         terminals,
+		selectedShell:     selectedShell,
+		selectedTerminal:  selectedTerminal,
+		shellCursor:       shellIdx,
+		terminalCursor:    termIdx,
+		envFocus:          "shell",
+		includeOSConfig:   true,
 		sudoCheckFn:       security.IsSudoAuthenticated,
 		sudoAuthCmdFn:     security.NewSudoAuthCmd,
 		activeWorkers:     make(map[int]activeWorkerSlot),
@@ -592,10 +596,15 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if resolved, err := w.catalog.ResolveProfilePackages(prof.Name); err == nil {
 						w.selectedPkgs = make(map[string]bool)
 						for _, p := range resolved {
+							if !w.isPkgSupported(p) {
+								continue
+							}
 							w.selectedPkgs[p] = true
 						}
 						for _, p := range resolved {
-							w.markDependencies(p)
+							if w.isPkgSupported(p) {
+								w.markDependencies(p)
+							}
 						}
 					}
 				}
@@ -850,12 +859,26 @@ func (w *WizardModel) togglePackage(pkgID string) {
 	}
 }
 
+func (w *WizardModel) isPkgSupported(pkgID string) bool {
+	if w.platform == nil {
+		return true
+	}
+	p, ok := w.pkgMap[pkgID]
+	if !ok {
+		return true
+	}
+	return p.SupportsOS(w.platform.OS()) && p.SupportsDisplayServer(w.platform.DisplayServer())
+}
+
 func (w *WizardModel) markDependencies(pkgID string) {
 	p, ok := w.pkgMap[pkgID]
 	if !ok {
 		return
 	}
 	for _, dep := range p.DependsOn {
+		if !w.isPkgSupported(dep) {
+			continue
+		}
 		if !w.selectedPkgs[dep] {
 			w.selectedPkgs[dep] = true
 			w.markDependencies(dep)
@@ -1049,17 +1072,17 @@ func runWizardApplyWorker(
 			})
 			destroyerSvc.SetOnLog(func(item, line string) {
 				progressChan <- wizardProgressMsg{
-					Phase:       "Purging (Destroyer)",
-					Action:      "purge",
-					ResourceID:  item,
-					OutputLine:  line,
+					Phase:      "Purging (Destroyer)",
+					Action:     "purge",
+					ResourceID: item,
+					OutputLine: line,
 				}
 			})
 			pctx := security.ContextWithOutputHandler(ctx, func(line string) {
 				progressChan <- wizardProgressMsg{
-					Phase:       "Purging (Destroyer)",
-					Action:      "purge",
-					OutputLine:  line,
+					Phase:      "Purging (Destroyer)",
+					Action:     "purge",
+					OutputLine: line,
 				}
 			})
 			_, _ = destroyerSvc.ExecutePurge(pctx, purgePlan, false, false)
@@ -1529,9 +1552,15 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	}
 
 	scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render(fmt.Sprintf("🖥️  DESKTOP & OS INTEGRATION (osconfig) %s (Press [o] to toggle):", osconfigBadge)))
-	scrollableLines = append(scrollableLines, "  • rcmd switcher     : Right-Alt fast window focus & daemon integration")
-	scrollableLines = append(scrollableLines, "  • GNOME Extension   : rcmd-shell@arturonavax.dev IPC bridge for Wayland")
-	scrollableLines = append(scrollableLines, "  • Desktop Shortcuts : Preserved host-specific window switcher keybindings")
+	if w.platform != nil && w.platform.OS() == "darwin" {
+		scrollableLines = append(scrollableLines, "  • Amethyst          : macOS tiling window manager config (~/.amethyst.yml)")
+		scrollableLines = append(scrollableLines, "  • Karabiner         : Right-Command instant app switcher & key rules")
+		scrollableLines = append(scrollableLines, "  • macos-osconfig    : System defaults (max macOS 27), Touch ID sudo_local & Shortcuts")
+	} else {
+		scrollableLines = append(scrollableLines, "  • rcmd switcher     : Right-Alt fast window focus & daemon integration")
+		scrollableLines = append(scrollableLines, "  • GNOME Extension   : rcmd-shell@arturonavax.dev IPC bridge for Wayland")
+		scrollableLines = append(scrollableLines, "  • Desktop Shortcuts : Preserved host-specific window switcher keybindings")
+	}
 
 	var drifted []app.ConfigDiff
 	for _, d := range w.configDiffs {

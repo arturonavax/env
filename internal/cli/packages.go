@@ -328,9 +328,13 @@ func collectPackages(cmd *cobra.Command, appCtx *AppContext, filter func(string,
 			continue
 		}
 		installed, ver, _ := appCtx.Provider.IsInstalled(cmd.Context(), p)
+		strategy := p.Strategy
+		if appCtx.InstallSvc != nil {
+			strategy = appCtx.InstallSvc.WinningStrategy(p.ID, p.Strategy)
+		}
 		rows = append(rows, packageRow{
 			ID: p.ID, Category: p.Category, Installed: installed, Version: ver,
-			Strategy: string(p.Strategy), Description: p.Description,
+			Strategy: string(strategy), Description: p.Description,
 			Deprecated: p.Deprecated, Replacement: p.Replacement,
 		})
 	}
@@ -438,12 +442,20 @@ func newInfoCmd(appCtx *AppContext) *cobra.Command {
 			if !ok {
 				return domain.NewExitError(domain.ExitUsageError, fmt.Errorf("unknown package %q", args[0]))
 			}
-			return emit(cmd, appCtx, spec, func(w io.Writer) {
+			effectiveSpec := spec
+			if appCtx.InstallSvc != nil {
+				effectiveSpec.DependsOn = appCtx.InstallSvc.EffectiveDependencies(spec.ID)
+			}
+			return emit(cmd, appCtx, effectiveSpec, func(w io.Writer) {
 				st := styles(appCtx)
-				fmt.Fprintln(w, st.Header.Render(spec.Name+" ("+spec.ID+")"))
-				fmt.Fprintf(w, "  %s\n  category: %s  binary: %s  depends_on: %v\n", spec.Description, spec.Category, spec.BinaryName, spec.DependsOn)
-				for i, s := range spec.Strategies {
-					fmt.Fprintf(w, "  tier %d: %s\n", i+1, s.Type)
+				fmt.Fprintln(w, st.Header.Render(effectiveSpec.Name+" ("+effectiveSpec.ID+")"))
+				fmt.Fprintf(w, "  %s\n  category: %s  binary: %s  depends_on: %v\n", effectiveSpec.Description, effectiveSpec.Category, effectiveSpec.BinaryName, effectiveSpec.DependsOn)
+				for i, s := range effectiveSpec.Strategies {
+					if len(s.DependsOn) > 0 {
+						fmt.Fprintf(w, "  tier %d: %s (depends_on: %v)\n", i+1, s.Type, s.DependsOn)
+					} else {
+						fmt.Fprintf(w, "  tier %d: %s\n", i+1, s.Type)
+					}
 				}
 			})
 		},

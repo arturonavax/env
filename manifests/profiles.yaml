@@ -1,11 +1,10 @@
 # Declarative Environment Profiles
 profiles:
   - name: minimal
-    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, wget, htop, tree)
+    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, htop, tree)
     packages:
       - git
       - curl
-      - wget
       - htop
       - jq
       - fzf
@@ -26,10 +25,6 @@ profiles:
     description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)
     extends: minimal
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - zsh
       - atuin
       - herdr
@@ -46,10 +41,6 @@ profiles:
     description: Neovim (LazyVim) with core formatters, linters, and Tree-sitter CLI
     extends: minimal
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - neovim
       - stylua
       - shfmt
@@ -63,13 +54,7 @@ profiles:
     description: Default full-stack engineering environment (Toolchains, Terminal, Neovim, Go/Rust/Node/Python tools)
     extends: terminal
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - build-essential
-      - cmake
-      - pkg-config
       - golang
       - rust
       - fnm
@@ -103,10 +88,6 @@ profiles:
     description: Developer workstation plus full AI CLI harnesses, RTK token compressor, and OS window switcher
     extends: developer
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - rtk
       - opencode
     config_groups:
@@ -120,10 +101,6 @@ profiles:
     description: Alias for complete workstation profile (Developer + AI + Desktop OS integrations)
     extends: ai-workstation
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - wmctrl
       - xdotool
       - xclip
@@ -138,10 +115,6 @@ profiles:
     description: Complete ecosystem including optional CLI harnesses and live-reload utilities
     extends: workstation
     packages:
-      - curl
-      - wget
-      - htop
-      - tree
       - shellharden
       - claude-code
       - codex-cli
@@ -156,9 +129,6 @@ profiles:
     description: Remote SSH/server developer profile without GUI emulators or X11 dependencies
     extends: minimal
     packages:
-      - curl
-      - wget
-      - htop
       - zsh
       - herdr
       - atuin
@@ -167,16 +137,8 @@ profiles:
       - difftastic
       - tealdeer
       - neovim
-      - ripgrep
-      - fd
-      - tree
       - lazygit
       - rsync
     configurations:
       - atuin-config
-      - starship-config
-      - zsh-lscolors
-      - zsh-base
-      - zsh-tools
-      - zshrc-loader
       - nvim-config

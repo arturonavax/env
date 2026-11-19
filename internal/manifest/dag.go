@@ -15,6 +15,16 @@ const (
 
 // ResolveInstallOrder resolves transitive depends_on relationships and returns PackageSpecs in topological install order.
 func (c *Catalog) ResolveInstallOrder(ids []string) ([]PackageSpec, error) {
+	return c.ResolveInstallOrderWithDeps(ids, nil, nil)
+}
+
+// ResolveInstallOrderWithDeps resolves transitive dependencies using optional host eligibility and dependency hooks.
+// When allowFn returns false for a package, that package and its dependencies are skipped cleanly.
+func (c *Catalog) ResolveInstallOrderWithDeps(
+	ids []string,
+	allowFn func(PackageSpec) bool,
+	depsFn func(PackageSpec) []string,
+) ([]PackageSpec, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -42,10 +52,19 @@ func (c *Catalog) ResolveInstallOrder(ids []string) ([]PackageSpec, error) {
 			return fmt.Errorf("unknown package dependency %q", trimmed)
 		}
 
+		if allowFn != nil && !allowFn(spec) {
+			states[trimmed] = visitDone
+			return nil
+		}
+
 		states[trimmed] = visitActive
 		stack = append(stack, trimmed)
 
-		for _, dep := range spec.DependsOn {
+		deps := spec.DependsOn
+		if depsFn != nil {
+			deps = depsFn(spec)
+		}
+		for _, dep := range deps {
 			if err := visit(dep); err != nil {
 				return err
 			}

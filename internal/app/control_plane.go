@@ -118,6 +118,10 @@ func (c *ControlPlaneService) Inventory(_ context.Context, filter InventoryFilte
 				if filter.Category != "" && p.Category != filter.Category {
 					continue
 				}
+				if c.installSvc != nil {
+					p.DependsOn = c.installSvc.EffectiveDependencies(p.ID)
+					p.Strategy = c.installSvc.WinningStrategy(p.ID, p.Strategy)
+				}
 				res.Packages = append(res.Packages, p)
 			}
 		}
@@ -211,16 +215,36 @@ func (c *ControlPlaneService) Explain(ctx context.Context, rawID domain.Resource
 	// 1. Check Packages
 	if c.catalog != nil {
 		if pkg, ok := c.catalog.GetPackage(id); ok {
+			conditions := append([]string{}, pkg.SupportedOS...)
+			for _, ds := range pkg.SupportedDisplayServers {
+				conditions = append(conditions, "display:"+ds)
+			}
+
+			supported := c.platform == nil ||
+				(pkg.SupportsOS(c.platform.OS()) && pkg.SupportsDisplayServer(c.platform.DisplayServer()))
+
+			winningPolicy := "unsupported"
+			var deps []string
+			if supported {
+				strategy := pkg.Strategy
+				deps = pkg.DependsOn
+				if c.installSvc != nil {
+					strategy = c.installSvc.WinningStrategy(pkg.ID, pkg.Strategy)
+					deps = c.installSvc.EffectiveDependencies(pkg.ID)
+				}
+				winningPolicy = fmt.Sprintf("strategy:%s", strategy)
+			}
+
 			prov := &domain.Provenance{
 				ResourceID:    domain.ResourceID(pkg.ID),
 				Kind:          domain.KindPackage,
 				Origin:        "manifests/packages",
 				ActiveProfile: activeProfile,
-				Conditions:    pkg.SupportedOS,
-				WinningPolicy: fmt.Sprintf("strategy:%s", pkg.Strategy),
+				Conditions:    conditions,
+				WinningPolicy: winningPolicy,
 				Reason:        pkg.Description,
 			}
-			for _, dep := range pkg.DependsOn {
+			for _, dep := range deps {
 				prov.Dependencies = append(prov.Dependencies, domain.ResourceID(dep))
 			}
 			return prov, nil

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -573,4 +574,78 @@ func TestCLISelfUpdate(t *testing.T) {
 	if !strings.Contains(chkOut.String(), "Available version: v2.0.0") {
 		t.Fatalf("expected output to report available v2.0.0, got:\n%s", chkOut.String())
 	}
+}
+
+func TestCLIInfoAndExplainEffectiveDeps(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	var codexOut, codexErr bytes.Buffer
+	code := cli.ExecuteCLI([]string{"info", "codex-cli"}, &codexOut, &codexErr, "1.0.0-test", "", "")
+	if code != 0 {
+		t.Fatalf("info codex-cli failed (code %d): %s", code, codexErr.String())
+	}
+	if !strings.Contains(codexOut.String(), "depends_on: []") {
+		t.Errorf("expected codex-cli effective depends_on: [], got:\n%s", codexOut.String())
+	}
+
+	if runtime.GOOS == "linux" {
+		var pyenvOut, pyenvErr bytes.Buffer
+		code = cli.ExecuteCLI([]string{"info", "pyenv"}, &pyenvOut, &pyenvErr, "1.0.0-test", "", "")
+		if code != 0 {
+			t.Fatalf("info pyenv failed (code %d): %s", code, pyenvErr.String())
+		}
+		if !strings.Contains(pyenvOut.String(), "ssl-dev") {
+			t.Errorf("expected linux info pyenv to report ssl-dev dependency, got:\n%s", pyenvOut.String())
+		}
+
+		var expOut, expErr bytes.Buffer
+		code = cli.ExecuteCLI([]string{"explain", "pyenv"}, &expOut, &expErr, "1.0.0-test", "", "")
+		if code != 0 {
+			t.Fatalf("explain pyenv failed (code %d): %s", code, expErr.String())
+		}
+		if !strings.Contains(expOut.String(), "strategy:script") {
+			t.Errorf("expected linux explain pyenv to report Winning Policy strategy:script, got:\n%s", expOut.String())
+		}
+	}
+}
+
+func TestCLIPlanProfileShowListAndUnknownErrors(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	var planOut, planErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"plan", "--profile", "minimal"}, &planOut, &planErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("plan --profile minimal failed (code %d): %s", code, planErr.String())
+	}
+	if !strings.Contains(planOut.String(), "Profile: minimal") {
+		t.Errorf("expected plan output to reference Profile: minimal, got:\n%s", planOut.String())
+	}
+
+	var profOut, profErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"profile", "show", "minimal"}, &profOut, &profErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("profile show minimal failed (code %d): %s", code, profErr.String())
+	}
+	if !strings.Contains(profOut.String(), "tree") || strings.Contains(profOut.String(), "wget") {
+		t.Errorf("unexpected minimal profile contents:\n%s", profOut.String())
+	}
+
+	var listOut, listErr bytes.Buffer
+	if code := cli.ExecuteCLI([]string{"list", "--format", "json"}, &listOut, &listErr, "1.0.0-test", "", ""); code != 0 {
+		t.Fatalf("list --format json failed (code %d): %s", code, listErr.String())
+	}
+	var parsed []map[string]any
+	if err := json.Unmarshal(listOut.Bytes(), &parsed); err != nil || len(parsed) == 0 {
+		t.Fatalf("expected non-empty JSON package list, err=%v output=%s", err, listOut.String())
+	}
+
+	for _, args := range [][]string{
+		{"info", "does-not-exist"},
+		{"explain", "does-not-exist"},
+		{"profile", "show", "does-not-exist"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := cli.ExecuteCLI(args, &out, &errOut, "1.0.0-test", "", ""); code == 0 {
+			t.Errorf("expected non-zero exit code for %v, got 0 (out: %s)", args, out.String())
+		}
+	}
+
 }

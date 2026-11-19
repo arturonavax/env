@@ -89,87 +89,115 @@ const (
 
 // ManagedResource represents any package, tool, or configuration managed by anx.
 type ManagedResource struct {
-	ID               string         `json:"id" yaml:"id"`
-	Name             string         `json:"name" yaml:"name"`
-	Category         string         `json:"category" yaml:"category"`
-	Description      string         `json:"description" yaml:"description"`
-	BinaryName       string         `json:"binary_name,omitempty" yaml:"binary_name,omitempty"`
-	Ecosystem        string         `json:"ecosystem,omitempty" yaml:"ecosystem,omitempty"`
-	OSVPackage       string         `json:"osv_package,omitempty" yaml:"osv_package,omitempty"`
-	Tags             []string       `json:"tags,omitempty" yaml:"tags,omitempty"`
-	DependsOn        []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
-	SupportedOS      []string       `json:"supported_os,omitempty" yaml:"os,omitempty"`
-	Status           ResourceStatus `json:"status" yaml:"-"`
-	InstalledVersion string         `json:"installed_version,omitempty" yaml:"-"`
-	DesiredVersion   string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
-	LatestVersion    string         `json:"latest_version,omitempty" yaml:"-"`
-	Strategy         StrategyType   `json:"strategy" yaml:"strategy,omitempty"`
-	ProviderName     string         `json:"provider_name" yaml:"provider_name,omitempty"`
-	IsManaged        bool           `json:"is_managed" yaml:"-"`
-	Health           HealthStatus   `json:"health" yaml:"-"`
-	AdvisoriesCount  int            `json:"advisories_count" yaml:"-"`
-	TargetPath       string         `json:"target_path,omitempty" yaml:"target_path,omitempty"`
-	SourcePath       string         `json:"source_path,omitempty" yaml:"source_path,omitempty"`
-	Deprecated       bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
-	DeprecatedReason string         `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
-	RecommendPurge   bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
-	Replacement      string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
-	Archived         bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
+	ID                      string         `json:"id" yaml:"id"`
+	Name                    string         `json:"name" yaml:"name"`
+	Category                string         `json:"category" yaml:"category"`
+	Description             string         `json:"description" yaml:"description"`
+	BinaryName              string         `json:"binary_name,omitempty" yaml:"binary_name,omitempty"`
+	Ecosystem               string         `json:"ecosystem,omitempty" yaml:"ecosystem,omitempty"`
+	OSVPackage              string         `json:"osv_package,omitempty" yaml:"osv_package,omitempty"`
+	Tags                    []string       `json:"tags,omitempty" yaml:"tags,omitempty"`
+	DependsOn               []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
+	SupportedOS             []string       `json:"supported_os,omitempty" yaml:"os,omitempty"`
+	SupportedDisplayServers []string       `json:"supported_display_servers,omitempty" yaml:"display_servers,omitempty"`
+	Status                  ResourceStatus `json:"status" yaml:"-"`
+	InstalledVersion        string         `json:"installed_version,omitempty" yaml:"-"`
+	DesiredVersion          string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
+	LatestVersion           string         `json:"latest_version,omitempty" yaml:"-"`
+	Strategy                StrategyType   `json:"strategy" yaml:"strategy,omitempty"`
+	ProviderName            string         `json:"provider_name" yaml:"provider_name,omitempty"`
+	IsManaged               bool           `json:"is_managed" yaml:"-"`
+	Health                  HealthStatus   `json:"health" yaml:"-"`
+	AdvisoriesCount         int            `json:"advisories_count" yaml:"-"`
+	TargetPath              string         `json:"target_path,omitempty" yaml:"target_path,omitempty"`
+	SourcePath              string         `json:"source_path,omitempty" yaml:"source_path,omitempty"`
+	Deprecated              bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
+	DeprecatedReason        string         `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
+	RecommendPurge          bool           `json:"recommend_purge,omitempty" yaml:"recommend_purge,omitempty"`
+	Replacement             string         `json:"replacement,omitempty" yaml:"replacement,omitempty"`
+	Archived                bool           `json:"archived,omitempty" yaml:"archived,omitempty"`
+}
+
+func matchesAllowed(allowed []string, val string, fold bool) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	if val == "" {
+		return false
+	}
+	for _, a := range allowed {
+		if a == "all" || a == val || (fold && strings.EqualFold(a, val)) {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsOS reports whether the resource applies to goos.
+func (r ManagedResource) SupportsOS(goos string) bool {
+	return matchesAllowed(r.SupportedOS, goos, false)
+}
+
+// SupportsDisplayServer reports whether the resource applies to the active display server.
+func (r ManagedResource) SupportsDisplayServer(ds string) bool {
+	return matchesAllowed(r.SupportedDisplayServers, ds, true)
 }
 
 // DirectToolsSet contains the authoritative canonical list of direct tools managed by anx.
 // Any resource with an ID in this set is a Tool; everything else is classified as a Dependency.
 var DirectToolsSet = map[string]struct{}{
-	"anx":             {},
-	"atuin":           {},
-	"bat":             {},
-	"claude-code":     {},
-	"codex-cli":       {},
-	"curl":            {},
-	"delta":           {},
-	"delve":           {},
-	"direnv":          {},
-	"eza":             {},
-	"fd":              {},
-	"fnm":             {},
-	"fx":              {},
-	"fzf":             {},
-	"ghostty":         {},
-	"git":             {},
-	"gofumpt":         {},
-	"golang":          {},
-	"golangci-lint":   {},
-	"gopls":           {},
-	"govulncheck":     {},
-	"herdr":           {},
-	"htop":            {},
-	"jq":              {},
-	"just":            {},
-	"lazygit":         {},
-	"make":            {},
-	"neovim":          {},
-	"opencode":        {},
-	"pipx":            {},
-	"pnpm":            {},
-	"pyenv":           {},
-	"python3":         {},
-	"resync":          {},
-	"ripgrep":         {},
-	"rtk":             {},
-	"shellcheck":      {},
-	"shellharden":     {},
-	"shfmt":           {},
-	"starship":        {},
-	"stylua":          {},
-	"tealdeer":        {},
-	"tree":            {},
-	"tree-sitter-cli": {},
-	"usql":            {},
-	"wget":            {},
-	"xclip":           {},
-	"zip":             {},
-	"zoxide":          {},
-	"zsh":             {},
+	"amethyst":           {},
+	"anx":                {},
+	"atuin":              {},
+	"bat":                {},
+	"claude-code":        {},
+	"codex-cli":          {},
+	"curl":               {},
+	"delta":              {},
+	"delve":              {},
+	"direnv":             {},
+	"eza":                {},
+	"fd":                 {},
+	"fnm":                {},
+	"fx":                 {},
+	"fzf":                {},
+	"ghostty":            {},
+	"git":                {},
+	"gofumpt":            {},
+	"golang":             {},
+	"golangci-lint":      {},
+	"gopls":              {},
+	"govulncheck":        {},
+	"herdr":              {},
+	"htop":               {},
+	"jq":                 {},
+	"just":               {},
+	"karabiner-elements": {},
+	"lazygit":            {},
+	"make":               {},
+	"neovim":             {},
+	"opencode":           {},
+	"pipx":               {},
+	"pnpm":               {},
+	"pyenv":              {},
+	"python3":            {},
+	"resync":             {},
+	"ripgrep":            {},
+	"rtk":                {},
+	"shellcheck":         {},
+	"shellharden":        {},
+	"shfmt":              {},
+	"starship":           {},
+	"stylua":             {},
+	"tealdeer":           {},
+	"tree":               {},
+	"tree-sitter-cli":    {},
+	"usql":               {},
+	"wget":               {},
+	"xclip":              {},
+	"zip":                {},
+	"zoxide":             {},
+	"zsh":                {},
 }
 
 // IsDirectTool reports whether this resource is a direct interactive user tool as defined in DirectToolsSet.
@@ -210,6 +238,7 @@ type ConfigurationResource struct {
 func (c ConfigurationResource) IsHostSpecific() bool {
 	return c.Strategy == StrategyPreserve || c.SkipCapture
 }
+
 
 // TargetForOS resolves the OS-specific target path, falling back to Target.
 func (c ConfigurationResource) TargetForOS(goos string) string {

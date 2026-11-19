@@ -41,6 +41,7 @@ type PackageSpec struct {
 	Tags             []string       `json:"tags,omitempty" yaml:"tags,omitempty"`
 	DependsOn        []string       `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
 	OS               []string       `json:"os,omitempty" yaml:"os,omitempty"`
+	DisplayServers   []string       `json:"display_servers,omitempty" yaml:"display_servers,omitempty"`
 	DesiredVersion   string         `json:"desired_version,omitempty" yaml:"desired_version,omitempty"`
 	Deprecated       bool           `json:"deprecated,omitempty" yaml:"deprecated,omitempty"`
 	DeprecatedReason string         `json:"deprecated_reason,omitempty" yaml:"deprecated_reason,omitempty"`
@@ -57,6 +58,22 @@ func (p PackageSpec) SupportsOS(goos string) bool {
 	}
 	for _, allowed := range p.OS {
 		if allowed == goos || allowed == "all" {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsDisplayServer reports whether the package applies to the active display server.
+func (p PackageSpec) SupportsDisplayServer(ds string) bool {
+	if len(p.DisplayServers) == 0 {
+		return true
+	}
+	if ds == "" {
+		return false
+	}
+	for _, allowed := range p.DisplayServers {
+		if strings.EqualFold(allowed, ds) || allowed == "all" {
 			return true
 		}
 	}
@@ -88,24 +105,28 @@ func (p PackageSpec) ToManagedResource() domain.ManagedResource {
 	supportedOS := make([]string, len(p.OS))
 	copy(supportedOS, p.OS)
 
+	supportedDS := make([]string, len(p.DisplayServers))
+	copy(supportedDS, p.DisplayServers)
+
 	return domain.ManagedResource{
-		ID:               p.ID,
-		Name:             p.Name,
-		Category:         p.Category,
-		Description:      p.Description,
-		BinaryName:       p.BinaryName,
-		Ecosystem:        p.Ecosystem,
-		OSVPackage:       p.OSVPackage,
-		Tags:             tags,
-		DependsOn:        deps,
-		SupportedOS:      supportedOS,
-		DesiredVersion:   p.DesiredVersion,
-		Strategy:         p.PrimaryStrategy(),
-		Deprecated:       p.Deprecated,
-		DeprecatedReason: p.DeprecatedReason,
-		RecommendPurge:   p.RecommendPurge,
-		Replacement:      p.Replacement,
-		Archived:         p.Archived,
+		ID:                      p.ID,
+		Name:                    p.Name,
+		Category:                p.Category,
+		Description:             p.Description,
+		BinaryName:              p.BinaryName,
+		Ecosystem:               p.Ecosystem,
+		OSVPackage:              p.OSVPackage,
+		Tags:                    tags,
+		DependsOn:               deps,
+		SupportedOS:             supportedOS,
+		SupportedDisplayServers: supportedDS,
+		DesiredVersion:          p.DesiredVersion,
+		Strategy:                p.PrimaryStrategy(),
+		Deprecated:              p.Deprecated,
+		DeprecatedReason:        p.DeprecatedReason,
+		RecommendPurge:          p.RecommendPurge,
+		Replacement:             p.Replacement,
+		Archived:                p.Archived,
 	}
 }
 
@@ -113,6 +134,7 @@ func (p PackageSpec) ToManagedResource() domain.ManagedResource {
 type StrategySpec struct {
 	Type          string              `json:"type" yaml:"type"`
 	When          *StrategyCondition  `json:"when,omitempty" yaml:"when,omitempty"`
+	DependsOn     []string            `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
 	Packages      map[string][]string `json:"packages,omitempty" yaml:"packages,omitempty"`
 	Repositories  map[string][]string `json:"repositories,omitempty" yaml:"repositories,omitempty"`
 	GitHubRelease *GitHubReleaseSpec  `json:"github_release,omitempty" yaml:"github_release,omitempty"`

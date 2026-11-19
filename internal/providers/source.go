@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/manifest"
 	"github.com/arturonavax/env/internal/security"
 )
@@ -23,14 +22,8 @@ func (d *Dispatcher) installFromSource(ctx context.Context, src manifest.SourceS
 	}
 
 	// Best-effort ensure declared build_deps are installed first.
-	for _, depID := range src.BuildDeps {
-		depRes := domain.ManagedResource{ID: depID, Name: depID}
-		installed, _, _ := d.IsInstalled(ctx, depRes)
-		if !installed {
-			if err := d.Install(ctx, depRes); err != nil {
-				return fmt.Errorf("installing source build dependency %q: %w", depID, err)
-			}
-		}
+	if err := d.ensureDependencies(ctx, src.BuildDeps, "source build dependency"); err != nil {
+		return err
 	}
 
 	tmpDir, err := os.MkdirTemp("", "anx-srcbuild-*")

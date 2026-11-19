@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/arturonavax/env/internal/app"
@@ -315,4 +316,373 @@ func TestInstallServicePlanRequiresSudo(t *testing.T) {
 	if svcLinuxSudo.PlanRequiresSudo(emptyPlan) {
 		t.Errorf("expected PlanRequiresSudo for empty plan to be false")
 	}
+
+	dispLinux := providers.NewDispatcher(platLinuxSudo, cat.Catalog(), security.NewRunner(0), "")
+	svcWithDispatcher := app.NewInstallService(app.InstallDeps{Platform: platLinuxSudo, Catalog: cat, Provider: dispLinux})
+	planWithGitHubRelease := &domain.ExecutionPlan{
+		Steps: []domain.PlanStep{
+			{ID: 1, ResourceID: "rtk", Action: domain.ActionInstall},
+		},
+	}
+	if svcWithDispatcher.PlanRequiresSudo(planWithGitHubRelease) {
+		t.Errorf("expected PlanRequiresSudo(rtk) to be false when winning strategy is github_release on linux/apt")
+	}
+	if !svcWithDispatcher.PlanRequiresSudo(planWithGit) {
+		t.Errorf("expected PlanRequiresSudo(git) to be true when winning strategy is native apt")
+	}
+}
+
+func TestInstallServicePlanFiltersByOSDisplayServerAndStrategy(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	runner := security.NewRunner(0)
+
+	hasStep := func(plan *domain.ExecutionPlan, id string) bool {
+		for _, st := range plan.Steps {
+			if st.Action == domain.ActionInstall && st.ResourceID == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("macos developer avoids linux build deps and pyenv dev headers", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "darwin",
+			Arch:            "arm64",
+			PackageManagers: []string{"brew"},
+			DisplayServer:   "quartz",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "workstation", nil, true)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+
+		forbidden := []string{
+			"zig", "wget", "cmake", "pkg-config",
+			"build-essential", "make", "gcc", "binutils",
+			"bz2-dev", "ssl-dev", "zlib-dev", "readline-dev", "sqlite-dev", "ffi-dev", "xz-dev", "ncurses-dev",
+			"wmctrl", "xdotool", "xclip",
+		}
+		for _, id := range forbidden {
+			if hasStep(plan, id) {
+				t.Errorf("macOS workstation plan unexpectedly scheduled %q", id)
+			}
+		}
+	})
+
+	t.Run("windows toolchains and ai tools avoid curl, pnpm, and linux build deps", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "windows",
+			Arch:            "amd64",
+			PackageManagers: []string{"winget"},
+			DisplayServer:   "win32",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "", []string{"rust", "golang", "zig", "herdr", "fnm", "rtk", "opencode", "claude-code", "codex-cli"}, true)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+
+		for _, id := range []string{"curl", "pnpm", "build-essential", "make", "gcc", "binutils"} {
+			if hasStep(plan, id) {
+				t.Errorf("Windows plan unexpectedly scheduled %q", id)
+			}
+		}
+	})
+
+	t.Run("linux wayland workstation skips x11 tools and terminal skips zig", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			Distribution:    "ubuntu",
+			PackageManagers: []string{"apt"},
+			DisplayServer:   "wayland",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "workstation", nil, true)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+
+		for _, id := range []string{"zig", "wmctrl", "xdotool", "xclip", "wget", "cmake", "pkg-config"} {
+			if hasStep(plan, id) {
+				t.Errorf("Linux Wayland workstation plan unexpectedly scheduled %q", id)
+			}
+		}
+		if !hasStep(plan, "build-essential") || !hasStep(plan, "ssl-dev") {
+			t.Errorf("Linux workstation plan should include build-essential and ssl-dev for rust/pyenv")
+		}
+		if hasStep(plan, "make") || hasStep(plan, "gcc") || hasStep(plan, "binutils") {
+			t.Errorf("Linux plan should not duplicate make/gcc/binutils alongside build-essential")
+		}
+	})
+
+	t.Run("linux x11 workstation keeps x11 tools", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			Distribution:    "ubuntu",
+			PackageManagers: []string{"apt"},
+			DisplayServer:   "x11",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "workstation", nil, true)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+
+		for _, id := range []string{"wmctrl", "xdotool", "xclip"} {
+			if !hasStep(plan, id) {
+				t.Errorf("Linux X11 workstation plan missing %q", id)
+			}
+		}
+	})
+
+	t.Run("minimal profile preserves core user tools", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			Distribution:    "ubuntu",
+			PackageManagers: []string{"apt"},
+			DisplayServer:   "x11",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "minimal", nil, true)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+		for _, id := range []string{"git", "curl", "htop", "jq", "fzf", "ripgrep", "fd", "bat", "eza", "tree", "starship"} {
+			if !hasStep(plan, id) {
+				t.Errorf("minimal plan missing core user tool %q", id)
+			}
+		}
+	})
+}
+
+func TestControlPlaneServiceExplainAndInventoryEffectiveDeps(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	runner := security.NewRunner(0)
+	ctx := context.Background()
+
+	buildControlPlane := func(params platform.TestInfoParams) *app.ControlPlaneService {
+		home := t.TempDir()
+		params.HomeDir = home
+		params.StateDir = filepath.Join(home, "state")
+		plat := platform.NewTestInfo(params)
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		installSvc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+		return app.NewControlPlaneService(plat, cat, installSvc, nil, nil, nil, nil)
+	}
+
+	cpLinux := buildControlPlane(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		Distribution:    "ubuntu",
+		PackageManagers: []string{"apt"},
+	})
+	provLinux, err := cpLinux.Explain(ctx, domain.ResourceID("pyenv"))
+	if err != nil {
+		t.Fatalf("Explain(pyenv) on linux failed: %v", err)
+	}
+	if provLinux.WinningPolicy != "strategy:script" {
+		t.Errorf("expected linux pyenv WinningPolicy strategy:script, got %q", provLinux.WinningPolicy)
+	}
+	if !slices.Contains(provLinux.Dependencies, domain.ResourceID("ssl-dev")) ||
+		!slices.Contains(provLinux.Dependencies, domain.ResourceID("build-essential")) {
+		t.Errorf("expected linux pyenv provenance dependencies to include ssl-dev and build-essential, got %v", provLinux.Dependencies)
+	}
+
+	cpDarwin := buildControlPlane(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		PackageManagers: []string{"brew"},
+	})
+	provDarwin, err := cpDarwin.Explain(ctx, domain.ResourceID("pyenv"))
+	if err != nil {
+		t.Fatalf("Explain(pyenv) on darwin failed: %v", err)
+	}
+	if provDarwin.WinningPolicy != "strategy:native" {
+		t.Errorf("expected darwin brew pyenv WinningPolicy strategy:native, got %q", provDarwin.WinningPolicy)
+	}
+	if len(provDarwin.Dependencies) != 0 {
+		t.Errorf("expected darwin brew pyenv provenance dependencies to be empty, got %v", provDarwin.Dependencies)
+	}
+
+	invDarwin, err := cpDarwin.Inventory(ctx, app.InventoryFilter{Kind: domain.KindPackage})
+	if err != nil {
+		t.Fatalf("Inventory on darwin failed: %v", err)
+	}
+	for _, pkg := range invDarwin.Packages {
+		if pkg.ID == "pyenv" && len(pkg.DependsOn) != 0 {
+			t.Errorf("expected darwin Inventory pyenv DependsOn to be empty, got %v", pkg.DependsOn)
+		}
+	}
+
+	cpWayland := buildControlPlane(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		Distribution:    "ubuntu",
+		PackageManagers: []string{"apt"},
+		DisplayServer:   "wayland",
+	})
+	provXclipWayland, err := cpWayland.Explain(ctx, domain.ResourceID("xclip"))
+	if err != nil {
+		t.Fatalf("Explain(xclip) on wayland failed: %v", err)
+	}
+	if provXclipWayland.WinningPolicy != "unsupported" {
+		t.Errorf("expected wayland xclip WinningPolicy unsupported, got %q", provXclipWayland.WinningPolicy)
+	}
+	if !slices.Contains(provXclipWayland.Conditions, "display:x11") {
+		t.Errorf("expected xclip Conditions to include display:x11, got %v", provXclipWayland.Conditions)
+	}
+}
+
+func TestInstallServicePlanHeadlessAndStepEdges(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	runner := security.NewRunner(0)
+
+	findStep := func(plan *domain.ExecutionPlan, id string) (domain.PlanStep, bool) {
+		for _, s := range plan.Steps {
+			if s.ResourceID == id {
+				return s, true
+			}
+		}
+		return domain.PlanStep{}, false
+	}
+
+	t.Run("headless omits x11 and desktop packages", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			PackageManagers: []string{"apt"},
+			DisplayServer:   "headless",
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+
+		plan, err := svc.PlanWithReinstall(context.Background(), "headless", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(headless) failed: %v", err)
+		}
+		for _, unwanted := range []string{"xclip", "wmctrl", "xdotool", "ghostty", "wget"} {
+			if _, ok := findStep(plan, unwanted); ok {
+				t.Errorf("headless plan unexpectedly scheduled %q", unwanted)
+			}
+		}
+	})
+
+	t.Run("opensuse zypper developer links rust -> tree-sitter-cli edge while alpine does not", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		homeZypper := t.TempDir()
+		platZypper := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			Distribution:    "opensuse-tumbleweed",
+			PackageManagers: []string{"zypper"},
+			HomeDir:         homeZypper,
+			StateDir:        filepath.Join(homeZypper, "state"),
+		})
+		svcZypper := app.NewInstallService(app.InstallDeps{
+			Platform: platZypper,
+			Catalog:  cat,
+			Provider: providers.NewDispatcher(platZypper, cat.Catalog(), runner, ""),
+		})
+		planZypper, err := svcZypper.PlanWithReinstall(context.Background(), "developer", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(developer zypper) failed: %v", err)
+		}
+		rustStep, hasRust := findStep(planZypper, "rust")
+		tsStep, hasTS := findStep(planZypper, "tree-sitter-cli")
+		if !hasRust || !hasTS {
+			t.Fatalf("expected rust and tree-sitter-cli in zypper developer plan (rust=%v, ts=%v)", hasRust, hasTS)
+		}
+		if !slices.Contains(tsStep.DependsOn, rustStep.ID) {
+			t.Errorf("expected zypper tree-sitter-cli DependsOn to include rust step %d, got %v", rustStep.ID, tsStep.DependsOn)
+		}
+
+		homeApk := t.TempDir()
+		platApk := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			Distribution:    "alpine",
+			PackageManagers: []string{"apk"},
+			HomeDir:         homeApk,
+			StateDir:        filepath.Join(homeApk, "state"),
+		})
+		svcApk := app.NewInstallService(app.InstallDeps{
+			Platform: platApk,
+			Catalog:  cat,
+			Provider: providers.NewDispatcher(platApk, cat.Catalog(), runner, ""),
+		})
+		planApk, err := svcApk.PlanWithReinstall(context.Background(), "developer", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(developer apk) failed: %v", err)
+		}
+		rustApk, _ := findStep(planApk, "rust")
+		tsApk, hasTSApk := findStep(planApk, "tree-sitter-cli")
+		if !hasTSApk {
+			t.Fatal("expected tree-sitter-cli in apk developer plan")
+		}
+		if slices.Contains(tsApk.DependsOn, rustApk.ID) {
+			t.Errorf("expected apk native tree-sitter-cli NOT to depend on rust step %d, got %v", rustApk.ID, tsApk.DependsOn)
+		}
+	})
+
+	t.Run("minimal linux orders curl before starship script", func(t *testing.T) {
+		home := t.TempDir()
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:              "linux",
+			Arch:            "amd64",
+			PackageManagers: []string{"apt"},
+			HomeDir:         home,
+			StateDir:        filepath.Join(home, "state"),
+		})
+		svc := app.NewInstallService(app.InstallDeps{
+			Platform: plat,
+			Catalog:  cat,
+			Provider: providers.NewDispatcher(plat, cat.Catalog(), runner, ""),
+		})
+		plan, err := svc.PlanWithReinstall(context.Background(), "minimal", nil, true)
+		if err != nil {
+			t.Fatalf("Plan(minimal) failed: %v", err)
+		}
+		curlStep, hasCurl := findStep(plan, "curl")
+		starStep, hasStar := findStep(plan, "starship")
+		if !hasCurl || !hasStar {
+			t.Fatalf("expected curl and starship in minimal plan (curl=%v, starship=%v)", hasCurl, hasStar)
+		}
+		if !slices.Contains(starStep.DependsOn, curlStep.ID) {
+			t.Errorf("expected linux starship DependsOn to include curl step %d, got %v", curlStep.ID, starStep.DependsOn)
+		}
+	})
+
 }

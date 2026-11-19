@@ -112,14 +112,22 @@ packages:
     strategies:
       - type: native
         packages:
+          apt: [tree-sitter-cli]
+          dnf: [tree-sitter-cli]
           pacman: [tree-sitter-cli]
-          brew: [tree-sitter]
+          apk: [tree-sitter-cli]
+          brew: [tree-sitter-cli]
+          winget: ["tree-sitter.tree-sitter-cli"]
           scoop: [tree-sitter]
       - type: language_pkg
+        when:
+          requires_binary: pnpm
+        depends_on: [pnpm]
         language_pkg:
           manager: pnpm
           package: tree-sitter-cli
       - type: language_pkg
+        depends_on: [rust]
         language_pkg:
           manager: cargo
           package: tree-sitter-cli

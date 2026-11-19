@@ -3,6 +3,7 @@ package manifest_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/arturonavax/env/internal/manifest"
@@ -223,3 +224,243 @@ func TestDAGTopologicalOrderAndCycleDetection(t *testing.T) {
 		t.Fatal("expected cycle error for cyc-1 <-> cyc-2, got nil")
 	}
 }
+
+func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog() failed: %v", err)
+	}
+
+	t.Run("pure-go github_release and native packages avoid unconditional curl/zig/pnpm", func(t *testing.T) {
+		noTopDeps := []string{"ghostty", "herdr", "fnm", "rtk", "opencode", "zig", "claude-code", "codex-cli", "build-essential", "pyenv", "rust"}
+		for _, id := range noTopDeps {
+			spec, ok := cat.GetPackageSpec(id)
+			if !ok {
+				t.Fatalf("expected package %q in catalog", id)
+			}
+			if len(spec.DependsOn) > 0 {
+				t.Errorf("package %q should not declare unconditional top-level depends_on, got %v", id, spec.DependsOn)
+			}
+		}
+	})
+
+	t.Run("unused dead core packages are removed", func(t *testing.T) {
+		removed := []string{"bison", "zstd", "clang", "fontconfig", "gnupg", "gzip"}
+		for _, id := range removed {
+			if _, ok := cat.GetPackageSpec(id); ok {
+				t.Errorf("expected unused package %q to be removed from catalog", id)
+			}
+		}
+	})
+
+	t.Run("distro package mappings match OS packaging", func(t *testing.T) {
+		be, ok := cat.GetPackageSpec("build-essential")
+		if !ok {
+			t.Fatal("missing build-essential")
+		}
+		if got := be.Strategies[0].Packages["dnf"]; len(got) == 0 || got[0] == "@development-tools" {
+			t.Errorf("build-essential dnf should not use @development-tools, got %v", got)
+		}
+		if got := be.Strategies[0].Packages["zypper"]; len(got) == 0 || got[0] == "devel_basis" {
+			t.Errorf("build-essential zypper should not use pattern name devel_basis without -t pattern, got %v", got)
+		}
+
+		nc, ok := cat.GetPackageSpec("ncurses-dev")
+		if !ok {
+			t.Fatal("missing ncurses-dev")
+		}
+		if got := nc.Strategies[0].Packages["apt"]; len(got) != 1 || got[0] != "libncurses-dev" {
+			t.Errorf("ncurses-dev apt = %v, want [libncurses-dev]", got)
+		}
+
+		delta, ok := cat.GetPackageSpec("delta")
+		if !ok {
+			t.Fatal("missing delta")
+		}
+		var deltaApk []string
+		for _, st := range delta.Strategies {
+			if st.Type == "native" {
+				deltaApk = st.Packages["apk"]
+			}
+		}
+		if len(deltaApk) != 1 || deltaApk[0] != "delta" {
+			t.Errorf("delta apk = %v, want [delta]", deltaApk)
+		}
+
+		ts, ok := cat.GetPackageSpec("tree-sitter-cli")
+		if !ok {
+			t.Fatal("missing tree-sitter-cli")
+		}
+		if got := ts.Strategies[0].Packages["brew"]; len(got) != 1 || got[0] != "tree-sitter-cli" {
+			t.Errorf("tree-sitter-cli brew = %v, want [tree-sitter-cli]", got)
+		}
+		if got := ts.Strategies[0].Packages["apk"]; len(got) != 1 || got[0] != "tree-sitter-cli" {
+			t.Errorf("tree-sitter-cli apk = %v, want [tree-sitter-cli]", got)
+		}
+		if len(ts.Strategies) < 3 || ts.Strategies[2].LanguagePkg == nil || ts.Strategies[2].LanguagePkg.Manager != "cargo" || !slices.Equal(ts.Strategies[2].DependsOn, []string{"rust"}) {
+			t.Errorf("tree-sitter-cli fallback cargo strategy should declare depends_on: [rust], got %+v", ts.Strategies)
+		}
+
+		codex, ok := cat.GetPackageSpec("codex-cli")
+		if !ok {
+			t.Fatal("missing codex-cli")
+		}
+		if codex.Strategies[0].GitHubRelease == nil || codex.Strategies[0].GitHubRelease.AssetPatterns["windows/amd64"] != "codex-x86_64-pc-windows-msvc.exe.zip" {
+			t.Errorf("codex-cli windows/amd64 asset pattern mismatch: %+v", codex.Strategies[0].GitHubRelease)
+		}
+		if len(codex.Strategies) < 2 || len(codex.Strategies[1].Packages["winget"]) == 0 || codex.Strategies[1].Packages["winget"][0] != "OpenAI.Codex" {
+			t.Errorf("codex-cli should declare winget OpenAI.Codex fallback, got %+v", codex.Strategies)
+		}
+	})
+
+	t.Run("profiles omit unnecessary wget and cmake", func(t *testing.T) {
+		minPkgs, err := cat.ResolveProfilePackages("minimal")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range minPkgs {
+			if id == "wget" {
+				t.Errorf("minimal profile should not include redundant wget: %v", minPkgs)
+			}
+		}
+
+		devPkgs, err := cat.ResolveProfilePackages("developer")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range devPkgs {
+			if id == "cmake" || id == "pkg-config" {
+				t.Errorf("developer profile should not include build-only %q: %v", id, devPkgs)
+			}
+		}
+	})
+}
+
+func TestPackageSpecSupportsDisplayServer(t *testing.T) {
+	tests := []struct {
+		name           string
+		displayServers []string
+		hostDS         string
+		want           bool
+	}{
+		{name: "unrestricted on x11", displayServers: nil, hostDS: "x11", want: true},
+		{name: "unrestricted on wayland", displayServers: nil, hostDS: "wayland", want: true},
+		{name: "unrestricted on headless", displayServers: nil, hostDS: "", want: true},
+		{name: "x11 matches exact", displayServers: []string{"x11"}, hostDS: "x11", want: true},
+		{name: "x11 matches case-insensitively", displayServers: []string{"x11"}, hostDS: "X11", want: true},
+		{name: "x11 rejects wayland", displayServers: []string{"x11"}, hostDS: "wayland", want: false},
+		{name: "x11 rejects headless", displayServers: []string{"x11"}, hostDS: "", want: false},
+		{name: "all matches wayland", displayServers: []string{"all"}, hostDS: "wayland", want: true},
+		{name: "all rejects headless", displayServers: []string{"all"}, hostDS: "", want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := manifest.PackageSpec{ID: "xclip", DisplayServers: tc.displayServers}
+			if got := spec.SupportsDisplayServer(tc.hostDS); got != tc.want {
+				t.Errorf("SupportsDisplayServer(%q) with %v = %v, want %v", tc.hostDS, tc.displayServers, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStrategySpecDependsOnAndResolveInstallOrderWithDeps(t *testing.T) {
+	dropIn := t.TempDir()
+	yamlSpec := `packages:
+  - id: dep-a
+    name: Dep A
+    category: test
+    strategies:
+      - type: native
+        packages:
+          brew: [dep-a]
+  - id: dep-b
+    name: Dep B
+    category: test
+    strategies:
+      - type: native
+        packages:
+          apt: [dep-b]
+  - id: linux-dep
+    name: Linux Dep
+    category: test
+    os: [linux]
+    strategies:
+      - type: native
+        packages:
+          apt: [linux-dep]
+  - id: skipped-tool
+    name: Skipped Tool
+    category: test
+    os: [linux]
+    depends_on: [linux-dep]
+    strategies:
+      - type: native
+        packages:
+          apt: [skipped-tool]
+  - id: multi-strat
+    name: Multi Strategy
+    category: test
+    strategies:
+      - type: native
+        depends_on: [dep-a]
+        packages:
+          brew: [multi-strat]
+      - type: script
+        depends_on: [dep-b]
+        script:
+          url: https://example.com/install.sh
+          interpreter: sh
+`
+	if err := os.WriteFile(filepath.Join(dropIn, "strategy_deps.yaml"), []byte(yamlSpec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cat, err := manifest.LoadCatalog(manifest.WithUserDropInDir(dropIn))
+	if err != nil {
+		t.Fatalf("LoadCatalog() failed: %v", err)
+	}
+
+	spec, ok := cat.GetPackageSpec("multi-strat")
+	if !ok {
+		t.Fatal("expected multi-strat in catalog")
+	}
+	if len(spec.Strategies) != 2 {
+		t.Fatalf("expected 2 strategies, got %d", len(spec.Strategies))
+	}
+	if !slices.Equal(spec.Strategies[0].DependsOn, []string{"dep-a"}) {
+		t.Errorf("strategy[0].DependsOn = %v, want [dep-a]", spec.Strategies[0].DependsOn)
+	}
+	if !slices.Equal(spec.Strategies[1].DependsOn, []string{"dep-b"}) {
+		t.Errorf("strategy[1].DependsOn = %v, want [dep-b]", spec.Strategies[1].DependsOn)
+	}
+
+	allowDarwin := func(p manifest.PackageSpec) bool {
+		return p.SupportsOS("darwin")
+	}
+	depsForFirstStrategy := func(p manifest.PackageSpec) []string {
+		if p.ID == "multi-strat" {
+			return p.Strategies[0].DependsOn
+		}
+		return p.DependsOn
+	}
+
+	ordered, err := cat.ResolveInstallOrderWithDeps(
+		[]string{"skipped-tool", "multi-strat"},
+		allowDarwin,
+		depsForFirstStrategy,
+	)
+	if err != nil {
+		t.Fatalf("ResolveInstallOrderWithDeps failed: %v", err)
+	}
+
+	gotIDs := make([]string, 0, len(ordered))
+	for _, p := range ordered {
+		gotIDs = append(gotIDs, p.ID)
+	}
+	wantIDs := []string{"dep-a", "multi-strat"}
+	if !slices.Equal(gotIDs, wantIDs) {
+		t.Errorf("ResolveInstallOrderWithDeps IDs = %v, want %v (must skip disallowed package and unused strategy deps)", gotIDs, wantIDs)
+	}
+}
+

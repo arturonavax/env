@@ -174,6 +174,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           url: https://starship.rs/install.sh
           interpreter: sh
@@ -219,6 +220,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           url: https://github.com/atuinsh/atuin/releases/latest/download/atuin-installer.sh
           interpreter: sh
@@ -241,7 +243,6 @@ packages:
     description: Statically-linked terminal and AI agent workspace multiplexer
     binary_name: herdr
     os: [linux, darwin]
-    depends_on: [curl]
     strategies:
       - type: github_release
         github_release:
@@ -255,6 +256,7 @@ packages:
           binary_in_archive: herdr
           install_to: "~/.local/bin/herdr"
       - type: script
+        depends_on: [curl]
         script:
           url: https://herdr.dev/install.sh
           interpreter: bash
@@ -271,6 +273,7 @@ packages:
       - type: script
         when:
           os: [linux]
+        depends_on: [curl]
         script:
           url: https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh
           interpreter: sh
@@ -320,9 +323,10 @@ packages:
     description: Fast, native, GPU-accelerated terminal emulator built in Zig
     binary_name: ghostty
     os: [linux, darwin]
-    depends_on: [zig]
     strategies:
       - type: native
+        repositories:
+          dnf: ["scottames/ghostty"]
         packages:
           apt: [ghostty]
           pacman: [ghostty]
@@ -332,18 +336,18 @@ packages:
       - type: script
         when:
           os: [linux]
+        depends_on: [curl]
         script:
           local_script: scripts/install_ghostty.sh
           interpreter: bash
           creates: "/usr/bin/ghostty"
       - type: source
         when:
-          os: [linux, darwin]
-          requires_binary: zig
+          os: [linux]
         source:
           git_url: https://github.com/ghostty-org/ghostty.git
-          ref: v1.1.3
-          build_deps: [gtk4-dev, adwaita-dev, gettext, pkg-config]
+          ref: v1.2.3
+          build_deps: [zig, gtk4-dev, adwaita-dev, gettext, pkg-config]
           steps:
             - ["zig", "build", "-Doptimize=ReleaseFast", "-p", "{{.Home}}/.local"]
           uninstall_paths:

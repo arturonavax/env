@@ -93,12 +93,17 @@ func (s *InstallService) InstallLogPath() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "anx", "logs", "install.log")
 }
 
+// StrategyDependencyResolver optionally provides host-specific winning strategy and dependency selection.
+type StrategyDependencyResolver interface {
+	SelectStrategy(pkgID string) (manifest.StrategySpec, bool)
+	EffectiveDependencies(pkgID string) []string
+}
+
 // baseToolRank defines explicit priority order for core environment tools.
 // Base tools must always be installed before other direct tools and dependencies
 // so that a functional core environment is guaranteed even if later steps fail.
 var baseToolRank = map[string]int{
 	"curl":            1,
-	"wget":            1,
 	"build-essential": 1,
 	"git":             2,
 	"htop":            3,
@@ -108,6 +113,52 @@ var baseToolRank = map[string]int{
 	"neovim":          7,
 	"nvim":            7,
 	"anx":             8,
+}
+
+func (s *InstallService) isSpecSupportedOnHost(spec manifest.PackageSpec) bool {
+	if s.platform == nil {
+		return true
+	}
+	return spec.SupportsOS(s.platform.OS()) && spec.SupportsDisplayServer(s.platform.DisplayServer())
+}
+
+// EffectiveDependencies returns the host-applicable dependency IDs for pkgID.
+func (s *InstallService) EffectiveDependencies(pkgID string) []string {
+	if resolver, ok := s.provider.(StrategyDependencyResolver); ok {
+		return resolver.EffectiveDependencies(pkgID)
+	}
+	if s.catalog == nil {
+		return nil
+	}
+	spec, ok := s.catalog.GetPackageSpec(pkgID)
+	if !ok || !s.isSpecSupportedOnHost(spec) {
+		return nil
+	}
+	out := make([]string, 0, len(spec.DependsOn))
+	for _, depID := range spec.DependsOn {
+		if depSpec, found := s.catalog.GetPackageSpec(depID); found && !s.isSpecSupportedOnHost(depSpec) {
+			continue
+		}
+		out = append(out, depID)
+	}
+	return out
+}
+
+func (s *InstallService) effectiveDeps(spec manifest.PackageSpec) []string {
+	if resolver, ok := s.provider.(StrategyDependencyResolver); ok {
+		return resolver.EffectiveDependencies(spec.ID)
+	}
+	return s.EffectiveDependencies(spec.ID)
+}
+
+// WinningStrategy returns the host-selected strategy for pkgID, or fallback if unresolved.
+func (s *InstallService) WinningStrategy(pkgID string, fallback domain.StrategyType) domain.StrategyType {
+	if resolver, ok := s.provider.(StrategyDependencyResolver); ok {
+		if st, found := resolver.SelectStrategy(pkgID); found && st.Type != "" {
+			return domain.StrategyType(st.Type)
+		}
+	}
+	return fallback
 }
 
 // PrioritizePackageIDs reorders package IDs into an optimal topological sequence:
@@ -124,13 +175,11 @@ func (s *InstallService) PrioritizePackageIDs(ids []string) []string {
 	if s.catalog != nil {
 		var collectDeps func(id string)
 		collectDeps = func(id string) {
-			if spec, ok := s.catalog.GetPackageSpec(id); ok {
-				for _, dep := range spec.DependsOn {
-					depNorm := strings.ToLower(dep)
-					if !toolDeps[depNorm] {
-						toolDeps[depNorm] = true
-						collectDeps(depNorm)
-					}
+			for _, dep := range s.EffectiveDependencies(id) {
+				depNorm := strings.ToLower(dep)
+				if !toolDeps[depNorm] {
+					toolDeps[depNorm] = true
+					collectDeps(depNorm)
 				}
 			}
 		}
@@ -191,7 +240,7 @@ func (s *InstallService) determinePackageLocks(pkg domain.ManagedResource) []str
 		locks = append(locks, "bin:"+pkg.BinaryName)
 	}
 
-	strat := pkg.Strategy
+	strat := s.WinningStrategy(pkg.ID, pkg.Strategy)
 	if strat == "" {
 		strat = domain.StrategyNative
 	}
@@ -255,7 +304,7 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 	}
 
 	prioritizedIDs := s.PrioritizePackageIDs(ids)
-	ordered, err := s.catalog.ResolveInstallOrder(prioritizedIDs)
+	ordered, err := s.catalog.ResolveInstallOrderWithDeps(prioritizedIDs, s.isSpecSupportedOnHost, s.effectiveDeps)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +312,7 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 	stepID := 1
 	installStepIDs := make(map[string]int, len(ordered))
 	for _, pkg := range ordered {
-		if len(pkg.SupportedOS) > 0 && !containsOS(pkg.SupportedOS, s.platform.OS()) {
+		if !pkg.SupportsOS(s.platform.OS()) || !pkg.SupportsDisplayServer(s.platform.DisplayServer()) {
 			continue
 		}
 		if !force {
@@ -272,14 +321,15 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 				continue
 			}
 		}
+		winningStrat := s.WinningStrategy(pkg.ID, pkg.Strategy)
 		plan.Steps = append(plan.Steps, domain.PlanStep{
 			ID:          stepID,
 			ResourceID:  pkg.ID,
 			Action:      domain.ActionInstall,
 			Description: fmt.Sprintf("Install %s (%s)", pkg.Name, pkg.Description),
 			Provider:    s.provider.Name(),
-			Strategy:    string(pkg.Strategy),
-			DependsOn:   installDependencies(pkg, installStepIDs),
+			Strategy:    string(winningStrat),
+			DependsOn:   installDependencies(s.EffectiveDependencies(pkg.ID), installStepIDs),
 			Locks:       s.determinePackageLocks(pkg),
 			IsExclusive: false,
 			Status:      domain.StepPending,
@@ -318,9 +368,9 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 
 // installDependencies maps a package's declared dependencies to the plan step IDs that install them.
 // Dependencies absent from stepIDs are already satisfied (installed or filtered out) and need no edge.
-func installDependencies(pkg domain.ManagedResource, stepIDs map[string]int) []int {
+func installDependencies(depIDs []string, stepIDs map[string]int) []int {
 	var deps []int
-	for _, dep := range pkg.DependsOn {
+	for _, dep := range depIDs {
 		if id, ok := stepIDs[dep]; ok {
 			deps = append(deps, id)
 		}
@@ -632,15 +682,6 @@ func (s *InstallService) journalStep(txID, typ string, step domain.PlanStep, err
 	})
 }
 
-func containsOS(list []string, goos string) bool {
-	for _, v := range list {
-		if v == goos || v == "all" {
-			return true
-		}
-	}
-	return false
-}
-
 // PlanRequiresSudo checks if any step in plan requires root/sudo privileges on this host.
 func (s *InstallService) PlanRequiresSudo(plan *domain.ExecutionPlan) bool {
 	if s.platform == nil || s.platform.IsRoot() || s.platform.IsTermux() || s.platform.OS() == "windows" || !s.platform.HasSudo() {
@@ -673,18 +714,34 @@ func (s *InstallService) packageSpecRequiresSudo(spec manifest.PackageSpec) bool
 	if s.platform == nil || s.platform.IsRoot() || s.platform.IsTermux() || s.platform.OS() == "windows" || !s.platform.HasSudo() {
 		return false
 	}
+	if resolver, ok := s.provider.(StrategyDependencyResolver); ok {
+		st, found := resolver.SelectStrategy(spec.ID)
+		if !found {
+			return false
+		}
+		return s.nativeStrategyRequiresSudo(st)
+	}
 	for _, st := range spec.Strategies {
-		if st.Type == string(domain.StrategyNative) {
-			for _, pm := range s.platform.PackageManagers() {
-				if isNativeSudoPM(pm) {
-					if pkgs, ok := st.Packages[pm]; ok && len(pkgs) > 0 {
-						return true
-					}
-					if repos, ok := st.Repositories[pm]; ok && len(repos) > 0 {
-						return true
-					}
-				}
-			}
+		if s.nativeStrategyRequiresSudo(st) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *InstallService) nativeStrategyRequiresSudo(st manifest.StrategySpec) bool {
+	if st.Type != string(domain.StrategyNative) {
+		return false
+	}
+	for _, pm := range s.platform.PackageManagers() {
+		if !isNativeSudoPM(pm) {
+			continue
+		}
+		if pkgs, ok := st.Packages[pm]; ok && len(pkgs) > 0 {
+			return true
+		}
+		if repos, ok := st.Repositories[pm]; ok && len(repos) > 0 {
+			return true
 		}
 	}
 	return false

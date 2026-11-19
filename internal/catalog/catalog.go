@@ -116,7 +116,16 @@ func (r *Registry) ResolveProfileConfigurations(name string) ([]domain.Configura
 
 // ResolveInstallOrder sorts package IDs topologically according to depends_on edges.
 func (r *Registry) ResolveInstallOrder(ids []string) ([]domain.ManagedResource, error) {
-	specs, err := r.cat.ResolveInstallOrder(ids)
+	return r.ResolveInstallOrderWithDeps(ids, nil, nil)
+}
+
+// ResolveInstallOrderWithDeps sorts package IDs topologically using optional host filter and strategy-aware dependency hooks.
+func (r *Registry) ResolveInstallOrderWithDeps(
+	ids []string,
+	allowFn func(manifest.PackageSpec) bool,
+	depsFn func(manifest.PackageSpec) []string,
+) ([]domain.ManagedResource, error) {
+	specs, err := r.cat.ResolveInstallOrderWithDeps(ids, allowFn, depsFn)
 	if err != nil {
 		return nil, err
 	}

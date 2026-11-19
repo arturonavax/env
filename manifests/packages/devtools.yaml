@@ -24,7 +24,7 @@ packages:
           dnf: [git-delta]
           pacman: [git-delta]
           zypper: [git-delta]
-          apk: [git-delta]
+          apk: [delta]
           brew: [git-delta]
           pkg: [git-delta]
           winget: [dandavison.delta]

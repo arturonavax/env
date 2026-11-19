@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -336,5 +337,338 @@ func TestScriptStrategyCompletesWhenTargetCreatedEvenIfScriptHangs(t *testing.T)
 	}
 	if _, err := os.Stat(targetFile); err != nil {
 		t.Fatalf("expected target file %s to exist, stat error: %v", targetFile, err)
+	}
+}
+
+func TestDispatcherEffectiveDependenciesByHost(t *testing.T) {
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		params    platform.TestInfoParams
+		isolate   bool
+		createBin string
+		pkgID     string
+		want      []string
+	}{
+		{
+			name: "pyenv on linux apt uses linux build deps",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				PackageManagers: []string{"apt"},
+			},
+			pkgID: "pyenv",
+			want:  []string{"git", "curl", "build-essential", "bz2-dev", "ssl-dev", "zlib-dev", "readline-dev", "sqlite-dev", "ffi-dev", "xz-dev", "ncurses-dev"},
+		},
+		{
+			name: "pyenv on darwin brew has no source build deps",
+			params: platform.TestInfoParams{
+				OS:              "darwin",
+				Arch:            "arm64",
+				PackageManagers: []string{"brew"},
+			},
+			pkgID: "pyenv",
+			want:  []string{},
+		},
+		{
+			name: "rust on linux uses curl and build-essential",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				PackageManagers: []string{"apt"},
+			},
+			pkgID: "rust",
+			want:  []string{"curl", "build-essential"},
+		},
+		{
+			name: "rust on darwin uses curl without linux build-essential",
+			params: platform.TestInfoParams{
+				OS:              "darwin",
+				Arch:            "arm64",
+				PackageManagers: []string{"brew"},
+			},
+			pkgID: "rust",
+			want:  []string{"curl"},
+		},
+		{
+			name: "rust on windows winget filters out linux-only build-essential",
+			params: platform.TestInfoParams{
+				OS:              "windows",
+				Arch:            "amd64",
+				PackageManagers: []string{"winget"},
+			},
+			pkgID: "rust",
+			want:  []string{},
+		},
+		{
+			name: "claude-code on linux uses script installer with curl only",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				PackageManagers: []string{"apt"},
+			},
+			pkgID: "claude-code",
+			want:  []string{"curl"},
+		},
+		{
+			name: "claude-code on darwin brew uses cask with zero deps",
+			params: platform.TestInfoParams{
+				OS:              "darwin",
+				Arch:            "arm64",
+				PackageManagers: []string{"brew"},
+			},
+			pkgID: "claude-code",
+			want:  []string{},
+		},
+		{
+			name: "codex-cli on linux uses github release with zero pnpm or curl deps",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				PackageManagers: []string{"apt"},
+			},
+			pkgID: "codex-cli",
+			want:  []string{},
+		},
+		{
+			name: "tree-sitter-cli on alpine uses native apk with zero rust dep",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				Distribution:    "alpine",
+				PackageManagers: []string{"apk"},
+			},
+			pkgID: "tree-sitter-cli",
+			want:  []string{},
+		},
+		{
+			name: "tree-sitter-cli on opensuse without pnpm falls back to cargo with rust dep",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				Distribution:    "opensuse-tumbleweed",
+				PackageManagers: []string{"zypper"},
+			},
+			isolate: true,
+			pkgID:   "tree-sitter-cli",
+			want:    []string{"rust"},
+		},
+		{
+			name: "tree-sitter-cli on opensuse with pnpm uses pnpm tier instead of rust",
+			params: platform.TestInfoParams{
+				OS:              "linux",
+				Arch:            "amd64",
+				Distribution:    "opensuse-tumbleweed",
+				PackageManagers: []string{"zypper"},
+			},
+			isolate:   true,
+			createBin: "pnpm",
+			pkgID:     "tree-sitter-cli",
+			want:      []string{"pnpm"},
+		},
+		{
+			name: "tree-sitter-cli on termux without pnpm falls back to cargo with rust dep",
+			params: platform.TestInfoParams{
+				OS:              "android",
+				Arch:            "arm64",
+				PackageManagers: []string{"pkg"},
+			},
+			isolate: true,
+			pkgID:   "tree-sitter-cli",
+			want:    []string{"rust"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.isolate {
+				t.Setenv("PATH", t.TempDir())
+			}
+			home := t.TempDir()
+			binDir := filepath.Join(home, ".local", "bin")
+			if tc.createBin != "" {
+				if err := os.MkdirAll(binDir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				binName := tc.createBin
+				if tc.params.OS == "windows" {
+					binName += ".exe"
+				}
+				if err := os.WriteFile(filepath.Join(binDir, binName), []byte("#!/bin/sh\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			params := tc.params
+			params.HomeDir = home
+			params.LocalBinDir = binDir
+			plat := platform.NewTestInfo(params)
+			disp := providers.NewDispatcher(plat, cat, security.NewRunner(5*time.Second), "")
+
+			got := disp.EffectiveDependencies(tc.pkgID)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("EffectiveDependencies(%q) = %v, want %v", tc.pkgID, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDispatcherPreviewStrategyDisplayServer(t *testing.T) {
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	homeWayland := t.TempDir()
+	platWayland := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		DisplayServer:   "wayland",
+		HomeDir:         homeWayland,
+	})
+	dispWayland := providers.NewDispatcher(platWayland, cat, security.NewRunner(5*time.Second), "")
+	if got := dispWayland.PreviewStrategy("xclip"); got != "unsupported" {
+		t.Errorf("PreviewStrategy(xclip) on wayland = %q, want %q", got, "unsupported")
+	}
+
+	homeX11 := t.TempDir()
+	platX11 := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		DisplayServer:   "x11",
+		HomeDir:         homeX11,
+	})
+	dispX11 := providers.NewDispatcher(platX11, cat, security.NewRunner(5*time.Second), "")
+	if got := dispX11.PreviewStrategy("xclip"); got != "native:apt (xclip)" {
+		t.Errorf("PreviewStrategy(xclip) on x11 = %q, want %q", got, "native:apt (xclip)")
+	}
+}
+
+func TestDispatcherFallbackInstallsStrategyDependsOn(t *testing.T) {
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+
+	osName := "linux"
+	binExt := ""
+	scriptInterp := "sh"
+	if runtime.GOOS == "windows" {
+		osName = "windows"
+		binExt = ".cmd"
+		scriptInterp = "cmd"
+	}
+
+	helperPath := filepath.Join(binDir, "helper-dep"+binExt)
+	unusedPath := filepath.Join(binDir, "unused-dep"+binExt)
+	targetPath := filepath.Join(binDir, "tier-target"+binExt)
+
+	mkScript := func(path, line string) string {
+		if runtime.GOOS == "windows" {
+			return "@echo off\r\nif not exist \"" + binDir + "\" mkdir \"" + binDir + "\"\r\necho @echo off> \"" + path + "\"\r\necho " + line + ">> \"" + path + "\"\r\n"
+		}
+		return "#!/bin/sh\nmkdir -p \"" + binDir + "\"\nprintf '#!/bin/sh\\n" + line + "\\n' > \"" + path + "\"\nchmod +x \"" + path + "\"\n"
+	}
+
+	targetScript := mkScript(targetPath, "echo tier-target 1.0.0")
+	if runtime.GOOS != "windows" {
+		targetScript = "#!/bin/sh\nif [ ! -f \"" + helperPath + "\" ]; then echo 'missing helper-dep' >&2; exit 1; fi\n" + mkScript(targetPath, "echo tier-target 1.0.0")
+	} else {
+		targetScript = "@echo off\r\nif not exist \"" + helperPath + "\" exit /b 1\r\n" + mkScript(targetPath, "echo tier-target 1.0.0")
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/install-helper":
+			_, _ = w.Write([]byte(mkScript(helperPath, "echo helper-dep 1.0.0")))
+		case "/install-unused":
+			_, _ = w.Write([]byte(mkScript(unusedPath, "echo unused-dep 1.0.0")))
+		case "/install-target":
+			_, _ = w.Write([]byte(targetScript))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              osName,
+		Arch:            "amd64",
+		PackageManagers: []string{},
+		HomeDir:         home,
+		LocalBinDir:     binDir,
+	})
+
+	dropIn := t.TempDir()
+	yamlSpec := `packages:
+  - id: helper-dep
+    name: Helper Dep
+    category: test
+    binary_name: helper-dep` + binExt + `
+    strategies:
+      - type: script
+        script:
+          url: "` + srv.URL + `/install-helper"
+          interpreter: ` + scriptInterp + `
+          creates: "~/.local/bin/helper-dep` + binExt + `"
+  - id: unused-dep
+    name: Unused Dep
+    category: test
+    binary_name: unused-dep` + binExt + `
+    strategies:
+      - type: script
+        script:
+          url: "` + srv.URL + `/install-unused"
+          interpreter: ` + scriptInterp + `
+          creates: "~/.local/bin/unused-dep` + binExt + `"
+  - id: tier-target
+    name: Tier Target
+    category: test
+    binary_name: tier-target` + binExt + `
+    strategies:
+      - type: github_release
+        github_release:
+          direct_urls:
+            linux/amd64: "` + srv.URL + `/missing-404.tar.gz"
+            windows/amd64: "` + srv.URL + `/missing-404.tar.gz"
+          binary_in_archive: "tier-target` + binExt + `"
+          install_to: "~/.local/bin/tier-target` + binExt + `"
+      - type: native
+        depends_on: [unused-dep]
+        packages:
+          pacman: [tier-target]
+      - type: script
+        depends_on: [helper-dep]
+        script:
+          url: "` + srv.URL + `/install-target"
+          interpreter: ` + scriptInterp + `
+          creates: "~/.local/bin/tier-target` + binExt + `"
+`
+	if err := os.WriteFile(filepath.Join(dropIn, "fallback_deps.yaml"), []byte(yamlSpec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cat, err := manifest.LoadCatalog(manifest.WithUserDropInDir(dropIn))
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	disp := providers.NewDispatcher(plat, cat, security.NewRunner(10*time.Second), "")
+	targetRes := domain.ManagedResource{ID: "tier-target", Name: "Tier Target", BinaryName: "tier-target" + binExt}
+	if err := disp.Install(context.Background(), targetRes); err != nil {
+		t.Fatalf("expected fallback install to install helper-dep and succeed, got: %v", err)
+	}
+
+	if _, err := os.Stat(helperPath); err != nil {
+		t.Errorf("expected fallback strategy dependency helper-dep to be installed at %s: %v", helperPath, err)
+	}
+	if _, err := os.Stat(unusedPath); !os.IsNotExist(err) {
+		t.Errorf("ineligible native tier dependency unused-dep should not have been installed, stat err=%v", err)
+	}
+	if _, err := os.Stat(targetPath); err != nil {
+		t.Errorf("expected tier-target to be installed at %s: %v", targetPath, err)
 	}
 }

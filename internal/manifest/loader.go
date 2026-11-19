@@ -177,6 +177,9 @@ func (c *Catalog) mergeYAML(source string, data []byte) error {
 		if pkg.OS == nil {
 			pkg.OS = []string{}
 		}
+		if pkg.DisplayServers == nil {
+			pkg.DisplayServers = []string{}
+		}
 		if pkg.Tags == nil {
 			pkg.Tags = []string{}
 		}

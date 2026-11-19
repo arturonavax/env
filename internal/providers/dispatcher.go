@@ -78,40 +78,117 @@ func (d *Dispatcher) Name() string {
 
 func (d *Dispatcher) IsAvailable(_ context.Context) bool { return true }
 
-// PreviewStrategy returns a human-readable description of the primary eligible strategy for pkg on this host.
-func (d *Dispatcher) PreviewStrategy(pkgID string) string {
+// SelectStrategy returns the first eligible StrategySpec for pkgID on the current host.
+func (d *Dispatcher) SelectStrategy(pkgID string) (manifest.StrategySpec, bool) {
 	spec := d.resolveSpec(domain.ManagedResource{ID: pkgID, Name: pkgID})
+	if !d.isSpecSupportedOnHost(spec) {
+		return manifest.StrategySpec{}, false
+	}
 	for _, st := range spec.Strategies {
-		if !d.matchesCondition(st.When) {
+		if !d.isStrategyEligible(st) {
 			continue
 		}
-		switch st.Type {
-		case string(domain.StrategyNative):
-			if pm, pkgs := d.selectNativePackages(st.Packages); pm != "" {
-				return fmt.Sprintf("native:%s (%s)", pm, strings.Join(pkgs, " "))
+		return st, true
+	}
+	return manifest.StrategySpec{}, false
+}
+
+func (d *Dispatcher) isStrategyEligible(st manifest.StrategySpec) bool {
+	if !d.matchesCondition(st.When) {
+		return false
+	}
+	switch st.Type {
+	case string(domain.StrategyNative):
+		pm, _ := d.selectNativePackages(st.Packages)
+		return pm != ""
+	case string(domain.StrategyGitHubRelease):
+		if st.GitHubRelease == nil {
+			return false
+		}
+		targetKey := d.platform.OS() + "/" + d.platform.Arch()
+		if direct := strings.TrimSpace(st.GitHubRelease.DirectURLs[targetKey]); direct != "" {
+			return true
+		}
+		return strings.TrimSpace(st.GitHubRelease.AssetPatterns[targetKey]) != ""
+	case string(domain.StrategyScript):
+		return st.Script != nil
+	case string(domain.StrategySource):
+		return st.Source != nil
+	case string(domain.StrategyLanguagePkg):
+		return st.LanguagePkg != nil
+	default:
+		return true
+	}
+}
+
+func (d *Dispatcher) isSpecSupportedOnHost(spec manifest.PackageSpec) bool {
+	return spec.SupportsOS(d.platform.OS()) && spec.SupportsDisplayServer(d.platform.DisplayServer())
+}
+
+// EffectiveDependencies returns the deduplicated host-applicable dependencies for pkgID
+// based on package-level depends_on and the winning eligible strategy's depends_on.
+func (d *Dispatcher) EffectiveDependencies(pkgID string) []string {
+	spec, ok := d.lookupSpec(domain.ManagedResource{ID: pkgID, Name: pkgID})
+	if !ok || !d.isSpecSupportedOnHost(spec) {
+		return nil
+	}
+
+	raw := make([]string, 0, len(spec.DependsOn)+4)
+	raw = append(raw, spec.DependsOn...)
+	if st, found := d.SelectStrategy(pkgID); found {
+		raw = append(raw, st.DependsOn...)
+	}
+
+	seen := make(map[string]bool, len(raw))
+	out := make([]string, 0, len(raw))
+	for _, depID := range raw {
+		trimmed := strings.TrimSpace(depID)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		if depSpec, exists := d.lookupSpec(domain.ManagedResource{ID: trimmed, Name: trimmed}); exists {
+			if !d.isSpecSupportedOnHost(depSpec) {
+				continue
 			}
-		case string(domain.StrategyGitHubRelease):
-			if st.GitHubRelease != nil && st.GitHubRelease.Repo != "" {
-				return "github_release:" + st.GitHubRelease.Repo
-			}
-			return "github_release"
-		case string(domain.StrategyScript):
-			if st.Script != nil && st.Script.LocalScript != "" {
-				return "script:" + st.Script.LocalScript
-			}
-			if st.Script != nil && st.Script.URL != "" {
-				return "script:" + st.Script.URL
-			}
-			return "script"
-		case string(domain.StrategySource):
-			if st.Source != nil {
-				return "source:" + st.Source.GitURL
-			}
-			return "source"
-		case string(domain.StrategyLanguagePkg):
-			if st.LanguagePkg != nil {
-				return fmt.Sprintf("language_pkg:%s (%s)", st.LanguagePkg.Manager, st.LanguagePkg.Package)
-			}
+		}
+		seen[trimmed] = true
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+// PreviewStrategy returns a human-readable description of the primary eligible strategy for pkg on this host.
+func (d *Dispatcher) PreviewStrategy(pkgID string) string {
+	st, ok := d.SelectStrategy(pkgID)
+	if !ok {
+		return "unsupported"
+	}
+	switch st.Type {
+	case string(domain.StrategyNative):
+		if pm, pkgs := d.selectNativePackages(st.Packages); pm != "" {
+			return fmt.Sprintf("native:%s (%s)", pm, strings.Join(pkgs, " "))
+		}
+	case string(domain.StrategyGitHubRelease):
+		if st.GitHubRelease != nil && st.GitHubRelease.Repo != "" {
+			return "github_release:" + st.GitHubRelease.Repo
+		}
+		return "github_release"
+	case string(domain.StrategyScript):
+		if st.Script != nil && st.Script.LocalScript != "" {
+			return "script:" + st.Script.LocalScript
+		}
+		if st.Script != nil && st.Script.URL != "" {
+			return "script:" + st.Script.URL
+		}
+		return "script"
+	case string(domain.StrategySource):
+		if st.Source != nil {
+			return "source:" + st.Source.GitURL
+		}
+		return "source"
+	case string(domain.StrategyLanguagePkg):
+		if st.LanguagePkg != nil {
+			return fmt.Sprintf("language_pkg:%s (%s)", st.LanguagePkg.Manager, st.LanguagePkg.Package)
 		}
 	}
 	return "unsupported"
@@ -182,8 +259,15 @@ func (d *Dispatcher) Install(ctx context.Context, pkg domain.ManagedResource) er
 	attempted := 0
 
 	for idx, st := range spec.Strategies {
-		if !d.matchesCondition(st.When) {
+		if !d.isStrategyEligible(st) {
 			continue
+		}
+
+		if len(st.DependsOn) > 0 {
+			if depErr := d.ensureDependencies(ctx, st.DependsOn, "strategy dependency"); depErr != nil {
+				tierErrors = append(tierErrors, fmt.Errorf("tier %d (%s): %w", idx+1, st.Type, depErr))
+				continue
+			}
 		}
 
 		var err error
@@ -239,6 +323,23 @@ func (d *Dispatcher) Install(ctx context.Context, pkg domain.ManagedResource) er
 	}
 
 	return fmt.Errorf("all %d installation tiers failed for %q: %w", attempted, spec.ID, errors.Join(tierErrors...))
+}
+
+func (d *Dispatcher) ensureDependencies(ctx context.Context, depIDs []string, label string) error {
+	for _, depID := range depIDs {
+		depSpec := d.resolveSpec(domain.ManagedResource{ID: depID, Name: depID})
+		if !d.isSpecSupportedOnHost(depSpec) {
+			continue
+		}
+		depRes := depSpec.ToManagedResource()
+		installed, _, _ := d.IsInstalled(ctx, depRes)
+		if !installed {
+			if err := d.Install(ctx, depRes); err != nil {
+				return fmt.Errorf("installing %s %q: %w", label, depID, err)
+			}
+		}
+	}
+	return nil
 }
 
 // Uninstall removes user-local artifacts and/or native packages for pkg.

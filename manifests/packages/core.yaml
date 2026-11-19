@@ -13,6 +13,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           url: https://raw.githubusercontent.com/arturonavax/env/main/install.sh
           interpreter: sh
@@ -23,14 +24,13 @@ packages:
     category: core-build
     description: C/C++ compiler suite, make, and standard system headers
     os: [linux]
-    depends_on: [make, gcc, binutils]
     strategies:
       - type: native
         packages:
           apt: [build-essential]
-          dnf: ["@development-tools"]
+          dnf: [gcc, gcc-c++, make, binutils]
           pacman: [base-devel]
-          zypper: [devel_basis]
+          zypper: [patterns-devel-base-devel_basis]
           apk: [build-base]
           pkg: [build-essential]
 
@@ -121,40 +121,6 @@ packages:
           pkg: [unzip]
           scoop: [unzip]
 
-  - id: gzip
-    name: GNU Gzip
-    category: core
-    description: Standard file compression utility
-    binary_name: gzip
-    strategies:
-      - type: native
-        packages:
-          apt: [gzip]
-          dnf: [gzip]
-          pacman: [gzip]
-          zypper: [gzip]
-          apk: [gzip]
-          brew: [gzip]
-          pkg: [gzip]
-
-  - id: zstd
-    name: Zstandard
-    category: core
-    description: Fast lossless compression algorithm
-    binary_name: zstd
-    strategies:
-      - type: native
-        packages:
-          apt: [zstd]
-          dnf: [zstd]
-          pacman: [zstd]
-          zypper: [zstd]
-          apk: [zstd]
-          brew: [zstd]
-          pkg: [zstd]
-          winget: [Facebook.Zstandard]
-          scoop: [zstd]
-
   - id: make
     name: GNU Make
     category: core-build
@@ -188,38 +154,6 @@ packages:
           apk: [gcc, g++]
           brew: [gcc]
           pkg: [clang]
-
-  - id: clang
-    name: Clang / LLVM
-    category: core-build
-    description: LLVM native C/C++/Objective-C compiler
-    binary_name: clang
-    strategies:
-      - type: native
-        packages:
-          apt: [clang]
-          dnf: [clang]
-          pacman: [clang]
-          zypper: [clang]
-          apk: [clang]
-          pkg: [clang]
-          winget: [LLVM.LLVM]
-
-  - id: bison
-    name: GNU Bison
-    category: core-build
-    description: General-purpose parser generator required by GVM
-    binary_name: bison
-    strategies:
-      - type: native
-        packages:
-          apt: [bison]
-          dnf: [bison]
-          pacman: [bison]
-          zypper: [bison]
-          apk: [bison]
-          brew: [bison]
-          pkg: [bison]
 
   - id: binutils
     name: GNU Binutils
@@ -271,22 +205,6 @@ packages:
           brew: [pkg-config]
           pkg: [pkg-config]
 
-  - id: fontconfig
-    name: Fontconfig
-    category: core
-    description: Font discovery and configuration library (fc-cache)
-    binary_name: fc-cache
-    strategies:
-      - type: native
-        packages:
-          apt: [fontconfig]
-          dnf: [fontconfig, fontconfig-devel]
-          pacman: [fontconfig]
-          zypper: [fontconfig, fontconfig-devel]
-          apk: [fontconfig]
-          brew: [fontconfig]
-          pkg: [fontconfig]
-
   - id: ca-certificates
     name: CA Certificates
     category: core
@@ -302,23 +220,6 @@ packages:
           apk: [ca-certificates]
           brew: [ca-certificates]
           pkg: [ca-certificates]
-
-  - id: gnupg
-    name: GnuPG
-    category: core
-    description: OpenPGP encryption and signing tool
-    binary_name: gpg
-    strategies:
-      - type: native
-        packages:
-          apt: [gnupg]
-          dnf: [gnupg2]
-          pacman: [gnupg]
-          zypper: [gpg2]
-          apk: [gnupg]
-          brew: [gnupg]
-          pkg: [gnupg]
-          winget: [GnuPG.Gpg4win]
 
   - id: ssl-dev
     name: OpenSSL Development Headers
@@ -435,15 +336,15 @@ packages:
   - id: ncurses-dev
     name: ncurses Headers
     category: core-libs
-    description: Terminal handling library headers and terminfo definitions
+    description: Terminal handling library headers
     os: [linux, darwin]
     strategies:
       - type: native
         packages:
-          apt: [libncurses5-dev, libncursesw5-dev, ncurses-term]
-          dnf: [ncurses, ncurses-devel, ncurses-term]
+          apt: [libncurses-dev]
+          dnf: [ncurses, ncurses-devel]
           pacman: [ncurses]
-          zypper: [ncurses-devel, terminfo]
+          zypper: [ncurses-devel]
           apk: [ncurses-dev]
           brew: [ncurses]
           pkg: [ncurses]
@@ -602,6 +503,7 @@ packages:
     description: Command-line interface to X11 clipboard selections
     binary_name: xclip
     os: [linux]
+    display_servers: [x11]
     strategies:
       - type: native
         packages:
@@ -617,6 +519,7 @@ packages:
     description: EWMH/NetWM X11 window manager control utility used by rcmd
     binary_name: wmctrl
     os: [linux]
+    display_servers: [x11]
     strategies:
       - type: native
         packages:
@@ -631,6 +534,7 @@ packages:
     description: X11 keyboard, mouse, and window automation tool used by rcmd
     binary_name: xdotool
     os: [linux]
+    display_servers: [x11]
     strategies:
       - type: native
         packages:
@@ -638,3 +542,4 @@ packages:
           dnf: [xdotool]
           pacman: [xdotool]
           zypper: [xdotool]
+

@@ -12,6 +12,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/providers"
 	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/theme"
@@ -1216,5 +1217,91 @@ func TestWizardReviewPlanStickyToggles(t *testing.T) {
 	viewNoOS := w.View().Content
 	if !strings.Contains(viewNoOS, "[o] OS Config:") || !strings.Contains(viewNoOS, "[Excluded]") {
 		t.Fatalf("expected sticky bar to update with excluded osconfig badge, got:\n%s", viewNoOS)
+	}
+}
+
+func TestWizardStageSelectProfileFiltersUnsupportedAndMarksEffectiveDeps(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	runner := security.NewRunner(0)
+
+	runProfileSelect := func(params platform.TestInfoParams) map[string]bool {
+		home := t.TempDir()
+		params.HomeDir = home
+		params.StateDir = filepath.Join(home, "state")
+		plat := platform.NewTestInfo(params)
+		disp := providers.NewDispatcher(plat, cat.Catalog(), runner, "")
+		svc := app.NewInstallService(app.InstallDeps{Platform: plat, Catalog: cat, Provider: disp})
+		w := NewWizardModel(plat, cat, svc)
+		for i, prof := range w.profiles {
+			if prof.Name == "workstation" {
+				w.selectedProf = i
+				break
+			}
+		}
+		nm, _ := w.Update(tea.KeyPressMsg{Text: "enter"})
+		return nm.(WizardModel).selectedPkgs
+	}
+
+	darwinSelected := runProfileSelect(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		PackageManagers: []string{"brew"},
+	})
+	for _, unwanted := range []string{"build-essential", "ssl-dev", "xclip", "wmctrl", "xdotool"} {
+		if darwinSelected[unwanted] {
+			t.Errorf("darwin workstation wizard unexpectedly selected %q", unwanted)
+		}
+	}
+
+	waylandSelected := runProfileSelect(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		DisplayServer:   "wayland",
+	})
+	for _, unwanted := range []string{"xclip", "wmctrl", "xdotool"} {
+		if waylandSelected[unwanted] {
+			t.Errorf("linux wayland workstation wizard unexpectedly selected %q", unwanted)
+		}
+	}
+	if !waylandSelected["build-essential"] || !waylandSelected["ssl-dev"] {
+		t.Errorf("linux workstation wizard should mark linux pyenv deps build-essential and ssl-dev")
+	}
+
+	x11Selected := runProfileSelect(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		DisplayServer:   "x11",
+	})
+	for _, wanted := range []string{"xclip", "wmctrl", "xdotool"} {
+		if !x11Selected[wanted] {
+			t.Errorf("linux x11 workstation wizard missing X11 package %q", wanted)
+		}
+	}
+}
+
+func TestWizardReviewPlanOSConfigMatchesHostOS(t *testing.T) {
+	cat := catalog.NewDefaultRegistry()
+	home := t.TempDir()
+	platDarwin := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		PackageManagers: []string{"brew"},
+		DisplayServer:   "quartz",
+		HomeDir:         home,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	w := NewWizardModel(platDarwin, cat, nil, WithWizardIncludeOSConfig(true))
+	w.stage = StageReviewPlan
+	w.width = 110
+	w.height = 36
+
+	view := w.View().Content
+	if !strings.Contains(view, "Amethyst") || !strings.Contains(view, "Karabiner") || !strings.Contains(view, "macos-osconfig") {
+		t.Errorf("expected darwin review plan osconfig section to describe Amethyst/Karabiner/macos-osconfig, got:\n%s", view)
+	}
+	if strings.Contains(view, "GNOME Extension") {
+		t.Errorf("darwin review plan unexpectedly rendered Linux GNOME Extension description:\n%s", view)
 	}
 }

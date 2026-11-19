@@ -5,11 +5,12 @@ packages:
     category: toolchains
     description: Go programming language provisioned via GVM with personal install_golang.sh fallback
     binary_name: go
-    depends_on: [curl, git]
+    depends_on: [git]
     strategies:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           local_script: scripts/bootstrap_anx.sh
           interpreter: bash
@@ -18,6 +19,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           local_script: scripts/install_golang.sh
           interpreter: bash
@@ -39,17 +41,27 @@ packages:
     category: toolchains
     description: Rust compiler toolchain and Cargo package manager
     binary_name: cargo
-    depends_on: [curl, build-essential]
     strategies:
       - type: script
         when:
-          os: [linux, darwin]
+          os: [linux]
+        depends_on: [curl, build-essential]
+        script:
+          url: https://sh.rustup.rs
+          interpreter: sh
+          args: ["-y", "--no-modify-path", "--default-toolchain", "stable"]
+          creates: "~/.cargo/bin/cargo"
+      - type: script
+        when:
+          os: [darwin]
+        depends_on: [curl]
         script:
           url: https://sh.rustup.rs
           interpreter: sh
           args: ["-y", "--no-modify-path", "--default-toolchain", "stable"]
           creates: "~/.cargo/bin/cargo"
       - type: native
+        depends_on: [build-essential]
         packages:
           pacman: [rustup]
           brew: [rustup]
@@ -65,7 +77,6 @@ packages:
     binary_name: fnm
     ecosystem: crates.io
     osv_package: fnm
-    depends_on: [curl]
     strategies:
       - type: github_release
         github_release:
@@ -81,6 +92,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl, unzip]
         script:
           url: https://fnm.vercel.app/install
           interpreter: bash
@@ -108,12 +120,15 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           url: https://get.pnpm.io/install.sh
           interpreter: sh
           env:
             SHELL: bash
       - type: language_pkg
+        when:
+          requires_binary: npm
         language_pkg:
           manager: npm
           package: pnpm
@@ -130,7 +145,6 @@ packages:
     description: Simple Python version management
     binary_name: pyenv
     os: [linux, darwin]
-    depends_on: [git, curl, build-essential, bz2-dev, ssl-dev, zlib-dev, readline-dev, sqlite-dev, ffi-dev, xz-dev, ncurses-dev]
     strategies:
       - type: native
         when:
@@ -138,6 +152,9 @@ packages:
         packages:
           brew: [pyenv]
       - type: script
+        when:
+          os: [linux]
+        depends_on: [git, curl, build-essential, bz2-dev, ssl-dev, zlib-dev, readline-dev, sqlite-dev, ffi-dev, xz-dev, ncurses-dev]
         script:
           local_script: scripts/install_pyenv.sh
           interpreter: bash
@@ -175,6 +192,7 @@ packages:
           dnf: [pipx]
           pacman: [python-pipx]
           zypper: [python3-pipx]
+          apk: [pipx]
           brew: [pipx]
           pkg: [pipx]
           scoop: [pipx]
@@ -184,7 +202,6 @@ packages:
     category: toolchains
     description: General-purpose systems programming language and C/C++ cross-compiler (required for Ghostty source builds)
     binary_name: zig
-    depends_on: [curl]
     strategies:
       - type: native
         packages:
@@ -199,6 +216,7 @@ packages:
       - type: script
         when:
           os: [linux, darwin]
+        depends_on: [curl]
         script:
           local_script: scripts/install_zig.sh
           interpreter: bash
