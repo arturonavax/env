@@ -43,10 +43,57 @@ log_success() { echo -e "  [${GREEN}OK${RESET}] $*"; }
 log_warn()    { echo -e "  [${YELLOW}WARN${RESET}] $*"; }
 log_error()   { echo -e "  [${RED}ERROR${RESET}] $*" >&2; }
 
-# Source GVM if available in standard location
-if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
+if [[ -z "${ANX_INITIAL_PATH:-}" ]]; then
+	ANX_INITIAL_PATH="${PATH}"
+	export ANX_INITIAL_PATH
+fi
+
+# Upstream GVM references unset variables (e.g. GVM_DEBUG, GVM_NO_GIT_BAK, ZSH_VERSION)
+# and overrides builtin 'cd' with an unguarded shell function. Relax strict flags while
+# loading or invoking GVM and restore builtin 'cd' immediately afterwards.
+source_gvm_safely() {
+	[[ -s "${HOME}/.gvm/scripts/gvm" ]] || return 1
+	local rc=0
+	export GVM_ROOT="${GVM_ROOT:-${HOME}/.gvm}"
+	export GVM_DEBUG="${GVM_DEBUG:-0}"
+	export GVM_NO_GIT_BAK="${GVM_NO_GIT_BAK:-1}"
+	set +euo pipefail
 	# shellcheck source=/dev/null
-	source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
+	source "${HOME}/.gvm/scripts/gvm" >/dev/null 2>&1 || rc=$?
+	unset -f cd 2>/dev/null || true
+	set -euo pipefail
+	return "${rc}"
+}
+
+run_gvm_safely() {
+	command -v gvm >/dev/null 2>&1 || return 1
+	local rc=0
+	export GVM_ROOT="${GVM_ROOT:-${HOME}/.gvm}"
+	export GVM_DEBUG="${GVM_DEBUG:-0}"
+	export GVM_NO_GIT_BAK="${GVM_NO_GIT_BAK:-1}"
+	set +euo pipefail
+	gvm "$@" >/dev/null 2>&1 || rc=$?
+	unset -f cd 2>/dev/null || true
+	set -euo pipefail
+	return "${rc}"
+}
+
+run_gvm_isolated() {
+	command -v gvm >/dev/null 2>&1 || return 1
+	local rc=0
+	(
+		set +euo pipefail
+		export GVM_ROOT="${GVM_ROOT:-${HOME}/.gvm}"
+		export GVM_DEBUG="${GVM_DEBUG:-0}"
+		export GVM_NO_GIT_BAK="${GVM_NO_GIT_BAK:-1}"
+		gvm "$@" >/dev/null 2>&1
+	) || rc=$?
+	return "${rc}"
+}
+
+# Source GVM if available in standard location without breaking strict mode
+if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
+	source_gvm_safely || true
 fi
 
 ensure_macos_homebrew_env() {
@@ -63,8 +110,9 @@ ensure_macos_homebrew_env() {
 if [[ "$(uname -s)" == "Darwin" ]]; then
 	ensure_macos_homebrew_env
 fi
-if ! command -v go >/dev/null 2>&1 && [[ -d "/usr/local/go/bin" && ":${PATH}:" != *":/usr/local/go/bin:"* ]]; then
-	export PATH="/usr/local/go/bin:${PATH}"
+GO_SYS_BIN="${ANX_GO_SYS_BIN:-/usr/local/go/bin}"
+if ! command -v go >/dev/null 2>&1 && [[ -d "${GO_SYS_BIN}" && ":${PATH}:" != *":${GO_SYS_BIN}:"* ]]; then
+	export PATH="${GO_SYS_BIN}:${PATH}"
 fi
 
 # Ensure target binary directory exists
@@ -382,29 +430,32 @@ install_go_tier1_gvm() {
 
 	if ! command -v gvm >/dev/null 2>&1; then
 		if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
-			set +u
-			# shellcheck source=/dev/null
-			source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
-			set -u
-		elif command -v curl >/dev/null 2>&1; then
-			log_info "Installing GVM..."
-			bash < <(curl -fsSL "https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer") || return 1
-			if [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
-				set +u
-				# shellcheck source=/dev/null
-				source "${HOME}/.gvm/scripts/gvm" 2>/dev/null || true
-				set -u
+			source_gvm_safely || true
+		fi
+		if ! command -v gvm >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+			if [[ -d "${HOME}/.gvm" && ! -s "${HOME}/.gvm/scripts/gvm" ]]; then
+				rm -rf "${HOME}/.gvm"
 			fi
+			log_info "Installing GVM..."
+			local tmp_gvm_installer tmp_gvm_log gvm_installer_url
+			tmp_gvm_installer="$(mktemp "${TMPDIR:-/tmp}/anx-gvm-installer.XXXXXX")"
+			tmp_gvm_log="$(mktemp "${TMPDIR:-/tmp}/anx-gvm-log.XXXXXX")"
+			gvm_installer_url="${ANX_GVM_INSTALLER_URL:-https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer}"
+			if curl -fsSL "${gvm_installer_url}" -o "${tmp_gvm_installer}"; then
+				GVM_NO_UPDATE_PROFILE=1 bash "${tmp_gvm_installer}" >"${tmp_gvm_log}" 2>&1 || true
+			fi
+			rm -f "${tmp_gvm_installer}" "${tmp_gvm_log}"
+			source_gvm_safely || true
 		fi
 	fi
 
 	if command -v gvm >/dev/null 2>&1; then
 		log_info "Installing ${TARGET_GO_VER} via GVM..."
-		gvm install "${TARGET_GO_VER}" -B 2>/dev/null || gvm install "${TARGET_GO_VER}" 2>/dev/null || return 1
-		gvm use "${TARGET_GO_VER}" --default 2>/dev/null || return 1
-		if check_go_version; then
-			log_success "Go $(go version | awk '{print $3}') configured via GVM."
-			return 0
+		if run_gvm_isolated install "${TARGET_GO_VER}" -B && run_gvm_safely use "${TARGET_GO_VER}" --default; then
+			if check_go_version; then
+				log_success "Go $(go version | awk '{print $3}') configured via GVM."
+				return 0
+			fi
 		fi
 	fi
 	return 1
@@ -421,8 +472,8 @@ install_go_tier2_standalone() {
 		return 1
 	fi
 
-	if [[ -d "/usr/local/go/bin" ]]; then
-		export PATH="/usr/local/go/bin:${PATH}"
+	if [[ -d "${GO_SYS_BIN}" ]]; then
+		export PATH="${GO_SYS_BIN}:${PATH}"
 	fi
 
 	if check_go_version; then
@@ -517,6 +568,86 @@ build_anx() {
 	fi
 }
 
+shell_rc_signature() {
+	local f sig=""
+	for f in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.base.zsh" "${HOME}/.base.bash"; do
+		if [[ -f "${f}" ]]; then
+			sig="${sig}${f}:$(cksum < "${f}" 2>/dev/null || echo present);"
+		fi
+	done
+	printf '%s' "${sig}"
+}
+
+launch_updated_shell_if_needed() {
+	if [[ "${ANX_ONE_SHOT:-0}" -ne 1 || "${ANX_NO_SHELL_RELOAD:-0}" -eq 1 ]]; then
+		return 0
+	fi
+	if ! [[ -c /dev/tty ]] || ! ( : </dev/tty ) 2>/dev/null; then
+		return 0
+	fi
+
+	local target_shell=""
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		if [[ -x "/bin/zsh" ]]; then
+			target_shell="/bin/zsh"
+		elif [[ -n "${SHELL:-}" && -x "${SHELL}" ]]; then
+			target_shell="${SHELL}"
+		fi
+	else
+		if [[ -n "${SHELL:-}" && -x "${SHELL}" ]]; then
+			target_shell="${SHELL}"
+		elif command -v zsh >/dev/null 2>&1 && [[ -s "${HOME}/.zshrc" ]]; then
+			target_shell="$(command -v zsh)"
+		elif command -v bash >/dev/null 2>&1; then
+			target_shell="$(command -v bash)"
+		fi
+	fi
+
+	if [[ -z "${target_shell}" ]]; then
+		return 0
+	fi
+
+	log_success "Configuration applied. Activating updated shell (no terminal restart needed)..."
+	case "${target_shell##*/}" in
+		zsh)
+			exec "${target_shell}" -l </dev/tty
+			;;
+		*)
+			exec "${target_shell}" -i </dev/tty
+			;;
+	esac
+}
+
+execute_anx_target() {
+	if [[ $# -eq 0 ]]; then
+		local alias_hint=""
+		if [[ -n "${BIN_NAME:-}" && "${BIN_NAME}" != "anx" ]]; then
+			alias_hint=" (or '${BIN_NAME}')"
+		fi
+		log_success "Bootstrap complete! You can now run 'anx'${alias_hint} or 'anx wizard'."
+		return 0
+	fi
+
+	log_info "Delegating execution to: ${DEST_BIN}/anx $*"
+	if [[ "${ANX_ONE_SHOT:-0}" -eq 1 && "${ANX_NO_SHELL_RELOAD:-0}" -eq 0 && -c /dev/tty ]] && ( : </dev/tty ) 2>/dev/null; then
+		local rc_before rc_after cmd_rc=0
+		rc_before="$(shell_rc_signature)"
+		"${DEST_BIN}/anx" "$@" </dev/tty || cmd_rc=$?
+		if [[ "${cmd_rc}" -ne 0 ]]; then
+			return "${cmd_rc}"
+		fi
+		rc_after="$(shell_rc_signature)"
+		if [[ "${rc_after}" != "${rc_before}" ]]; then
+			launch_updated_shell_if_needed
+		elif [[ ":${ANX_INITIAL_PATH:-}:" != *":${DEST_BIN}:"* && -s "${HOME}/.zshrc" ]]; then
+			log_info "Run 'source ~/.zshrc' to load updated PATH in this existing shell session."
+		fi
+		return 0
+	fi
+
+	exec "${DEST_BIN}/anx" "$@"
+}
+
 # ------------------------------------------------------------------------------
 # Main Dispatch
 # ------------------------------------------------------------------------------
@@ -527,6 +658,7 @@ main() {
 
 	BIN_NAME="${ANX_BIN_NAME:-}"
 	local force_go_install=0
+	local ensure_go_only=0
 	local forward_args=()
 
 	while [[ $# -gt 0 ]]; do
@@ -545,6 +677,10 @@ main() {
 				;;
 			--go-install)
 				force_go_install=1
+				shift
+				;;
+			--ensure-go-only)
+				ensure_go_only=1
 				shift
 				;;
 			*)
@@ -566,19 +702,32 @@ main() {
 		done
 	fi
 
+	if [[ ${#forward_args[@]} -eq 0 && "${ensure_go_only}" -eq 0 && -z "${ANX_BOOTSTRAP_ONLY:-}" ]]; then
+		if [[ "${ANX_ONE_SHOT:-0}" -eq 1 ]] || [[ -t 0 && -t 1 ]]; then
+			ANX_ONE_SHOT=1
+			export ANX_ONE_SHOT
+			forward_args=("wizard")
+		fi
+	fi
+
 	if [[ "$(uname -s)" == "Darwin" && "${readonly_action}" -eq 0 ]]; then
 		ensure_macos_clt
 		ensure_macos_homebrew
 	fi
 
+	if [[ "${ensure_go_only}" -eq 1 ]]; then
+		ensure_go_runtime
+		return 0
+	fi
+
 	if [[ "${force_go_install}" -eq 1 ]]; then
 		if try_go_install; then
 			if [[ ${#forward_args[@]} -gt 0 ]]; then
-				exec "${DEST_BIN}/anx" "${forward_args[@]}"
+				execute_anx_target "${forward_args[@]}"
 			else
-				log_success "Bootstrap complete! You can now run 'anx' or 'anx wizard'."
-				return 0
+				execute_anx_target
 			fi
+			return 0
 		fi
 	fi
 
@@ -586,16 +735,11 @@ main() {
 	if try_download_release_binary; then
 		if [[ -x "${DEST_BIN}/anx" ]]; then
 			if [[ ${#forward_args[@]} -gt 0 ]]; then
-				log_info "Delegating execution to: ${DEST_BIN}/anx ${forward_args[*]}"
-				exec "${DEST_BIN}/anx" "${forward_args[@]}"
+				execute_anx_target "${forward_args[@]}"
 			else
-				local alias_hint=""
-				if [[ -n "${BIN_NAME}" && "${BIN_NAME}" != "anx" ]]; then
-					alias_hint=" (or '${BIN_NAME}')"
-				fi
-				log_success "Bootstrap complete! You can now run 'anx'${alias_hint} or 'anx wizard'."
-				return 0
+				execute_anx_target
 			fi
+			return 0
 		fi
 	fi
 
@@ -603,14 +747,9 @@ main() {
 	build_anx
 
 	if [[ ${#forward_args[@]} -gt 0 ]]; then
-		log_info "Delegating execution to: ${DEST_BIN}/anx ${forward_args[*]}"
-		exec "${DEST_BIN}/anx" "${forward_args[@]}"
+		execute_anx_target "${forward_args[@]}"
 	else
-		local alias_hint=""
-		if [[ -n "${BIN_NAME}" && "${BIN_NAME}" != "anx" ]]; then
-			alias_hint=" (or '${BIN_NAME}')"
-		fi
-		log_success "Bootstrap complete! You can now run 'anx'${alias_hint} or 'anx wizard'."
+		execute_anx_target
 	fi
 }
 

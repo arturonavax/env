@@ -310,4 +310,184 @@ exit 1
 			t.Errorf("expected CGO_ENABLED=0 when CLT is missing on Darwin, calls:\n%s", calls2)
 		}
 	})
+
+	t.Run("bootstrap_anx.sh survives upstream GVM set -u cd() override and supports one-shot wizard and --ensure-go-only", func(t *testing.T) {
+		tmp := t.TempDir()
+		home := filepath.Join(tmp, "home")
+		binDir := filepath.Join(tmp, "bin")
+		fakeDevDir := filepath.Join(tmp, "CLT")
+		logFile := filepath.Join(tmp, "calls.log")
+		if err := os.MkdirAll(filepath.Join(home, ".gvm", "scripts"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(binDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(fakeDevDir, "usr", "bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(fakeDevDir, "usr", "bin", "git"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate upstream moovweb/gvm scripts/gvm whose gvm-default/cd() references unset
+		// variables ($GVM_DEBUG, $GVM_NO_GIT_BAK) and replaces builtin cd with a broken function.
+		fakeGVM := `export GVM_ROOT="` + filepath.Join(home, ".gvm") + `"
+cd() {
+  if [ "${GVM_DEBUG}" -eq 1 ]; then echo "GVM_CD"; fi
+  return 1
+}
+gvm() {
+  if [ -z "${GVM_NO_GIT_BAK}" ]; then echo "UNBOUND"; fi
+  if [ "$1" = "install" ]; then
+    return 0
+  fi
+  if [ "$1" = "use" ]; then
+    export PATH="` + binDir + `:$PATH"
+    echo "GVM_USE $*" >> "` + logFile + `"
+    return 0
+  fi
+  return 1
+}
+cd .
+`
+		if err := os.WriteFile(filepath.Join(home, ".gvm", "scripts", "gvm"), []byte(fakeGVM), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		writeStub := func(name, body string) {
+			p := filepath.Join(binDir, name)
+			if err := os.WriteFile(p, []byte(body), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeStub("uname", "#!/bin/sh\n[ \"$1\" = \"-m\" ] && echo arm64 || echo Darwin\n")
+		writeStub("xcode-select", "#!/bin/sh\n[ \"$1\" = \"-p\" ] && echo \""+fakeDevDir+"\" && exit 0\nexit 0\n")
+		writeStub("brew", "#!/bin/sh\nexit 0\n")
+		writeStub("git", "#!/bin/sh\necho '1.0.0'\n")
+		writeStub("go", `#!/bin/sh
+if [ "$1" = "version" ]; then
+  echo "go version go1.27.3 darwin/arm64"
+  exit 0
+fi
+if [ "$1" = "build" ]; then
+  out=""
+  prev=""
+  for a in "$@"; do
+    if [ "$prev" = "-o" ]; then out="$a"; fi
+    prev="$a"
+  done
+  cat <<'EOF' > "$out"
+#!/bin/sh
+echo "ANX_ONESHOT $*" >> "`+logFile+`"
+if [ "$1" = "wizard" ]; then
+  touch "`+home+`/.zshrc"
+fi
+echo "ANX_STUB $*"
+EOF
+  chmod +x "$out"
+  exit 0
+fi
+exit 1
+`)
+
+		// 1. Re-run with broken GVM present + ANX_ONE_SHOT=1: must not exit silently at startup
+		//    or break in build_anx's cd, and must auto-launch `anx wizard` one-shot.
+		cmd := exec.Command("bash", filepath.Join(repoRoot, "scripts", "bootstrap_anx.sh"), "--from-source")
+		cmd.Env = []string{
+			"HOME=" + home,
+			"PATH=" + binDir + ":/usr/bin:/bin",
+			"ANX_SKIP_CLT=1",
+			"ANX_SKIP_HOMEBREW=1",
+			"ANX_ONE_SHOT=1",
+			"ANX_NO_SHELL_RELOAD=1",
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("bootstrap_anx.sh with existing GVM and ANX_ONE_SHOT failed: %v\nout:\n%s", err, out)
+		}
+		if !strings.Contains(string(out), "ANX_STUB wizard") {
+			t.Errorf("expected one-shot bootstrap to auto-run 'anx wizard', got:\n%s", out)
+		}
+		if _, err := os.Stat(filepath.Join(home, ".zshrc")); err != nil {
+			t.Errorf("expected wizard one-shot run to create %s: %v", filepath.Join(home, ".zshrc"), err)
+		}
+
+		// 2. Fresh GVM installer mock: must pass GVM_NO_UPDATE_PROFILE=1 and hide restart-terminal noise.
+		home2 := filepath.Join(tmp, "home2")
+		if err := os.MkdirAll(home2, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		goGvmDir := filepath.Join(tmp, "go-gvm-bin")
+		if err := os.MkdirAll(goGvmDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(filepath.Join(binDir, "go"), filepath.Join(goGvmDir, "go")); err != nil {
+			t.Fatal(err)
+		}
+		gvmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/gvm-installer" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write([]byte(`#!/usr/bin/env bash
+if [ -z "${GVM_NO_UPDATE_PROFILE:-}" ]; then
+  echo "Unable to locate profile settings file" >&2
+  exit 1
+fi
+mkdir -p "$HOME/.gvm/scripts"
+cat <<'EOS' > "$HOME/.gvm/scripts/gvm"
+export GVM_ROOT="$HOME/.gvm"
+cd() {
+  if [ "${GVM_DEBUG}" -eq 1 ]; then echo "DBG"; fi
+  return 1
+}
+gvm() {
+  if [ -z "${GVM_NO_GIT_BAK}" ]; then return 1; fi
+  if [ "$1" = "install" ]; then
+    [ "$2" = "go1.27.3" ] || return 1
+    return 0
+  fi
+  if [ "$1" = "use" ]; then
+    if [ -n "${PKGSET}" ]; then return 1; fi
+    export PATH="` + goGvmDir + `:$PATH"
+    echo "GVM_USE_OK $*" >> "` + logFile + `"
+    return 0
+  fi
+  return 1
+}
+cd .
+EOS
+echo "Please restart your terminal session or run source $HOME/.gvm/scripts/gvm"
+`))
+		}))
+		defer gvmSrv.Close()
+
+		cmdEnsureOnly := exec.Command("bash", filepath.Join(repoRoot, "scripts", "bootstrap_anx.sh"), "--ensure-go-only")
+		cmdEnsureOnly.Env = []string{
+			"HOME=" + home2,
+			"PATH=" + binDir + ":/usr/bin:/bin",
+			"ANX_SKIP_CLT=1",
+			"ANX_SKIP_HOMEBREW=1",
+			"ANX_GO_SYS_BIN=" + filepath.Join(tmp, "no-sys-go"),
+			"ANX_GVM_INSTALLER_URL=" + gvmSrv.URL + "/gvm-installer",
+		}
+		outEnsureOnly, err := cmdEnsureOnly.CombinedOutput()
+		if err != nil {
+			t.Fatalf("bootstrap_anx.sh --ensure-go-only failed: %v\nout:\n%s", err, outEnsureOnly)
+		}
+		if strings.Contains(string(outEnsureOnly), "restart your terminal") {
+			t.Errorf("bootstrap_anx.sh must not leak GVM restart-terminal chatter, got:\n%s", outEnsureOnly)
+		}
+		if strings.Contains(string(outEnsureOnly), "Compiling ANX") {
+			t.Errorf("--ensure-go-only must not compile ANX, got:\n%s", outEnsureOnly)
+		}
+		if !strings.Contains(string(outEnsureOnly), "configured via GVM") {
+			t.Errorf("expected GVM Go activation confirmation under --ensure-go-only, got:\n%s", outEnsureOnly)
+		}
+		callsLogBytes, _ := os.ReadFile(logFile)
+		if !strings.Contains(string(callsLogBytes), "GVM_USE_OK use go1.27.3 --default") {
+			t.Errorf("expected GVM use invocation in calls log, got:\n%s", string(callsLogBytes))
+		}
+	})
 }

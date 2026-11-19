@@ -24,6 +24,10 @@ dispatch_exec() {
 }
 
 DEST_BIN="${HOME}/.local/bin"
+if [ -z "${ANX_INITIAL_PATH:-}" ]; then
+	ANX_INITIAL_PATH="${PATH}"
+	export ANX_INITIAL_PATH
+fi
 
 for _brew_bin in /opt/homebrew/bin /usr/local/bin; do
 	if [ -d "${_brew_bin}" ]; then
@@ -179,6 +183,7 @@ check_precompiled_release() {
 	fi
 }
 
+ANX_ONE_SHOT="${ANX_ONE_SHOT:-0}"
 INTERACTIVE_TTY=0
 if [ "$#" -eq 0 ] && [ -z "${ANX_INSTALL_MODE:-}" ]; then
 	if [ -t 0 ] && [ -t 1 ]; then
@@ -212,7 +217,11 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 		fi
 		prompt_out "\n"
 		case "$choice" in
-		2) FORCE_SOURCE=1 ;;
+		2)
+			FORCE_SOURCE=1
+			ANX_ONE_SHOT=1
+			set -- "wizard"
+			;;
 		3)
 			echo "  [INFO] Preview mode selected."
 			echo "  - OS/Arch     : ${os_arch}"
@@ -227,6 +236,8 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 		*)
 			# Default 1: verified release
 			FORCE_SOURCE=0
+			ANX_ONE_SHOT=1
+			set -- "wizard"
 			;;
 		esac
 	else
@@ -255,11 +266,14 @@ if [ "$INTERACTIVE_TTY" -eq 1 ]; then
 		*)
 			# Default 1: build from source
 			FORCE_SOURCE=1
+			ANX_ONE_SHOT=1
+			set -- "wizard"
 			;;
 		esac
 	fi
 fi
 
+export ANX_ONE_SHOT
 if [ "$FORCE_SOURCE" -eq 1 ]; then
 	export ANX_FORCE_SOURCE=1
 fi
@@ -313,7 +327,7 @@ fetch_repo_tarball() {
 	fi
 
 	mkdir -p "$_dest"
-	cp -R "${_extract}/." "${_dest}/"
+	cp -Rf "${_extract}/." "${_dest}/"
 	rm -rf "$_tmp_tar"
 	return 0
 }
@@ -434,24 +448,7 @@ try_go_install_direct() {
 	return 1
 }
 
-# If remote execution (no local repo), prioritize pre-compiled release, then go-install, then source clone
-if [ -z "${REPO_ROOT}" ]; then
-	if [ "$FORCE_GO_INSTALL" -eq 1 ]; then
-		if try_go_install_direct; then
-			dispatch_exec "${DEST_BIN}/anx" "$@"
-		fi
-	fi
-
-	if [ "$FORCE_SOURCE" -eq 0 ]; then
-		if try_download_release_direct; then
-			dispatch_exec "${DEST_BIN}/anx" "$@"
-		fi
-		if try_go_install_direct; then
-			dispatch_exec "${DEST_BIN}/anx" "$@"
-		fi
-	fi
-
-	# Fallback to source checkout/tarball (avoiding Apple /usr/bin/git stub on fresh macOS without CLT)
+ensure_repo_checkout() {
 	TARGET_REPO="${ANX_REPO_DIR:-${HOME}/.local/share/anx/repo}"
 	echo "  [INFO] Bootstrapping repository into ${TARGET_REPO}..."
 	mkdir -p "$(dirname "${TARGET_REPO}")"
@@ -475,6 +472,29 @@ if [ -z "${REPO_ROOT}" ]; then
 		fi
 	fi
 	REPO_ROOT="${TARGET_REPO}"
+}
+
+# If remote execution (no local repo), ensure checkout; delegate Darwin and interactive one-shot runs through bootstrap_anx.sh
+if [ -z "${REPO_ROOT}" ]; then
+	if [ "$(uname -s)" != "Darwin" ] && [ "${ANX_ONE_SHOT:-0}" -eq 0 ]; then
+		if [ "$FORCE_GO_INSTALL" -eq 1 ]; then
+			if try_go_install_direct; then
+				dispatch_exec "${DEST_BIN}/anx" "$@"
+			fi
+		fi
+
+		if [ "$FORCE_SOURCE" -eq 0 ]; then
+			if try_download_release_direct; then
+				dispatch_exec "${DEST_BIN}/anx" "$@"
+			fi
+			if try_go_install_direct; then
+				dispatch_exec "${DEST_BIN}/anx" "$@"
+			fi
+		fi
+	fi
+
+	# Fallback to source checkout/tarball (avoiding Apple /usr/bin/git stub on fresh macOS without CLT)
+	ensure_repo_checkout
 fi
 
 cd "${REPO_ROOT}"
