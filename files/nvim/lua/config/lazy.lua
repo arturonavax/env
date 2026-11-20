@@ -51,6 +51,9 @@ require("lazy").setup({
     -- version = "*", -- try installing the latest stable version for plugins that support semver
   },
   install = { colorscheme = { "tokyonight", "habamax" } },
+  -- Lua dependencies (such as mega.cmdparse for avante.nvim) are declared as standard lazy plugins
+  -- rather than relying on hererocks/luarocks compilation.
+  rocks = { enabled = false },
   checker = {
     enabled = true, -- check for plugin updates periodically
     notify = false, -- notify on update

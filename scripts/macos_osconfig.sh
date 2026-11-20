@@ -30,6 +30,7 @@ DO_RESET_LAUNCHSERVICES=0
 DO_SHORTCUTS=0
 DO_RESTART=1
 USE_SUDO=1
+EXPLICIT_NO_SUDO=0
 FORCE_VERSION=0
 DRY_RUN=0
 ANY_SECTION=0
@@ -132,6 +133,7 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--no-sudo)
 		USE_SUDO=0
+		EXPLICIT_NO_SUDO=1
 		;;
 	--no-restart)
 		DO_RESTART=0
@@ -282,9 +284,19 @@ plist_set() {
 		return 0
 	fi
 	if "$pb" -c "Print ${key_path}" "$plist_path" >/dev/null 2>&1; then
-		"$pb" -c "Set ${key_path} ${value}" "$plist_path" >/dev/null 2>&1 || true
+		"$pb" -c "Set ${key_path} ${value}" "$plist_path" >/dev/null 2>&1 || log_warn "Could not set ${key_path} in ${plist_path}."
 	else
-		"$pb" -c "Add ${key_path} ${value_type} ${value}" "$plist_path" >/dev/null 2>&1 || true
+		local parent_path="${key_path%:*}"
+		if [[ -n "$parent_path" && "$parent_path" != "$key_path" ]]; then
+			if ! "$pb" -c "Print ${parent_path}" "$plist_path" >/dev/null 2>&1; then
+				local grandparent_path="${parent_path%:*}"
+				if [[ -n "$grandparent_path" && "$grandparent_path" != "$parent_path" ]] && ! "$pb" -c "Print ${grandparent_path}" "$plist_path" >/dev/null 2>&1; then
+					"$pb" -c "Add ${grandparent_path} dict" "$plist_path" >/dev/null 2>&1 || true
+				fi
+				"$pb" -c "Add ${parent_path} dict" "$plist_path" >/dev/null 2>&1 || true
+			fi
+		fi
+		"$pb" -c "Add ${key_path} ${value_type} ${value}" "$plist_path" >/dev/null 2>&1 || log_warn "Could not add ${key_path} in ${plist_path}."
 	fi
 }
 
@@ -330,9 +342,8 @@ init_sudo_keepalive() {
 		return 0
 	fi
 	if ! sudo -v; then
-		log_warn "sudo authentication failed; skipping privileged steps."
-		USE_SUDO=0
-		return 0
+		log_err "sudo authentication failed; re-run with cached sudo or pass --no-sudo to skip privileged steps."
+		return 1
 	fi
 	(
 		sleep_pid=""
@@ -381,22 +392,33 @@ configure_touchid_sudo() {
 
 	local pam_reattach_path=""
 	if ! pam_reattach_path="$(find_pam_reattach 2>/dev/null)"; then
-		if command -v brew >/dev/null 2>&1; then
+		if [[ "${ANX_OSCONFIG_NO_BREW:-0}" != "1" ]] && command -v brew >/dev/null 2>&1; then
 			log_info "Installing pam-reattach via Homebrew (bridges Herdr/tmux daemon sessions to Aqua Touch ID)..."
-			run_cmd brew install pam-reattach || true
+			if ! run_cmd brew install pam-reattach; then
+				log_warn "Failed to install pam-reattach via Homebrew; Touch ID inside detached Herdr/tmux sessions may require pam_reattach.so."
+			fi
 			pam_reattach_path="$(find_pam_reattach 2>/dev/null || true)"
 		else
 			log_warn "Homebrew not found; configuring native pam_tid.so (Touch ID works directly in Ghostty, install pam-reattach for detached Herdr/tmux sessions)."
 		fi
 	fi
 
-	local desired_content tmp_sudo_local
+	local desired_content tmp_sudo_local extra_pam_lines="" line
 	desired_content="# sudo_local: local config file which survives system updates (managed by anx macos_osconfig)"$'\n'
 	# pam_reattach must precede pam_tid.so with 'optional' so SSH/root logins never fail while Ghostty+Herdr sessions re-attach to Aqua GUI.
 	if [[ -n "$pam_reattach_path" ]]; then
 		desired_content+="auth       optional       ${pam_reattach_path}"$'\n'
 	fi
 	desired_content+="auth       sufficient     pam_tid.so"$'\n'
+	if [[ -r /etc/pam.d/sudo_local ]]; then
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			case "$line" in
+			""|"# sudo_local:"*|*pam_reattach.so*|*pam_tid.so*) ;;
+			*) extra_pam_lines+="${line}"$'\n' ;;
+			esac
+		done < /etc/pam.d/sudo_local
+		desired_content+="$extra_pam_lines"
+	fi
 
 	if [[ "$DRY_RUN" -eq 1 ]]; then
 		log_info "[dry-run] Would ensure /etc/pam.d/sudo_local contains:"
@@ -404,7 +426,7 @@ configure_touchid_sudo() {
 		return 0
 	fi
 
-	if [[ -f /etc/pam.d/sudo_local ]] && [[ "$(cat /etc/pam.d/sudo_local)"$'\n' == "$desired_content" || "$(cat /etc/pam.d/sudo_local)" == "${desired_content%$'\n'}" ]]; then
+	if [[ -r /etc/pam.d/sudo_local ]] && [[ "$(cat /etc/pam.d/sudo_local)"$'\n' == "$desired_content" || "$(cat /etc/pam.d/sudo_local)" == "${desired_content%$'\n'}" ]]; then
 		log_info "/etc/pam.d/sudo_local is already up to date."
 		return 0
 	fi
@@ -529,6 +551,7 @@ configure_defaults() {
 
 	# Close Finder before direct PlistBuddy mutations so cached preferences do not overwrite disk writes.
 	quit_app_if_running "Finder"
+	flush_cfprefsd
 	local finder_plist="${HOME}/Library/Preferences/com.apple.finder.plist"
 	local view_group
 	for view_group in DesktopViewSettings FK_StandardViewSettings StandardViewSettings; do
@@ -580,6 +603,7 @@ configure_defaults() {
 	defaults_write_optional com.apple.terminal FocusFollowsMouse -bool false
 	if [[ "${TERM_PROGRAM:-}" != "Apple_Terminal" ]]; then
 		quit_app_if_running "Terminal"
+		flush_cfprefsd
 		plist_set "${HOME}/Library/Preferences/com.apple.Terminal.plist" ':"Window Settings":Basic:shellExitAction' integer 0
 	fi
 
@@ -680,6 +704,7 @@ configure_spaces() {
 	pb="$(resolve_plist_buddy)"
 	activate="$(resolve_activate_settings)"
 	local existing_ids=()
+	local added_missing_hotkeys=0
 
 	# Phase 1: create missing entries via cfprefsd first so cached writes never clobber subsequent PlistBuddy disk edits.
 	for hotkey_id in 79 80 81 82 98 118 119 120 121 122 123 124 125 126 127; do
@@ -689,8 +714,13 @@ configure_spaces() {
 			run_cmd defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey_id" "<dict><key>enabled</key><true/></dict>"
 		else
 			defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey_id" "<dict><key>enabled</key><true/></dict>" >/dev/null 2>&1 || true
+			added_missing_hotkeys=1
 		fi
 	done
+
+	if [[ "$added_missing_hotkeys" -eq 1 && ${#existing_ids[@]} -gt 0 ]]; then
+		flush_cfprefsd
+	fi
 
 	# Phase 2: enable pre-existing hotkey dicts (preserving keybindings, adding :enabled if absent).
 	if [[ ${#existing_ids[@]} -gt 0 ]]; then
@@ -817,6 +847,9 @@ main() {
 	fi
 	if [[ "$DO_DEFAULTS" -eq 1 || "$DO_REDUCE_UI_FX" -eq 1 || "$DO_SAFARI" -eq 1 || "$DO_SPACES" -eq 1 ]]; then
 		restart_affected_services
+	fi
+	if [[ "$EXPLICIT_NO_SUDO" -eq 1 ]]; then
+		log_warn "Completed user-level configuration; privileged steps (Touch ID sudo_local / pmset / loginwindow) were skipped (--no-sudo)."
 	fi
 	log_info "Done. Re-login or reboot is recommended if WindowManager/Space hotkeys need full refresh."
 }

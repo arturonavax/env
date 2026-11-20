@@ -363,8 +363,8 @@ func (c *Catalog) ListConfigurationsByGroup(group string) []domain.Configuration
 	if normalized == "" || normalized == "all" {
 		result := make([]domain.ConfigurationResource, 0, len(all))
 		for _, cfg := range all {
-			// Mirror utils/sync_config.sh: vscode and cursor are synced only when explicitly targeted.
-			if cfg.Group == "vscode" || cfg.Group == "cursor" {
+			// Mirror utils/sync_config.sh: vscode, cursor, and karabiner are synced only when explicitly targeted.
+			if cfg.Group == "vscode" || cfg.Group == "cursor" || cfg.Group == "karabiner" {
 				continue
 			}
 			result = append(result, cfg)

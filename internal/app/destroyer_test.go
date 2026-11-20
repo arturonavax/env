@@ -6,10 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/arturonavax/env/internal/app"
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/providers"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/state"
 )
 
@@ -198,5 +201,84 @@ func TestPurgeConfigTarget_FileRemoval(t *testing.T) {
 
 	if _, err := os.Stat(targetFile); !os.IsNotExist(err) {
 		t.Errorf("expected file %s to be deleted, but it still exists", targetFile)
+	}
+}
+
+
+func TestDestroyerService_PlanPurge_AllMergesCatalogWithPartialStore(t *testing.T) {
+	plat := platform.Detect()
+	cat := catalog.NewDefaultRegistry()
+	tmpDir := t.TempDir()
+	store, err := state.OpenStore(filepath.Join(tmpDir, "state"))
+	if err != nil {
+		t.Fatalf("failed to open store: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	// Seed store with only 2 tracked packages (previously caused PlanPurge to ignore remaining catalog packages).
+	for _, id := range []string{"git", "curl"} {
+		if err := store.RecordResource(state.InstalledRecord{ResourceID: id, ManagedByAnx: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	destroyer := app.NewDestroyerService(plat, cat, nil, nil, store)
+	plan, err := destroyer.PlanPurge(context.Background(), app.PurgeOptions{})
+	if err != nil {
+		t.Fatalf("PlanPurge failed: %v", err)
+	}
+	if len(plan.PackagesToUninstall) <= 2 {
+		t.Fatalf("expected PlanPurge to merge full catalog alongside partial store, got only %d packages: %v", len(plan.PackagesToUninstall), plan.PackagesToUninstall)
+	}
+}
+
+func TestDestroyerService_ReinstallForcesAllProfilePackagesEvenWhenInstalled(t *testing.T) {
+	home := t.TempDir()
+	localBin := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(localBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Pre-seed all minimal profile binaries so IsInstalled() would return true on non-forced plans.
+	for _, bin := range []string{"git", "curl", "htop", "jq", "fzf", "rg", "fd", "bat", "eza", "tree", "starship"} {
+		if err := os.WriteFile(filepath.Join(localBin, bin), []byte("#!/bin/sh\necho 1.0.0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("PATH", localBin)
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		LocalBinDir:     localBin,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	cat := catalog.NewDefaultRegistry()
+	store, err := state.OpenStore(plat.StateDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	disp := providers.NewDispatcher(plat, cat.Catalog(), security.NewRunner(5*time.Second), "")
+	instSvc := app.NewInstallService(app.InstallDeps{
+		Platform: plat,
+		Catalog:  cat,
+		Provider: disp,
+		Store:    store,
+	})
+	destroyer := app.NewDestroyerService(plat, cat, instSvc, nil, store)
+
+	res, err := destroyer.DestroyerReinstall(context.Background(), "minimal", true)
+	if err != nil {
+		t.Fatalf("DestroyerReinstall dry-run failed: %v", err)
+	}
+	expectedMin, err := cat.ResolveProfilePackages("minimal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.ReinstallSteps < len(expectedMin) {
+		t.Fatalf("expected forced destroyer plan steps >= %d (all minimal packages even when pre-installed), got %d", len(expectedMin), res.ReinstallSteps)
 	}
 }

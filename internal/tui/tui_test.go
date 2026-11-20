@@ -2,10 +2,12 @@ package tui
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/arturonavax/env/internal/app"
@@ -1332,10 +1334,92 @@ func TestWizardReviewPlanOSConfigMatchesHostOS(t *testing.T) {
 	w.height = 36
 
 	view := w.View().Content
-	if !strings.Contains(view, "Amethyst") || !strings.Contains(view, "Karabiner") || !strings.Contains(view, "macos-osconfig") {
-		t.Errorf("expected darwin review plan osconfig section to describe Amethyst/Karabiner/macos-osconfig, got:\n%s", view)
+	if !strings.Contains(view, "Amethyst") || !strings.Contains(view, "macos-osconfig") {
+		t.Errorf("expected darwin review plan osconfig section to describe Amethyst/macos-osconfig, got:\n%s", view)
+	}
+	if strings.Contains(view, "Karabiner") {
+		t.Errorf("darwin review plan should not include Karabiner by default, got:\n%s", view)
 	}
 	if strings.Contains(view, "GNOME Extension") {
 		t.Errorf("darwin review plan unexpectedly rendered Linux GNOME Extension description:\n%s", view)
+	}
+}
+
+
+func TestWizardDestroyerToggleReplansWithForceAndRendersOSConfigStatus(t *testing.T) {
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Pre-seed minimal binaries so non-forced Plan skips them, while forced Destroyer Plan includes them.
+	for _, bin := range []string{"git", "curl", "htop", "jq", "fzf", "rg", "fd", "bat", "eza", "tree", "starship"} {
+		if err := os.WriteFile(filepath.Join(binDir, bin), []byte("#!/bin/sh\necho 1.0.0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", binDir)
+	plat := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "linux",
+		Arch:            "amd64",
+		PackageManagers: []string{"apt"},
+		HomeDir:         home,
+		LocalBinDir:     binDir,
+		StateDir:        filepath.Join(home, "state"),
+	})
+	cat := catalog.NewDefaultRegistry()
+	disp := providers.NewDispatcher(plat, cat.Catalog(), security.NewRunner(5*time.Second), "")
+	instSvc := app.NewInstallService(app.InstallDeps{
+		Platform: plat,
+		Catalog:  cat,
+		Provider: disp,
+	})
+
+	w := NewWizardModel(plat, cat, instSvc)
+	w.selectedPkgs = map[string]bool{"git": true, "curl": true, "fzf": true}
+	w.stage = StageReviewPlan
+
+	// Toggling [d] in StageReviewPlan must enter StagePlanning and return a plan command with destroyer=true.
+	nm, cmd := w.Update(tea.KeyPressMsg{Text: "d"})
+	w = nm.(WizardModel)
+	if !w.destroyerMode || w.stage != StagePlanning || cmd == nil {
+		t.Fatalf("expected [d] toggle in StageReviewPlan to enter StagePlanning with cmd, got destroyer=%v stage=%v cmd=%v", w.destroyerMode, w.stage, cmd)
+	}
+	rawMsg := cmd()
+	batch, ok := rawMsg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected tea.BatchMsg from StagePlanning trigger, got %T (%#v)", rawMsg, rawMsg)
+	}
+	var planMsg wizardPlanDoneMsg
+	foundPlan := false
+	for _, subCmd := range batch {
+		if subCmd == nil {
+			continue
+		}
+		if pm, ok := subCmd().(wizardPlanDoneMsg); ok {
+			planMsg = pm
+			foundPlan = true
+			break
+		}
+	}
+	if !foundPlan || planMsg.err != nil || planMsg.plan == nil {
+		t.Fatalf("expected wizardPlanDoneMsg with plan inside batch, got found=%v msg=%#v", foundPlan, planMsg)
+	}
+	if len(planMsg.plan.Steps) < 3 {
+		t.Fatalf("expected destroyer force plan to reschedule all 3 pre-installed packages, got %d steps", len(planMsg.plan.Steps))
+	}
+
+	// Verify StageCompleted renders reconciled count + explicit OS Configuration status even when err == nil.
+	w.stage = StageCompleted
+	w.width = 100
+	w.height = 40
+	w.succeededItems = []string{"git", "curl", "fzf"}
+	w.osConfigStatus = "applied with warnings (privileged steps skipped: --no-sudo)"
+	view := w.View().Content
+	if !strings.Contains(view, "Reconciled (3 components)") {
+		t.Errorf("expected StageCompleted to show reconciled component count, got:\n%s", view)
+	}
+	if !strings.Contains(view, "OS Configuration (osconfig)") || !strings.Contains(view, "--no-sudo") {
+		t.Errorf("expected StageCompleted to explicitly show OS Configuration warning status, got:\n%s", view)
 	}
 }

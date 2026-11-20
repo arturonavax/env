@@ -22,7 +22,33 @@ vim.opt.autoread = true
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_perl_provider = 0
 
--- Fijar el binario de Python 3
+-- Ensure user & Homebrew toolchain directories are visible in PATH (including GUI launches and Mason installers)
+do
+  local home = vim.env.HOME or vim.uv.os_homedir()
+  local sep = vim.fn.has("win32") == 1 and ";" or ":"
+  local current_path = vim.env.PATH or ""
+  local candidates = {
+    "/opt/homebrew/bin",
+    "/opt/homebrew/sbin",
+    "/usr/local/go/bin",
+  }
+  if home and home ~= "" then
+    vim.list_extend(candidates, {
+      home .. "/.pyenv/shims",
+      home .. "/go/bin",
+      home .. "/.cargo/bin",
+      home .. "/.local/bin",
+    })
+  end
+  for _, dir in ipairs(candidates) do
+    if vim.fn.isdirectory(dir) == 1 and not string.find(sep .. current_path .. sep, sep .. dir .. sep, 1, true) then
+      current_path = dir .. sep .. current_path
+    end
+  end
+  vim.env.PATH = current_path
+end
+
+-- Fijar el binario de Python 3 (después de enriquecer PATH)
 vim.g.python3_host_prog = vim.fn.exepath("python3")
 
 -- Desactiva la línea del cursor durante renders pesados o en general

@@ -372,8 +372,8 @@ configurations:
 
   - id: karabiner-config
     name: Karabiner-Elements Configuration
-    group: osconfig
-    description: macOS keyboard remapping rules
+    group: karabiner
+    description: Optional macOS keyboard remapping rules (only synced when explicitly targeted)
     source: files/karabiner/karabiner.json
     target: "~/.config/karabiner/karabiner.json"
     os: [darwin]

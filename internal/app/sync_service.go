@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/arturonavax/env/internal/catalog"
@@ -384,7 +385,18 @@ func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult,
 		}
 	}
 
+	var dotfileCfgs, osAssetCfgs, osScriptCfgs []domain.ConfigurationResource
 	for _, cfg := range cfgs {
+		if cfg.Group != "osconfig" {
+			dotfileCfgs = append(dotfileCfgs, cfg)
+		} else if len(cfg.PostSyncCmds) > 0 {
+			osScriptCfgs = append(osScriptCfgs, cfg)
+		} else {
+			osAssetCfgs = append(osAssetCfgs, cfg)
+		}
+	}
+
+	for _, cfg := range dotfileCfgs {
 		if err := ctx.Err(); err != nil {
 			return results, err
 		}
@@ -395,7 +407,21 @@ func (s *SyncService) Sync(ctx context.Context, opts SyncOptions) ([]SyncResult,
 		res.SnapshotID = snapID
 		results = append(results, res)
 	}
-	return results, nil
+
+	var osErrs []error
+	orderedOS := append(osAssetCfgs, osScriptCfgs...)
+	for _, cfg := range orderedOS {
+		if err := ctx.Err(); err != nil {
+			return results, err
+		}
+		res, err := s.syncConfig(ctx, cfg, opts)
+		res.SnapshotID = snapID
+		results = append(results, res)
+		if err != nil {
+			osErrs = append(osErrs, fmt.Errorf("syncing %s: %w", cfg.ID, err))
+		}
+	}
+	return results, errors.Join(osErrs...)
 }
 
 // SyncOne synchronizes a single configuration by ID (used by InstallService plan steps).
@@ -458,11 +484,17 @@ func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationRe
 		r, syncErr = s.syncFile(cfg, source, target, opts, res)
 	}
 
-	if syncErr == nil && !opts.DryRun && (r.Action == "created" || r.Action == "updated" || r.Action == "merged") {
-		if err := s.runPostSync(ctx, cfg); err != nil {
+	isOSConfigScript := cfg.Group == "osconfig" && len(cfg.PostSyncCmds) > 0
+	shouldRunPostSync := r.Action == "created" || r.Action == "updated" || r.Action == "merged" ||
+		(isOSConfigScript && r.Action == "unchanged") ||
+		(opts.Force && len(cfg.PostSyncCmds) > 0 && r.Action != "skipped" && r.Action != "conflict")
+	if syncErr == nil && !opts.DryRun && shouldRunPostSync {
+		if detail, err := s.runPostSync(ctx, cfg); err != nil {
 			r.Action = "partial"
 			appendSyncDetail(&r, fmt.Sprintf("post-sync error: %v", err))
 			syncErr = fmt.Errorf("post-sync failed for config %q: %w", cfg.ID, err)
+		} else if detail != "" {
+			appendSyncDetail(&r, detail)
 		}
 	}
 	if syncErr == nil && r.Action != "skipped" && r.Action != "conflict" {
@@ -475,7 +507,47 @@ func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationRe
 	return r, syncErr
 }
 
-func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.ConfigurationResource) error {
+type postSyncLineWriter struct {
+	mu      sync.Mutex
+	buf     bytes.Buffer
+	lineBuf strings.Builder
+	handler func(string)
+}
+
+func (w *postSyncLineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, _ = w.buf.Write(p)
+	if w.handler != nil {
+		for _, b := range p {
+			if b == '\n' {
+				line := strings.TrimRight(w.lineBuf.String(), "\r")
+				w.lineBuf.Reset()
+				if line != "" {
+					w.handler(line)
+				}
+			} else if b != '\r' {
+				w.lineBuf.WriteByte(b)
+			}
+		}
+	}
+	return len(p), nil
+}
+
+func (w *postSyncLineWriter) Flush() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.handler != nil && w.lineBuf.Len() > 0 {
+		line := strings.TrimSpace(w.lineBuf.String())
+		w.lineBuf.Reset()
+		if line != "" {
+			w.handler(line)
+		}
+	}
+	return strings.TrimSpace(w.buf.String())
+}
+
+func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.ConfigurationResource) (string, error) {
 	var errs []error
 	if parentCtx == nil {
 		parentCtx = context.Background()
@@ -487,6 +559,8 @@ func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.Configur
 	if s.platform != nil && s.platform.HomeDir() != "" {
 		cmdEnv = replaceOrAppendEnv(os.Environ(), "HOME", s.platform.HomeDir())
 	}
+	outHandler := security.OutputHandlerFromContext(parentCtx)
+	var outputs []string
 
 	runCmd := func(cmdArgs []string, prefix string) {
 		if len(cmdArgs) == 0 {
@@ -496,12 +570,17 @@ func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.Configur
 		if len(cmdEnv) > 0 {
 			cmd.Env = cmdEnv
 		}
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		if err := cmd.Run(); err != nil {
-			errOutput := strings.TrimSpace(stderr.String())
-			if errOutput != "" {
-				errs = append(errs, fmt.Errorf("%scmd %v failed: %w (stderr: %s)", prefix, cmdArgs, err, errOutput))
+		w := &postSyncLineWriter{handler: outHandler}
+		cmd.Stdout = w
+		cmd.Stderr = w
+		err := cmd.Run()
+		captured := w.Flush()
+		if captured != "" {
+			outputs = append(outputs, captured)
+		}
+		if err != nil {
+			if captured != "" {
+				errs = append(errs, fmt.Errorf("%scmd %v failed: %w (stderr: %s)", prefix, cmdArgs, err, captured))
 			} else {
 				errs = append(errs, fmt.Errorf("%scmd %v failed: %w", prefix, cmdArgs, err))
 			}
@@ -519,7 +598,23 @@ func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.Configur
 			}
 		}
 	}
-	return errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return "", err
+	}
+	if cfg.Group == "osconfig" && len(cfg.PostSyncCmds) > 0 {
+		joined := strings.Join(outputs, "\n")
+		if strings.Contains(joined, "skipped (--no-sudo)") || strings.Contains(joined, "Skipping Touch ID sudo") {
+			return "applied with warnings (privileged steps skipped: --no-sudo)", nil
+		}
+		if strings.Contains(joined, "[WARN]") || strings.Contains(joined, "WARNING:") {
+			return "applied with warnings (review osconfig warnings or grant Full Disk Access)", nil
+		}
+		if joined != "" {
+			return "applied successfully", nil
+		}
+		return "skipped (ANX_SKIP_OSCONFIG=1)", nil
+	}
+	return "", nil
 }
 
 func replaceOrAppendEnv(env []string, key, value string) []string {

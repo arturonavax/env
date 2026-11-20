@@ -92,32 +92,51 @@ func runDestroyerReinstall(cmd *cobra.Command, appCtx *AppContext, profile strin
 	}
 
 	res, err := appCtx.DestroyerSvc.DestroyerReinstall(cmd.Context(), profile, appCtx.Flags.DryRun)
-	if err != nil {
-		return err
-	}
-	if !appCtx.Flags.DryRun && profile != "" && appCtx.Store != nil {
+	if !appCtx.Flags.DryRun && err == nil && profile != "" && appCtx.Store != nil {
 		_ = appCtx.Store.SetActiveProfile(profile)
 	}
 
-	return emit(cmd, appCtx, res, func(w io.Writer) {
-		mode := "Executed"
-		if appCtx.Flags.DryRun {
-			mode = "Planned (Dry-Run)"
-		}
-		fmt.Fprintf(w, "\n%s Destroyer Reinstall:\n", mode)
-		fmt.Fprintf(w, "  • Uninstalled Packages: %d\n", res.UninstalledPackages)
-		fmt.Fprintf(w, "  • Purged Configurations: %d\n", res.PurgedConfigs)
-		if len(res.PurgedPaths) > 0 {
-			fmt.Fprintln(w, "  • Purged Paths:")
-			for _, p := range res.PurgedPaths {
-				fmt.Fprintf(w, "      - %s\n", p)
+	if res != nil && (!appCtx.Flags.ScriptMode && !appCtx.Flags.Quiet) {
+		renderErr := emit(cmd, appCtx, res, func(w io.Writer) {
+			mode := "Executed"
+			if appCtx.Flags.DryRun {
+				mode = "Planned (Dry-Run)"
 			}
+			fmt.Fprintf(w, "\n%s Destroyer Reinstall:\n", mode)
+			fmt.Fprintf(w, "  • Uninstalled Packages: %d\n", res.UninstalledPackages)
+			fmt.Fprintf(w, "  • Purged Configurations: %d\n", res.PurgedConfigs)
+			if len(res.PurgedPaths) > 0 {
+				fmt.Fprintln(w, "  • Purged Paths:")
+				for _, p := range res.PurgedPaths {
+					fmt.Fprintf(w, "      - %s\n", p)
+				}
+			}
+			if res.Reinstalled {
+				fmt.Fprintf(w, "  • Fresh Installation:   %s (%d steps, Plan ID: %s)\n", st.Success.Render("[COMPLETED]"), res.ReinstallSteps, res.ReinstallPlanID)
+			} else if res.ReinstallSteps > 0 {
+				fmt.Fprintf(w, "  • Fresh Installation:   %s (%d steps, Plan ID: %s)\n", st.Warning.Render("[PARTIAL]"), res.ReinstallSteps, res.ReinstallPlanID)
+			}
+			if res.SyncedConfigs {
+				fmt.Fprintf(w, "  • Dotfile Sync:         %s\n", st.Success.Render("[COMPLETED]"))
+			} else if !appCtx.Flags.DryRun && res.OSConfigStatus != "" {
+				fmt.Fprintf(w, "  • Dotfile Sync:         %s\n", st.Error.Render("[FAILED]"))
+			}
+			if res.OSConfigStatus != "" {
+				label := st.Success.Render(res.OSConfigStatus)
+				if strings.Contains(res.OSConfigStatus, "failed") || strings.Contains(res.OSConfigStatus, "error") {
+					label = st.Error.Render(res.OSConfigStatus)
+				} else if strings.Contains(res.OSConfigStatus, "warning") || strings.Contains(res.OSConfigStatus, "skipped") {
+					label = st.Warning.Render(res.OSConfigStatus)
+				}
+				fmt.Fprintf(w, "  • OS Configuration:     %s\n", label)
+			}
+		})
+		if err != nil {
+			return err
 		}
-		if res.Reinstalled {
-			fmt.Fprintf(w, "  • Fresh Installation:   %s (Plan ID: %s)\n", st.Success.Render("[COMPLETED]"), res.ReinstallPlanID)
-			fmt.Fprintf(w, "  • Dotfile Sync:         %s\n", st.Success.Render("[COMPLETED]"))
-		}
-	})
+		return renderErr
+	}
+	return err
 }
 
 func runDestroyerUninstall(cmd *cobra.Command, appCtx *AppContext, profile string) error {

@@ -35,8 +35,10 @@ const (
 )
 
 type wizardApplyDoneMsg struct {
-	err     error
-	logPath string
+	err            error
+	logPath        string
+	osConfigStatus string
+	osConfigErr    error
 }
 
 type wizardSudoAuthMsg struct {
@@ -143,7 +145,10 @@ type WizardModel struct {
 	workerLogs            map[int][]string
 	recentOutputLines     []string
 	failedItems           []string
+	skippedItems          []string
 	succeededItems        []string
+	osConfigStatus        string
+	osConfigErr           error
 	installLogPath        string
 	err                   error
 	quitting              bool
@@ -587,6 +592,11 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "d", "D":
 			w.destroyerMode = !w.destroyerMode
+			if w.stage == StageReviewPlan && w.installSvc != nil {
+				w.stage = StagePlanning
+				cmd := runWizardPlanCmd(w.installSvc, w.syncSvc, w.ChosenProfile(), w.selectedPackageList(), w.destroyerMode)
+				return w, tea.Batch(cmd, tickSpinnerCmd())
+			}
 
 		case "enter":
 			switch w.stage {
@@ -620,14 +630,9 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				w.stage = StageSelectPackages
 
 			case StageSelectPackages:
-				selectedList := make([]string, 0, len(w.selectedPkgs))
-				for id, enabled := range w.selectedPkgs {
-					if enabled {
-						selectedList = append(selectedList, id)
-					}
-				}
+				selectedList := w.selectedPackageList()
 				w.stage = StagePlanning
-				cmd := runWizardPlanCmd(w.installSvc, w.syncSvc, selectedList)
+				cmd := runWizardPlanCmd(w.installSvc, w.syncSvc, w.ChosenProfile(), selectedList, w.destroyerMode)
 				return w, tea.Batch(cmd, tickSpinnerCmd())
 
 			case StageReviewPlan:
@@ -774,11 +779,18 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			w.activeWorkers[msg.StepID] = slot
-		} else if msg.Status == domain.StepSuccess || msg.Status == domain.StepFailed {
-			if msg.Status == domain.StepSuccess {
+		} else if msg.Status == domain.StepSuccess || msg.Status == domain.StepFailed || msg.Status == domain.StepSkipped {
+			switch msg.Status {
+			case domain.StepSuccess:
 				w.succeededItems = append(w.succeededItems, msg.ResourceID)
-			} else {
-				w.failedItems = append(w.failedItems, fmt.Sprintf("%s (%s)", msg.ResourceID, msg.Description))
+			case domain.StepFailed:
+				detail := msg.Description
+				if msg.OutputLine != "" {
+					detail = msg.OutputLine
+				}
+				w.failedItems = append(w.failedItems, fmt.Sprintf("%s (%s)", msg.ResourceID, detail))
+			case domain.StepSkipped:
+				w.skippedItems = append(w.skippedItems, msg.ResourceID)
 			}
 			if _, exists := w.activeWorkers[msg.StepID]; exists {
 				delete(w.activeWorkers, msg.StepID)
@@ -789,19 +801,22 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				w.completedSteps++
-				badge := "✔"
-				if msg.Status == domain.StepFailed {
-					badge = "✖"
-				}
-				act := msg.Action
-				if act == "" {
-					act = "install"
-				}
-				rec := fmt.Sprintf("%s %s [%s]", badge, msg.ResourceID, strings.ToUpper(act))
-				w.recentCompleted = append(w.recentCompleted, rec)
-				if len(w.recentCompleted) > 5 {
-					w.recentCompleted = w.recentCompleted[len(w.recentCompleted)-5:]
-				}
+			}
+			badge := "✔"
+			switch msg.Status {
+			case domain.StepFailed:
+				badge = "✖"
+			case domain.StepSkipped:
+				badge = "ℹ"
+			}
+			act := msg.Action
+			if act == "" {
+				act = "install"
+			}
+			rec := fmt.Sprintf("%s %s [%s]", badge, msg.ResourceID, strings.ToUpper(act))
+			w.recentCompleted = append(w.recentCompleted, rec)
+			if len(w.recentCompleted) > 5 {
+				w.recentCompleted = w.recentCompleted[len(w.recentCompleted)-5:]
 			}
 		}
 
@@ -818,6 +833,8 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case wizardApplyDoneMsg:
 		w.err = msg.err
 		w.installLogPath = msg.logPath
+		w.osConfigStatus = msg.osConfigStatus
+		w.osConfigErr = msg.osConfigErr
 		if msg.err == nil && w.store != nil {
 			prof := w.ChosenProfile()
 			if prof != "" {
@@ -932,18 +949,30 @@ func (w WizardModel) needsSudo() bool {
 	return false
 }
 
-func (w WizardModel) startApplying() (tea.Model, tea.Cmd) {
-	w.stage = StageApplying
-	profName := ""
-	if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
-		profName = w.profiles[w.selectedProf].Name
-	}
+func (w WizardModel) selectedPackageList() []string {
 	selectedList := make([]string, 0, len(w.selectedPkgs))
 	for id, enabled := range w.selectedPkgs {
 		if enabled {
 			selectedList = append(selectedList, id)
 		}
 	}
+	sort.Strings(selectedList)
+	return selectedList
+}
+
+func (w WizardModel) startApplying() (tea.Model, tea.Cmd) {
+	w.stage = StageApplying
+	w.failedItems = nil
+	w.skippedItems = nil
+	w.succeededItems = nil
+	w.recentCompleted = nil
+	w.osConfigStatus = ""
+	w.osConfigErr = nil
+	profName := ""
+	if len(w.profiles) > 0 && w.selectedProf < len(w.profiles) {
+		profName = w.profiles[w.selectedProf].Name
+	}
+	selectedList := w.selectedPackageList()
 
 	progressChan := make(chan tea.Msg, 128)
 	w.progressChan = progressChan
@@ -973,13 +1002,17 @@ func (w WizardModel) startApplying() (tea.Model, tea.Cmd) {
 	return w, tea.Batch(waitForProgressCmd(progressChan), tickSpinnerCmd())
 }
 
-func runWizardPlanCmd(installSvc *app.InstallService, syncSvc *app.SyncService, selectedList []string) tea.Cmd {
+func runWizardPlanCmd(installSvc *app.InstallService, syncSvc *app.SyncService, profName string, selectedList []string, destroyerMode bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		var plan *domain.ExecutionPlan
 		var err error
 		if installSvc != nil {
-			plan, err = installSvc.Plan(ctx, "", selectedList)
+			targetProf := ""
+			if len(selectedList) == 0 {
+				targetProf = profName
+			}
+			plan, err = installSvc.PlanWithReinstall(ctx, targetProf, selectedList, destroyerMode)
 		}
 		var diffs []app.ConfigDiff
 		if syncSvc != nil {
@@ -1088,12 +1121,20 @@ func runWizardApplyWorker(
 					OutputLine: line,
 				}
 			})
-			_, _ = destroyerSvc.ExecutePurge(pctx, purgePlan, false, false)
+			if _, purgeErr := destroyerSvc.ExecutePurge(pctx, purgePlan, false, false); purgeErr != nil {
+				progressChan <- wizardProgressMsg{
+					Phase:      "Purging (Destroyer)",
+					Action:     "purge",
+					ResourceID: "destroyer",
+					OutputLine: "Purge warning: " + purgeErr.Error(),
+				}
+			}
 		}
 	}
 
 	// 3. Install Phase
 	activePlan := plan
+	var installErr error
 	if destroyerMode && installSvc != nil {
 		progressChan <- wizardProgressMsg{
 			StepID:      0,
@@ -1104,12 +1145,20 @@ func runWizardApplyWorker(
 			Description: "Generating fresh install plan for selected packages...",
 			Percent:     32,
 		}
-		if freshPlan, err := installSvc.PlanWithReinstall(ctx, profName, selectedList, true); err == nil && freshPlan != nil {
+		targetList := selectedList
+		targetProf := ""
+		if len(targetList) == 0 {
+			targetProf = profName
+		}
+		freshPlan, planErr := installSvc.PlanWithReinstall(ctx, targetProf, targetList, true)
+		if planErr != nil {
+			installErr = errors.Join(installErr, fmt.Errorf("planning destroyer reinstall: %w", planErr))
+			activePlan = nil
+		} else if freshPlan != nil {
 			activePlan = freshPlan
 		}
 	}
 
-	var installErr error
 	if installSvc != nil && activePlan != nil && len(activePlan.Steps) > 0 {
 		totalInstallSteps := len(activePlan.Steps)
 		var completedSteps atomic.Int32
@@ -1176,48 +1225,155 @@ func runWizardApplyWorker(
 		}
 	}
 
-	// 5. Sync Phase
+	// 5. Sync Phase (Dotfiles first, then OS Configuration strictly at the end)
 	var syncErr error
+	var osConfigStatus string
+	var osConfigErr error
 	if syncSvc != nil {
 		progressChan <- wizardProgressMsg{
-			StepID:      1,
+			StepID:      90001,
 			TotalSteps:  1,
 			Phase:       "Dotfile Sync",
 			Action:      "merge",
 			ResourceID:  "dotfiles",
 			Description: "Reconciling dotfiles with 3-way merge...",
-			Percent:     95,
+			Status:      domain.StepRunning,
+			Percent:     92,
 		}
-		syncOpts := app.SyncOptions{
-			Force:    destroyerMode,
-			Shell:    selectedShell,
-			Terminal: selectedTerminal,
+		dotfilesOpts := app.SyncOptions{
+			Force:         destroyerMode,
+			Shell:         selectedShell,
+			Terminal:      selectedTerminal,
+			ExcludeGroups: []string{"osconfig"},
 		}
-		if !includeOSConfig {
-			syncOpts.ExcludeGroups = []string{"osconfig"}
+		if _, err := syncSvc.Sync(ctx, dotfilesOpts); err != nil {
+			syncErr = errors.Join(syncErr, err)
+			progressChan <- wizardProgressMsg{
+				StepID:      90001,
+				TotalSteps:  1,
+				Phase:       "Dotfile Sync",
+				Action:      "merge",
+				ResourceID:  "dotfiles",
+				Description: "Dotfile synchronization failed",
+				Status:      domain.StepFailed,
+				Percent:     95,
+				OutputLine:  err.Error(),
+			}
+		} else {
+			progressChan <- wizardProgressMsg{
+				StepID:      90001,
+				TotalSteps:  1,
+				Phase:       "Dotfile Sync",
+				Action:      "merge",
+				ResourceID:  "dotfiles",
+				Description: "Dotfiles synchronized",
+				Status:      domain.StepSuccess,
+				Percent:     95,
+			}
 		}
-		if _, err := syncSvc.Sync(ctx, syncOpts); err != nil {
-			syncErr = err
+
+		if includeOSConfig && ctx.Err() == nil {
+			progressChan <- wizardProgressMsg{
+				StepID:      90002,
+				TotalSteps:  1,
+				Phase:       "OS Configuration",
+				Action:      "osconfig",
+				ResourceID:  "osconfig",
+				Description: "Applying OS integration & system configuration...",
+				Status:      domain.StepRunning,
+				Percent:     97,
+			}
+			osCtx := security.ContextWithOutputHandler(ctx, func(line string) {
+				progressChan <- wizardProgressMsg{
+					StepID:      90002,
+					TotalSteps:  1,
+					Phase:       "OS Configuration",
+					Action:      "osconfig",
+					ResourceID:  "osconfig",
+					Description: "Applying OS configuration...",
+					Status:      domain.StepRunning,
+					Percent:     98,
+					OutputLine:  line,
+				}
+			})
+			osOpts := app.SyncOptions{
+				Group:    "osconfig",
+				Force:    destroyerMode,
+				Shell:    selectedShell,
+				Terminal: selectedTerminal,
+			}
+			osResults, err := syncSvc.Sync(osCtx, osOpts)
+			for _, r := range osResults {
+				if r.ConfigID == "macos-osconfig-script" && r.Detail != "" {
+					osConfigStatus = r.Detail
+				}
+			}
+			if err != nil {
+				osConfigErr = err
+				if osConfigStatus == "" {
+					osConfigStatus = "Failed: " + err.Error()
+				}
+				syncErr = errors.Join(syncErr, err)
+				progressChan <- wizardProgressMsg{
+					StepID:      90002,
+					TotalSteps:  1,
+					Phase:       "OS Configuration",
+					Action:      "osconfig",
+					ResourceID:  "osconfig",
+					Description: "OS configuration failed",
+					Status:      domain.StepFailed,
+					Percent:     99,
+					OutputLine:  err.Error(),
+				}
+			} else {
+				if osConfigStatus == "" {
+					if len(osResults) > 0 {
+						osConfigStatus = "Applied successfully"
+					} else {
+						osConfigStatus = "Applied (no OS-specific entries)"
+					}
+				}
+				progressChan <- wizardProgressMsg{
+					StepID:      90002,
+					TotalSteps:  1,
+					Phase:       "OS Configuration",
+					Action:      "osconfig",
+					ResourceID:  "osconfig",
+					Description: "OS configuration applied",
+					Status:      domain.StepSuccess,
+					Percent:     99,
+					OutputLine:  osConfigStatus,
+				}
+			}
+		} else if !includeOSConfig {
+			osConfigStatus = "Excluded by user"
 		}
 	}
 
+	finalErr := errors.Join(installErr, hacksErr, syncErr)
+	completeDesc := "All components reconciled successfully."
+	if finalErr != nil {
+		completeDesc = "Completed with component errors (review summary)."
+	}
 	progressChan <- wizardProgressMsg{
 		StepID:      1,
 		TotalSteps:  1,
 		Phase:       "Complete",
 		Action:      "done",
 		ResourceID:  "complete",
-		Description: "All components reconciled successfully.",
+		Description: completeDesc,
 		Percent:     100,
 	}
 
-	if store != nil && profName != "" {
+	if finalErr == nil && store != nil && profName != "" {
 		_ = store.SetActiveProfile(profName)
 	}
 
 	progressChan <- wizardApplyDoneMsg{
-		err:     errors.Join(installErr, hacksErr, syncErr),
-		logPath: logPath,
+		err:            finalErr,
+		logPath:        logPath,
+		osConfigStatus: osConfigStatus,
+		osConfigErr:    osConfigErr,
 	}
 }
 
@@ -1557,7 +1713,6 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	scrollableLines = append(scrollableLines, "", w.styles.Highlight.Render(fmt.Sprintf("🖥️  DESKTOP & OS INTEGRATION (osconfig) %s (Press [o] to toggle):", osconfigBadge)))
 	if w.platform != nil && w.platform.OS() == "darwin" {
 		scrollableLines = append(scrollableLines, "  • Amethyst          : macOS tiling window manager config (~/.amethyst.yml)")
-		scrollableLines = append(scrollableLines, "  • Karabiner         : Right-Command instant app switcher & key rules")
 		scrollableLines = append(scrollableLines, "  • macos-osconfig    : System defaults (max macOS 27), Touch ID sudo_local & Shortcuts")
 	} else {
 		scrollableLines = append(scrollableLines, "  • rcmd switcher     : Right-Alt fast window focus & daemon integration")
@@ -1675,6 +1830,10 @@ func (w WizardModel) renderCompleted(width int, height ...int) string {
 			lines = append(lines, "")
 		}
 
+		if len(w.skippedItems) > 0 {
+			lines = append(lines, w.styles.Muted.Render(fmt.Sprintf("ℹ Skipped Dependents (%d): %s", len(w.skippedItems), strings.Join(w.skippedItems, ", "))), "")
+		}
+
 		if len(w.failedItems) > 0 {
 			lines = append(lines, w.styles.Error.Render(fmt.Sprintf("✖ Failed Components (%d):", len(w.failedItems))))
 			for _, item := range w.failedItems {
@@ -1683,6 +1842,16 @@ func (w WizardModel) renderCompleted(width int, height ...int) string {
 				}
 			}
 			lines = append(lines, "")
+		}
+
+		if w.osConfigErr != nil {
+			lines = append(lines, w.styles.Error.Render("✖ OS Configuration (osconfig): "+w.osConfigErr.Error()), "")
+		} else if w.osConfigStatus != "" {
+			if strings.Contains(w.osConfigStatus, "warning") || strings.Contains(w.osConfigStatus, "skipped") {
+				lines = append(lines, w.styles.Warning.Render("⚠️  OS Configuration (osconfig): "+w.osConfigStatus), "")
+			} else {
+				lines = append(lines, w.styles.Success.Render("✓ OS Configuration (osconfig): "+w.osConfigStatus), "")
+			}
 		}
 
 		lines = append(lines, w.styles.Highlight.Render("Detailed Error Report:"))
@@ -1722,6 +1891,22 @@ func (w WizardModel) renderCompleted(width int, height ...int) string {
 			w.styles.Success.Render("✓ SETUP AND RECONCILIATION COMPLETED SUCCESSFULLY"),
 			"",
 			"All selected packages and configurations were reconciled safely.",
+		)
+		if len(w.succeededItems) > 0 {
+			lines = append(lines, "", w.styles.Success.Render(fmt.Sprintf("✓ Reconciled (%d components):", len(w.succeededItems))))
+			for _, wl := range AnsiWrap("   "+strings.Join(w.succeededItems, ", "), width-4) {
+				lines = append(lines, w.styles.Muted.Render(wl))
+			}
+		}
+		if w.osConfigStatus != "" {
+			lines = append(lines, "")
+			if strings.Contains(w.osConfigStatus, "warning") || strings.Contains(w.osConfigStatus, "skipped") {
+				lines = append(lines, w.styles.Warning.Render("⚠️  OS Configuration (osconfig): "+w.osConfigStatus))
+			} else {
+				lines = append(lines, w.styles.Success.Render("✓ OS Configuration (osconfig): "+w.osConfigStatus))
+			}
+		}
+		lines = append(lines,
 			"",
 			w.styles.Highlight.Render("Next Steps:"),
 			"  • Restart your terminal or run 'zsh' to load new configs.",

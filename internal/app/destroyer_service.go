@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,6 +46,9 @@ type DestroyerResult struct {
 	PurgedPaths         []string `json:"purged_paths"`
 	Reinstalled         bool     `json:"reinstalled"`
 	ReinstallPlanID     string   `json:"reinstall_plan_id,omitempty"`
+	ReinstallSteps      int      `json:"reinstall_steps,omitempty"`
+	SyncedConfigs       bool     `json:"synced_configs,omitempty"`
+	OSConfigStatus      string   `json:"osconfig_status,omitempty"`
 }
 
 // DestroyerOption configures DestroyerService.
@@ -139,8 +143,8 @@ func (d *DestroyerService) PlanPurge(_ context.Context, opts PurgeOptions) (*Des
 				}
 			}
 		}
-		// If store is empty, fall back to all declared packages in catalog
-		if len(plan.PackagesToUninstall) == 0 && d.catalog != nil {
+		// Always merge all declared packages from catalog so partial store tracking never misses packages.
+		if d.catalog != nil {
 			for _, pkg := range d.catalog.ListPackages() {
 				if !seenPkgs[pkg.ID] {
 					seenPkgs[pkg.ID] = true
@@ -432,39 +436,69 @@ func (d *DestroyerService) DestroyerReinstall(
 
 	if dryRun {
 		if d.installSvc != nil {
-			if plan, err := d.installSvc.Plan(ctx, profile, nil); err == nil {
+			if plan, err := d.installSvc.PlanWithReinstall(ctx, profile, nil, true); err == nil {
 				res.Reinstalled = true
 				res.ReinstallPlanID = plan.ID
+				res.ReinstallSteps = len(plan.Steps)
 			}
 		}
 		return res, nil
 	}
 
-	// Execute fresh install
+	var allErrs []error
+
+	// Execute fresh install (force=true so purged/existing packages are all reconciled)
 	if d.installSvc != nil {
-		freshPlan, err := d.installSvc.Plan(ctx, profile, nil)
+		freshPlan, err := d.installSvc.PlanWithReinstall(ctx, profile, nil, true)
 		if err != nil {
 			return res, fmt.Errorf("planning fresh installation: %w", err)
 		}
-
-		if err := d.installSvc.Apply(ctx, freshPlan); err != nil {
-			return res, fmt.Errorf("applying fresh installation: %w", err)
+		if d.syncSvc != nil {
+			filtered := freshPlan.Steps[:0]
+			for _, st := range freshPlan.Steps {
+				if st.Action != domain.ActionSync {
+					filtered = append(filtered, st)
+				}
+			}
+			freshPlan.Steps = filtered
 		}
-
-		res.Reinstalled = true
 		res.ReinstallPlanID = freshPlan.ID
+		res.ReinstallSteps = len(freshPlan.Steps)
+		if len(freshPlan.Steps) > 0 {
+			if err := d.installSvc.Apply(ctx, freshPlan); err != nil {
+				allErrs = append(allErrs, fmt.Errorf("applying fresh installation: %w", err))
+			}
+		}
+		res.Reinstalled = len(allErrs) == 0
 	}
 
-	// Execute fresh dotfile sync
-	if d.syncSvc != nil {
-		_, _ = d.syncSvc.Sync(ctx, SyncOptions{Force: true})
+	// Execute fresh dotfile + OS configuration sync strictly after installations finish
+	if d.syncSvc != nil && ctx.Err() == nil {
+		syncResults, syncErr := d.syncSvc.Sync(ctx, SyncOptions{Force: true})
+		for _, sr := range syncResults {
+			if sr.ConfigID == "macos-osconfig-script" {
+				if sr.Detail != "" {
+					res.OSConfigStatus = sr.Detail
+				} else {
+					res.OSConfigStatus = sr.Action
+				}
+			}
+		}
+		if syncErr != nil {
+			if res.OSConfigStatus == "" && strings.Contains(syncErr.Error(), "macos-osconfig") {
+				res.OSConfigStatus = "failed: " + syncErr.Error()
+			}
+			allErrs = append(allErrs, fmt.Errorf("synchronizing configurations: %w", syncErr))
+		} else {
+			res.SyncedConfigs = true
+		}
 	}
 
-	if d.store != nil && profile != "" {
+	if len(allErrs) == 0 && d.store != nil && profile != "" {
 		_ = d.store.SetActiveProfile(profile)
 	}
 
-	return res, nil
+	return res, errors.Join(allErrs...)
 }
 
 // DestroyerUninstall executes a system purge and removes managed packages, configurations, and binaries.

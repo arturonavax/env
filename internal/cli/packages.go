@@ -123,14 +123,35 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 		defer stopKeepalive()
 	}
 
+	var (
+		osConfigAttempted bool
+		osConfigErr       string
+		osConfigDetail    string
+	)
 	if !appCtx.Flags.Quiet {
 		st := styles(appCtx)
 		out := cmd.OutOrStdout()
 		appCtx.InstallSvc.SetOnProgress(func(ev app.ProgressEvent) {
+			if ev.ResourceID == "macos-osconfig-script" && ev.Action == domain.ActionSync {
+				switch ev.Status {
+				case domain.StepSuccess:
+					osConfigAttempted = true
+					osConfigDetail = ev.OutputLine
+				case domain.StepFailed:
+					osConfigAttempted = true
+					osConfigErr = ev.Error
+				}
+			}
 			switch ev.Status {
 			case domain.StepRunning:
-				fmt.Fprintf(out, "  %s [%d/%d] %s: %s...\n",
-					st.Highlight.Render("▶"), ev.StepID, ev.TotalSteps, ev.Action, ev.Description)
+				if ev.OutputLine != "" {
+					if ev.Action == domain.ActionSync {
+						fmt.Fprintf(out, "      %s\n", st.Muted.Render(ev.OutputLine))
+					}
+				} else {
+					fmt.Fprintf(out, "  %s [%d/%d] %s: %s...\n",
+						st.Highlight.Render("▶"), ev.StepID, ev.TotalSteps, ev.Action, ev.Description)
+				}
 			case domain.StepSuccess:
 				fmt.Fprintf(out, "  %s [%d/%d] Completed: %s\n",
 					st.Success.Render("✓"), ev.StepID, ev.TotalSteps, ev.ResourceID)
@@ -147,23 +168,41 @@ func runApply(cmd *cobra.Command, appCtx *AppContext, profile string, pkgs []str
 		})
 	}
 
-	if err := appCtx.InstallSvc.Apply(cmd.Context(), plan); err != nil {
-		return err
+	applyErr := appCtx.InstallSvc.Apply(cmd.Context(), plan)
+	if !appCtx.Flags.Quiet && osConfigAttempted {
+		st := styles(appCtx)
+		out := cmd.OutOrStdout()
+		if osConfigErr != "" {
+			fmt.Fprintf(out, "  %s OS Configuration (macos-osconfig) failed: %s\n", st.Error.Render("✖"), osConfigErr)
+		} else if strings.Contains(osConfigDetail, "warning") || strings.Contains(osConfigDetail, "skipped") {
+			fmt.Fprintf(out, "  %s OS Configuration (macos-osconfig): %s\n", st.Warning.Render("⚠"), osConfigDetail)
+		} else {
+			if osConfigDetail == "" {
+				osConfigDetail = "applied successfully"
+			}
+			fmt.Fprintf(out, "  %s OS Configuration (macos-osconfig): %s\n", st.Success.Render("✓"), osConfigDetail)
+		}
+	}
+	if applyErr != nil {
+		return applyErr
 	}
 	if len(pkgs) == 0 {
 		_ = appCtx.Store.SetActiveProfile(plan.Profile)
 	}
 
+	var hacksErrs []error
 	if appCtx.Flags.IncludeHacks && appCtx.HacksSvc != nil {
 		_, matched := appCtx.HacksSvc.Detect(cmd.Context())
 		for _, hk := range matched {
 			if !appCtx.Flags.Quiet {
 				fmt.Fprintf(cmd.OutOrStdout(), "Applying matched hardware workstation hack: %s (%s)...\n", hk.ID, hk.Name)
 			}
-			_, _ = appCtx.HacksSvc.Apply(cmd.Context(), hk.ID, app.WithHackOutput(cmd.OutOrStdout()))
+			if _, err := appCtx.HacksSvc.Apply(cmd.Context(), hk.ID, app.WithHackOutput(cmd.OutOrStdout())); err != nil {
+				hacksErrs = append(hacksErrs, err)
+			}
 		}
 	}
-	return nil
+	return errors.Join(hacksErrs...)
 }
 
 func newInstallCmd(appCtx *AppContext) *cobra.Command {

@@ -527,9 +527,18 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, id := range []string{"amethyst", "karabiner-elements", "pam-reattach"} {
+		for _, id := range []string{"amethyst", "pam-reattach"} {
 			if !slices.Contains(wsPkgs, id) {
 				t.Errorf("workstation profile should include %q for darwin hosts", id)
+			}
+		}
+		for _, prof := range cat.ListProfiles() {
+			pkgs, err := cat.ResolveProfilePackages(prof.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if slices.Contains(pkgs, "karabiner-elements") {
+				t.Errorf("profile %q should not include karabiner-elements by default", prof.Name)
 			}
 		}
 
@@ -551,9 +560,17 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 				}
 			}
 		}
-		for _, id := range []string{"amethyst-config", "karabiner-config", "macos-osconfig-script", "macos-shortcuts"} {
+		for _, id := range []string{"amethyst-config", "macos-osconfig-script", "macos-shortcuts"} {
 			if !found[id] {
 				t.Errorf("osconfig group missing darwin configuration %q", id)
+			}
+		}
+		if found["karabiner-config"] {
+			t.Errorf("osconfig group should not include karabiner-config by default")
+		}
+		for _, cfg := range cat.ListConfigurationsByGroup("all") {
+			if cfg.ID == "karabiner-config" {
+				t.Errorf("default configuration sync (all) should not include karabiner-config")
 			}
 		}
 	})
@@ -1092,14 +1109,16 @@ exit 0
 		dictAdd127Idx := strings.Index(spacesCalls, "AppleSymbolicHotKeys -dict-add 127")
 		pb79Idx := strings.Index(spacesCalls, "PlistBuddy -c Set :AppleSymbolicHotKeys:79:enabled true")
 		pb80Idx := strings.Index(spacesCalls, "PlistBuddy -c Add :AppleSymbolicHotKeys:80:enabled bool true")
-		flushIdx := strings.Index(spacesCalls, "killall cfprefsd")
 		readIdx := strings.Index(spacesCalls, "defaults read com.apple.symbolichotkeys\n")
 		actIdx := strings.Index(spacesCalls, "activateSettings -u")
-		if dictAdd127Idx == -1 || pb79Idx == -1 || pb80Idx == -1 || flushIdx == -1 || readIdx == -1 || actIdx == -1 {
+		if dictAdd127Idx == -1 || pb79Idx == -1 || pb80Idx == -1 || readIdx == -1 || actIdx == -1 {
 			t.Fatalf("missing expected --spaces phase calls:\n%s", spacesCalls)
 		}
-		if !(dictAdd127Idx < pb79Idx && pb79Idx < pb80Idx && pb80Idx < flushIdx && flushIdx < readIdx && readIdx < actIdx) {
-			t.Errorf("expected order dict-add -> PlistBuddy Set/Add -> killall cfprefsd -> defaults read -> activateSettings -u, calls:\n%s", spacesCalls)
+		if !(dictAdd127Idx < pb79Idx && pb79Idx < pb80Idx && pb80Idx < readIdx && readIdx < actIdx) {
+			t.Errorf("expected order dict-add -> PlistBuddy Set/Add -> defaults read -> activateSettings -u, calls:\n%s", spacesCalls)
+		}
+		if !strings.Contains(spacesCalls[pb80Idx:readIdx], "killall cfprefsd") {
+			t.Errorf("expected killall cfprefsd between PlistBuddy edits and defaults read, calls:\n%s", spacesCalls)
 		}
 
 		// 5. --power live stub executes sudo pmset -a lowpowermode 0 without UI restarts.
@@ -1148,6 +1167,21 @@ exit 0
 		cmdPipe.Env = env
 		if pipeOut, pipeErr := cmdPipe.CombinedOutput(); pipeErr != nil {
 			t.Fatalf("expected sudo keepalive not to hold stderr/stdout pipe open after exit, err=%v out:\n%s", pipeErr, pipeOut)
+		}
+
+		// 8. Without --no-sudo, failed sudo authentication fails loudly instead of silently downgrading.
+		failBin := t.TempDir()
+		if err := os.WriteFile(filepath.Join(failBin, "sudo"), []byte("#!/bin/sh\nif [ \"$1\" = \"-v\" ]; then exit 1; fi\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cmdFailSudo := exec.Command("bash", scriptPath, "--touchid")
+		cmdFailSudo.Env = []string{
+			"HOME=" + home,
+			"TMPDIR=" + t.TempDir(),
+			"PATH=" + failBin + ":" + binDir + ":/usr/bin:/bin",
+		}
+		if failOut, failErr := cmdFailSudo.CombinedOutput(); failErr == nil {
+			t.Fatalf("expected failed sudo -v without --no-sudo to exit non-zero, got nil output:\n%s", failOut)
 		}
 	})
 }
@@ -1286,6 +1320,87 @@ func TestSSHAgentAssetsAndAllProfilesCoverage(t *testing.T) {
 			if string(out) != tc.wantSock {
 				t.Errorf("%s (OS=%s XDG=%q): SSH_AUTH_SOCK = %q, want %q", relPath, tc.osName, tc.xdgDir, string(out), tc.wantSock)
 			}
+		}
+	}
+}
+
+
+func TestLazyVimAndZshHighlightingAssets(t *testing.T) {
+	cat, err := manifest.LoadCatalog()
+	if err != nil {
+		t.Fatalf("LoadCatalog() failed: %v", err)
+	}
+
+	for _, profName := range []string{"terminal", "developer", "workstation", "full", "headless"} {
+		pkgs, err := cat.ResolveProfilePackages(profName)
+		if err != nil {
+			t.Fatalf("ResolveProfilePackages(%q): %v", profName, err)
+		}
+		if !slices.Contains(pkgs, "zsh-plugins") {
+			t.Errorf("profile %q should include zsh-plugins for shell syntax highlighting", profName)
+		}
+	}
+
+	baseZshRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "zsh", ".base.zsh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseZsh := string(baseZshRaw)
+	for _, want := range []string{
+		"_anx_source_first_plugin",
+		"/opt/homebrew/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh",
+		"zsh-syntax-highlighting.zsh",
+		"zsh-completions/src",
+		"zsh/completions",
+	} {
+		if !strings.Contains(baseZsh, want) {
+			t.Errorf("files/zsh/.base.zsh missing %q", want)
+		}
+	}
+	if strings.Contains(baseZsh, "[[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]") {
+		t.Errorf("files/zsh/.base.zsh still contains un-globbed zcompdump check inside [[ ]]")
+	}
+	if zshPath, err := exec.LookPath("zsh"); err == nil {
+		if out, err := exec.Command(zshPath, "-n", filepath.Join("..", "..", "files", "zsh", ".base.zsh")).CombinedOutput(); err != nil {
+			t.Errorf("zsh -n files/zsh/.base.zsh failed: %v\n%s", err, out)
+		}
+	}
+
+	zshenvRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "zsh", ".zshenv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(zshenvRaw), ".local/bin") || !strings.Contains(string(zshenvRaw), "/opt/homebrew/bin") {
+		t.Errorf("files/zsh/.zshenv should initialize user and Homebrew PATHs for non-interactive shells/Mason")
+	}
+
+	aiLua, err := os.ReadFile(filepath.Join("..", "..", "files", "nvim", "lua", "plugins", "ai.lua"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(aiLua), "ColinKennedy/mega.cmdparse") || !strings.Contains(string(aiLua), "ColinKennedy/mega.logging") {
+		t.Errorf("files/nvim/lua/plugins/ai.lua must declare mega.cmdparse and mega.logging for avante.nvim")
+	}
+
+	lazyLua, err := os.ReadFile(filepath.Join("..", "..", "files", "nvim", "lua", "config", "lazy.lua"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(lazyLua), "rocks = { enabled = false }") {
+		t.Errorf("files/nvim/lua/config/lazy.lua should disable rocks to prevent broken lazy-rocks paths")
+	}
+
+	lockRaw, err := os.ReadFile(filepath.Join("..", "..", "files", "nvim", "lazy-lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lockMap map[string]json.RawMessage
+	if err := json.Unmarshal(lockRaw, &lockMap); err != nil {
+		t.Fatalf("files/nvim/lazy-lock.json invalid JSON: %v", err)
+	}
+	for _, key := range []string{"LazyVim", "avante.nvim", "mega.cmdparse", "mega.logging"} {
+		if _, ok := lockMap[key]; !ok {
+			t.Errorf("files/nvim/lazy-lock.json missing locked plugin %q", key)
 		}
 	}
 }

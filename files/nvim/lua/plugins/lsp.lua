@@ -1,7 +1,64 @@
 local exclusions = require("config.exclusions")
 
 return {
-  "neovim/nvim-lspconfig",
+  {
+    "mason-org/mason.nvim",
+    opts = function(_, opts)
+      if type(opts.ensure_installed) ~= "table" then
+        return
+      end
+      local bin_aliases = {
+        delve = "dlv",
+        ["rust-analyzer"] = "rust-analyzer",
+      }
+      local go_pkgs = {
+        goimports = true,
+        gofumpt = true,
+        gomodifytags = true,
+        impl = true,
+        ["golangci-lint"] = true,
+        delve = true,
+      }
+      local has_go = vim.fn.executable("go") == 1
+      local has_npm = vim.fn.executable("npm") == 1
+      local has_python_venv = nil
+      local function check_python_venv()
+        if has_python_venv ~= nil then
+          return has_python_venv
+        end
+        if vim.fn.executable("python3") == 1 then
+          vim.fn.system({ "python3", "-c", "import venv, ensurepip" })
+          has_python_venv = (vim.v.shell_error == 0)
+        else
+          has_python_venv = false
+        end
+        return has_python_venv
+      end
+      local npm_pkgs = {
+        ["nomicfoundation-solidity-language-server"] = true,
+        solhint = true,
+        prettier = true,
+      }
+      local python_pkgs = {
+        sqlfluff = true,
+      }
+
+      local filtered = {}
+      for _, pkg in ipairs(opts.ensure_installed) do
+        local bin = bin_aliases[pkg] or pkg
+        local already_present = vim.fn.executable(bin) == 1
+        local missing_runtime = (go_pkgs[pkg] and not has_go)
+          or (npm_pkgs[pkg] and not has_npm)
+          or (python_pkgs[pkg] and not already_present and not check_python_venv())
+        if not already_present and not missing_runtime then
+          table.insert(filtered, pkg)
+        end
+      end
+      opts.ensure_installed = filtered
+    end,
+  },
+  {
+    "neovim/nvim-lspconfig",
   init = function()
     -- Evita que cualquier observador de archivos de LSP intente vigilar
     -- carpetas masivas de dependencias (node_modules, vendor, etc.) a nivel de Neovim
@@ -32,6 +89,7 @@ return {
 
       -- Go: excluye node_modules, vendor y directorios pesados del análisis
       gopls = {
+        mason = (vim.fn.executable("gopls") == 0 and vim.fn.executable("go") == 1),
         settings = {
           gopls = {
             hints = {
@@ -114,6 +172,7 @@ return {
 
       -- Rust (rust-analyzer)
       ["rust-analyzer"] = {
+        mason = (vim.fn.executable("rust-analyzer") == 0 and vim.fn.executable("cargo") == 1),
         settings = {
           ["rust-analyzer"] = {
             files = {
@@ -123,5 +182,6 @@ return {
         },
       },
     },
+  },
   },
 }

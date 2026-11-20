@@ -231,6 +231,9 @@ func (d *Dispatcher) IsInstalled(ctx context.Context, pkg domain.ManagedResource
 		if st.Script != nil && st.Script.Creates != "" {
 			createdPath := expandTemplateString(st.Script.Creates, d.platform, d.repoDir)
 			if info, err := os.Stat(createdPath); err == nil && !info.IsDir() {
+				if pkgID == "zsh-plugins" && !d.hasAllZshPlugins() {
+					continue
+				}
 				if len(candidates) == 0 {
 					return true, "installed", nil
 				}
@@ -301,6 +304,25 @@ func (d *Dispatcher) isBrokenManagedBinary(ctx context.Context, pkgID, binPath s
 	default:
 		return false
 	}
+}
+
+func (d *Dispatcher) hasAllZshPlugins() bool {
+	if d.platform == nil || d.platform.HomeDir() == "" {
+		return false
+	}
+	zshDir := filepath.Join(d.platform.HomeDir(), ".zsh")
+	required := []string{
+		filepath.Join(zshDir, "fast-syntax-highlighting", "fast-syntax-highlighting.plugin.zsh"),
+		filepath.Join(zshDir, "zsh-autosuggestions", "zsh-autosuggestions.zsh"),
+		filepath.Join(zshDir, "fzf-tab", "fzf-tab.plugin.zsh"),
+		filepath.Join(zshDir, "zsh-completions", "zsh-completions.plugin.zsh"),
+	}
+	for _, path := range required {
+		if info, err := os.Stat(path); err != nil || info.IsDir() {
+			return false
+		}
+	}
+	return true
 }
 
 // Install executes the ordered declarative strategies for pkg, automatically falling back across tiers on error.

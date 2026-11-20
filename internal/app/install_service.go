@@ -343,24 +343,38 @@ func (s *InstallService) PlanWithReinstall(ctx context.Context, profileName stri
 		if err != nil {
 			return nil, err
 		}
+		var dotfileCfgs, osAssetCfgs, osScriptCfgs []domain.ConfigurationResource
 		for _, cfg := range cfgs {
 			if !cfg.SupportsOS(s.platform.OS()) {
 				continue
 			}
-			target := s.platform.ExpandPath(cfg.TargetForOS(s.platform.OS()))
-			plan.Steps = append(plan.Steps, domain.PlanStep{
-				ID:          stepID,
-				ResourceID:  cfg.ID,
-				Action:      domain.ActionSync,
-				Description: fmt.Sprintf("Synchronize %s", cfg.Name),
-				SourcePath:  cfg.Source,
-				TargetPath:  target,
-				// Serialize configs that write the same path while letting unrelated ones overlap.
-				Locks:  []string{"file:" + target},
-				Status: domain.StepPending,
-			})
-			stepID++
+			if cfg.Group != "osconfig" {
+				dotfileCfgs = append(dotfileCfgs, cfg)
+			} else if len(cfg.PostSyncCmds) > 0 {
+				osScriptCfgs = append(osScriptCfgs, cfg)
+			} else {
+				osAssetCfgs = append(osAssetCfgs, cfg)
+			}
 		}
+		appendSyncCfgs := func(list []domain.ConfigurationResource, descPrefix string) {
+			for _, cfg := range list {
+				target := s.platform.ExpandPath(cfg.TargetForOS(s.platform.OS()))
+				plan.Steps = append(plan.Steps, domain.PlanStep{
+					ID:          stepID,
+					ResourceID:  cfg.ID,
+					Action:      domain.ActionSync,
+					Description: fmt.Sprintf("%s %s", descPrefix, cfg.Name),
+					SourcePath:  cfg.Source,
+					TargetPath:  target,
+					Locks:       []string{"file:" + target},
+					Status:      domain.StepPending,
+				})
+				stepID++
+			}
+		}
+		appendSyncCfgs(dotfileCfgs, "Synchronize")
+		appendSyncCfgs(osAssetCfgs, "Synchronize")
+		appendSyncCfgs(osScriptCfgs, "Apply OS Configuration:")
 	}
 
 	return plan, nil
@@ -440,9 +454,25 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		detailsMu.Unlock()
 	}
 
-	tasks := make([]execution.Task, len(plan.Steps))
+	var installTasks, dotfileTasks, osAssetTasks, osScriptTasks []execution.Task
 	for i := range plan.Steps {
-		tasks[i] = s.buildTaskWithDetail(txID, plan.Steps[i], writeLog, recordDetail)
+		task := s.buildTaskWithDetail(txID, plan.Steps[i], writeLog, recordDetail)
+		if task.Step.Action != domain.ActionSync {
+			installTasks = append(installTasks, task)
+			continue
+		}
+		task.Step.DependsOn = nil
+		if s.catalog != nil {
+			if cfg, ok := s.catalog.GetConfiguration(task.Step.ResourceID); ok && cfg.Group == "osconfig" {
+				if len(cfg.PostSyncCmds) > 0 {
+					osScriptTasks = append(osScriptTasks, task)
+				} else {
+					osAssetTasks = append(osAssetTasks, task)
+				}
+				continue
+			}
+		}
+		dotfileTasks = append(dotfileTasks, task)
 	}
 
 	byID := make(map[int]*domain.PlanStep, len(plan.Steps))
@@ -450,7 +480,7 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 		byID[plan.Steps[i].ID] = &plan.Steps[i]
 	}
 
-	_, execErr := s.engine.ExecuteTasks(ctx, tasks, func(res execution.Result) {
+	onResult := func(res execution.Result) {
 		step := byID[res.StepID]
 		if step == nil {
 			return
@@ -468,7 +498,25 @@ func (s *InstallService) Apply(ctx context.Context, plan *domain.ExecutionPlan) 
 				Action: step.Action, Description: step.Description, Status: res.Status, Error: step.Error, OutputLine: outLine,
 			})
 		}
-	})
+	}
+
+	var execErrs []error
+	for _, phaseTasks := range [][]execution.Task{installTasks, dotfileTasks, osAssetTasks, osScriptTasks} {
+		if len(phaseTasks) == 0 {
+			continue
+		}
+		if ctx.Err() != nil {
+			execErrs = append(execErrs, execution.ErrExecutionInterrupted)
+			break
+		}
+		if _, err := s.engine.ExecuteTasks(ctx, phaseTasks, onResult); err != nil {
+			execErrs = append(execErrs, err)
+			if errors.Is(err, execution.ErrExecutionInterrupted) {
+				break
+			}
+		}
+	}
+	execErr := errors.Join(execErrs...)
 
 	if execErr != nil {
 		writeLog("================================================================================")
@@ -588,7 +636,22 @@ func (s *InstallService) buildTaskWithDetail(txID string, step domain.PlanStep, 
 			if s.sync == nil {
 				return errors.New("sync service not configured")
 			}
-			res, err := s.sync.SyncOne(ctx, step.ResourceID, SyncOptions{})
+			syncCtx := security.ContextWithOutputHandler(ctx, func(line string) {
+				if writeLog != nil {
+					writeLog("[STEP %d] [OUTPUT] [%s] %s", step.ID, step.ResourceID, line)
+				}
+				if progressFn := s.getOnProgress(); progressFn != nil {
+					progressFn(ProgressEvent{
+						StepID:      step.ID,
+						ResourceID:  step.ResourceID,
+						Action:      step.Action,
+						Description: step.Description,
+						Status:      domain.StepRunning,
+						OutputLine:  line,
+					})
+				}
+			})
+			res, err := s.sync.SyncOne(syncCtx, step.ResourceID, SyncOptions{})
 			if err != nil {
 				if writeLog != nil {
 					writeLog("[STEP %d] [SYNC-FAILED] %s: %v", step.ID, step.ResourceID, err)
@@ -714,6 +777,14 @@ func (s *InstallService) PlanRequiresSudo(plan *domain.ExecutionPlan) bool {
 		return false
 	}
 	for _, step := range plan.Steps {
+		if step.Action == domain.ActionSync {
+			if s.platform.OS() == "darwin" && s.catalog != nil {
+				if cfg, ok := s.catalog.GetConfiguration(step.ResourceID); ok && cfg.Group == "osconfig" && len(cfg.PostSyncCmds) > 0 {
+					return true
+				}
+			}
+			continue
+		}
 		if step.Action != domain.ActionInstall && step.Action != domain.ActionUninstall {
 			continue
 		}

@@ -31,6 +31,7 @@ profiles:
     extends: minimal
     packages:
       - zsh
+      - zsh-plugins
       - atuin
       - herdr
       - zoxide
@@ -112,7 +113,6 @@ profiles:
       - xdotool
       - xclip
       - amethyst
-      - karabiner-elements
       - pam-reattach
     config_groups:
       - terminal
@@ -140,6 +140,7 @@ profiles:
     extends: minimal
     packages:
       - zsh
+      - zsh-plugins
       - herdr
       - atuin
       - zoxide

@@ -741,10 +741,13 @@ func TestInstallServicePlanHeadlessAndStepEdges(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Plan(darwin workstation) failed: %v", err)
 		}
-		for _, id := range []string{"amethyst", "karabiner-elements", "pam-reattach"} {
+		for _, id := range []string{"amethyst", "pam-reattach"} {
 			if _, ok := findStep(planDarwin, id); !ok {
 				t.Errorf("darwin workstation plan missing %q", id)
 			}
+		}
+		if _, ok := findStep(planDarwin, "karabiner-elements"); ok {
+			t.Errorf("darwin workstation plan should not include karabiner-elements by default")
 		}
 
 		homeLinux := t.TempDir()
@@ -1062,4 +1065,108 @@ func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
 			}
 		}
 	})
+}
+
+
+func TestSyncOSConfigRunsLastEvenWhenUnchangedAndReportsStatus(t *testing.T) {
+	fx := newFixture(t)
+	orderLog := filepath.Join(fx.plat.HomeDir(), "sync_order.log")
+
+	fx.cat.AddConfiguration(domain.ConfigurationResource{
+		ID:           "zz-dotfile",
+		Group:        "terminal",
+		Source:       "files/test/dot.txt",
+		Target:       "~/.config/test/dot.txt",
+		Strategy:     domain.StrategyReplace,
+		PostSyncCmds: [][]string{{"sh", "-c", "echo dotfile >> \"" + orderLog + "\""}},
+	})
+	fx.cat.AddConfiguration(domain.ConfigurationResource{
+		ID:       "macos-osconfig-script",
+		Group:    "osconfig",
+		Source:   "files/test/osconfig.sh",
+		Target:   "~/.local/bin/macos-osconfig",
+		Strategy: domain.StrategyReplace,
+		FileMode: "0755",
+		PostSyncCmds: [][]string{
+			{"sh", "-c", "echo osconfig >> \"" + orderLog + "\"; echo \"[macos-osconfig] WARNING: privileged steps skipped (--no-sudo)\""},
+		},
+	})
+
+	write(t, filepath.Join(fx.repo, "files/test/dot.txt"), "v1")
+	write(t, filepath.Join(fx.repo, "files/test/osconfig.sh"), "#!/bin/sh\necho ok\n")
+
+	svc := app.NewSyncService(fx.plat, fx.cat, fx.snap, fx.store, fx.repo)
+
+	// Run 1 (created): dotfile runs BEFORE osconfig even though macos-osconfig-script sorts before zz-dotfile alphabetically.
+	res1, err := svc.Sync(context.Background(), app.SyncOptions{})
+	if err != nil {
+		t.Fatalf("Sync run 1 failed: %v", err)
+	}
+	logBytes, err := os.ReadFile(orderLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(logBytes) != "dotfile\nosconfig\n" {
+		t.Fatalf("expected dotfile before osconfig, got order:\n%s", string(logBytes))
+	}
+	foundWarningDetail := false
+	for _, r := range res1 {
+		if r.ConfigID == "macos-osconfig-script" && strings.Contains(r.Detail, "--no-sudo") {
+			foundWarningDetail = true
+		}
+	}
+	if !foundWarningDetail {
+		t.Errorf("expected SyncResult.Detail to capture --no-sudo warning, got %+v", res1)
+	}
+
+	// Run 2 (unchanged file): osconfig post-sync MUST still execute instead of silent-skipping on unchanged file.
+	if err := os.WriteFile(orderLog, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Sync(context.Background(), app.SyncOptions{}); err != nil {
+		t.Fatalf("Sync run 2 failed: %v", err)
+	}
+	log2Bytes, err := os.ReadFile(orderLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(log2Bytes) != "osconfig\n" {
+		t.Fatalf("expected osconfig to execute on unchanged 2nd run, got:\n%s", string(log2Bytes))
+	}
+}
+
+func TestInstallServicePlanOrdersOSConfigLastAndRequiresSudoOnDarwin(t *testing.T) {
+	home := t.TempDir()
+	platDarwin := platform.NewTestInfo(platform.TestInfoParams{
+		OS:              "darwin",
+		Arch:            "arm64",
+		HasSudo:         true,
+		PackageManagers: []string{"brew"},
+		HomeDir:         home,
+		LocalBinDir:     filepath.Join(home, ".local", "bin"),
+		StateDir:        filepath.Join(home, "state"),
+	})
+	cat := catalog.NewDefaultRegistry()
+	runner := security.NewRunner(5)
+	disp := providers.NewDispatcher(platDarwin, cat.Catalog(), runner, "")
+	instSvc := app.NewInstallService(app.InstallDeps{
+		Platform: platDarwin,
+		Catalog:  cat,
+		Provider: disp,
+		Sync:     app.NewSyncService(platDarwin, cat, nil, nil, filepath.Join("..", "..")),
+	})
+	plan, err := instSvc.PlanWithReinstall(context.Background(), "workstation", nil, true)
+	if err != nil {
+		t.Fatalf("PlanWithReinstall(workstation) failed: %v", err)
+	}
+	if len(plan.Steps) == 0 {
+		t.Fatal("expected non-empty workstation plan")
+	}
+	lastStep := plan.Steps[len(plan.Steps)-1]
+	if lastStep.ResourceID != "macos-osconfig-script" {
+		t.Errorf("expected last step in workstation plan to be macos-osconfig-script, got %+v", lastStep)
+	}
+	if !instSvc.PlanRequiresSudo(plan) {
+		t.Errorf("expected PlanRequiresSudo=true for darwin plan containing macos-osconfig-script")
+	}
 }

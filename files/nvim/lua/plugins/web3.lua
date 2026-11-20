@@ -9,10 +9,13 @@ return {
     end,
   },
 
-  -- 2. Asegurar binarios en Mason
+  -- 2. Asegurar binarios en Mason (solo si npm está disponible)
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
+      if vim.fn.executable("npm") == 0 then
+        return
+      end
       opts.ensure_installed = opts.ensure_installed or {}
       vim.list_extend(opts.ensure_installed, {
         "nomicfoundation-solidity-language-server",
@@ -26,7 +29,9 @@ return {
     "neovim/nvim-lspconfig",
     opts = {
       servers = {
-        solidity_ls_nomicfoundation = {},
+        solidity_ls_nomicfoundation = {
+          mason = (vim.fn.executable("npm") == 1),
+        },
       },
     },
   },

@@ -376,6 +376,15 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("failed to plan package installation: %w", err)
 				}
+				if !skipSync && appCtx.SyncSvc != nil && len(plan.Steps) > 0 {
+					filtered := plan.Steps[:0]
+					for _, stStep := range plan.Steps {
+						if stStep.Action != domain.ActionSync {
+							filtered = append(filtered, stStep)
+						}
+					}
+					plan.Steps = filtered
+				}
 				if len(plan.Steps) == 0 {
 					fmt.Fprintf(out, "    %s All packages are already up to date (0 pending actions).\n", st.Success.Render("✓"))
 				} else {
@@ -453,8 +462,12 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 					return fmt.Errorf("dotfile sync failed: %w", err)
 				}
 				for _, r := range results {
-					if r.Action != "unchanged" {
-						fmt.Fprintf(out, "    • %-24s [%s]\n", r.ConfigID, st.Highlight.Render(r.Action))
+					if r.Action != "unchanged" || r.Detail != "" {
+						if r.Detail != "" {
+							fmt.Fprintf(out, "    • %-24s [%s] (%s)\n", r.ConfigID, st.Highlight.Render(r.Action), r.Detail)
+						} else {
+							fmt.Fprintf(out, "    • %-24s [%s]\n", r.ConfigID, st.Highlight.Render(r.Action))
+						}
 					}
 				}
 				fmt.Fprintf(out, "    %s Dotfiles synchronized successfully.\n", st.Success.Render("✓"))

@@ -506,8 +506,31 @@ install_go_tier3_package_manager() {
 	return 1
 }
 
+expose_go_binaries_in_local_bin() {
+	local go_bin="" go_dir tool
+	if command -v go >/dev/null 2>&1; then
+		go_bin="$(command -v go)"
+	elif [[ -s "${HOME}/.gvm/scripts/gvm" ]]; then
+		source_gvm_safely || true
+		go_bin="$(command -v go 2>/dev/null || true)"
+	fi
+	if [[ -z "${go_bin}" || ! -x "${go_bin}" ]] && [[ -x "${GO_SYS_BIN}/go" ]]; then
+		go_bin="${GO_SYS_BIN}/go"
+	fi
+	[[ -n "${go_bin}" && -x "${go_bin}" ]] || return 0
+
+	go_dir="$(dirname "${go_bin}")"
+	mkdir -p "${HOME}/.local/bin"
+	for tool in go gofmt; do
+		if [[ -x "${go_dir}/${tool}" ]] && [[ "${go_dir}/${tool}" != "${HOME}/.local/bin/${tool}" ]]; then
+			ln -sfn "${go_dir}/${tool}" "${HOME}/.local/bin/${tool}"
+		fi
+	done
+}
+
 ensure_go_runtime() {
 	if check_go_version; then
+		expose_go_binaries_in_local_bin
 		log_success "Go runtime verified: $(go version | awk '{print $3}')"
 		return 0
 	fi
@@ -515,16 +538,19 @@ ensure_go_runtime() {
 	log_warn "Go runtime (>= 1.27.3) not detected. Initiating multi-tier bootstrap..."
 
 	if install_go_tier1_gvm; then
+		expose_go_binaries_in_local_bin
 		return 0
 	fi
 	log_warn "Tier 1 (GVM) did not succeed. Falling back to Tier 2 (standalone script)..."
 
 	if install_go_tier2_standalone; then
+		expose_go_binaries_in_local_bin
 		return 0
 	fi
 	log_warn "Tier 2 (standalone script) did not succeed. Falling back to Tier 3 (package manager)..."
 
 	if install_go_tier3_package_manager; then
+		expose_go_binaries_in_local_bin
 		return 0
 	fi
 
@@ -570,7 +596,7 @@ build_anx() {
 
 shell_rc_signature() {
 	local f sig=""
-	for f in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.base.zsh" "${HOME}/.base.bash"; do
+	for f in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.base.zsh" "${HOME}/.base.bash" "${HOME}/.tools.sh" "${HOME}/.zshenv"; do
 		if [[ -f "${f}" ]]; then
 			sig="${sig}${f}:$(cksum < "${f}" 2>/dev/null || echo present);"
 		fi

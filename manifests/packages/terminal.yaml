@@ -17,6 +17,19 @@ packages:
           brew: [zsh]
           pkg: [zsh]
 
+  - id: zsh-plugins
+    name: Zsh Plugins (Syntax Highlighting, Autosuggestions, fzf-tab, Completions)
+    category: shell
+    description: Zsh syntax highlighting, autosuggestions, fzf-tab, and extra completions in ~/.zsh
+    os: [linux, darwin]
+    strategies:
+      - type: script
+        depends_on: [zsh, git]
+        script:
+          local_script: scripts/install_zsh_plugins.sh
+          interpreter: bash
+          creates: "~/.zsh/.anx-plugins-ready"
+
   - id: fzf
     name: fzf
     category: cli-tools

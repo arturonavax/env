@@ -972,4 +972,82 @@ cat "` + installerSrc + `" > "$out"
 			t.Fatalf("expected standalone package marker at %s: %v", marker, err)
 		}
 	})
+
+	t.Run("install_zsh_plugins.sh guardrails, local clone, and Dispatcher IsInstalled check", func(t *testing.T) {
+		scriptPath := filepath.Join(repoRoot, "scripts", "install_zsh_plugins.sh")
+		raw, err := os.ReadFile(scriptPath)
+		if err != nil {
+			t.Fatalf("reading %s: %v", scriptPath, err)
+		}
+		if violations := security.ValidateScriptGuardrails(string(raw)); len(violations) > 0 {
+			t.Fatalf("%s failed security guardrails: %+v", scriptPath, violations)
+		}
+
+		// Create 4 lightweight local git repositories so install_zsh_plugins.sh clones offline.
+		mkPluginRepo := func(name, entrypoint string) string {
+			t.Helper()
+			repo := filepath.Join(t.TempDir(), name)
+			if err := os.MkdirAll(repo, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, entrypoint), []byte("# stub "+name+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for _, gitArgs := range [][]string{
+				{"init", "-q"},
+				{"config", "user.email", "test@example.com"},
+				{"config", "user.name", "Test"},
+				{"add", entrypoint},
+				{"commit", "-q", "-m", "init"},
+			} {
+				cmd := exec.Command("git", append([]string{"-C", repo}, gitArgs...)...)
+				if out, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("git %v failed: %v\n%s", gitArgs, err, out)
+				}
+			}
+			return repo
+		}
+
+		home := t.TempDir()
+		fshRepo := mkPluginRepo("fast-syntax-highlighting", "fast-syntax-highlighting.plugin.zsh")
+		autoRepo := mkPluginRepo("zsh-autosuggestions", "zsh-autosuggestions.zsh")
+		tabRepo := mkPluginRepo("fzf-tab", "fzf-tab.plugin.zsh")
+		compRepo := mkPluginRepo("zsh-completions", "zsh-completions.plugin.zsh")
+
+		cmd := exec.Command("bash", scriptPath)
+		cmd.Env = []string{
+			"HOME=" + home,
+			"PATH=" + os.Getenv("PATH"),
+			"ANX_ZSH_FSH_URL=" + fshRepo,
+			"ANX_ZSH_AUTOSUGGEST_URL=" + autoRepo,
+			"ANX_ZSH_FZFTAB_URL=" + tabRepo,
+			"ANX_ZSH_COMPLETIONS_URL=" + compRepo,
+		}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("install_zsh_plugins.sh failed: %v\n%s", err, out)
+		}
+
+		plat := platform.NewTestInfo(platform.TestInfoParams{
+			OS:      "darwin",
+			Arch:    "arm64",
+			HomeDir: home,
+		})
+		cat, err := manifest.LoadCatalog()
+		if err != nil {
+			t.Fatal(err)
+		}
+		disp := providers.NewDispatcher(plat, cat, security.NewRunner(5*time.Second), "")
+		zshPlugins := domain.ManagedResource{ID: "zsh-plugins", Name: "Zsh Plugins"}
+		if ok, _, err := disp.IsInstalled(context.Background(), zshPlugins); err != nil || !ok {
+			t.Fatalf("expected zsh-plugins IsInstalled=true after install, got ok=%v err=%v", ok, err)
+		}
+
+		// Removing one plugin dir even while .anx-plugins-ready remains must trigger reinstall.
+		if err := os.RemoveAll(filepath.Join(home, ".zsh", "fast-syntax-highlighting")); err != nil {
+			t.Fatal(err)
+		}
+		if ok, _, err := disp.IsInstalled(context.Background(), zshPlugins); err != nil || ok {
+			t.Fatalf("expected zsh-plugins IsInstalled=false when fast-syntax-highlighting missing, got ok=%v err=%v", ok, err)
+		}
+	})
 }

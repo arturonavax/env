@@ -224,6 +224,12 @@ if [[ -z "$current_version" ]]; then
 		else
 			install_binary_release
 		fi
+		mkdir -p "${HOME}/.local/bin"
+		for tool in go gofmt; do
+			if [[ -x "${INSTALLATION_DIR}/go/bin/${tool}" ]]; then
+				ln -sfn "${INSTALLATION_DIR}/go/bin/${tool}" "${HOME}/.local/bin/${tool}"
+			fi
+		done
 		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Installation completed successfully!${fcr}"
 	else
 		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically install: ${fccb}./scripts/install_golang.sh -i${fcr}"
@@ -237,6 +243,12 @@ elif [[ "$current_version" != "$latest_version" ]]; then
 		else
 			install_binary_release
 		fi
+		mkdir -p "${HOME}/.local/bin"
+		for tool in go gofmt; do
+			if [[ -x "${INSTALLATION_DIR}/go/bin/${tool}" ]]; then
+				ln -sfn "${INSTALLATION_DIR}/go/bin/${tool}" "${HOME}/.local/bin/${tool}"
+			fi
+		done
 		echo -e "${fcwb}[Golang Installer]: ${fcgb}✔️ Update completed successfully!${fcr}"
 	else
 		echo -e "${fcwb}[Golang Installer]: Run with ${fcgb}'-i'${fcr} to automatically update: ${fccb}./scripts/install_golang.sh -i${fcr}"

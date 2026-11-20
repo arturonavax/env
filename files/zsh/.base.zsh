@@ -61,15 +61,41 @@ export \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8
 
+# Helper to source the first existing Zsh plugin file from candidate paths.
+_anx_source_first_plugin() {
+    local candidate
+    for candidate in "$@"; do
+        if [[ -f "$candidate" ]]; then
+            # shellcheck source=/dev/null
+            source "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # ==============================================================================
 # 1. MOTOR DE COMPLETION (COMPINIT OPTIMIZADO)
 # ==============================================================================
+setopt EXTENDED_GLOB
+[[ -d "${HOME}/.zsh/zsh-completions/src" ]] && fpath=("${HOME}/.zsh/zsh-completions/src" $fpath)
+[[ -d "${HOME}/.zsh/completions" ]] && fpath=("${HOME}/.zsh/completions" $fpath)
+[[ -d "/usr/local/share/zsh/site-functions" ]] && fpath=("/usr/local/share/zsh/site-functions" $fpath)
+[[ -d "/opt/homebrew/share/zsh/site-functions" ]] && fpath=("/opt/homebrew/share/zsh/site-functions" $fpath)
+
 autoload -Uz compinit
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
-    compinit
-else
-    compinit -C
-fi
+_anx_init_compinit() {
+    local -a stale
+    local dump="${ZDOTDIR:-$HOME}/.zcompdump"
+    stale=( "${~dump}"(N.mh+24) )
+    if [[ ! -f "$dump" ]] || (( ${#stale} > 0 )); then
+        compinit -d "$dump"
+    else
+        compinit -C -d "$dump"
+    fi
+}
+_anx_init_compinit
+unfunction _anx_init_compinit 2>/dev/null || true
 
 # GVM (Go Version Manager) bash completion integration in Zsh
 if [[ -s "${GVM_ROOT:-$HOME/.gvm}/scripts/completion" ]]; then
@@ -130,8 +156,11 @@ fi
 # ==============================================================================
 # 4. FZF-TAB (SINCRONIZACIÓN DE COLOR TOTAL + RESPONSIVE)
 # ==============================================================================
-if [[ -f ~/.zsh/fzf-tab/fzf-tab.plugin.zsh ]] && (( $+commands[fzf] )); then
-    source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
+if (( $+commands[fzf] )) && _anx_source_first_plugin \
+    "${HOME}/.zsh/fzf-tab/fzf-tab.plugin.zsh" \
+    "/opt/homebrew/share/fzf-tab/fzf-tab.plugin.zsh" \
+    "/usr/local/share/fzf-tab/fzf-tab.plugin.zsh" \
+    "/usr/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh"; then
 
     # Paleta canónica sincronizada (10 slots deterministas para grupos)
     local -a ftb_group_palette=(
@@ -266,8 +295,22 @@ if (( $+commands[atuin] )); then
 fi
 
 [[ -f /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found
-[[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ]] && source ~/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
+_anx_source_first_plugin \
+    "${HOME}/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" || true
+_anx_source_first_plugin \
+    "${HOME}/.zsh/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
+    "/opt/homebrew/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
+    "/usr/local/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
+    "/usr/share/zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
+    "${HOME}/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+    "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" || true
 
 # Starship Prompt (Invocación única)
 (( $+commands[starship] )) && eval "$(starship init zsh)"
