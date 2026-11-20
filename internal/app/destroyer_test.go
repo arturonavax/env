@@ -204,7 +204,6 @@ func TestPurgeConfigTarget_FileRemoval(t *testing.T) {
 	}
 }
 
-
 func TestDestroyerService_PlanPurge_AllMergesCatalogWithPartialStore(t *testing.T) {
 	plat := platform.Detect()
 	cat := catalog.NewDefaultRegistry()

@@ -344,14 +344,26 @@ func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles omit unnecessary wget and cmake and include nodejs for editor and developer", func(t *testing.T) {
+	t.Run("base build tools are in every profile except minimal and nodejs in editor and developer", func(t *testing.T) {
+		baseTools := []string{"make", "wget", "ca-certificates", "cmake", "tar", "unzip"}
 		minPkgs, err := cat.ResolveProfilePackages("minimal")
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, id := range minPkgs {
-			if id == "wget" {
-				t.Errorf("minimal profile should not include redundant wget: %v", minPkgs)
+		for _, id := range baseTools {
+			if slices.Contains(minPkgs, id) {
+				t.Errorf("minimal profile should stay lean and not include %q: %v", id, minPkgs)
+			}
+		}
+		for _, prof := range []string{"terminal", "editor", "developer", "ai-workstation", "workstation", "full", "headless"} {
+			pkgs, err := cat.ResolveProfilePackages(prof)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, id := range baseTools {
+				if !slices.Contains(pkgs, id) {
+					t.Errorf("profile %q should include %q, got %v", prof, id, pkgs)
+				}
 			}
 		}
 
@@ -362,18 +374,12 @@ func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
 		if !slices.Contains(editorPkgs, "nodejs") {
 			t.Errorf("editor profile should include nodejs for Mason/LSPs, got %v", editorPkgs)
 		}
-
 		devPkgs, err := cat.ResolveProfilePackages("developer")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !slices.Contains(devPkgs, "nodejs") {
 			t.Errorf("developer profile should include nodejs, got %v", devPkgs)
-		}
-		for _, id := range devPkgs {
-			if id == "cmake" || id == "pkg-config" {
-				t.Errorf("developer profile should not include build-only %q: %v", id, devPkgs)
-			}
 		}
 	})
 }
@@ -1323,7 +1329,6 @@ func TestSSHAgentAssetsAndAllProfilesCoverage(t *testing.T) {
 		}
 	}
 }
-
 
 func TestLazyVimAndZshHighlightingAssets(t *testing.T) {
 	cat, err := manifest.LoadCatalog()

@@ -828,6 +828,7 @@ func (w WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return w, nil
 		}
 		w.sudoErr = nil
+		_, _ = security.SanitizeSudoLocalPAM(context.Background())
 		return w.startApplying()
 
 	case wizardApplyDoneMsg:

@@ -14,6 +14,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/domain"
 	"github.com/arturonavax/env/internal/platform"
+	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/state"
 	"github.com/arturonavax/env/internal/tools"
 )
@@ -315,6 +316,12 @@ func (d *DestroyerService) ExecutePurge(
 	}
 
 	var mu sync.Mutex
+
+	// 0. Drop stale PAM modules from sudo_local (cached sudo only) so that removing pam-reattach
+	// mid-run can never leave sudo unable to authenticate if the purge is interrupted.
+	if !dryRun {
+		_, _ = security.SanitizeSudoLocalPAM(ctx)
+	}
 
 	// 1. Uninstall managed packages sequentially to prevent package manager and state lock collisions
 	if len(plan.PackagesToUninstall) > 0 && d.installSvc != nil {

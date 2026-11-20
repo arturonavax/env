@@ -30,6 +30,12 @@ profiles:
     description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)
     extends: minimal
     packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
       - zsh
       - zsh-plugins
       - atuin
@@ -47,6 +53,12 @@ profiles:
     description: Neovim (LazyVim) with core formatters, linters, and Tree-sitter CLI
     extends: minimal
     packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
       - neovim
       - nodejs
       - stylua
@@ -125,6 +137,12 @@ profiles:
     description: Complete ecosystem including optional CLI harnesses and live-reload utilities
     extends: workstation
     packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
       - shellharden
       - claude-code
       - codex-cli
@@ -139,6 +157,12 @@ profiles:
     description: Remote SSH/server developer profile without GUI emulators or X11 dependencies
     extends: minimal
     packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
       - zsh
       - zsh-plugins
       - herdr

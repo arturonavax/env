@@ -1345,7 +1345,6 @@ func TestWizardReviewPlanOSConfigMatchesHostOS(t *testing.T) {
 	}
 }
 
-
 func TestWizardDestroyerToggleReplansWithForceAndRendersOSConfigStatus(t *testing.T) {
 	home := t.TempDir()
 	binDir := filepath.Join(home, ".local", "bin")

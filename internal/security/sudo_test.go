@@ -2,6 +2,8 @@ package security
 
 import (
 	"context"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -45,8 +47,9 @@ func TestNewSudoAuthCmd(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd")
 	}
-	if cmd.Path == "" && cmd.Args[0] != "sudo" {
-		t.Fatalf("expected sudo command, got %v", cmd.Args)
+	joined := strings.Join(cmd.Args, " ")
+	if !strings.Contains(joined, "sudo -p") || !strings.Contains(joined, "sudo -k") {
+		t.Fatalf("expected sudo auth with password-retry fallback (sudo -k), got %v", cmd.Args)
 	}
 	// Verify askpass stripped
 	for _, kv := range cmd.Env {
@@ -74,4 +77,35 @@ func TestStartSudoKeepaliveLifecycle(t *testing.T) {
 	stop2 := StartSudoKeepalive(ctx2)
 	<-ctx2.Done()
 	stop2()
+}
+
+func TestBrokenSudoLocalModulesDetectsMissingPamReattach(t *testing.T) {
+	dir := t.TempDir()
+	present := dir + "/pam_present.so"
+	if err := os.WriteFile(present, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	content := "# sudo_local\nauth       optional       " + dir + "/pam_reattach.so\nauth       optional       " + present + "\nauth       sufficient     pam_tid.so\n"
+	missing := brokenSudoLocalModules(content)
+	if len(missing) != 1 || missing[0] != dir+"/pam_reattach.so" {
+		t.Fatalf("expected only missing pam_reattach.so, got %v", missing)
+	}
+}
+
+func TestSudoPAMRecoveryHintOnDarwinOnly(t *testing.T) {
+	dir := t.TempDir()
+	prev := SudoLocalPath
+	SudoLocalPath = dir + "/sudo_local"
+	t.Cleanup(func() { SudoLocalPath = prev })
+	if err := os.WriteFile(SudoLocalPath, []byte("auth optional "+dir+"/pam_reattach.so\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hint := SudoPAMRecoveryHint()
+	if runtime.GOOS == "darwin" {
+		if !strings.Contains(hint, "pam_reattach.so") || !strings.Contains(hint, "Password login") {
+			t.Fatalf("expected actionable hint on darwin, got %q", hint)
+		}
+	} else if hint != "" {
+		t.Fatalf("expected empty hint off darwin, got %q", hint)
+	}
 }

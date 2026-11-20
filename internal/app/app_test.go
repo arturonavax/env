@@ -401,8 +401,8 @@ func TestInstallServicePlanFiltersByOSDisplayServerAndStrategy(t *testing.T) {
 		}
 
 		forbidden := []string{
-			"zig", "wget", "cmake", "pkg-config",
-			"build-essential", "make", "gcc", "binutils",
+			"zig", "pkg-config",
+			"build-essential", "gcc", "binutils",
 			"bz2-dev", "ssl-dev", "zlib-dev", "readline-dev", "sqlite-dev", "ffi-dev", "xz-dev", "ncurses-dev",
 			"wmctrl", "xdotool", "xclip",
 		}
@@ -457,7 +457,7 @@ func TestInstallServicePlanFiltersByOSDisplayServerAndStrategy(t *testing.T) {
 			t.Fatalf("Plan failed: %v", err)
 		}
 
-		for _, id := range []string{"zig", "wmctrl", "xdotool", "xclip", "wget", "cmake", "pkg-config"} {
+		for _, id := range []string{"zig", "wmctrl", "xdotool", "xclip", "pkg-config"} {
 			if hasStep(plan, id) {
 				t.Errorf("Linux Wayland workstation plan unexpectedly scheduled %q", id)
 			}
@@ -465,8 +465,13 @@ func TestInstallServicePlanFiltersByOSDisplayServerAndStrategy(t *testing.T) {
 		if !hasStep(plan, "build-essential") || !hasStep(plan, "ssl-dev") {
 			t.Errorf("Linux workstation plan should include build-essential and ssl-dev for rust/pyenv")
 		}
-		if hasStep(plan, "make") || hasStep(plan, "gcc") || hasStep(plan, "binutils") {
-			t.Errorf("Linux plan should not duplicate make/gcc/binutils alongside build-essential")
+		if hasStep(plan, "gcc") || hasStep(plan, "binutils") {
+			t.Errorf("Linux plan should not duplicate gcc/binutils alongside build-essential")
+		}
+		for _, id := range []string{"make", "wget", "ca-certificates", "cmake", "tar", "unzip"} {
+			if !hasStep(plan, id) {
+				t.Errorf("Linux workstation plan should include base tool %q", id)
+			}
 		}
 	})
 
@@ -630,7 +635,7 @@ func TestInstallServicePlanHeadlessAndStepEdges(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Plan(headless) failed: %v", err)
 		}
-		for _, unwanted := range []string{"xclip", "wmctrl", "xdotool", "ghostty", "wget"} {
+		for _, unwanted := range []string{"xclip", "wmctrl", "xdotool", "ghostty"} {
 			if _, ok := findStep(plan, unwanted); ok {
 				t.Errorf("headless plan unexpectedly scheduled %q", unwanted)
 			}
@@ -812,8 +817,8 @@ func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
 			OS:           "linux",
 			Arch:         "amd64",
 			CurrentShell: "zsh",
-			HomeDir:  home,
-			StateDir: filepath.Join(home, "state"),
+			HomeDir:      home,
+			StateDir:     filepath.Join(home, "state"),
 		})
 		snap, err := snapshot.NewManager(plat.StateDir())
 		if err != nil {
@@ -938,8 +943,8 @@ func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
 		plat := platform.NewTestInfo(platform.TestInfoParams{
 			OS:           "linux",
 			CurrentShell: "zsh",
-			HomeDir:  home,
-			StateDir: filepath.Join(home, "state"),
+			HomeDir:      home,
+			StateDir:     filepath.Join(home, "state"),
 		})
 		runner := &stubSSHRunner{
 			lookPaths: map[string]string{"systemctl": "/usr/bin/systemctl"},
@@ -966,8 +971,8 @@ func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
 			OS:           "darwin",
 			Arch:         "arm64",
 			CurrentShell: "zsh",
-			HomeDir:  home,
-			StateDir: filepath.Join(home, "state"),
+			HomeDir:      home,
+			StateDir:     filepath.Join(home, "state"),
 		})
 		_ = os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
 		_ = os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("private"), 0o600)
@@ -1066,7 +1071,6 @@ func TestSyncServiceSSHAgentLinuxAndDarwin(t *testing.T) {
 		}
 	})
 }
-
 
 func TestSyncOSConfigRunsLastEvenWhenUnchangedAndReportsStatus(t *testing.T) {
 	fx := newFixture(t)
