@@ -34,6 +34,44 @@ packages:
           apk: [build-base]
           pkg: [build-essential]
 
+  - id: gnupg
+    name: GnuPG
+    category: core
+    description: GNU Privacy Guard (gpg) for commit signing, encryption, and key management
+    binary_name: gpg
+    strategies:
+      - type: native
+        packages:
+          apt: [gnupg]
+          dnf: [gnupg2]
+          pacman: [gnupg]
+          zypper: [gpg2]
+          apk: [gnupg]
+          brew: [gnupg]
+          pkg: [gnupg]
+
+  - id: terminal-notifier
+    name: terminal-notifier
+    category: core
+    description: Send native macOS notifications from the command line
+    binary_name: terminal-notifier
+    os: [darwin]
+    strategies:
+      - type: native
+        packages:
+          brew: [terminal-notifier]
+
+  - id: pinentry-mac
+    name: pinentry-mac
+    category: core
+    description: Native macOS passphrase prompt for gpg-agent (Keychain integration)
+    binary_name: pinentry-mac
+    os: [darwin]
+    strategies:
+      - type: native
+        packages:
+          brew: [pinentry-mac]
+
   - id: git
     name: Git
     category: core

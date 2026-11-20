@@ -275,6 +275,7 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 
 			isDryRun := appCtx.Flags.DryRun
 			var stepErrors []error
+			osConfigPending := false
 
 			if isDryRun {
 				fmt.Fprintln(out, st.Highlight.Render("Previewing ANX Environment Upgrade (Dry-Run Mode)..."))
@@ -453,9 +454,11 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 			if !skipSync && appCtx.SyncSvc != nil {
 				fmt.Fprintln(out, "  [4/4] Synchronizing dotfiles with 3-way merge...")
 				syncOpts := app.SyncOptions{
-					Group:  "all",
-					DryRun: appCtx.Flags.DryRun,
-					Force:  false,
+					Group:                 "all",
+					DryRun:                appCtx.Flags.DryRun,
+					Force:                 false,
+					SkipUnchangedOSConfig: true,
+					DeferOSConfigScript:   true,
 				}
 				results, err := appCtx.SyncSvc.Sync(ctx, syncOpts)
 				if err != nil {
@@ -471,8 +474,19 @@ func newUpgradeCmd(appCtx *AppContext) *cobra.Command {
 					}
 				}
 				fmt.Fprintf(out, "    %s Dotfiles synchronized successfully.\n", st.Success.Render("✓"))
+				for _, r := range results {
+					if r.ConfigID == "macos-osconfig-script" && strings.Contains(r.Detail, app.OSConfigPendingDetail) {
+						osConfigPending = true
+					}
+				}
 			} else {
 				fmt.Fprintln(out, "  [4/4] Skipping dotfiles synchronization.")
+			}
+
+			if osConfigPending && !appCtx.Flags.DryRun {
+				if err := confirmAndRunOSConfig(cmd, appCtx, ctx); err != nil {
+					stepErrors = append(stepErrors, err)
+				}
 			}
 
 			if len(stepErrors) > 0 {
@@ -533,4 +547,42 @@ func gitBehindCount(ctx context.Context, dir string) (int, error) {
 	var count int
 	_, err = fmt.Sscanf(strings.TrimSpace(string(out)), "%d", &count)
 	return count, err
+}
+
+// confirmAndRunOSConfig asks for explicit confirmation before running the (changed) macOS
+// osconfig script at the end of `update all`, since it may restart Dock/Finder and other apps.
+func confirmAndRunOSConfig(cmd *cobra.Command, appCtx *AppContext, ctx context.Context) error {
+	out := cmd.OutOrStdout()
+	st := styles(appCtx)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, st.Warning.Render("⚠ The macOS OS configuration script (macos-osconfig) changed and is ready to run."))
+	fmt.Fprintln(out, "  It may restart Dock, Finder, and other processes, and reset UI preferences.")
+	if !isTerminal(cmd) {
+		fmt.Fprintln(out, "  Non-interactive session: skipped. Run '~/.local/bin/macos-osconfig' manually when convenient.")
+		return nil
+	}
+	fmt.Fprint(out, "  Are you sure you want to run it now? [y/N]: ")
+	var answer string
+	_, _ = fmt.Scanln(&answer)
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	if answer != "y" && answer != "yes" {
+		fmt.Fprintln(out, "  Skipped. Run '~/.local/bin/macos-osconfig' manually when convenient.")
+		return nil
+	}
+	if appCtx.Platform != nil && appCtx.Platform.HasSudo() && !appCtx.Platform.IsRoot() {
+		if !security.IsSudoAuthenticated() {
+			fmt.Fprintln(out, "  Administrator privileges (sudo) required for privileged OS configuration steps.")
+			if err := security.AuthenticateSudoCLI(); err != nil {
+				fmt.Fprintf(out, "  %s sudo authentication failed; privileged steps will be skipped.\n", st.Warning.Render("⚠"))
+			}
+		}
+		stop := security.StartSudoKeepalive(ctx)
+		defer stop()
+	}
+	detail, err := appCtx.SyncSvc.RunOSConfigScript(ctx, "macos-osconfig-script")
+	if err != nil {
+		return fmt.Errorf("macos-osconfig: %w", err)
+	}
+	fmt.Fprintf(out, "  %s OS Configuration (macos-osconfig): %s\n", st.Success.Render("✓"), detail)
+	return nil
 }

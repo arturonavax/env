@@ -230,7 +230,7 @@
 
 - Delete file: `Command-Delete`
 
-### [System configs (Requiring reboot)](../scripts/macos_osconfig.sh)
+### [System configs (Requiring reboot)](../scripts/osconfig/macos.sh)
 
 ## Devs
 
@@ -830,3 +830,21 @@ _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment ap
 [noir]: https://apps.apple.com/es/app/noir-dark-mode-for-safari/id1592917505
 [darkreader]: https://darkreader.org
 [amphetamine]: https://apps.apple.com/es/app/amphetamine/id937984704
+
+### OS configuration backups (`anx osconfig`)
+
+Before every real run, anx snapshots all preference domains, `/etc/pam.d/sudo_local`, and
+`pmset lowpowermode` that [the osconfig script](../scripts/osconfig/macos.sh) alters, into
+`<state dir>/osconfig-backups/`. Identical states are not stored twice. At most 5 snapshots are kept;
+the first one (your Mac before anx) is never deleted.
+
+```sh
+anx osconfig backup              # manual snapshot
+anx osconfig list                # first entry = original, pre-anx state
+anx osconfig restore             # latest snapshot
+anx osconfig restore first       # back to the state before anx
+anx osconfig restore <id>        # specific snapshot
+```
+
+Restore reverts whole preference domains (changes made to them since the snapshot are lost), stores a
+`pre-restore` safety copy first, and restarts Dock/Finder/SystemUIServer (`--no-restart` to skip).

@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/arturonavax/env/internal/security"
@@ -73,6 +74,11 @@ func (d *Dispatcher) isNativeInstalled(ctx context.Context, matrix map[string][]
 			return false, ""
 		}
 	}
+	if pm == "brew" && first == "pam-reattach" && d.platform != nil && d.platform.OS() == "darwin" {
+		if !security.HasValidPamReattachModule() {
+			return false, ""
+		}
+	}
 	return true, "installed"
 }
 
@@ -137,7 +143,25 @@ func (d *Dispatcher) installNative(ctx context.Context, matrix map[string][]stri
 		_, err := d.runner.RunWithOptions(ctx, "", env, cmd, args...)
 		return wrapSudoAuthErr(err)
 	case "brew":
+		hasPamReattach := slices.Contains(pkgs, "pam-reattach")
+		if hasPamReattach {
+			_, _ = security.SanitizeSudoLocalPAM(ctx)
+			security.CleanupPamReattachBrewPaths()
+		}
 		_, err := d.runner.RunWithOptions(ctx, "", env, "brew", append([]string{"install"}, pkgs...)...)
+		if hasPamReattach {
+			if err != nil {
+				security.CleanupPamReattachBrewPaths()
+				if _, lerr := d.runner.RunWithOptions(ctx, "", env, "brew", "link", "--overwrite", "pam-reattach"); lerr == nil && security.HasValidPamReattachModule() {
+					return nil
+				}
+				_, err = d.runner.RunWithOptions(ctx, "", env, "brew", append([]string{"install"}, pkgs...)...)
+			}
+			if err == nil && d.platform != nil && d.platform.OS() == "darwin" && !security.HasValidPamReattachModule() {
+				security.CleanupPamReattachBrewPaths()
+				_, _ = d.runner.RunWithOptions(ctx, "", env, "brew", "link", "--overwrite", "pam-reattach")
+			}
+		}
 		return err
 	case "pkg":
 		_, err := d.runner.RunWithOptions(ctx, "", env, "pkg", append([]string{"install", "-y"}, pkgs...)...)

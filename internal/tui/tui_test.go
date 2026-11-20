@@ -1422,3 +1422,15 @@ func TestWizardDestroyerToggleReplansWithForceAndRendersOSConfigStatus(t *testin
 		t.Errorf("expected StageCompleted to explicitly show OS Configuration warning status, got:\n%s", view)
 	}
 }
+
+func TestOrderProfilesForWizard(t *testing.T) {
+	in := []domain.Profile{{Name: "minimal"}, {Name: "zzz"}, {Name: "full"}, {Name: "developer"}, {Name: "editor"}, {Name: "terminal"}, {Name: "headless"}, {Name: "workstation"}, {Name: "ai-workstation"}}
+	var got []string
+	for _, p := range orderProfilesForWizard(in) {
+		got = append(got, p.Name)
+	}
+	want := "full,workstation,ai-workstation,developer,terminal,editor,headless,minimal,zzz"
+	if strings.Join(got, ",") != want {
+		t.Fatalf("got %v", got)
+	}
+}

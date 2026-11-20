@@ -69,6 +69,7 @@ func TestDestroyerService_PlanPurge_ProfileScoped(t *testing.T) {
 	expectedMinimalPkgs := map[string]bool{
 		"git": true, "curl": true, "wget": true, "htop": true, "jq": true, "fzf": true,
 		"ripgrep": true, "fd": true, "bat": true, "eza": true, "starship": true, "tree": true,
+		"gnupg": true, "pinentry-mac": true, "terminal-notifier": true,
 	}
 
 	for _, pkg := range plan.PackagesToUninstall {
@@ -277,7 +278,14 @@ func TestDestroyerService_ReinstallForcesAllProfilePackagesEvenWhenInstalled(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.ReinstallSteps < len(expectedMin) {
-		t.Fatalf("expected forced destroyer plan steps >= %d (all minimal packages even when pre-installed), got %d", len(expectedMin), res.ReinstallSteps)
+	applicable := 0
+	for _, id := range expectedMin {
+		if spec, ok := cat.GetPackageSpec(id); ok && !spec.SupportsOS(plat.OS()) {
+			continue
+		}
+		applicable++
+	}
+	if res.ReinstallSteps < applicable {
+		t.Fatalf("expected forced destroyer plan steps >= %d (all minimal packages even when pre-installed), got %d", applicable, res.ReinstallSteps)
 	}
 }

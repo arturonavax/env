@@ -82,6 +82,20 @@ func TestEmbeddedManifestsLoadAndValidate(t *testing.T) {
 		t.Fatal("expected herdr to declare a script/curl strategy")
 	}
 
+	// Verify herdr-core and herdr-app strategies and herdr-app-keys configuration
+	for _, id := range []string{"herdr-core", "herdr-app"} {
+		spec, ok := cat.GetPackageSpec(id)
+		if !ok {
+			t.Fatalf("expected %q in embedded catalog", id)
+		}
+		if len(spec.Strategies) < 2 {
+			t.Fatalf("expected %q to declare unix and windows script strategies, got %d", id, len(spec.Strategies))
+		}
+	}
+	if _, ok := cat.GetConfiguration("herdr-app-keys"); !ok {
+		t.Fatal("expected 'herdr-app-keys' configuration in embedded catalog")
+	}
+
 	// Verify configs and profiles
 	if len(cat.ListConfigurations()) < 12 {
 		t.Fatalf("expected >=12 declarative configurations, got %d", len(cat.ListConfigurations()))
@@ -253,7 +267,7 @@ func TestManifestDependencyHygieneAndDistroMappings(t *testing.T) {
 	})
 
 	t.Run("unused dead core packages are removed", func(t *testing.T) {
-		removed := []string{"bison", "zstd", "clang", "fontconfig", "gnupg", "gzip"}
+		removed := []string{"bison", "zstd", "clang", "fontconfig", "gzip"}
 		for _, id := range removed {
 			if _, ok := cat.GetPackageSpec(id); ok {
 				t.Errorf("expected unused package %q to be removed from catalog", id)
@@ -666,13 +680,13 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 	})
 
 	t.Run("macos_osconfig.sh passes security guardrails and targets max macOS 27 with sudo_local", func(t *testing.T) {
-		raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "macos_osconfig.sh"))
+		raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "osconfig", "macos.sh"))
 		if err != nil {
-			t.Fatalf("reading scripts/macos_osconfig.sh: %v", err)
+			t.Fatalf("reading scripts/osconfig/macos.sh: %v", err)
 		}
 		content := string(raw)
 		if violations := security.ValidateScriptGuardrails(content); len(violations) > 0 {
-			t.Errorf("scripts/macos_osconfig.sh triggered guardrails: %+v", violations)
+			t.Errorf("scripts/osconfig/macos.sh triggered guardrails: %+v", violations)
 		}
 		for _, required := range []string{
 			"/etc/pam.d/sudo_local",
@@ -698,7 +712,7 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 			"defaults read com.apple.symbolichotkeys",
 		} {
 			if !strings.Contains(content, required) {
-				t.Errorf("scripts/macos_osconfig.sh missing expected setting %q", required)
+				t.Errorf("scripts/osconfig/macos.sh missing expected setting %q", required)
 			}
 		}
 		for _, banned := range []string{
@@ -719,7 +733,7 @@ func TestMacOSOSConfigAssetsAndManifests(t *testing.T) {
 			"dynamic_pager",
 		} {
 			if strings.Contains(content, banned) {
-				t.Errorf("scripts/macos_osconfig.sh still contains deprecated/unsafe command %q", banned)
+				t.Errorf("scripts/osconfig/macos.sh still contains deprecated/unsafe command %q", banned)
 			}
 		}
 	})
@@ -730,7 +744,7 @@ func TestMacOSOSConfigScriptDryRunAndVersionBounds(t *testing.T) {
 		t.Skip("POSIX bash script test skipped on Windows")
 	}
 
-	scriptPath := filepath.Join("..", "..", "scripts", "macos_osconfig.sh")
+	scriptPath := filepath.Join("..", "..", "scripts", "osconfig", "macos.sh")
 
 	runWithStubOS := func(osName, productVersion string, args ...string) (string, error) {
 		t.Helper()

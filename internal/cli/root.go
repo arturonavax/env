@@ -154,6 +154,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 	rootCmd.AddCommand(newCompletionCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newDocCmd(rootCmd, appCtx))
 	rootCmd.AddCommand(newResetCmd(appCtx))
+	rootCmd.AddCommand(newOSConfigCmd(appCtx))
 	rootCmd.AddCommand(newStateCmd(appCtx))
 	rootCmd.AddCommand(newJobsCmd(appCtx))
 

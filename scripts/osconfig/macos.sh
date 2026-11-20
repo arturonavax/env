@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# scripts/macos_osconfig.sh
+# scripts/osconfig/macos.sh
 # Modern, idempotent macOS system configuration (Sonoma 14 through macOS 27 max).
 #
 # Replaces archived legacy scripts (archives/src/osconfig/macos/*):
@@ -12,7 +12,7 @@
 #   - Optional interactive Apple Shortcuts import (files/macos-shortcuts/*.shortcut)
 #
 # Usage:
-#   ./scripts/macos_osconfig.sh [options]
+#   ./scripts/osconfig/macos.sh [options]
 # ==============================================================================
 
 set -euo pipefail
@@ -221,7 +221,7 @@ defaults_write_optional() {
 			*"|$1|"*) ;;
 			*)
 				OPTIONAL_WARNED_DOMAINS="${OPTIONAL_WARNED_DOMAINS}$1|"
-				log_warn "Skipped sandboxed/unavailable defaults domain ($1)."
+				log_info "Skipped sandboxed/unavailable defaults domain ($1)."
 				;;
 		esac
 	fi
@@ -230,7 +230,7 @@ defaults_write_optional() {
 quit_app_if_running() {
 	local app_name="$1"
 	if [[ "$app_name" == "Terminal" && "${TERM_PROGRAM:-}" == "Apple_Terminal" ]]; then
-		log_warn "Skipping quit for Terminal while running inside active Apple Terminal session."
+		log_info "Skipping quit for Terminal while running inside active Apple Terminal session."
 		return 0
 	fi
 	if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -382,7 +382,7 @@ repair_macos_sudo_pam_if_needed() {
 }
 
 remove_temporary_pam_shims() {
-	local cand target
+	local cand target opt_dir
 	for cand in \
 		"/opt/homebrew/opt/pam-reattach/lib/pam/pam_reattach.so" \
 		"/opt/homebrew/lib/pam/pam_reattach.so" \
@@ -393,6 +393,14 @@ remove_temporary_pam_shims() {
 			case "$target" in
 				/usr/lib/pam/*) rm -f "$cand" 2>/dev/null || true ;;
 			esac
+			if [[ ! -e "$cand" ]]; then
+				rm -f "$cand" 2>/dev/null || true
+			fi
+		fi
+	done
+	for opt_dir in "/opt/homebrew/opt/pam-reattach" "/usr/local/opt/pam-reattach"; do
+		if [[ -d "$opt_dir" && ! -L "$opt_dir" ]] && ! is_real_pam_module "${opt_dir}/lib/pam/pam_reattach.so"; then
+			rm -rf "$opt_dir" 2>/dev/null || true
 		fi
 	done
 }
@@ -402,6 +410,7 @@ init_sudo_keepalive() {
 		return 0
 	fi
 	repair_macos_sudo_pam_if_needed
+	log_info ">>> WAITING FOR SUDO AUTHORIZATION <<< If a Touch ID dialog appears (it may be unfocused), click it and place your finger, or type your password."
 	if ! sudo -v; then
 		log_err "sudo authentication failed; re-run with cached sudo or pass --no-sudo to skip privileged steps."
 		return 1
@@ -457,7 +466,14 @@ configure_touchid_sudo() {
 			[[ "$DRY_RUN" -eq 0 ]] && remove_temporary_pam_shims
 			log_info "Installing pam-reattach via Homebrew (bridges Herdr/tmux daemon sessions to Aqua Touch ID)..."
 			if ! run_cmd brew install pam-reattach; then
-				log_warn "Failed to install pam-reattach via Homebrew; Touch ID inside detached Herdr/tmux sessions may require pam_reattach.so."
+				[[ "$DRY_RUN" -eq 0 ]] && remove_temporary_pam_shims
+				run_cmd brew link --overwrite pam-reattach >/dev/null 2>&1 || true
+				if ! find_pam_reattach >/dev/null 2>&1 && ! run_cmd brew install pam-reattach; then
+					log_warn "Failed to install pam-reattach via Homebrew; Touch ID inside detached Herdr/tmux sessions may require pam_reattach.so."
+				fi
+			elif [[ "$DRY_RUN" -eq 0 ]] && ! find_pam_reattach >/dev/null 2>&1; then
+				remove_temporary_pam_shims
+				brew link --overwrite pam-reattach >/dev/null 2>&1 || true
 			fi
 			pam_reattach_path="$(find_pam_reattach 2>/dev/null || true)"
 		else
@@ -583,10 +599,23 @@ configure_defaults() {
 	defaults_curhost_write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 	defaults_write NSGlobalDomain com.apple.mouse.tapBehavior -int 0
 	defaults_write NSGlobalDomain com.apple.swipescrolldirection -bool false
-	defaults_write_tcc com.apple.universalaccess closeViewScrollWheelToggle -bool true
-	defaults_write_tcc com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
-	defaults_write_tcc com.apple.universalaccess closeViewZoomFollowsFocus -bool true
-	defaults_write_tcc com.apple.universalaccess showWindowTitlebarIcons -bool true
+
+	# Disable Force Click / Look up & data detectors and haptic detents (built-in + Magic Trackpad)
+	defaults_write com.apple.AppleMultitouchTrackpad ForceSuppressed -bool true
+	defaults_write com.apple.AppleMultitouchTrackpad ActuateDetents -int 0
+	defaults_write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerTapGesture -int 0
+	defaults_write com.apple.driver.AppleBluetoothMultitouch.trackpad ForceSuppressed -bool true
+	defaults_write com.apple.driver.AppleBluetoothMultitouch.trackpad ActuateDetents -int 0
+	defaults_write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerTapGesture -int 0
+	defaults_write NSGlobalDomain com.apple.trackpad.forceClick -bool false
+
+	# Disable two-finger horizontal scroll "Go Back / Forward" page navigation (keeps normal horizontal scroll)
+	defaults_write NSGlobalDomain AppleEnableSwipeNavigateWithScrolls -bool false
+	defaults_write NSGlobalDomain AppleEnableMouseSwipeNavigateWithScrolls -bool false
+	defaults_write_optional com.apple.universalaccess closeViewScrollWheelToggle -bool true
+	defaults_write_optional com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
+	defaults_write_optional com.apple.universalaccess closeViewZoomFollowsFocus -bool true
+	defaults_write_optional com.apple.universalaccess showWindowTitlebarIcons -bool true
 	defaults_write NSGlobalDomain NSToolbarTitleViewRolloverDelay -float 0
 
 	# Finder
@@ -841,7 +870,7 @@ import_shortcuts() {
 	log_info "Importing bundled macOS Shortcuts (requires interactive GUI approval per shortcut)..."
 	local script_dir repo_dir shortcuts_dir
 	script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	repo_dir="$(cd "${script_dir}/.." && pwd)"
+	repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
 	if [[ -d "${repo_dir}/files/macos-shortcuts" ]]; then
 		shortcuts_dir="${repo_dir}/files/macos-shortcuts"

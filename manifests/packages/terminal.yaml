@@ -253,9 +253,9 @@ packages:
   - id: herdr
     name: Herdr
     category: terminal
-    description: Statically-linked terminal and AI agent workspace multiplexer
+    description: Statically-linked terminal and AI agent workspace multiplexer (TUI)
     binary_name: herdr
-    os: [linux, darwin]
+    os: [linux, darwin, windows]
     strategies:
       - type: github_release
         github_release:
@@ -269,11 +269,69 @@ packages:
           binary_in_archive: herdr
           install_to: "~/.local/bin/herdr"
       - type: script
+        when:
+          os: [linux, darwin]
         depends_on: [curl]
         script:
           url: https://herdr.dev/install.sh
-          interpreter: bash
+          interpreter: sh
           creates: "~/.local/bin/herdr"
+      - type: script
+        when:
+          os: [windows]
+        script:
+          url: https://herdr.dev/install.ps1
+          interpreter: powershell
+      - type: script
+        when:
+          os: [windows]
+        script:
+          url: https://herdr.dev/install.cmd
+          interpreter: cmd
+
+  - id: herdr-core
+    name: Herdr Core
+    category: terminal
+    description: Herdr Core runtime and CLI daemon required by Herdr App
+    binary_name: herdr-core
+    os: [linux, darwin, windows]
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          url: https://releases.herdr.dev/core/install.sh
+          interpreter: sh
+          creates: "~/.local/bin/herdr-core"
+      - type: script
+        when:
+          os: [windows]
+        script:
+          url: https://releases.herdr.dev/core/install.ps1
+          interpreter: powershell
+
+  - id: herdr-app
+    name: Herdr App
+    category: terminal
+    description: Herdr desktop application for terminal and AI agent workspaces
+    binary_name: herdr-app
+    os: [linux, darwin, windows]
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl, herdr-core]
+        script:
+          url: https://releases.herdr.dev/app/install.sh
+          interpreter: sh
+      - type: script
+        when:
+          os: [windows]
+        depends_on: [herdr-core]
+        script:
+          url: https://releases.herdr.dev/app/install.ps1
+          interpreter: powershell
 
   - id: zoxide
     name: zoxide

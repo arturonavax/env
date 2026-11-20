@@ -213,4 +213,52 @@ exit 0
 	if SudoLocalReferencesModule("pam_reattach.so") {
 		t.Fatal("expected SudoLocalReferencesModule(pam_reattach.so) = false after PrepareSudoLocalForPurge")
 	}
+
+	// 4. CleanupPamReattachBrewPaths removes an unowned real directory at <brew-prefix>/opt/pam-reattach
+	// (created by emergency mkdir -p) and any temporary PAM shim at <brew-prefix>/lib/pam/pam_reattach.so
+	// so `brew link pam-reattach` never fails with a directory/file conflict.
+	fakeBrewPrefix := filepath.Join(dir, "homebrew")
+	prevPrefixes := PamReattachBrewPrefixes
+	PamReattachBrewPrefixes = []string{fakeBrewPrefix}
+	t.Cleanup(func() { PamReattachBrewPrefixes = prevPrefixes })
+
+	optDir := filepath.Join(fakeBrewPrefix, "opt", "pam-reattach")
+	optSO := filepath.Join(optDir, "lib", "pam", "pam_reattach.so")
+	libSO := filepath.Join(fakeBrewPrefix, "lib", "pam", "pam_reattach.so")
+	if err := os.MkdirAll(filepath.Dir(optSO), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(libSO), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sysPermit, optSO); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sysPermit, libSO); err != nil {
+		t.Fatal(err)
+	}
+	if HasValidPamReattachModule() {
+		t.Fatal("expected HasValidPamReattachModule() = false when only temporary shims exist")
+	}
+
+	CleanupPamReattachBrewPaths()
+
+	if _, err := os.Lstat(optDir); !os.IsNotExist(err) {
+		t.Fatalf("expected real directory %s to be removed for Homebrew symlink linking, lstat err=%v", optDir, err)
+	}
+	if _, err := os.Lstat(libSO); !os.IsNotExist(err) {
+		t.Fatalf("expected temporary shim %s to be removed, lstat err=%v", libSO, err)
+	}
+
+	// Once Homebrew links a real non-shim module, HasValidPamReattachModule() returns true and CleanupPamReattachBrewPaths preserves it.
+	if err := os.WriteFile(libSO, []byte("real-pam-reattach-binary"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !HasValidPamReattachModule() {
+		t.Fatal("expected HasValidPamReattachModule() = true when real pam_reattach.so is present")
+	}
+	CleanupPamReattachBrewPaths()
+	if _, err := os.Stat(libSO); err != nil {
+		t.Fatalf("expected real %s to be preserved by CleanupPamReattachBrewPaths: %v", libSO, err)
+	}
 }

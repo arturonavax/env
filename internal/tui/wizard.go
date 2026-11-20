@@ -310,7 +310,7 @@ func NewWizardModel(
 	var profs []domain.Profile
 	if cat != nil {
 		pkgs = cat.ListPackages()
-		profs = cat.ListProfiles()
+		profs = orderProfilesForWizard(cat.ListProfiles())
 	}
 
 	pkgMap := make(map[string]domain.ManagedResource, len(pkgs))
@@ -1716,6 +1716,7 @@ func (w WizardModel) renderReviewPlan(width, height int) string {
 	if w.platform != nil && w.platform.OS() == "darwin" {
 		scrollableLines = append(scrollableLines, "  • Amethyst          : macOS tiling window manager config (~/.amethyst.yml)")
 		scrollableLines = append(scrollableLines, "  • macos-osconfig    : System defaults (max macOS 27), Touch ID sudo_local & Shortcuts")
+		scrollableLines = append(scrollableLines, "  • TCC / Full Disk   : Optional (Safari/Accessibility TCC keys auto-skip if FDA is not enabled)")
 	} else {
 		scrollableLines = append(scrollableLines, "  • rcmd switcher     : Right-Alt fast window focus & daemon integration")
 		scrollableLines = append(scrollableLines, "  • GNOME Extension   : rcmd-shell@arturonavax.dev IPC bridge for Wayland")
@@ -2260,4 +2261,28 @@ func (w WizardModel) renderApplying(width int, height ...int) string {
 
 	scrollHint := w.styles.Muted.Render(fmt.Sprintf("  Navigation: [j/k / Up/Down / Mouse Wheel] Scroll Output (%d-%d/%d)", offset+1, end, totalLines))
 	return strings.Join(append(visibleLines, scrollHint), "\n")
+}
+
+// wizardProfileOrder lists profiles from most complete to most minimal; unknown profiles follow alphabetically.
+var wizardProfileOrder = []string{"full", "workstation", "ai-workstation", "developer", "terminal", "editor", "headless", "minimal"}
+
+func orderProfilesForWizard(profs []domain.Profile) []domain.Profile {
+	rank := make(map[string]int, len(wizardProfileOrder))
+	for i, n := range wizardProfileOrder {
+		rank[n] = i
+	}
+	out := append([]domain.Profile(nil), profs...)
+	sort.SliceStable(out, func(i, j int) bool {
+		ri, iok := rank[out[i].Name]
+		rj, jok := rank[out[j].Name]
+		switch {
+		case iok && jok:
+			return ri < rj
+		case iok != jok:
+			return iok
+		default:
+			return out[i].Name < out[j].Name
+		}
+	})
+	return out
 }

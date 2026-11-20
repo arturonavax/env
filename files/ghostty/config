@@ -33,13 +33,10 @@ window-vsync = false
 scrollback-limit = 10000
 image-storage-limit = 50000000
 
-# --- Inicio automático con Herdr ---
 # Desactivado para evitar race condition en X11/Xfce (OSC 52 selection ownership crash al renderizar buffers extensos en TUI)
 copy-on-select = false
 # Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
 mouse-scroll-multiplier = 1
-
-command = zsh -ic "herdr"
 
 desktop-notifications = true
 notify-on-command-finish = unfocused

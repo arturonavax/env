@@ -16,6 +16,7 @@ import (
 	"github.com/arturonavax/env/internal/catalog"
 	"github.com/arturonavax/env/internal/configsync"
 	"github.com/arturonavax/env/internal/domain"
+	"github.com/arturonavax/env/internal/osconfig"
 	"github.com/arturonavax/env/internal/platform"
 	"github.com/arturonavax/env/internal/security"
 	"github.com/arturonavax/env/internal/snapshot"
@@ -23,14 +24,19 @@ import (
 )
 
 // SyncOptions tunes a synchronization run.
+// OSConfigPendingDetail marks an osconfig script result whose post-sync run was deferred.
+const OSConfigPendingDetail = "osconfig pending confirmation"
+
 type SyncOptions struct {
-	Group         string
-	ExcludeGroups []string
-	DryRun        bool
-	Force         bool   // incoming (repo) wins on conflicts
-	Push          bool   // capture from $HOME back into the repository instead
-	Shell         string // override shell for filtering configs (defaults to platform shell)
-	Terminal      string // override terminal for filtering configs (defaults to platform terminal)
+	Group                 string
+	ExcludeGroups         []string
+	DryRun                bool
+	DeferOSConfigScript   bool   // do not run the osconfig script inline; report OSConfigPendingDetail so the caller can confirm and run it later
+	SkipUnchangedOSConfig bool   // do not re-run the osconfig script when its file is unchanged (e.g. update all)
+	Force                 bool   // incoming (repo) wins on conflicts
+	Push                  bool   // capture from $HOME back into the repository instead
+	Shell                 string // override shell for filtering configs (defaults to platform shell)
+	Terminal              string // override terminal for filtering configs (defaults to platform terminal)
 }
 
 // SyncResult reports what happened for one configuration.
@@ -486,9 +492,11 @@ func (s *SyncService) syncConfig(ctx context.Context, cfg domain.ConfigurationRe
 
 	isOSConfigScript := cfg.Group == "osconfig" && len(cfg.PostSyncCmds) > 0
 	shouldRunPostSync := r.Action == "created" || r.Action == "updated" || r.Action == "merged" ||
-		(isOSConfigScript && r.Action == "unchanged") ||
+		(isOSConfigScript && r.Action == "unchanged" && !opts.SkipUnchangedOSConfig) ||
 		(opts.Force && len(cfg.PostSyncCmds) > 0 && r.Action != "skipped" && r.Action != "conflict")
-	if syncErr == nil && !opts.DryRun && shouldRunPostSync {
+	if syncErr == nil && !opts.DryRun && shouldRunPostSync && isOSConfigScript && opts.DeferOSConfigScript {
+		appendSyncDetail(&r, OSConfigPendingDetail)
+	} else if syncErr == nil && !opts.DryRun && shouldRunPostSync {
 		if detail, err := s.runPostSync(ctx, cfg); err != nil {
 			r.Action = "partial"
 			appendSyncDetail(&r, fmt.Sprintf("post-sync error: %v", err))
@@ -555,12 +563,28 @@ func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.Configur
 	ctx, cancel := context.WithTimeout(parentCtx, 3*time.Minute)
 	defer cancel()
 
+	var preWarnings []string
+	if cfg.ID == "macos-osconfig-script" && os.Getenv("ANX_SKIP_OSCONFIG") != "1" && s.platform != nil && s.platform.OS() == "darwin" {
+		mgr := osconfig.NewManager(filepath.Join(s.platform.StateDir(), "osconfig-backups"), s.platform.HomeDir())
+		if man, created, err := mgr.Create(parentCtx, "pre-osconfig", true); err != nil {
+			preWarnings = append(preWarnings, fmt.Sprintf("[anx] WARNING: could not back up current macOS settings before osconfig: %v", err))
+		} else if created {
+			preWarnings = append(preWarnings, fmt.Sprintf("[anx] Backed up current macOS settings (%s). Restore with: anx osconfig restore", man.ID))
+		}
+	}
+
 	var cmdEnv []string
 	if s.platform != nil && s.platform.HomeDir() != "" {
 		cmdEnv = replaceOrAppendEnv(os.Environ(), "HOME", s.platform.HomeDir())
 	}
 	outHandler := security.OutputHandlerFromContext(parentCtx)
 	var outputs []string
+
+	if outHandler != nil {
+		for _, line := range preWarnings {
+			outHandler(line)
+		}
+	}
 
 	runCmd := func(cmdArgs []string, prefix string) {
 		if len(cmdArgs) == 0 {
@@ -606,8 +630,8 @@ func (s *SyncService) runPostSync(parentCtx context.Context, cfg domain.Configur
 		if strings.Contains(joined, "skipped (--no-sudo)") || strings.Contains(joined, "Skipping Touch ID sudo") {
 			return "applied with warnings (privileged steps skipped: --no-sudo)", nil
 		}
-		if strings.Contains(joined, "[WARN]") || strings.Contains(joined, "WARNING:") {
-			return "applied with warnings (review osconfig warnings or grant Full Disk Access)", nil
+		if strings.Contains(joined, "Failed to install pam-reattach") || strings.Contains(joined, "Could not update pmset") {
+			return "applied with warnings (some privileged osconfig steps could not be applied)", nil
 		}
 		if joined != "" {
 			return "applied successfully", nil
@@ -881,4 +905,14 @@ func writeFileAtomicWithDirMode(path string, data []byte, dirMode, fileMode os.F
 		return err
 	}
 	return nil
+}
+
+// RunOSConfigScript executes the post-sync commands of an osconfig script configuration
+// (used after the caller obtained explicit user confirmation for a deferred run).
+func (s *SyncService) RunOSConfigScript(ctx context.Context, configID string) (string, error) {
+	cfg, ok := s.catalog.GetConfiguration(configID)
+	if !ok {
+		return "", fmt.Errorf("unknown configuration %q", configID)
+	}
+	return s.runPostSync(ctx, cfg)
 }

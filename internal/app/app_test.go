@@ -1137,6 +1137,26 @@ func TestSyncOSConfigRunsLastEvenWhenUnchangedAndReportsStatus(t *testing.T) {
 	if string(log2Bytes) != "osconfig\n" {
 		t.Fatalf("expected osconfig to execute on unchanged 2nd run, got:\n%s", string(log2Bytes))
 	}
+
+	// Run 3 (optional TCC / Safari container skip notices): must report "applied successfully", not a false warning.
+	fx.cat.AddConfiguration(domain.ConfigurationResource{
+		ID:       "macos-osconfig-script",
+		Group:    "osconfig",
+		Source:   "files/test/osconfig.sh",
+		Target:   "~/.local/bin/macos-osconfig",
+		Strategy: domain.StrategyReplace,
+		FileMode: "0755",
+		PostSyncCmds: [][]string{
+			{"sh", "-c", "echo \"[macos-osconfig] WARNING: Safari container plist not found. Open Safari once and re-run --safari.\"; echo \"[macos-osconfig] Skipped sandboxed/unavailable defaults domain (com.apple.helpviewer).\""},
+		},
+	})
+	res3, err := svc.SyncOne(context.Background(), "macos-osconfig-script", app.SyncOptions{})
+	if err != nil {
+		t.Fatalf("SyncOne run 3 failed: %v", err)
+	}
+	if res3.Detail != "applied successfully" {
+		t.Fatalf("expected optional TCC/Safari skips to report 'applied successfully', got %q", res3.Detail)
+	}
 }
 
 func TestInstallServicePlanOrdersOSConfigLastAndRequiresSudoOnDarwin(t *testing.T) {

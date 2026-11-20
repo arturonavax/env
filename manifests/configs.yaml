@@ -4,7 +4,7 @@ configurations:
   - id: ghostty-config
     name: Ghostty Terminal Configuration
     group: terminal
-    description: Ghostty configuration launching Herdr workspace multiplexer and theme definitions
+    description: Ghostty terminal appearance, performance, and theme configuration
     source: files/ghostty
     target: "~/.config/ghostty"
     targets_by_os:
@@ -52,6 +52,18 @@ configurations:
     source: files/herdr/config.toml
     target: "~/.config/herdr/config.toml"
     os: [linux, darwin]
+    strategy: three_way
+    backup: true
+
+  - id: herdr-app-keys
+    name: Herdr App Keybindings Configuration
+    group: terminal
+    description: Herdr App desktop keybindings configuration (keys.json)
+    source: files/herdr-app/keys.json
+    target: "~/.config/herdr-app/keys.json"
+    targets_by_os:
+      windows: "~/AppData/Roaming/herdr-app/keys.json"
+    os: [linux, darwin, windows]
     strategy: three_way
     backup: true
 
@@ -177,6 +189,26 @@ configurations:
     marker_start: "# >>> arturonavax/env >>>"
     marker_end: "# <<< arturonavax/env <<<"
     backup: true
+
+  - id: gpg-agent-pinentry
+    name: GnuPG Agent pinentry-mac (~/.gnupg/gpg-agent.conf)
+    group: terminal
+    description: Point gpg-agent at pinentry-mac and restart the agent (macOS only)
+    source: files/gnupg/gpg-agent.conf
+    target: "~/.gnupg/gpg-agent.conf"
+    os: [darwin]
+    strategy: marker_block
+    marker_start: "# >>> arturonavax/env >>>"
+    marker_end: "# <<< arturonavax/env <<<"
+    dir_mode: "0700"
+    file_mode: "0600"
+    skip_capture: true
+    backup: true
+    post_sync_cmds:
+      -
+        - sh
+        - -c
+        - 'bin="$(command -v pinentry-mac 2>/dev/null)"; [ -n "$bin" ] || exit 0; f="${HOME}/.gnupg/gpg-agent.conf"; grep -q "^pinentry-program ${bin}$" "$f" 2>/dev/null && exit 0; tmp="$(mktemp)"; grep -v "^pinentry-program " "$f" > "$tmp" 2>/dev/null; echo "pinentry-program ${bin}" >> "$tmp"; cat "$tmp" > "$f"; rm -f "$tmp"; gpgconf --kill gpg-agent 2>/dev/null || true'
 
   - id: ssh-config
     name: OpenSSH Client Configuration (~/.ssh/config)
@@ -384,7 +416,7 @@ configurations:
     name: macOS System Configuration Script
     group: osconfig
     description: Modern idempotent macOS 14-27 preferences, Safari, Spaces hotkeys, and Ghostty+Herdr Touch ID sudo setup
-    source: scripts/macos_osconfig.sh
+    source: scripts/osconfig/macos.sh
     target: "~/.local/bin/macos-osconfig"
     os: [darwin]
     strategy: replace

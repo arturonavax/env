@@ -50,6 +50,9 @@ Use --uninstall-only to perform a complete Destroyer Uninstall without re-instal
 }
 
 func runDestroyerReinstall(cmd *cobra.Command, appCtx *AppContext, profile string) error {
+	if err := guardDestroyerSession(appCtx.Flags.DryRun); err != nil {
+		return err
+	}
 	desc := fmt.Sprintf("PURGE all packages, tools, configurations, and state, then REINSTALL profile %q", profile)
 	confirmed, err := confirmDestroyerAction(cmd, appCtx, desc)
 	if err != nil {
@@ -140,6 +143,9 @@ func runDestroyerReinstall(cmd *cobra.Command, appCtx *AppContext, profile strin
 }
 
 func runDestroyerUninstall(cmd *cobra.Command, appCtx *AppContext, profile string) error {
+	if err := guardDestroyerSession(appCtx.Flags.DryRun); err != nil {
+		return err
+	}
 	desc := fmt.Sprintf("PURGE packages, tools, configurations, state, caches, and anx binaries (profile: %s)", profile)
 	confirmed, err := confirmDestroyerAction(cmd, appCtx, desc)
 	if err != nil {

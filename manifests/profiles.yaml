@@ -4,6 +4,9 @@ profiles:
     description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, htop, tree)
     packages:
       - git
+      - gnupg
+      - pinentry-mac
+      - terminal-notifier
       - curl
       - htop
       - jq
@@ -25,6 +28,7 @@ profiles:
       - ssh-agent-env
       - ssh-agent-zshenv
       - ssh-agent-profile
+      - gpg-agent-pinentry
 
   - name: terminal
     description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)
@@ -40,6 +44,8 @@ profiles:
       - zsh-plugins
       - atuin
       - herdr
+      - herdr-core
+      - herdr-app
       - zoxide
       - delta
       - difftastic

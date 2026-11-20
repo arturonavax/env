@@ -197,7 +197,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"scripts/install_node.sh"
 			"scripts/install_rust.sh"
 			"scripts/install_zsh_plugins.sh"
-			"scripts/macos_osconfig.sh"
+			"scripts/osconfig/macos.sh"
 			"scripts/safe_suspend.sh"
 			"scripts/test_e2e_docker.sh"
 			"manifests/hacks/dell-precision-m6800/apply_hacks.sh"

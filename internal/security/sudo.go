@@ -25,6 +25,12 @@ var SystemPAMFallbackModules = []string{
 	"/usr/lib/pam/pam_deny.so",
 }
 
+// PamReattachBrewPrefixes lists standard Homebrew prefixes where pam-reattach may be linked or shimmed.
+var PamReattachBrewPrefixes = []string{
+	"/opt/homebrew",
+	"/usr/local",
+}
+
 func isDarwinOrTestSudoLocal() bool {
 	return runtime.GOOS == "darwin" || SudoLocalPath != "/etc/pam.d/sudo_local"
 }
@@ -91,11 +97,20 @@ const sudoAuthScript = `repair_macos_sudo_pam_if_needed() {
 	done < /etc/pam.d/sudo_local
 }
 repair_macos_sudo_pam_if_needed
+announce_sudo_wait() {
+	if [ "$(uname -s)" = "Darwin" ]; then
+		printf '\n[anx] >>> WAITING FOR SUDO AUTHORIZATION <<<\n[anx] If a Touch ID dialog appears (it may be unfocused), click it and place your finger, or type your password here.\n' >&2
+	else
+		printf '\n[anx] >>> WAITING FOR SUDO AUTHORIZATION: enter your password below <<<\n' >&2
+	fi
+}
+announce_sudo_wait
 prompt='[sudo] Password for %u (ANX package installation): '
 if sudo -p "$prompt" -v; then exit 0; fi
 printf '\n[anx] sudo authentication failed; resetting cached credentials and retrying with password...\n' >&2
 sudo -k >/dev/null 2>&1 || true
 repair_macos_sudo_pam_if_needed
+announce_sudo_wait
 exec sudo -p "$prompt" -v`
 
 // NewSudoAuthCmd creates an exec.Cmd configured for terminal-only sudo credential refresh.
@@ -156,11 +171,15 @@ func firstSystemPAMFallback() string {
 }
 
 func findExistingRealPamReattach(excludePath string) string {
-	candidates := []string{
-		"/opt/homebrew/opt/pam-reattach/lib/pam/pam_reattach.so",
-		"/opt/homebrew/lib/pam/pam_reattach.so",
-		"/usr/local/opt/pam-reattach/lib/pam/pam_reattach.so",
-		"/usr/local/lib/pam/pam_reattach.so",
+	var candidates []string
+	for _, prefix := range PamReattachBrewPrefixes {
+		candidates = append(candidates,
+			filepath.Join(prefix, "opt", "pam-reattach", "lib", "pam", "pam_reattach.so"),
+			filepath.Join(prefix, "lib", "pam", "pam_reattach.so"),
+		)
+		if matches, err := filepath.Glob(filepath.Join(prefix, "Cellar", "pam-reattach", "*", "lib", "pam", "pam_reattach.so")); err == nil {
+			candidates = append(candidates, matches...)
+		}
 	}
 	for _, cand := range candidates {
 		if cand == excludePath || isTemporaryPAMShim(cand) {
@@ -171,6 +190,71 @@ func findExistingRealPamReattach(excludePath string) string {
 		}
 	}
 	return ""
+}
+
+// HasValidPamReattachModule reports whether a non-shim pam_reattach.so exists at the standard Homebrew link path.
+func HasValidPamReattachModule() bool {
+	for _, prefix := range PamReattachBrewPrefixes {
+		for _, cand := range []string{
+			filepath.Join(prefix, "lib", "pam", "pam_reattach.so"),
+			filepath.Join(prefix, "opt", "pam-reattach", "lib", "pam", "pam_reattach.so"),
+		} {
+			if isTemporaryPAMShim(cand) {
+				continue
+			}
+			if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// CleanupPamReattachBrewPaths removes temporary PAM recovery shims and unowned real directories at
+// <brew-prefix>/opt/pam-reattach so Homebrew can cleanly create its opt/pam-reattach -> ../Cellar/...
+// symlink and link lib/pam/pam_reattach.so without conflict.
+func CleanupPamReattachBrewPaths() {
+	if !isDarwinOrTestSudoLocal() {
+		return
+	}
+	for _, prefix := range PamReattachBrewPrefixes {
+		soPaths := []string{
+			filepath.Join(prefix, "opt", "pam-reattach", "lib", "pam", "pam_reattach.so"),
+			filepath.Join(prefix, "lib", "pam", "pam_reattach.so"),
+		}
+		for _, soPath := range soPaths {
+			if SudoLocalReferencesModule(soPath) {
+				continue
+			}
+			if isTemporaryPAMShim(soPath) {
+				_ = os.Remove(soPath)
+				continue
+			}
+			// Remove dangling symlinks left behind after a Cellar uninstall.
+			if linfo, lerr := os.Lstat(soPath); lerr == nil && linfo.Mode()&os.ModeSymlink != 0 {
+				if _, serr := os.Stat(soPath); serr != nil {
+					_ = os.Remove(soPath)
+				}
+			}
+		}
+
+		// In Homebrew, <prefix>/opt/pam-reattach MUST be a symlink to ../Cellar/pam-reattach/<version>,
+		// never a real directory. If emergency mkdir -p created a real directory there, remove it once
+		// sudo_local no longer depends on it.
+		optDir := filepath.Join(prefix, "opt", "pam-reattach")
+		if SudoLocalReferencesModule(optDir) {
+			continue
+		}
+		if linfo, err := os.Lstat(optDir); err == nil && linfo.IsDir() && linfo.Mode()&os.ModeSymlink == 0 {
+			optSO := filepath.Join(optDir, "lib", "pam", "pam_reattach.so")
+			if isTemporaryPAMShim(optSO) {
+				_ = os.Remove(optSO)
+			}
+			if info, serr := os.Stat(optSO); serr != nil || info.IsDir() {
+				_ = os.RemoveAll(optDir)
+			}
+		}
+	}
 }
 
 // EnsureSudoPAMHealthy inspects /etc/pam.d/sudo_local for absolute .so module paths (such as
@@ -334,6 +418,7 @@ func rewriteSudoLocalFiltering(ctx context.Context, dropLine func(line string) (
 		kept = append(kept, line)
 	}
 	if !changed {
+		CleanupPamReattachBrewPaths()
 		return false, nil
 	}
 
@@ -360,6 +445,7 @@ func rewriteSudoLocalFiltering(ctx context.Context, dropLine func(line string) (
 			_ = os.Remove(p)
 		}
 	}
+	CleanupPamReattachBrewPaths()
 	return true, nil
 }
 

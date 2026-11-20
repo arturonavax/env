@@ -7,11 +7,11 @@ delivery = "system"
 enabled = true
 
 [ui]
-status_indicators = "dots"
+status_indicators = "symbols"
 
 [theme]
-name = "tokyo night"
-auto_switch = true
+name = "tokyo-night"
+auto_switch = false
 custom.accent = "red"
 
 [keys]
