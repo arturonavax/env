@@ -39,6 +39,39 @@ for _brew_bin in /opt/homebrew/bin /usr/local/bin; do
 done
 export PATH
 
+# Self-heal broken /etc/pam.d/sudo_local (e.g. missing /opt/homebrew/.../pam_reattach.so after an
+# interrupted destroyer run) in user-space without sudo so that subsequent sudo calls can initialize PAM.
+repair_macos_sudo_pam_if_needed() {
+	[ "$(uname -s 2>/dev/null || true)" = "Darwin" ] || return 0
+	[ -r /etc/pam.d/sudo_local ] || return 0
+	_shim=""
+	for _cand in /usr/lib/pam/pam_permit.so.2 /usr/lib/pam/pam_permit.so /usr/lib/pam/pam_deny.so.2 /usr/lib/pam/pam_deny.so; do
+		if [ -f "$_cand" ]; then
+			_shim="$_cand"
+			break
+		fi
+	done
+	[ -n "$_shim" ] || return 0
+	while IFS= read -r _line || [ -n "$_line" ]; do
+		case "$_line" in
+		"" | \#*) continue ;;
+		esac
+		for _tok in $_line; do
+			case "$_tok" in
+			/*.so)
+				if [ ! -f "$_tok" ]; then
+					_dir="$(dirname "$_tok")"
+					mkdir -p "$_dir" 2>/dev/null || true
+					rm -f "$_tok" 2>/dev/null || true
+					ln -sfn "$_shim" "$_tok" 2>/dev/null || true
+				fi
+				;;
+			esac
+		done
+	done </etc/pam.d/sudo_local
+}
+repair_macos_sudo_pam_if_needed
+
 # Locate repository root if running inside an existing checkout
 REPO_ROOT=""
 cur="${PWD:-.}"

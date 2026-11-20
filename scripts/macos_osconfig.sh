@@ -337,10 +337,71 @@ ensure_homebrew_env() {
 	fi
 }
 
+is_real_pam_module() {
+	local path="$1"
+	[[ -f "$path" ]] || return 1
+	if [[ -L "$path" ]]; then
+		local target
+		target="$(readlink "$path" 2>/dev/null || true)"
+		case "$target" in
+			/usr/lib/pam/*) return 1 ;;
+		esac
+	fi
+	return 0
+}
+
+repair_macos_sudo_pam_if_needed() {
+	local sudo_local="${ANX_SUDO_LOCAL_PATH:-/etc/pam.d/sudo_local}"
+	[[ "$DRY_RUN" -eq 0 && -r "$sudo_local" ]] || return 0
+	local shim="" cand line tok dir
+	for cand in /usr/lib/pam/pam_permit.so.2 /usr/lib/pam/pam_permit.so /usr/lib/pam/pam_deny.so.2 /usr/lib/pam/pam_deny.so; do
+		if [[ -f "$cand" ]]; then
+			shim="$cand"
+			break
+		fi
+	done
+	[[ -n "$shim" ]] || return 0
+
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		case "$line" in
+			""|\#*) continue ;;
+		esac
+		for tok in $line; do
+			case "$tok" in
+				/*.so)
+					if [[ ! -f "$tok" ]]; then
+						dir="$(dirname "$tok")"
+						mkdir -p "$dir" 2>/dev/null || true
+						rm -f "$tok" 2>/dev/null || true
+						ln -sfn "$shim" "$tok" 2>/dev/null || true
+					fi
+					;;
+			esac
+		done
+	done < "$sudo_local"
+}
+
+remove_temporary_pam_shims() {
+	local cand target
+	for cand in \
+		"/opt/homebrew/opt/pam-reattach/lib/pam/pam_reattach.so" \
+		"/opt/homebrew/lib/pam/pam_reattach.so" \
+		"/usr/local/opt/pam-reattach/lib/pam/pam_reattach.so" \
+		"/usr/local/lib/pam/pam_reattach.so"; do
+		if [[ -L "$cand" ]]; then
+			target="$(readlink "$cand" 2>/dev/null || true)"
+			case "$target" in
+				/usr/lib/pam/*) rm -f "$cand" 2>/dev/null || true ;;
+			esac
+		fi
+	done
+}
+
 init_sudo_keepalive() {
 	if [[ "$USE_SUDO" -eq 0 || "$DRY_RUN" -eq 1 ]]; then
 		return 0
 	fi
+	repair_macos_sudo_pam_if_needed
 	if ! sudo -v; then
 		log_err "sudo authentication failed; re-run with cached sudo or pass --no-sudo to skip privileged steps."
 		return 1
@@ -365,16 +426,16 @@ find_pam_reattach() {
 	arch="$(uname -m)"
 	if command -v brew >/dev/null 2>&1; then
 		prefix="$(brew --prefix pam-reattach 2>/dev/null || brew --prefix 2>/dev/null || true)"
-		if [[ -n "$prefix" && -f "${prefix}/lib/pam/pam_reattach.so" ]]; then
+		if [[ -n "$prefix" ]] && is_real_pam_module "${prefix}/lib/pam/pam_reattach.so"; then
 			printf '%s\n' "${prefix}/lib/pam/pam_reattach.so"
 			return 0
 		fi
 	fi
-	if [[ "$arch" == "arm64" && -f "/opt/homebrew/lib/pam/pam_reattach.so" ]]; then
+	if [[ "$arch" == "arm64" ]] && is_real_pam_module "/opt/homebrew/lib/pam/pam_reattach.so"; then
 		printf '%s\n' "/opt/homebrew/lib/pam/pam_reattach.so"
 		return 0
 	fi
-	if [[ -f "/usr/local/lib/pam/pam_reattach.so" ]]; then
+	if is_real_pam_module "/usr/local/lib/pam/pam_reattach.so"; then
 		printf '%s\n' "/usr/local/lib/pam/pam_reattach.so"
 		return 0
 	fi
@@ -393,6 +454,7 @@ configure_touchid_sudo() {
 	local pam_reattach_path=""
 	if ! pam_reattach_path="$(find_pam_reattach 2>/dev/null)"; then
 		if [[ "${ANX_OSCONFIG_NO_BREW:-0}" != "1" ]] && command -v brew >/dev/null 2>&1; then
+			[[ "$DRY_RUN" -eq 0 ]] && remove_temporary_pam_shims
 			log_info "Installing pam-reattach via Homebrew (bridges Herdr/tmux daemon sessions to Aqua Touch ID)..."
 			if ! run_cmd brew install pam-reattach; then
 				log_warn "Failed to install pam-reattach via Homebrew; Touch ID inside detached Herdr/tmux sessions may require pam_reattach.so."
@@ -441,7 +503,9 @@ configure_touchid_sudo() {
 	tmp_sudo_local="$(mktemp "${TMPDIR:-/tmp}/anx-sudo_local.XXXXXX")"
 	TMP_FILES+=("$tmp_sudo_local")
 	printf '%s' "$desired_content" >"$tmp_sudo_local"
+	repair_macos_sudo_pam_if_needed
 	run_sudo install -m 0644 "$tmp_sudo_local" /etc/pam.d/sudo_local
+	[[ "$DRY_RUN" -eq 0 ]] && remove_temporary_pam_shims
 	log_info "Touch ID sudo configured in /etc/pam.d/sudo_local."
 }
 

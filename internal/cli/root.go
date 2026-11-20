@@ -96,6 +96,7 @@ func NewRootCommand(appCtx *AppContext) *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			_, _ = security.EnsureSudoPAMHealthy()
 			return applyConfigLayering(cmd, appCtx)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {

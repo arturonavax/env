@@ -305,6 +305,7 @@ func NewWizardModel(
 	svc *app.InstallService,
 	opts ...WizardOption,
 ) WizardModel {
+	_, _ = security.EnsureSudoPAMHealthy()
 	var pkgs []domain.ManagedResource
 	var profs []domain.Profile
 	if cat != nil {

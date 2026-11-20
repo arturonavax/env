@@ -317,15 +317,19 @@ func (d *DestroyerService) ExecutePurge(
 
 	var mu sync.Mutex
 
-	// 0. Drop stale PAM modules from sudo_local (cached sudo only) so that removing pam-reattach
-	// mid-run can never leave sudo unable to authenticate if the purge is interrupted.
+	// 0. Strip external PAM modules (e.g. pam_reattach.so) from sudo_local BEFORE uninstalling packages
+	// so that interrupting the purge mid-run can never leave sudo unable to initialize PAM.
 	if !dryRun {
-		_, _ = security.SanitizeSudoLocalPAM(ctx)
+		_, _ = security.PrepareSudoLocalForPurge(ctx)
 	}
 
 	// 1. Uninstall managed packages sequentially to prevent package manager and state lock collisions
 	if len(plan.PackagesToUninstall) > 0 && d.installSvc != nil {
 		for _, pkgID := range plan.PackagesToUninstall {
+			if pkgID == "pam-reattach" && security.SudoLocalReferencesModule("pam_reattach.so") {
+				report("package: "+pkgID, "Skipping pam-reattach uninstall while referenced by /etc/pam.d/sudo_local")
+				continue
+			}
 			report("package: "+pkgID, fmt.Sprintf("Uninstalling package %s", pkgID))
 			_ = d.installSvc.Uninstall(ctx, []string{pkgID})
 			res.UninstalledPackages++

