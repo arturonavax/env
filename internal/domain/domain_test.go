@@ -174,6 +174,8 @@ func TestIsDirectTool(t *testing.T) {
 	directTools := []domain.ManagedResource{
 		{ID: "ghostty", Category: "terminal"},
 		{ID: "herdr", Category: "terminal"},
+		{ID: "herdr-app", Category: "terminal"},
+		{ID: "herdr-core", Category: "terminal"},
 		{ID: "neovim", Category: "editor"},
 		{ID: "lazygit", Category: "devtools"},
 		{ID: "zsh", Category: "shell"},

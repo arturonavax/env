@@ -174,6 +174,8 @@ var DirectToolsSet = map[string]struct{}{
 	"gopls":              {},
 	"govulncheck":        {},
 	"herdr":              {},
+	"herdr-app":          {},
+	"herdr-core":         {},
 	"htop":               {},
 	"jq":                 {},
 	"just":               {},
