@@ -3,10 +3,15 @@ package cli
 import "testing"
 
 func TestDetectActiveTerminalSession(t *testing.T) {
-	env := map[string]string{"TERM_PROGRAM": "ghostty", "HERDR_PANE_ID": "1"}
+	env := map[string]string{"TERM_PROGRAM": "ghostty", "HERDR_ENV": "1"}
 	got := detectActiveTerminalSession(func(k string) string { return env[k] })
-	if len(got) != 2 || got[0] != "Ghostty" || got[1] != "Herdr" {
+	if len(got) != 2 || got[0] != "Ghostty" || got[1] != "Herdr TUI" {
 		t.Fatalf("unexpected detection: %v", got)
+	}
+	appEnv := map[string]string{"HC_TERMINAL_ID": "t-1", "HC_TERMINAL_SOCKET": "/tmp/hc.sock"}
+	got = detectActiveTerminalSession(func(k string) string { return appEnv[k] })
+	if len(got) != 1 || got[0] != "Herdr Core / App" {
+		t.Fatalf("expected Herdr Core / App, got %v", got)
 	}
 	if got := detectActiveTerminalSession(func(string) string { return "" }); len(got) != 0 {
 		t.Fatalf("expected none, got %v", got)

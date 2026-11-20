@@ -42,8 +42,11 @@ func detectActiveTerminalSession(getenv func(string) string) []string {
 	if strings.Contains(tp, "warp") || getenv("WARP_IS_LOCAL_SHELL_SESSION") != "" {
 		add("Warp")
 	}
-	if getenv("HERDR_PANE_ID") != "" || getenv("HERDR_ENV") != "" {
-		add("Herdr")
+	if getenv("HERDR_ENV") == "1" || getenv("HERDR_PANE_ID") != "" {
+		add("Herdr TUI")
+	}
+	if getenv("HC_TERMINAL_ID") != "" && getenv("HC_TERMINAL_SOCKET") != "" {
+		add("Herdr Core / App")
 	}
 	if getenv("TMUX") != "" {
 		add("tmux")
