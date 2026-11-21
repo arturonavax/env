@@ -267,7 +267,7 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 ```
 
-### GNU/Linux and Ubuntu utils
+### GNU/Linux and Ubuntu utils (No recommended)
 
 GNU commands that have names equal to default commands in MacOS are
 installed with the prefix "g", for example: `ggrep`.
@@ -423,6 +423,8 @@ All applications available on Setapp and paying for those that are not:
 _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment apps)_
 
 ### App list
+
+> [Update] Only Raycast, rcmd, Shottr, lazygit, AppCleaner + `brew cleanup`, OrbStack, yt-dlp.
 
 #### Essentials
 
