@@ -17,6 +17,28 @@ packages:
           brew: [zsh]
           pkg: [zsh]
 
+  - id: fonts
+    name: Monaspace Nerd Fonts (Mono)
+    category: terminal
+    description: Monaspace Nerd Font Mono patched fonts (v3.5.1) for Linux, macOS, and Windows
+    os: [linux, darwin, windows]
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl, unzip]
+        script:
+          local_script: scripts/install_fonts.sh
+          interpreter: bash
+          creates: "~/.local/share/anx/fonts-monaspace.ready"
+      - type: script
+        when:
+          os: [windows]
+        script:
+          local_script: scripts/install_fonts.ps1
+          interpreter: powershell
+          creates: "~/.local/share/anx/fonts-monaspace.ready"
+
   - id: zsh-plugins
     name: Zsh Plugins (Syntax Highlighting, Autosuggestions, fzf-tab, Completions)
     category: shell

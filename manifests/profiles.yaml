@@ -52,6 +52,7 @@ profiles:
       - tealdeer
       - lazygit
       - ghostty
+      - fonts
     config_groups:
       - terminal
 

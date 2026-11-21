@@ -96,6 +96,24 @@ func TestEmbeddedManifestsLoadAndValidate(t *testing.T) {
 		t.Fatal("expected 'herdr-app-keys' configuration in embedded catalog")
 	}
 
+	// Verify fonts package and scripts pass security guardrails
+	fontsSpec, ok := cat.GetPackageSpec("fonts")
+	if !ok {
+		t.Fatal("expected 'fonts' in embedded catalog")
+	}
+	if len(fontsSpec.Strategies) < 2 {
+		t.Fatalf("expected 'fonts' to declare unix and windows script strategies, got %d", len(fontsSpec.Strategies))
+	}
+	for _, scriptRel := range []string{"install_fonts.sh", "install_fonts.ps1"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", scriptRel))
+		if err != nil {
+			t.Fatalf("reading scripts/%s: %v", scriptRel, err)
+		}
+		if violations := security.ValidateScriptGuardrails(string(raw)); len(violations) > 0 {
+			t.Errorf("scripts/%s triggered guardrails: %+v", scriptRel, violations)
+		}
+	}
+
 	// Verify configs and profiles
 	if len(cat.ListConfigurations()) < 12 {
 		t.Fatalf("expected >=12 declarative configurations, got %d", len(cat.ListConfigurations()))

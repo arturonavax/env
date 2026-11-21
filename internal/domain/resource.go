@@ -164,6 +164,7 @@ var DirectToolsSet = map[string]struct{}{
 	"eza":                {},
 	"fd":                 {},
 	"fnm":                {},
+	"fonts":              {},
 	"fx":                 {},
 	"fzf":                {},
 	"ghostty":            {},

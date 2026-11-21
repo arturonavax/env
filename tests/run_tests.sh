@@ -193,6 +193,7 @@ if [[ "$RUN_LINT" -eq 1 ]]; then
 			"uninstall.sh"
 			"scripts/bootstrap_anx.sh"
 			"scripts/install_codex.sh"
+			"scripts/install_fonts.sh"
 			"scripts/install_golang.sh"
 			"scripts/install_node.sh"
 			"scripts/install_rust.sh"
