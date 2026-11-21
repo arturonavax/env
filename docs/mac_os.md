@@ -388,9 +388,18 @@ sudo killall -HUP mDNSResponder
 sudo killall mDNSResponderHelper
 ```
 
-## Personal list of applications for MacOS
+## Personal list of applications for MacOS (Deprecated)
 
-### Costs
+**(Update)** Only:
+- Raycast
+- rcmd
+- Shottr
+- lazygit
+- AppCleaner + `brew cleanup`
+- OrbStack
+- yt-dlp
+
+### Costs (Deprecated)
 
 Some of these applications are available in [Setapp subscriptions][setapp]
 ($107.88 USD/annual).
@@ -422,9 +431,7 @@ Total applications: 43 (excluding Parallels and CrossOver).
 All applications available on Setapp and paying for those that are not:
 _$107.88 USD/annual (23 Setapp apps) + $119.34 USD approx (6 One-time payment apps)_
 
-### App list
-
-> [Update] Only Raycast, rcmd, Shottr, lazygit, AppCleaner + `brew cleanup`, OrbStack, yt-dlp.
+### App list (Deprecated)
 
 #### Essentials
 
