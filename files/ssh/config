@@ -1,0 +1,5 @@
+Host *
+    AddKeysToAgent yes
+    IdentitiesOnly yes
+    IgnoreUnknown UseKeychain
+    UseKeychain yes

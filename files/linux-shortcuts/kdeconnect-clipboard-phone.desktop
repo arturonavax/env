@@ -1,0 +1,9 @@
+# ~/.local/share/applications/.
+[Desktop Entry]
+Type=Application
+Name= KDE - Send clipboard to phone
+Comment=Envía el portapapeles actual al teléfono vía KDE Connect
+Exec=bash -c '"$HOME"/.local/bin/kdc-sync-clip.sh'
+Icon=kdeconnect
+Terminal=false
+Categories=Utility;

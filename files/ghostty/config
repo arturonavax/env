@@ -1,0 +1,52 @@
+# --- Dimensiones y Estado ---
+window-width = 150
+window-height = 43
+# window-save-state = "always"
+
+# --- Tipografía ---
+font-family = "MonaspiceNe Nerd Font Mono"
+font-size = 13
+
+# --- Apariencia ---
+theme = "light:TokyoNight Day,dark:TokyoNight Night"
+
+background-opacity = 0.97
+background-blur-radius = 0
+
+window-decoration = true
+window-padding-balance = true
+# window-colorspace = "display-p3" # Exclusivo de macOS (Metal Wide Color)
+
+# Ajuste de grises para comentarios y texto secundario
+palette = 8=#808080
+palette = 0=#404040
+
+# --- Rendimiento y Comportamiento ---
+gtk-single-instance = false
+mouse-hide-while-typing = true
+auto-update = "off"
+gtk-titlebar = false
+cursor-style = block
+cursor-style-blink = false
+font-feature = []
+window-vsync = false
+scrollback-limit = 10000
+image-storage-limit = 50000000
+
+# Desactivado para evitar race condition en X11/Xfce (OSC 52 selection ownership crash al renderizar buffers extensos en TUI)
+copy-on-select = false
+# Reducir eventos de scroll emitidos por tick/touchpad (default: 3)
+mouse-scroll-multiplier = 1
+
+desktop-notifications = true
+notify-on-command-finish = unfocused
+notify-on-command-finish-action = notify
+notify-on-command-finish-after = 3s
+
+# for Herdr rename workspace
+keybind = control+,=unbind
+
+# --- Estabilidad de I/O y Portapapeles (Linux Kernel 7.x + X11) ---
+async-backend = epoll
+keybind = ctrl+shift+c=copy_to_clipboard:plain
+keybind = copy=copy_to_clipboard:plain

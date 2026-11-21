@@ -1,0 +1,129 @@
+# Declarative AI Harnesses, Token Optimizers & Agent Tooling
+packages:
+  - id: rtk
+    name: RTK (Rust Token Killer)
+    category: ai
+    description: High-speed Rust CLI output compressor saving up to 90% LLM context tokens
+    binary_name: rtk
+    ecosystem: crates.io
+    osv_package: rtk
+    strategies:
+      - type: github_release
+        github_release:
+          repo: rtk-ai/rtk
+          asset_patterns:
+            linux/amd64: "rtk-x86_64-unknown-linux-musl.tar.gz"
+            linux/arm64: "rtk-aarch64-unknown-linux-gnu.tar.gz"
+            darwin/amd64: "rtk-x86_64-apple-darwin.tar.gz"
+            darwin/arm64: "rtk-aarch64-apple-darwin.tar.gz"
+            windows/amd64: "rtk-x86_64-pc-windows-msvc.zip"
+          binary_in_archive: rtk
+          install_to: "~/.local/bin/rtk"
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          url: https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh
+          interpreter: sh
+          creates: "~/.local/bin/rtk"
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: rtk
+
+  - id: claude-code
+    name: Claude Code CLI
+    category: ai
+    description: Anthropic terminal coding agent harness
+    binary_name: claude
+    strategies:
+      - type: native
+        when:
+          os: [darwin, windows]
+        packages:
+          brew: ["--cask", "claude-code"]
+          winget: ["Anthropic.ClaudeCode"]
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          url: https://claude.ai/install.sh
+          interpreter: bash
+          creates: "~/.local/bin/claude"
+      - type: script
+        when:
+          os: [windows]
+        script:
+          url: https://claude.ai/install.ps1
+          interpreter: powershell
+          creates: "~/.local/bin/claude.exe"
+      - type: language_pkg
+        when:
+          requires_binary: pnpm
+        depends_on: [pnpm]
+        language_pkg:
+          manager: pnpm
+          package: "@anthropic-ai/claude-code"
+
+  - id: codex-cli
+    name: OpenAI Codex CLI
+    category: ai
+    description: Lightweight terminal coding agent from OpenAI
+    binary_name: codex
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          local_script: scripts/install_codex.sh
+          interpreter: bash
+      - type: native
+        when:
+          os: [darwin, windows]
+        packages:
+          brew: ["--cask", "codex"]
+          winget: ["OpenAI.Codex"]
+      - type: language_pkg
+        when:
+          requires_binary: pnpm
+        depends_on: [pnpm]
+        language_pkg:
+          manager: pnpm
+          package: "@openai/codex"
+
+  - id: opencode
+    name: OpenCode CLI
+    category: ai
+    description: Open-source terminal AI coding assistant
+    binary_name: opencode
+    strategies:
+      - type: github_release
+        github_release:
+          repo: anomalyco/opencode
+          asset_patterns:
+            linux/amd64: "opencode-linux-x64.tar.gz"
+            linux/arm64: "opencode-linux-arm64.tar.gz"
+            darwin/amd64: "opencode-darwin-x64.zip"
+            darwin/arm64: "opencode-darwin-arm64.zip"
+            windows/amd64: "opencode-windows-x64.zip"
+            windows/arm64: "opencode-windows-arm64.zip"
+          binary_in_archive: opencode
+          install_to: "~/.local/bin/opencode"
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          url: https://opencode.ai/install
+          interpreter: bash
+      - type: native
+        packages:
+          brew: [opencode]
+          scoop: [opencode]
+      - type: language_pkg
+        language_pkg:
+          manager: pnpm
+          package: "opencode-ai"

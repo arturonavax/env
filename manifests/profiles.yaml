@@ -1,0 +1,186 @@
+# Declarative Environment Profiles
+profiles:
+  - name: minimal
+    description: Lean shell & modern POSIX-safe CLI essentials (Starship, FZF, ripgrep, fd, bat, eza, jq, curl, htop, tree)
+    packages:
+      - git
+      - gnupg
+      - pinentry-mac
+      - terminal-notifier
+      - curl
+      - htop
+      - jq
+      - fzf
+      - ripgrep
+      - fd
+      - bat
+      - eza
+      - tree
+      - starship
+    configurations:
+      - starship-config
+      - zsh-lscolors
+      - zsh-base
+      - zsh-tools
+      - zshrc-loader
+      - ssh-config
+      - ssh-agent-service
+      - ssh-agent-env
+      - ssh-agent-zshenv
+      - ssh-agent-profile
+      - gpg-agent-pinentry
+
+  - name: terminal
+    description: Complete terminal, shell history, and agent multiplexer stack (Ghostty, Herdr, Atuin, Zsh, Delta, Difftastic)
+    extends: minimal
+    packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
+      - zsh
+      - zsh-plugins
+      - atuin
+      - herdr
+      - herdr-core
+      - herdr-app
+      - zoxide
+      - delta
+      - difftastic
+      - tealdeer
+      - lazygit
+      - ghostty
+      - fonts
+    config_groups:
+      - terminal
+
+  - name: editor
+    description: Neovim (LazyVim) with core formatters, linters, and Tree-sitter CLI
+    extends: minimal
+    packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
+      - neovim
+      - nodejs
+      - stylua
+      - shfmt
+      - actionlint
+      - tree-sitter-cli
+      - shellcheck
+    config_groups:
+      - editor
+
+  - name: developer
+    description: Default full-stack engineering environment (Toolchains, Terminal, Neovim, Go/Rust/Node/Python tools)
+    extends: terminal
+    packages:
+      - build-essential
+      - golang
+      - rust
+      - fnm
+      - nodejs
+      - pnpm
+      - pyenv
+      - python3
+      - pipx
+      - neovim
+      - stylua
+      - shfmt
+      - actionlint
+      - tree-sitter-cli
+      - shellcheck
+      - gopls
+      - gofumpt
+      - revive
+      - golangci-lint
+      - delve
+      - govulncheck
+      - gosec
+      - usql
+      - just
+      - fx
+      - direnv
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+
+  - name: ai-workstation
+    description: Developer workstation plus full AI CLI harnesses, RTK token compressor, and OS window switcher
+    extends: developer
+    packages:
+      - rtk
+      - opencode
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: workstation
+    description: Alias for complete workstation profile (Developer + AI + Desktop OS integrations)
+    extends: ai-workstation
+    packages:
+      - wmctrl
+      - xdotool
+      - xclip
+      - amethyst
+      - pam-reattach
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: full
+    description: Complete ecosystem including optional CLI harnesses and live-reload utilities
+    extends: workstation
+    packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
+      - shellharden
+      - claude-code
+      - codex-cli
+    config_groups:
+      - terminal
+      - editor
+      - devtools
+      - ai
+      - osconfig
+
+  - name: headless
+    description: Remote SSH/server developer profile without GUI emulators or X11 dependencies
+    extends: minimal
+    packages:
+      - make
+      - wget
+      - ca-certificates
+      - cmake
+      - tar
+      - unzip
+      - zsh
+      - zsh-plugins
+      - herdr
+      - atuin
+      - zoxide
+      - delta
+      - difftastic
+      - tealdeer
+      - neovim
+      - lazygit
+      - rsync
+    configurations:
+      - atuin-config
+      - nvim-config

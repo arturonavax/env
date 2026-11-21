@@ -1,0 +1,242 @@
+# Declarative Language Runtimes & Version Managers
+packages:
+  - id: golang
+    name: Go (GVM Primary + Personal Standalone Fallback)
+    category: toolchains
+    description: Go programming language provisioned via GVM with personal install_golang.sh fallback
+    binary_name: go
+    depends_on: [git]
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          local_script: scripts/bootstrap_anx.sh
+          interpreter: bash
+          args: ["--ensure-go-only"]
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          local_script: scripts/install_golang.sh
+          interpreter: bash
+          args: ["-i"]
+      - type: native
+        packages:
+          apt: [golang-go]
+          dnf: [golang]
+          pacman: [go]
+          zypper: [go]
+          apk: [go]
+          brew: [go]
+          pkg: [golang]
+          winget: [GoLang.Go]
+          scoop: [go]
+
+  - id: rust
+    name: Rust & Cargo (rustup)
+    category: toolchains
+    description: Rust compiler toolchain and Cargo package manager
+    binary_name: cargo
+    strategies:
+      - type: script
+        when:
+          os: [linux]
+        depends_on: [curl, build-essential]
+        script:
+          local_script: scripts/install_rust.sh
+          interpreter: bash
+      - type: script
+        when:
+          os: [darwin]
+        depends_on: [curl]
+        script:
+          local_script: scripts/install_rust.sh
+          interpreter: bash
+      - type: native
+        depends_on: [build-essential]
+        packages:
+          pacman: [rustup]
+          brew: [rustup]
+          apk: [rust, cargo]
+          pkg: [rust]
+          winget: [Rustlang.Rustup]
+          scoop: [rustup]
+
+  - id: nodejs
+    name: Node.js (LTS via fnm)
+    category: toolchains
+    description: Node.js LTS runtime and npm managed via fnm and linked into ~/.local/bin
+    binary_name: node
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [fnm]
+        script:
+          local_script: scripts/install_node.sh
+          interpreter: bash
+      - type: native
+        packages:
+          brew: [node]
+          apt: [nodejs, npm]
+          dnf: [nodejs, npm]
+          pacman: [nodejs, npm]
+          apk: [nodejs, npm]
+          pkg: [node, npm]
+          winget: [OpenJS.NodeJS.LTS]
+          scoop: [nodejs-lts]
+
+  - id: fnm
+    name: Fast Node Manager (fnm)
+    category: toolchains
+    description: Fast and simple Node.js version manager built in Rust
+    binary_name: fnm
+    ecosystem: crates.io
+    osv_package: fnm
+    strategies:
+      - type: github_release
+        github_release:
+          repo: Schniz/fnm
+          asset_patterns:
+            linux/amd64: "fnm-linux.zip"
+            linux/arm64: "fnm-arm64.zip"
+            darwin/amd64: "fnm-macos.zip"
+            darwin/arm64: "fnm-macos.zip"
+            windows/amd64: "fnm-windows.zip"
+          binary_in_archive: fnm
+          install_to: "~/.local/bin/fnm"
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl, unzip]
+        script:
+          url: https://fnm.vercel.app/install
+          interpreter: bash
+          args: ["--skip-shell"]
+          creates: "~/.local/share/fnm/fnm"
+      - type: native
+        packages:
+          pacman: [fnm]
+          brew: [fnm]
+          winget: [Schniz.fnm]
+          scoop: [fnm]
+      - type: language_pkg
+        language_pkg:
+          manager: cargo
+          package: fnm
+
+  - id: pnpm
+    name: pnpm
+    category: toolchains
+    description: Fast, disk-space efficient Node.js package manager
+    binary_name: pnpm
+    ecosystem: npm
+    osv_package: pnpm
+    strategies:
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          url: https://get.pnpm.io/install.sh
+          interpreter: sh
+          env:
+            SHELL: bash
+      - type: language_pkg
+        when:
+          requires_binary: npm
+        language_pkg:
+          manager: npm
+          package: pnpm
+      - type: native
+        packages:
+          pacman: [pnpm]
+          brew: [pnpm]
+          winget: [pnpm.pnpm]
+          scoop: [pnpm]
+
+  - id: pyenv
+    name: pyenv
+    category: toolchains
+    description: Simple Python version management
+    binary_name: pyenv
+    os: [linux, darwin]
+    strategies:
+      - type: native
+        when:
+          os: [darwin]
+        packages:
+          brew: [pyenv]
+      - type: script
+        when:
+          os: [linux]
+        depends_on: [git, curl, build-essential, bz2-dev, ssl-dev, zlib-dev, readline-dev, sqlite-dev, ffi-dev, xz-dev, ncurses-dev]
+        script:
+          local_script: scripts/install_pyenv.sh
+          interpreter: bash
+          creates: "~/.pyenv/bin/pyenv"
+
+  - id: python3
+    name: Python 3
+    category: toolchains
+    description: Python 3 runtime and virtual environment support
+    binary_name: python3
+    binary_aliases: [python]
+    strategies:
+      - type: native
+        packages:
+          apt: [python3, python3-pip, python3-venv]
+          dnf: [python3, python3-pip]
+          pacman: [python, python-pip]
+          zypper: [python3, python3-pip]
+          apk: [python3, py3-pip]
+          brew: ["python@3"]
+          pkg: [python]
+          winget: ["Python.Python.3.12"]
+          scoop: [python]
+
+  - id: pipx
+    name: pipx
+    category: toolchains
+    description: Install and run Python CLI applications in isolated environments
+    binary_name: pipx
+    depends_on: [python3]
+    strategies:
+      - type: native
+        packages:
+          apt: [pipx]
+          dnf: [pipx]
+          pacman: [python-pipx]
+          zypper: [python3-pipx]
+          apk: [pipx]
+          brew: [pipx]
+          pkg: [pipx]
+          scoop: [pipx]
+
+  - id: zig
+    name: Zig
+    category: toolchains
+    description: General-purpose systems programming language and C/C++ cross-compiler (required for Ghostty source builds)
+    binary_name: zig
+    strategies:
+      - type: native
+        packages:
+          pacman: [zig]
+          dnf: [zig]
+          zypper: [zig]
+          apk: [zig]
+          brew: [zig]
+          pkg: [zig]
+          winget: [zig.zig]
+          scoop: [zig]
+      - type: script
+        when:
+          os: [linux, darwin]
+        depends_on: [curl]
+        script:
+          local_script: scripts/install_zig.sh
+          interpreter: bash
+          creates: "~/.local/bin/zig"

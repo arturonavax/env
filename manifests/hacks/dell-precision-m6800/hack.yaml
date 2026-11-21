@@ -1,0 +1,41 @@
+id: dell-precision-m6800
+name: Dell Precision M6800 Workstation Suite (Quadro K3100M / Nouveau / Xfce)
+category: workstation
+description: >-
+  Resolves Ghostty GTK AT-SPI input latency and DRI3 buffer leaks, Mesa Nouveau
+  Picom GLX fence stability, Brave Skia/2D canvas GPU lockups, dual-monitor Xfce
+  top-panel strut alignment, instant RandR Night Shift toggling, and unwanted
+  04:00 AM RTC suspend wakeups on Dell Precision M6800 workstations.
+safe_by_opt_in: true
+match:
+  os:
+    - linux
+  dmi_vendor: Dell
+  dmi_product: Precision M6800
+  gpu_driver: nouveau
+  desktop_env:
+    - xfce
+backup_paths:
+  - "~/.config/ghostty/config"
+  - "~/.config/picom/picom.conf"
+  - "~/.config/BraveSoftware"
+  - "~/.config/brave-flags.conf"
+  - "~/.config/night-shift.conf"
+steps:
+  - id: apply-m6800-workstation-hacks
+    name: Apply Dell Precision M6800 Nouveau & Xfce Optimizations
+    description: >-
+      Configures Ghostty wrapper and bounded scrollback, Picom GLX DRI3 fences,
+      Brave X11 Nouveau flags, Xfce Y=0 monitor alignment, instant RandR Night
+      Shift session guard, and disables 04:00 AM RTC wakeups.
+    script: apply_hacks.sh
+    touches:
+      - "~/.config/ghostty/config"
+      - "~/.local/bin/ghostty"
+      - "~/.config/picom/picom.conf"
+      - "~/.config/brave-flags.conf"
+      - "~/.config/night-shift.conf"
+      - "~/.local/bin/toggle-redshift"
+      - "~/.local/bin/xfce-session-guard"
+      - "~/.config/systemd/user/xfce-session-guard.service"
+    privileged: false

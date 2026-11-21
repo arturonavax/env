@@ -1,0 +1,128 @@
+# Declarative Developer & Personal Tools Registry
+# External tools can be implemented in any language (Go, Rust, Python, Bash, Node.js)
+# and discovered dynamically without recompiling anx. Drop custom tool manifests in ~/.config/anx/tools.d/*.yaml.
+tools:
+  - id: ai
+    name: "AI Productivity Suite (anx ai)"
+    category: "ai"
+    description: "Multi-harness AI CLI suite, rolling quota tracker, and gitflow automation"
+    executable: "anx"
+    fallback_builtin: true
+    language: "go"
+    version_args: ["ai", "--version"]
+    repo_url: "https://github.com/arturonavax/anx"
+    update_strategy: "anx_self"
+
+  - id: rtk
+    name: "Rust Token Killer"
+    category: "ai"
+    description: "High-speed LLM terminal output compressor proxy (saves 60-90% prompt tokens)"
+    executable: "rtk"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    package_id: "rtk"
+    version_args: ["--version"]
+    repo_url: "https://github.com/arturonavax/rtk"
+    update_strategy: "package"
+
+  - id: herdr
+    name: "Herdr Multiplexer"
+    category: "terminal"
+    description: "Terminal and agent multiplexer with workspace isolation and socket API"
+    executable: "herdr"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    package_id: "herdr"
+    version_args: ["--version"]
+    repo_url: "https://herdr.dev"
+    update_strategy: "package"
+
+  - id: usql
+    name: "Universal SQL Client"
+    category: "database"
+    description: "Single universal CLI for PostgreSQL, MySQL, SQLite3, Redis, and ClickHouse"
+    executable: "usql"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "go"
+    package_id: "usql"
+    version_args: ["--version"]
+    repo_url: "https://github.com/xo/usql"
+    update_strategy: "package"
+
+  - id: difft
+    name: "Difftastic (dft)"
+    category: "git"
+    description: "Tree-sitter structural AST diffing tool"
+    executable: "difft"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    package_id: "difftastic"
+    version_args: ["--version"]
+    repo_url: "https://github.com/Wilfred/difftastic"
+    update_strategy: "package"
+
+  - id: delta
+    name: "Git Delta"
+    category: "git"
+    description: "Syntax-highlighting side-by-side terminal diff viewer"
+    executable: "delta"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    package_id: "delta"
+    version_args: ["--version"]
+    repo_url: "https://github.com/dandavison/delta"
+    update_strategy: "package"
+
+  - id: tealdeer
+    name: "Tealdeer (tldr)"
+    category: "cli-tools"
+    description: "Instant Rust implementation of tldr help pages"
+    executable: "tldr"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "rust"
+    package_id: "tealdeer"
+    version_args: ["--version"]
+    repo_url: "https://github.com/dbrgn/tealdeer"
+    update_strategy: "package"
+
+  - id: security-audit
+    name: "Security Audit Engine (anx-security)"
+    category: "security"
+    description: "Decoupled multi-tool security compliance auditor and vulnerability scanner"
+    executable: "anx-security"
+    fallback_builtin: true
+    allow_global_path: true
+    language: "bash"
+    version_args: ["--version"]
+    repo_url: "https://github.com/arturonavax/anx"
+    update_strategy: "anx_self"
+
+  - id: vault
+    name: "VAULT Knowledge Framework"
+    category: "knowledge"
+    description: "Minimal, portable, local-first Markdown knowledge vault initializer and script dispatcher"
+    executable: "vault"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "go"
+    version_args: ["version"]
+    repo_url: "https://github.com/arturonavax/vault"
+    update_strategy: "source"
+
+  - id: rcmd
+    name: "rcmd Window Switcher"
+    category: "osconfig"
+    description: "Instant macOS-style Right-Alt window switcher & app launcher daemon (GNOME, Hyprland, Sway, KDE, X11)"
+    executable: "rcmd"
+    fallback_builtin: false
+    allow_global_path: true
+    language: "bash"
+    version_args: ["--help"]
+    repo_url: "https://github.com/arturonavax/env"
+    update_strategy: "anx_self"
