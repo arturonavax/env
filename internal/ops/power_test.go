@@ -60,6 +60,8 @@ func TestDetectStatus_NouveauKeplerQuirk(t *testing.T) {
 	var buf bytes.Buffer
 	pm := NewPowerManager(nil, nil,
 		WithPowerRoots(sysRoot, procRoot),
+		WithPowerOS("linux"),
+		WithPowerEnv(func(string) string { return "" }, func(string) (string, error) { return "", os.ErrNotExist }),
 		WithPowerOutput(&buf),
 	)
 
@@ -110,6 +112,8 @@ func TestDetectStatus_S2Idle(t *testing.T) {
 	var buf bytes.Buffer
 	pm := NewPowerManager(nil, nil,
 		WithPowerRoots(sysRoot, procRoot),
+		WithPowerOS("linux"),
+		WithPowerEnv(func(string) string { return "" }, func(string) (string, error) { return "", os.ErrNotExist }),
 		WithPowerOutput(&buf),
 	)
 
@@ -145,6 +149,13 @@ func TestExecute_DryRun(t *testing.T) {
 	var buf bytes.Buffer
 	pm := NewPowerManager(nil, nil,
 		WithPowerRoots(sysRoot, procRoot),
+		WithPowerOS("linux"),
+		WithPowerEnv(func(string) string { return "" }, func(bin string) (string, error) {
+			if bin == "systemctl" {
+				return "/usr/bin/systemctl", nil
+			}
+			return "", os.ErrNotExist
+		}),
 		WithPowerOutput(&buf),
 		WithPowerDryRun(true),
 	)
@@ -196,19 +207,69 @@ func TestExecute_DryRun(t *testing.T) {
 		t.Errorf("expected status header, got: %s", buf.String())
 	}
 
-	// Test auto
+	// Test auto on standard Linux -> systemctl suspend
 	buf.Reset()
 	if err := pm.Execute(ctx, ""); err != nil {
 		t.Fatalf("unexpected error in auto: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Safe Screen Standby") {
-		t.Errorf("expected auto to select safe standby, got: %s", buf.String())
+	if !strings.Contains(buf.String(), "Linux Safe Suspend") {
+		t.Errorf("expected auto on healthy Linux to select Linux Safe Suspend, got: %s", buf.String())
 	}
 
 	// Test invalid
 	if err := pm.Execute(ctx, "bogus-mode"); err == nil {
 		t.Errorf("expected error for bogus mode")
 	}
+}
+
+func TestExecute_XfceAndDarwin(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Xfce uses xfce4-session-logout even with nouveau.pstate=1", func(t *testing.T) {
+		sysRoot, procRoot := setupMockPowerFS(t, "nouveau.pstate=1", "s2idle [deep]", "tty7\n", "", "nouveau")
+		var buf bytes.Buffer
+		env := map[string]string{"DISPLAY": ":0", "XDG_CURRENT_DESKTOP": "XFCE"}
+		pm := NewPowerManager(nil, nil,
+			WithPowerRoots(sysRoot, procRoot),
+			WithPowerOS("linux"),
+			WithPowerEnv(func(k string) string { return env[k] }, func(bin string) (string, error) {
+				if bin == "xfce4-session-logout" {
+					return "/usr/bin/xfce4-session-logout", nil
+				}
+				return "", os.ErrNotExist
+			}),
+			WithPowerOutput(&buf),
+			WithPowerDryRun(true),
+		)
+		if err := pm.Execute(ctx, ""); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !strings.Contains(buf.String(), "xfce4-session-logout --suspend") {
+			t.Errorf("expected Xfce session suspend, got:\n%s", buf.String())
+		}
+	})
+
+	t.Run("macOS uses pmset sleepnow and displaysleepnow", func(t *testing.T) {
+		var buf bytes.Buffer
+		pm := NewPowerManager(nil, nil,
+			WithPowerOS("darwin"),
+			WithPowerOutput(&buf),
+			WithPowerDryRun(true),
+		)
+		if err := pm.Execute(ctx, ""); err != nil {
+			t.Fatalf("unexpected darwin auto error: %v", err)
+		}
+		if !strings.Contains(buf.String(), "pmset sleepnow") {
+			t.Errorf("expected pmset sleepnow on darwin, got:\n%s", buf.String())
+		}
+		buf.Reset()
+		if err := pm.Execute(ctx, "lock"); err != nil {
+			t.Fatalf("unexpected darwin lock error: %v", err)
+		}
+		if !strings.Contains(buf.String(), "pmset displaysleepnow") {
+			t.Errorf("expected pmset displaysleepnow on darwin lock, got:\n%s", buf.String())
+		}
+	})
 }
 
 func TestHibernate_InsufficientSwap(t *testing.T) {
@@ -218,6 +279,8 @@ func TestHibernate_InsufficientSwap(t *testing.T) {
 	var buf bytes.Buffer
 	pm := NewPowerManager(nil, nil,
 		WithPowerRoots(sysRoot, procRoot),
+		WithPowerOS("linux"),
+		WithPowerEnv(func(string) string { return "" }, func(string) (string, error) { return "", os.ErrNotExist }),
 		WithPowerOutput(&buf),
 	)
 

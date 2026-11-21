@@ -23,6 +23,22 @@ end
 if type -q difft
     alias diff="difft"
 end
+function safe-suspend
+    if type -q anx
+        anx sleep $argv
+    else if test -x "$HOME/.local/bin/anx"
+        "$HOME/.local/bin/anx" sleep $argv
+    else
+        set -l repo_root (test -n "$REPO_ROOT"; and echo "$REPO_ROOT"; or echo "$HOME/repos/github.com/arturonavax/env")
+        set -l script_path "$repo_root/scripts/safe_suspend.sh"
+        if test -f "$script_path"
+            bash "$script_path" $argv
+        else
+            echo "safe-suspend command not found" >&2
+            return 1
+        end
+    end
+end
 alias suspend-safe="safe-suspend"
 alias sleep-safe="safe-suspend"
 

@@ -405,7 +405,7 @@ function rebuild-tools() {
 }
 alias rbt=rebuild-tools
 
-## Safe Suspend & Power Management (Hardware-Aware for Kepler/Nouveau/Xfce)
+## Safe Suspend & Power Management (macOS & Linux, Xfce/Kepler-aware)
 function safe-suspend() {
     if command -v anx >/dev/null 2>&1; then
         anx sleep "$@"

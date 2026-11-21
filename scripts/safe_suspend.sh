@@ -259,32 +259,74 @@ main() {
 			do_status
 			;;
 		lock|screen|blank)
-			do_lock_screen
-			;;
-		s2idle|idle)
-			do_s2idle
-			;;
-		deep|vt|s3)
-			do_vt_suspend
-			;;
-		hibernate|disk)
-			do_hibernate
-			;;
-		"")
-			# Default intelligent auto selection based on hardware
-			local driver
-			driver="$(detect_gpu_driver)"
-			if [[ "$driver" == "nouveau" ]] && has_nouveau_pstate_quirk; then
-				log_warn "Dell M6800 / Nouveau Kepler detected with 'nouveau.pstate=1'."
-				log_info "Standard S3 sleep locks up video. Activating safe screen standby & lock..."
-				do_lock_screen
+			if [[ "$(uname -s)" == "Darwin" ]]; then
+				sync
+				pmset displaysleepnow
 			else
 				do_lock_screen
 			fi
 			;;
+		s2idle|idle)
+			if [[ "$(uname -s)" == "Darwin" ]]; then
+				sync
+				pmset sleepnow || osascript -e 'tell application "System Events" to sleep'
+			else
+				do_s2idle
+			fi
+			;;
+		deep|vt|s3)
+			if [[ "$(uname -s)" == "Darwin" ]]; then
+				sync
+				pmset sleepnow || osascript -e 'tell application "System Events" to sleep'
+			else
+				do_vt_suspend
+			fi
+			;;
+		hibernate|disk)
+			if [[ "$(uname -s)" == "Darwin" ]]; then
+				sync
+				pmset sleepnow || osascript -e 'tell application "System Events" to sleep'
+			else
+				do_hibernate
+			fi
+			;;
+		""|auto|suspend|sleep|xfce)
+			if [[ "$(uname -s)" == "Darwin" ]]; then
+				log_step "Flushing disks and putting macOS to sleep..."
+				sync
+				pmset sleepnow || osascript -e 'tell application "System Events" to sleep'
+			elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && [[ "${XDG_CURRENT_DESKTOP:-}${DESKTOP_SESSION:-}" =~ [Xx][Ff][Cc][Ee] ]] && command -v xfce4-session-logout >/dev/null 2>&1; then
+				log_step "Flushing disks and invoking Xfce session-managed suspend..."
+				sync
+				xfce4-session-logout --suspend
+			else
+				local driver
+				driver="$(detect_gpu_driver)"
+				if [[ "$driver" == "nouveau" ]] && has_nouveau_pstate_quirk; then
+					log_warn "Nouveau Kepler detected with 'nouveau.pstate=1' outside an Xfce session."
+					log_info "Raw systemctl suspend locks up video. Activating safe screen standby & lock..."
+					do_lock_screen
+				else
+					sync
+					lock_desktop_session
+					sleep 0.3
+					if command -v systemctl >/dev/null 2>&1; then
+						systemctl --no-ask-password suspend || sudo systemctl --no-ask-password suspend
+					elif command -v loginctl >/dev/null 2>&1; then
+						loginctl suspend
+					elif command -v zzz >/dev/null 2>&1; then
+						zzz
+					elif command -v pm-suspend >/dev/null 2>&1; then
+						sudo -n pm-suspend
+					else
+						do_lock_screen
+					fi
+				fi
+			fi
+			;;
 		*)
 			log_error "Unknown mode: '$mode'"
-			echo "Usage: safe-suspend [lock|s2idle|deep|hibernate|status]"
+			echo "Usage: safe-suspend [auto|suspend|lock|s2idle|deep|hibernate|status]"
 			exit 1
 			;;
 	esac

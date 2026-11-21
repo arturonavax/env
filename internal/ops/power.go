@@ -3,11 +3,13 @@ package ops
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +24,7 @@ type PowerMode string
 const (
 	PowerModeStatus    PowerMode = "status"
 	PowerModeLock      PowerMode = "lock"
+	PowerModeSuspend   PowerMode = "suspend"
 	PowerModeS2Idle    PowerMode = "s2idle"
 	PowerModeDeepVT    PowerMode = "deep"
 	PowerModeHibernate PowerMode = "hibernate"
@@ -30,6 +33,8 @@ const (
 
 // PowerStatus contains hardware and kernel diagnostics relevant to power management.
 type PowerStatus struct {
+	OS                  string `json:"os"`
+	DesktopEnv          string `json:"desktop_env,omitempty"`
 	GPUDriver           string `json:"gpu_driver"`
 	HasKeplerPStateBug  bool   `json:"has_kepler_pstate_bug"`
 	MemSleepModes       string `json:"mem_sleep_modes"`
@@ -71,14 +76,36 @@ func WithPowerRoots(sysRoot, procRoot string) PowerOption {
 	}
 }
 
-// PowerManager provides hardware-aware power transitions (lock, s2idle, deep VT, hibernate).
+// WithPowerOS overrides the target OS (linux, darwin) for deterministic testing.
+func WithPowerOS(goos string) PowerOption {
+	return func(p *PowerManager) {
+		p.osOverride = goos
+	}
+}
+
+// WithPowerEnv overrides environment lookup and binary probing for deterministic testing.
+func WithPowerEnv(getenv func(string) string, lookPath func(string) (string, error)) PowerOption {
+	return func(p *PowerManager) {
+		if getenv != nil {
+			p.getenv = getenv
+		}
+		if lookPath != nil {
+			p.lookPath = lookPath
+		}
+	}
+}
+
+// PowerManager provides cross-platform, hardware-aware power transitions (macOS & Linux).
 type PowerManager struct {
-	platform *platform.Info
-	runner   *security.Runner
-	dryRun   bool
-	out      io.Writer
-	sysRoot  string
-	procRoot string
+	platform   *platform.Info
+	runner     *security.Runner
+	dryRun     bool
+	out        io.Writer
+	sysRoot    string
+	procRoot   string
+	osOverride string
+	getenv     func(string) string
+	lookPath   func(string) (string, error)
 }
 
 // NewPowerManager creates a new PowerManager instance.
@@ -89,6 +116,8 @@ func NewPowerManager(plat *platform.Info, runner *security.Runner, opts ...Power
 		out:      os.Stdout,
 		sysRoot:  "/sys",
 		procRoot: "/proc",
+		getenv:   os.Getenv,
+		lookPath: exec.LookPath,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -96,6 +125,45 @@ func NewPowerManager(plat *platform.Info, runner *security.Runner, opts ...Power
 		}
 	}
 	return pm
+}
+
+func (pm *PowerManager) targetOS() string {
+	if pm.osOverride != "" {
+		return pm.osOverride
+	}
+	if pm.platform != nil && pm.platform.OS() != "" {
+		return pm.platform.OS()
+	}
+	return runtime.GOOS
+}
+
+func (pm *PowerManager) desktopEnv() string {
+	if de := pm.getenv("XDG_CURRENT_DESKTOP"); de != "" {
+		return de
+	}
+	if ds := pm.getenv("DESKTOP_SESSION"); ds != "" {
+		return ds
+	}
+	if pm.platform != nil && pm.platform.DesktopEnv() != "" {
+		return pm.platform.DesktopEnv()
+	}
+	return ""
+}
+
+func (pm *PowerManager) hasGraphicalSession() bool {
+	return pm.getenv("DISPLAY") != "" || pm.getenv("WAYLAND_DISPLAY") != ""
+}
+
+func (pm *PowerManager) isXfceSuspendAvailable() bool {
+	if pm.targetOS() != "linux" || !pm.hasGraphicalSession() {
+		return false
+	}
+	de := strings.ToLower(pm.desktopEnv())
+	if !strings.Contains(de, "xfce") {
+		return false
+	}
+	_, err := pm.lookPath("xfce4-session-logout")
+	return err == nil
 }
 
 func (pm *PowerManager) log(format string, a ...any) {
@@ -124,9 +192,19 @@ func (pm *PowerManager) logError(msg string) {
 
 // DetectStatus probes the host hardware, GPU driver, sleep modes, and swap configuration.
 func (pm *PowerManager) DetectStatus(ctx context.Context) (*PowerStatus, error) {
+	goos := pm.targetOS()
 	status := &PowerStatus{
+		OS:            goos,
+		DesktopEnv:    pm.desktopEnv(),
 		ActiveVT:      "7",
 		MemSleepModes: "unknown",
+	}
+
+	if goos == "darwin" {
+		status.GPUDriver = "apple-native"
+		status.MemSleepModes = "pmset"
+		status.RecommendedStrategy = "suspend (macOS native pmset sleepnow)"
+		return status, nil
 	}
 
 	// 1. Detect GPU Driver
@@ -178,13 +256,15 @@ func (pm *PowerManager) DetectStatus(ctx context.Context) (*PowerStatus, error) 
 		status.CanHibernate = true
 	}
 
-	// Recommend safest strategy based on hardware profile
-	if status.GPUDriver == "nouveau" && status.HasKeplerPStateBug {
-		status.RecommendedStrategy = "lock (Screen standby via DPMS; ACPI S3 deep sleep deadlocks Kepler VRAM PLL)"
+	// Recommend safest strategy based on OS, desktop session, and hardware profile
+	if pm.isXfceSuspendAvailable() {
+		status.RecommendedStrategy = "suspend via xfce4-session-logout --suspend (or lock for zero-risk DPMS standby)"
+	} else if status.GPUDriver == "nouveau" && status.HasKeplerPStateBug {
+		status.RecommendedStrategy = "lock (Screen standby via DPMS; raw systemctl suspend deadlocks Kepler VRAM PLL)"
 	} else if strings.Contains(status.MemSleepModes, "s2idle") {
-		status.RecommendedStrategy = "s2idle (Suspend-to-idle; CPU low power, leaves GPU PLL intact)"
+		status.RecommendedStrategy = "s2idle / suspend (Suspend-to-idle; CPU low power, leaves GPU PLL intact)"
 	} else {
-		status.RecommendedStrategy = "lock (Safe screen standby)"
+		status.RecommendedStrategy = "suspend (systemd / loginctl / zzz fallback)"
 	}
 
 	return status, nil
@@ -228,21 +308,27 @@ func (pm *PowerManager) PrintStatus(status *PowerStatus) {
 	pm.log("==============================================================================")
 	pm.log("  ANX Safe Power & Suspend Diagnostics")
 	pm.log("==============================================================================")
-	pm.log("  * GPU Driver in use  : %s", status.GPUDriver)
-	if status.HasKeplerPStateBug {
-		pm.log("  * Kepler P-State     : nouveau.pstate=1 detected (ACPI S3 deep sleep causes VRAM PLL deadlock)")
-	} else {
-		pm.log("  * Kepler P-State     : Standard (no manual pstate override detected)")
+	pm.log("  * Platform           : %s", status.OS)
+	if status.DesktopEnv != "" {
+		pm.log("  * Desktop Session    : %s", status.DesktopEnv)
 	}
-	pm.log("  * Memory Sleep Modes : %s", status.MemSleepModes)
-	pm.log("  * Active X11 Console : tty%s", status.ActiveVT)
-	pm.log("  * Physical RAM       : %d MB", status.RAMTotalMB)
-	pm.log("  * Swap Allocated     : %d MB", status.SwapTotalMB)
+	pm.log("  * GPU Driver in use  : %s", status.GPUDriver)
+	if status.OS != "darwin" {
+		if status.HasKeplerPStateBug {
+			pm.log("  * Kepler P-State     : nouveau.pstate=1 detected (raw systemctl suspend causes VRAM PLL deadlock)")
+		} else {
+			pm.log("  * Kepler P-State     : Standard (no manual pstate override detected)")
+		}
+		pm.log("  * Memory Sleep Modes : %s", status.MemSleepModes)
+		pm.log("  * Active X11 Console : tty%s", status.ActiveVT)
+		pm.log("  * Physical RAM       : %d MB", status.RAMTotalMB)
+		pm.log("  * Swap Allocated     : %d MB", status.SwapTotalMB)
 
-	if status.CanHibernate {
-		pm.log("  * Hibernation Ready  : YES (Swap >= RAM)")
-	} else {
-		pm.log("  * Hibernation Ready  : NO (Swap %d MB < RAM %d MB)", status.SwapTotalMB, status.RAMTotalMB)
+		if status.CanHibernate {
+			pm.log("  * Hibernation Ready  : YES (Swap >= RAM)")
+		} else {
+			pm.log("  * Hibernation Ready  : NO (Swap %d MB < RAM %d MB)", status.SwapTotalMB, status.RAMTotalMB)
+		}
 	}
 
 	pm.log("")
@@ -264,38 +350,150 @@ func (pm *PowerManager) Execute(ctx context.Context, mode string) error {
 	case "lock", "screen", "blank":
 		return pm.LockScreen(ctx)
 
+	case "suspend", "sleep", "xfce":
+		return pm.Suspend(ctx)
+
 	case "s2idle", "idle":
+		if pm.targetOS() == "darwin" {
+			return pm.Suspend(ctx)
+		}
 		return pm.SuspendToIdle(ctx)
 
 	case "deep", "vt", "s3":
+		if pm.targetOS() == "darwin" {
+			return pm.Suspend(ctx)
+		}
 		return pm.DeepVTSuspend(ctx)
 
 	case "hibernate", "disk":
+		if pm.targetOS() == "darwin" {
+			return pm.Suspend(ctx)
+		}
 		return pm.Hibernate(ctx)
 
 	case "", "auto":
-		st, err := pm.DetectStatus(ctx)
-		if err != nil {
-			return err
-		}
-		if st.GPUDriver == "nouveau" && st.HasKeplerPStateBug {
-			pm.logWarn("Dell M6800 / Nouveau Kepler detected with 'nouveau.pstate=1'.")
-			pm.log("  Standard S3 sleep locks up video. Activating safe screen standby & lock...")
-			return pm.LockScreen(ctx)
-		}
-		return pm.LockScreen(ctx)
+		return pm.Suspend(ctx)
 
 	default:
-		return fmt.Errorf("unknown power mode: %q (supported: lock, s2idle, deep, hibernate, status)", mode)
+		return fmt.Errorf("unknown power mode: %q (supported: auto, suspend, lock, s2idle, deep, hibernate, status)", mode)
 	}
 }
 
-// LockScreen locks the graphical user session and cuts display power using DPMS.
+// Suspend performs the safest OS- and desktop-appropriate system suspend:
+//   - macOS: pmset sleepnow (with osascript fallback)
+//   - Linux (Xfce session): xfce4-session-logout --suspend (preserves Xfce power-manager/compositor hooks so GPU resume works)
+//   - Linux (Kepler/Nouveau with nouveau.pstate=1 outside Xfce): safe DPMS screen lock/standby to prevent GPU deadlock
+//   - Linux (other distros/DEs): systemctl suspend -> loginctl suspend -> zzz -> pm-suspend
+func (pm *PowerManager) Suspend(ctx context.Context) error {
+	if pm.targetOS() == "darwin" {
+		pm.log("Executing macOS Safe Sleep...")
+		pm.logStep("Flushing filesystem buffers to disk...")
+		if !pm.dryRun {
+			syncFilesystems()
+		}
+		pm.logStep("Invoking pmset sleepnow...")
+		if !pm.dryRun {
+			if _, err := pm.lookPath("pmset"); err == nil {
+				if err := pm.runCommand(ctx, "pmset", "sleepnow"); err == nil {
+					pm.logSuccess("macOS sleep triggered via pmset.")
+					return nil
+				}
+			}
+			if _, err := pm.lookPath("osascript"); err == nil {
+				if err := pm.runCommand(ctx, "osascript", "-e", `tell application "System Events" to sleep`); err == nil {
+					pm.logSuccess("macOS sleep triggered via System Events.")
+					return nil
+				}
+			}
+			return errors.New("macOS sleep failed (neither pmset nor osascript succeeded)")
+		}
+		pm.logSuccess("macOS sleep ready (pmset sleepnow).")
+		return nil
+	}
+
+	if pm.isXfceSuspendAvailable() {
+		pm.log("Executing Xfce Session-Managed Safe Suspend...")
+		pm.logStep("Flushing filesystem buffers to disk...")
+		if !pm.dryRun {
+			syncFilesystems()
+		}
+		pm.logStep("Invoking xfce4-session-logout --suspend (preserves Xfce GPU/session hooks)...")
+		if !pm.dryRun {
+			if err := pm.runCommand(ctx, "xfce4-session-logout", "--suspend"); err != nil {
+				return fmt.Errorf("xfce4-session-logout --suspend failed: %w", err)
+			}
+		}
+		pm.logSuccess("Xfce session suspend triggered safely.")
+		return nil
+	}
+
+	st, err := pm.DetectStatus(ctx)
+	if err != nil {
+		return err
+	}
+	if st.GPUDriver == "nouveau" && st.HasKeplerPStateBug {
+		pm.logWarn("Nouveau Kepler detected with 'nouveau.pstate=1' outside an Xfce session.")
+		pm.log("  Raw systemctl suspend can deadlock video output. Activating safe screen standby & lock...")
+		return pm.LockScreen(ctx)
+	}
+
+	pm.log("Executing Linux Safe Suspend...")
+	pm.logStep("Flushing filesystem buffers to disk...")
+	if !pm.dryRun {
+		syncFilesystems()
+	}
+	pm.logStep("Locking desktop session...")
+	if !pm.dryRun {
+		pm.lockDesktopSession(ctx)
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	candidates := [][]string{
+		{"systemctl", "--no-ask-password", "suspend"},
+		{"loginctl", "suspend"},
+		{"zzz"},
+		{"sudo", "-n", "pm-suspend"},
+	}
+	for _, c := range candidates {
+		if _, err := pm.lookPath(c[0]); err != nil {
+			continue
+		}
+		pm.logStep(fmt.Sprintf("Invoking %s...", strings.Join(c, " ")))
+		if pm.dryRun {
+			pm.logSuccess("Linux suspend ready.")
+			return nil
+		}
+		if err := pm.runCommand(ctx, c[0], c[1:]...); err == nil {
+			pm.logSuccess("System resumed from suspend.")
+			return nil
+		}
+	}
+
+	if pm.dryRun {
+		pm.logSuccess("Linux suspend ready (fallback to lock if no suspender is installed).")
+		return nil
+	}
+	pm.logWarn("No working Linux suspend command (systemctl/loginctl/zzz/pm-suspend) succeeded; falling back to screen lock.")
+	return pm.LockScreen(ctx)
+}
+
+// LockScreen locks the graphical user session and cuts display power (DPMS on Linux, displaysleepnow on macOS).
 func (pm *PowerManager) LockScreen(ctx context.Context) error {
 	pm.log("Entering Safe Screen Standby...")
 	pm.logStep("Flushing filesystem buffers to disk...")
 	if !pm.dryRun {
 		syncFilesystems()
+	}
+
+	if pm.targetOS() == "darwin" {
+		pm.logStep("Putting macOS display to sleep (pmset displaysleepnow)...")
+		if !pm.dryRun {
+			if _, err := pm.lookPath("pmset"); err == nil {
+				_ = pm.runCommand(ctx, "pmset", "displaysleepnow")
+			}
+		}
+		pm.logSuccess("macOS display placed in standby.")
+		return nil
 	}
 
 	pm.logStep("Locking desktop session...")
@@ -304,8 +502,8 @@ func (pm *PowerManager) LockScreen(ctx context.Context) error {
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	if os.Getenv("DISPLAY") != "" {
-		if _, err := exec.LookPath("xset"); err == nil {
+	if pm.getenv("DISPLAY") != "" {
+		if _, err := pm.lookPath("xset"); err == nil {
 			pm.logStep("Powering off display outputs (DPMS force off)...")
 			if !pm.dryRun {
 				_ = exec.CommandContext(ctx, "xset", "dpms", "force", "off").Run()
@@ -396,8 +594,8 @@ func (pm *PowerManager) DeepVTSuspend(ctx context.Context) error {
 	if !pm.dryRun {
 		_ = pm.runCommand(ctx, "sudo", "chvt", origVT)
 		time.Sleep(500 * time.Millisecond)
-		if os.Getenv("DISPLAY") != "" {
-			if _, err := exec.LookPath("xrandr"); err == nil {
+		if pm.getenv("DISPLAY") != "" {
+			if _, err := pm.lookPath("xrandr"); err == nil {
 				_ = pm.runCommand(ctx, "xrandr", "--auto")
 			}
 		}
@@ -459,7 +657,7 @@ func (pm *PowerManager) lockDesktopSession(ctx context.Context) {
 
 	for _, l := range lockers {
 		bin := l[0]
-		if _, err := exec.LookPath(bin); err == nil {
+		if _, err := pm.lookPath(bin); err == nil {
 			cmd := exec.CommandContext(ctx, bin, l[1:]...)
 			_ = cmd.Start()
 			return

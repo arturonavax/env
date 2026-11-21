@@ -31,10 +31,10 @@ func systemCommands(appCtx *AppContext) []*cobra.Command {
 
 func newSleepCmd(appCtx *AppContext) *cobra.Command {
 	return &cobra.Command{
-		Use:       "sleep [lock|s2idle|deep|hibernate|status]",
+		Use:       "sleep [auto|suspend|lock|s2idle|deep|hibernate|status]",
 		Aliases:   []string{"suspend", "safe-suspend"},
-		Short:     "Execute hardware-safe suspend, screen standby, or hibernation",
-		ValidArgs: []string{"lock", "s2idle", "deep", "hibernate", "status"},
+		Short:     "Execute hardware-safe suspend, screen standby, or hibernation (macOS & Linux)",
+		ValidArgs: []string{"auto", "suspend", "lock", "s2idle", "deep", "hibernate", "status"},
 		Args:      cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mode := ""
