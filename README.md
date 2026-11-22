@@ -45,6 +45,29 @@ anx sync
 
 The [upstream binaries](https://hledger.org/install.html#official-binaries) cover Linux x64, macOS x64 and ARM64, and Windows x64 (including ARM64 via x64 emulation). Check the installation with `hledger --version`, `hledger-ui --version`, and `hledger-web --version`.
 
+## Local installation smoke test
+
+This optional Docker test uses a Linux ANX binary and an image already stored
+locally. It verifies this repository, applies a self-contained profile twice,
+and checks that the second apply does not reinstall its package. It does not
+pull an image, use the network, modify the checkout, or enable CI.
+
+From the ANX checkout, build a binary for the image architecture:
+
+```sh
+CGO_ENABLED=0 GOOS=linux go build -o /tmp/anx-linux ./cmd/anx
+```
+
+Then run from this environment checkout, with a local image that has a POSIX shell:
+
+```sh
+sh tests/e2e/run.sh /tmp/anx-linux alpine:3.20
+```
+
+Set `ANX_E2E_PROFILE=developer` to also preview a profile from this repository.
+The test applies only the offline fixture profile, not the workstation profile.
+It runs as your UID/GID in the container and keeps writes in its temporary filesystem.
+
 ## Public Repository Policy
 
 This repository is public and must contain **zero private, sensitive, or personal data** (no credentials, API tokens, personal emails, private hostnames, or local machine paths).

@@ -1,0 +1,36 @@
+packages:
+  - id: anx-e2e-tool
+    name: ANX E2E Tool
+    category: test
+    description: Local package installation fixture
+    binary_name: anx-e2e-tool
+    strategies:
+      - type: script
+        when:
+          os: [linux]
+        script:
+          local_script: scripts/install.sh
+          interpreter: sh
+          creates: ~/.local/bin/anx-e2e-tool
+
+configurations:
+  - id: anx-e2e-config
+    name: ANX E2E Configuration
+    group: smoke
+    source: files/anx-e2e.conf
+    target: ~/.config/anx-e2e.conf
+    os: [linux]
+  - id: anx-e2e-alpine-config
+    name: ANX E2E Alpine Configuration
+    group: smoke
+    source: files/anx-e2e.conf
+    target: ~/.config/anx-e2e-alpine.conf
+    os: [linux]
+    distros: [alpine]
+
+profiles:
+  - name: container-smoke
+    description: Installs one local package and one configuration without a network
+    packages: [anx-e2e-tool]
+    configurations: [anx-e2e-config, anx-e2e-alpine-config]
+    max_parallel: 1
