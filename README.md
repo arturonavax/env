@@ -51,6 +51,12 @@ Orchestrated by the unified Go CLI/TUI platform **ANX** (`anx`) and powered by a
 
 ## 2. Quick Start & Installation
 
+### Optional: hledger
+
+`anx install hledger` installs `hledger`, `hledger-ui`, and `hledger-web` into the ANX user bin directory using [Eget](https://github.com/zyedidia/eget). ANX uses Homebrew on macOS, Chocolatey on Windows, and Homebrew or the SHA-256-checked Eget bootstrap on Linux.
+
+The [upstream binaries](https://hledger.org/install.html#official-binaries) cover Linux x64, macOS x64 and ARM64, and Windows x64 (including ARM64 via x64 emulation). Check the installation with `hledger --version`, `hledger-ui --version`, and `hledger-web --version`.
+
 ### One-Line Remote Installation
 
 Bootstrap directly from `sh.arturonavax.dev`:
