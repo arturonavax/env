@@ -193,3 +193,60 @@ packages:
         language_pkg:
           manager: go
           package: "github.com/antonmedv/fx@latest"
+
+  - id: eget
+    name: Eget
+    category: cli-tools
+    description: Installer for prebuilt GitHub release binaries
+    binary_name: eget
+    os: [linux, darwin, windows]
+    strategies:
+      - type: native
+        when:
+          os: [linux, darwin, windows]
+        packages:
+          brew: [eget]
+          choco: [eget]
+      - type: script
+        when:
+          os: [linux]
+        depends_on: [curl, tar]
+        script:
+          local_script: scripts/install_eget.sh
+          interpreter: bash
+          args: ["{{.LocalBin}}"]
+
+  - id: hledger
+    name: hledger
+    category: cli-tools
+    description: Plain-text accounting suite (hledger, hledger-ui, and hledger-web)
+    binary_name: hledger
+    os: [linux, darwin, windows]
+    strategies:
+      - type: script
+        when:
+          os: [linux]
+          arch: [amd64]
+        depends_on: [eget]
+        script:
+          local_script: scripts/install_hledger.sh
+          interpreter: bash
+          args: ["{{.LocalBin}}"]
+      - type: script
+        when:
+          os: [darwin]
+          arch: [amd64, arm64]
+        depends_on: [eget]
+        script:
+          local_script: scripts/install_hledger.sh
+          interpreter: bash
+          args: ["{{.LocalBin}}"]
+      - type: script
+        when:
+          os: [windows]
+          arch: [amd64, arm64]
+        depends_on: [eget]
+        script:
+          local_script: scripts/install_hledger.ps1
+          interpreter: powershell
+          args: ["{{.LocalBin}}"]
