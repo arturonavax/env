@@ -10,6 +10,8 @@ __pycache__/
 .atl/
 .cloudflare/
 .wrangler/
+# Cloudflare Worker files belong to the standalone ANX repository.
+/deploy/cloudflare/
 .agents/
 .claude/
 bin/
