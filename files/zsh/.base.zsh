@@ -667,7 +667,7 @@ function flushdns() {
 }
 
 # Get Public IP
-alias publicip='curl --silent ipinfo.io/ip'
+alias publicip='curl --proto "=https" --tlsv1.2 --silent https://ipinfo.io/ip'
 
 # Get Public IP Geolocation
 function geoip() {
@@ -676,20 +676,25 @@ function geoip() {
     local fgcolor_blue_bold='\033[1;34m'
     local fgcolor_green_bold='\033[1;32m'
 
-    local formatter="cat"
-    if (( $+commands[jq] )); then
-        formatter="jq ."
-    elif (( $+commands[json_pp] )); then
-        formatter="json_pp"
-    fi
+    _geoip_format() {
+        if (( $+commands[jq] )); then
+            jq .
+        elif (( $+commands[json_pp] )); then
+            json_pp
+        else
+            cat
+        fi
+    }
 
     if [[ "$#" == 0 ]]; then
         echo "${fgcolor_white_bold}My GeoIP:${fgcolor_reset}"
-        curl --silent ipinfo.io/"$(curl --silent ipinfo.io/ip)" | eval "$formatter"
+        local my_ip
+        my_ip="$(curl --proto '=https' --tlsv1.2 --silent https://ipinfo.io/ip)"
+        curl --proto '=https' --tlsv1.2 --silent "https://ipinfo.io/${my_ip}" | _geoip_format
     else
         for arg in "$@"; do
             echo "${fgcolor_white_bold}GeoIP ${fgcolor_green_bold}$arg$fgcolor_white_bold:${fgcolor_reset}"
-            curl --silent "ipinfo.io/$arg" | eval "$formatter"
+            curl --proto '=https' --tlsv1.2 --silent "https://ipinfo.io/${arg}" | _geoip_format
             echo "${fgcolor_blue_bold}---${fgcolor_reset}"
         done
     fi

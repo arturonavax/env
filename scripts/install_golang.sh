@@ -142,6 +142,34 @@ esac
 archive_filename="${latest_version}.${target_os}-${target_arch}.tar.gz"
 archive_url="${DL_URL}${archive_filename}"
 
+verify_go_sha256() {
+	local archive_path="$1"
+	local sha_url="${archive_url}.sha256"
+	local expected_sum=""
+	if command -v curl >/dev/null 2>&1; then
+		expected_sum="$(curl --proto '=https' --tlsv1.2 -fsSL "$sha_url" | tr -d '[:space:]')"
+	else
+		expected_sum="$(wget -qO- "$sha_url" | tr -d '[:space:]')"
+	fi
+	if [[ ! "$expected_sum" =~ ^[0-9a-fA-F]{64}$ ]]; then
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}❌ Invalid SHA-256 digest fetched from ${sha_url}.${fcr}" >&2
+		return 1
+	fi
+	local actual_sum=""
+	if command -v sha256sum >/dev/null 2>&1; then
+		actual_sum="$(sha256sum "$archive_path" | awk '{print $1}')"
+	elif command -v shasum >/dev/null 2>&1; then
+		actual_sum="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
+	else
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}❌ Neither sha256sum nor shasum is available to verify Go archive.${fcr}" >&2
+		return 1
+	fi
+	if [[ "${actual_sum,,}" != "${expected_sum,,}" ]]; then
+		echo -e "${fcwb}[Golang Installer]: ${fcrb}❌ SHA-256 mismatch for ${archive_filename} (expected ${expected_sum}, got ${actual_sum}).${fcr}" >&2
+		return 1
+	fi
+}
+
 # Helper for binary release installation
 install_binary_release() {
 	echo -e "${fcwb}[Golang Installer]: ${fccb}⚡ Downloading ${archive_filename}...${fcr}"
@@ -154,6 +182,7 @@ install_binary_release() {
 	else
 		wget -q "$archive_url" -O "$tmp_archive"
 	fi
+	verify_go_sha256 "$tmp_archive" || { rm -rf "$tmp_dir"; return 1; }
 
 	echo -e "${fcwb}[Golang Installer]: Extracting into ${INSTALLATION_DIR}/go...${fcr}"
 	if [[ -w "${INSTALLATION_DIR}" || "${EUID:-$(id -u)}" -eq 0 ]]; then
@@ -185,6 +214,7 @@ install_from_source() {
 		else
 			wget -q "$archive_url" -O "$b_archive"
 		fi
+		verify_go_sha256 "$b_archive" || { rm -rf "$b_tmp"; return 1; }
 		sudo mkdir -p "$BOOTSTRAP_DIR"
 		sudo tar -C "$BOOTSTRAP_DIR" -xzf "$b_archive"
 		rm -rf "$b_tmp"

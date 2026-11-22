@@ -103,28 +103,69 @@ function isMatch(win, pattern, mode) {
     return candidates.some(cand => cand.toLowerCase().includes(patLower));
 }
 
+function loadAllowedCommands() {
+    const allowed = new Set();
+    const home = GLib.get_home_dir();
+    const xdgConfig = GLib.getenv('XDG_CONFIG_HOME') || `${home}/.config`;
+    const candidates = [
+        `${xdgConfig}/rcmd/rcmd.conf`,
+        `${home}/.config/rcmd.conf`,
+    ];
+    for (const path of candidates) {
+        try {
+            const [ok, bytes] = GLib.file_get_contents(path);
+            if (!ok) continue;
+            const text = new TextDecoder().decode(bytes);
+            for (const rawLine of text.split(/\r?\n/)) {
+                const line = rawLine.trim();
+                if (!line || line.startsWith('#')) continue;
+                const parts = line.split('|');
+                if (parts.length >= 2) {
+                    const cmd = parts[1].trim();
+                    if (cmd) allowed.add(cmd);
+                }
+            }
+            break;
+        } catch (_) {}
+    }
+    return allowed;
+}
+
 function launchApp(command) {
-    if (!command) return;
+    const trimmed = (command || '').trim();
+    if (!trimmed) return;
     try {
         const appSys = Shell.AppSystem.get_default();
-        const firstWord = command.trim().split(/\s+/)[0];
-        const app = appSys.lookup_app(command) ||
-                    appSys.lookup_app(`${command}.desktop`) ||
+        const firstWord = trimmed.split(/\s+/)[0];
+        const app = appSys.lookup_app(trimmed) ||
+                    appSys.lookup_app(`${trimmed}.desktop`) ||
                     appSys.lookup_app(firstWord) ||
                     appSys.lookup_app(`${firstWord}.desktop`) ||
                     appSys.lookup_app(`com.mitchellh.${firstWord}.desktop`) ||
                     appSys.lookup_app(`org.gnome.${firstWord}.desktop`);
-        if (app && (command.trim() === firstWord)) {
+        if (app && (trimmed === firstWord)) {
             app.activate();
             return;
         }
     } catch (_) {}
 
+    // Security boundary: never pass arbitrary D-Bus strings to bash -c.
+    // Only launch commands explicitly allowlisted in the user's rcmd.conf without a shell.
+    const allowed = loadAllowedCommands();
+    if (!allowed.has(trimmed)) {
+        console.warn(`[rcmd-shell] Refused to launch unconfigured command over D-Bus: "${trimmed}"`);
+        return;
+    }
+
     try {
-        // Run via bash -c to ensure user PATH (~/.local/bin) and argument parsing work
-        Gio.Subprocess.new(['/usr/bin/env', 'bash', '-c', command], Gio.SubprocessFlags.NONE);
+        const [parsed, argv] = GLib.shell_parse_argv(trimmed);
+        if (!parsed || !argv || argv.length === 0) {
+            console.error(`[rcmd-shell] Failed to parse allowlisted command "${trimmed}"`);
+            return;
+        }
+        Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
     } catch (e) {
-        console.error(`[rcmd-shell] Failed to launch command "${command}": ${e.message}`);
+        console.error(`[rcmd-shell] Failed to launch command "${trimmed}": ${e.message}`);
     }
 }
 

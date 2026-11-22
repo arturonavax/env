@@ -66,7 +66,8 @@ fi
 
 # 5. Caso B: Imágenes en RAM (Screenshots o navegador)
 if [[ "$TARGETS" == *"image/png"* ]] || [[ "$TARGETS" == *"image/jpeg"* ]] || [[ "$TARGETS" == *"image/bmp"* ]] || [[ "$TARGETS" == *"image/webp"* ]]; then
-    TEMP_IMG="/tmp/Screenshot_$(date +%Y%m%d_%H%M%S).png"
+    TEMP_IMG="$(umask 077 && mktemp --tmpdir="${XDG_RUNTIME_DIR:-/tmp}" Screenshot_XXXXXX.png)"
+    chmod 0600 "$TEMP_IMG"
     if xclip -selection clipboard -target image/png -out >"$TEMP_IMG" 2>/dev/null && [ -s "$TEMP_IMG" ]; then
         if ERR_MSG=$(kdeconnect-cli --device "$DEVICE_ID" --share "$TEMP_IMG" 2>&1); then
             notify_warn "Imagen en cola de envío a $DEV_NAME."
